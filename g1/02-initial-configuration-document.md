@@ -232,7 +232,7 @@ Whether the course's Vertex AI project is available to this student has not been
 | Wire protocol | 1 |
 | Proxy package | 0.1.0 |
 
-A local Git repository was initialized in `fathom/` on 2026-11-12, branch `main`. It has no commit or remote yet, so versions are not tied to commits and no repository URL is ready for submission.
+The implementation workspace has its own local Git repository on `main`, without an implementation commit or remote. On November 14, the student authorized publishing the G1 documents. They are now available in a separate public documentation repository: https://github.com/DemonRain7/before-the-cut-g1. This does not deploy the game or publish the implementation source.
 
 ## A18. Executable artifacts, test commands, CI
 
@@ -266,7 +266,7 @@ godot --headless --path game --script res://tests/run_ui_smoke.gd
 
 Results on 2026-11-12: the proxy suite passes 28 tests. The two Godot suites pass 269 and 141 assertions. The earlier lint was a rough static check, not an engine run. Additional command: `node tools/run_proxy_integration.mjs PATH_TO_GODOT_CONSOLE_EXE validation/latest` runs 73 real-client integration checks using mock providers.
 
-CI workflow path: none. The local repository has no remote. Planned: `.github/workflows/checks.yml` running the first two commands on every push.
+CI workflow path: none. The G1 documentation repository is public; runtime code and its CI remain in the separate development workspace. Planned: `.github/workflows/checks.yml` running the first two commands when the implementation repository is established.
 
 ---
 
@@ -274,7 +274,7 @@ CI workflow path: none. The local repository has no remote. Planned: `.github/wo
 
 ## B1. Who decides
 
-The student is Executive Producer and Creative Director: sets the concept, approves scope and content, runs and judges the game, records and submits. The instructor is the Gate Approver. Agents propose, write and check. No agent posts to the course site, spends money, publishes, or makes a gate decision.
+The student is Executive Producer and Creative Director: sets the concept, approves scope and content, runs and judges the game, records and submits. The instructor is the Gate Approver. Agents propose, write and check. The student controls course submission, spending and gate decisions. Agents may publish repository materials under explicit student authorization; the student requested G1 document publication on November 14. No CourseWorks post was made.
 
 ## B2. What has actually happened so far
 
@@ -297,7 +297,7 @@ So today there is one working production role, the implementation agent, used by
 | **Art Lead** | Planned: `agent_team/art-brief.md`. Today: placeholder figures drawn by `game/scripts/ui/patient_view.gd` | Readable look spots first, pixel art later | The GDD's feedback section, the UI code | Would write under `game/assets`. Third-party assets only with recorded license terms | Sprites and a license log | Tech Lead | A new player can describe the visible response and find the matching guide entry | Student approves the look | Unresolved |
 | **Audio** | Planned: a list of at most six sounds | A sound for the warning and the shutter | The GDD | Same as Art Lead | Sound files with license terms | Tech Lead | The warning is noticed without reading | Student approves | Unresolved. First to be cut |
 | **Business Intelligence** | `game/scripts/core/event_log.gd`. Planned: a log summary script | Turn play logs into the few numbers the playtest question needs | Session logs | Read logs, write summaries. No identities | A per-session table | Student | Numbers match a hand count on one session | Student writes the interpretation | Log writer verified in local tests. BI summary tool unresolved |
-| **Publishing and Release** | `game/README.md`, `README.md`. Planned: an export checklist | Make the build reachable and runnable by a playtester | The READMEs, course publishing guidance | Local export only. Deployment or any public post needs the student's explicit go-ahead | A Windows build, run instructions, a submission checklist | Student | Someone who has not seen the project runs it from the README | Student records, uploads and posts everything personally | Run instructions implemented (not yet followed by a person) |
+| **Publishing and Release** | `game/README.md`, `README.md`. Planned: an export checklist | Make the build reachable and runnable by a playtester | The READMEs, course publishing guidance | Local export only. Deployment or any public post needs the student's explicit go-ahead | A Windows build, run instructions, a submission checklist | Student | Someone who has not seen the project runs it from the README | Student records and approves submissions; agents may publish repository files when authorized | Run instructions implemented (not yet followed by a person) |
 
 ## B4. The executable artifacts
 
@@ -326,7 +326,7 @@ Steps 2 and 4 have not been exercised yet.
 
 ## B6. Gaps
 
-- Local repository only, with no commits, remote or CI. Checks are launched locally.
+- G1 documents are published in a separate public repository. The implementation workspace has no remote or CI; game checks are launched locally.
 - The reviewer has never run, so its usefulness is unknown.
 - Art, audio, log analysis and release have no executable artifact yet.
 - One student is the only human check. There is no second person to catch what the student and the agents both miss. External playtesters are the planned counterweight.

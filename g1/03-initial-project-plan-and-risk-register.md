@@ -4,14 +4,14 @@ AI use: Claude drafted the initial plan. Codex updated the implementation status
 
 Version 0.6, G1 Concept, 2026-11-14. Schedule updated from the corrected announcement supplied by the student. One student, directing coding agents as Executive Producer and Creative Director. The G1 assignment permits this repository document as the Initial Project Plan. It moves into Asana after G1, with owners, acceptance criteria, dependencies and the full Risk Register developed at G2/G3. Asana is not set up yet.
 
-## 1. Where the project stands on 2026-11-13
+## 1. Where the project stands on 2026-11-14
 
 | | |
 |---|---|
 | **Decided by the student** | Normal reference sheet; optional appearance comparison, actions and dialogue, including verbal pressure; no fixed order; clinic concept, fixed counter, Godot 4 / 2D and English. Specific signs, cases and balance numbers remain proposals |
 | **Running locally** | Earlier scan/re-check build in Godot 4.7.2: one counter, three patients, result cards, shift report and restart. Rule suite: 269 assertions pass. Main-scene suite: 141 pass. Ten rendered states captured |
 | **Run and passing** | Proxy: 28 tests. Real Godot HTTP integration: 73 checks, including a 10-request mock shift and both timeout paths |
-| **Not done** | Revised guide, visible action responses and case/rule migration. Live model calls, deployment, any human playtest, standalone export, final art and sound. Local Git exists, but has no commits or remote. The student's recording and publication are pending |
+| **Not done** | Revised guide, visible action responses and case/rule migration. Live model calls, deployment, any human playtest, standalone export, final art and sound. The implementation workspace has no commits or remote; G1 documents are published separately. The student's recording and CourseWorks submission are pending |
 
 The hour estimates below are the assistant's guesses. The student's available hours per week are not known, and the student has not used Godot before. Treat every estimate as unverified.
 
@@ -38,7 +38,7 @@ For current G1 feedback, choose two classmates' pitches in the G1 discussion, st
 | 1.1 | **Complete, Nov 12:** install portable Godot 4.7.2 and run the project | Tech Lead, within the authorized continuation | None | Actual automated work completed | Main scene renders. Suites pass 269 and 141 assertions | `07-verification-record.md`, validation logs and actual captures |
 | 1.2 | Review the optional-check proposal and labeled layout/reference images; optionally play the earlier build for comparison | Student, as Creative Director | 1.1 | 1 to 2 h | Identify the desired observation, interaction, response and decision. Old universal re-check and automatic verdict colors are not assumed approved | Dated notes in `HANDOFF.md`. This is a self-test, not a playtest with an outside player |
 | 1.3 | Review the completed English G1 documents, nine-slide deck and script | Student | Materials prepared Nov 12 | 2 to 3 h | Disclosures match actual contributions. The student's observation-guide concept is represented; examples and open choices are labeled. Recording stays within 3-5 minutes | Reviewed files and actual rehearsal time |
-| 1.4 | Publish the prepared local repository and make GDD / Configuration reachable | Student owns account and visibility; Producer prepares files | Local `main` repository exists, without commits or remote | 1 h | Links open for the instructor. Credentials and personal screenshots stay excluded | Actual URLs in the post draft |
+| 1.4 | **Complete, Nov 14:** publish the G1 documentation repository | Student authorized; Producer prepared and published | Reviewed publication file list; authenticated GitHub account | Completed | Required documents open without signing in; private workspace files stay excluded | https://github.com/DemonRain7/before-the-cut-g1; all three required raw documents returned HTTP 200 without authentication |
 | 1.5 | Rehearse and record the 3 to 5 minute pitch | **Student only** | 1.3 | 1 to 2 h | Recording length between 3:00 and 5:00 | Measured length written into the script file |
 | 1.6 | Publish the G1 main post | **Student only** | 1.4, 1.5 | 0.5 h | Post visible, every link works | The post |
 | 1.7 | Two Braintrust replies on self-selected G1 posts, starting with posts with fewer than two replies | Student reviews and authorizes; assistant may draft from observed recordings | Main post makes classmates' posts visible, or accessible recordings supplied | 1 h | Posted by Thu 19 Nov 23:59 New York, each naming a specific moment and reporting what was understood or experienced before proposing a cause; student reviews drafts before sending | The approved replies |
