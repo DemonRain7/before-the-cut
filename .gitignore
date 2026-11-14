@@ -1,0 +1,9 @@
+.claude/
+.env
+.env.*
+!.env.example
+**/.dev.vars
+**/node_modules/
+**/__pycache__/
+**/.godot/
+~$*
