@@ -9,7 +9,7 @@ Updated 2026-11-13 for the student's observation-guide direction. The separate a
 
 ## Design authority
 
-Read `AGENTS.md`, `HANDOFF.md` and `g1/01-initial-gdd.md` first. The core is comparison with a sheet of normal appearance, states and responses. Observation, actions and dialogue (including verbal pressure) are optional, unordered choices. A player can skip any method and decide; no checklist-completion gate is allowed. The older universal re-check rule is superseded.
+Read `AGENTS.md`, `HANDOFF.md` and `docs/g1/01-initial-gdd.md` first. The core is comparison with a sheet of normal appearance, states and responses. Observation, actions and dialogue (including verbal pressure) are optional, unordered choices. A player can skip any method and decide; no checklist-completion gate is allowed. The older universal re-check rule is superseded.
 
 The executable still uses the earlier case schema and scan/re-check rule. Do not rename a scan and claim the new interaction is implemented. Before writing a new runtime case, inspect `case_db.gd`, `visit_state.gd` and the current rules to see whether the guide/response migration exists.
 

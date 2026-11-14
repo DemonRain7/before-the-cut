@@ -7,3 +7,16 @@
 **/__pycache__/
 **/.godot/
 ~$*
+
+# Local build products and evidence, not source assets.
+*.import
+**/.wrangler/
+*.log
+artifacts/
+validation/
+exports/
+builds/
+history/
+tools/art/out/
+.DS_Store
+Thumbs.db

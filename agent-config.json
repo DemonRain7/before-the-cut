@@ -2,8 +2,8 @@
   "ai_use": "Claude authored the initial implementation and manifest. Codex verified local execution and updated status on 2026-11-12.",
   "schema_version": "course-1",
   "project": "Before the Cut",
-  "config_version": "0.5.0",
-  "updated": "2026-11-13",
+  "config_version": "0.6.0",
+  "updated": "2026-11-14",
   "status": "Initial (G1). Written by an AI assistant from the student's concept; 'planned' and 'not run' are marked on every item they apply to.",
   "purpose": "Play one patient at the clinic counter: pick one legal move (comply, stall, deflect, or explain with a prepared reason) and say one short line. The patient's choices change which check the player wants to run next.",
   "tools_available": [],
@@ -97,23 +97,23 @@
   },
   "fallback": "Verified locally with the real Godot HTTP client and mock servers. Proxy deadline: scripted fallback at 2,068 ms. Client deadline: fallback at 2,504 ms. Invalid move: fallback at 54 ms. No live provider was contacted.",
   "limitations": [
-    "The observation guide and action-response screening flow are not yet implemented; older tests do not verify the revised design.",
+    "The revised observation/action design is being implemented in the active legacy workspace. Completion is unverified; older tests do not verify it.",
     "No live model call has been made. Live latency, provider tokens, cost and line quality are unmeasured.",
     "Mock and GDScript moves agree on the tested 10-turn evidence path, not exhaustively.",
     "Nothing is deployed. The Worker entry has only been called in Node.",
     "Proxy call caps are per process. Deployment needs shared limits and authentication.",
     "No human playtest or standalone Windows export has occurred.",
-    "The local Git repository has no commits or remote. Course submission and recording remain pending."
+    "The ongoing public repository contains the G1 documents and structure. Runtime source transfer waits for the active writer to stop. Course submission and recording remain pending."
   ],
   "agent_team": [
     {
       "role": "Producer",
-      "native_artifact": "HANDOFF.md, NEXT_AGENT_PROMPT.md, g1/03-initial-project-plan-and-risk-register.md",
+      "native_artifact": "HANDOFF.md, NEXT_AGENT_PROMPT.md, docs/g1/03-initial-project-plan-and-risk-register.md",
       "status": "Handoff files created by Codex on 2026-11-12. Fresh-agent usability not yet tested.",
       "purpose": "Keep scope, dates, risks and the next three tasks current so any coding agent can continue.",
       "context": [
         "HANDOFF.md",
-        "g1/",
+        "docs/g1/",
         "course dates recorded in HANDOFF.md"
       ],
       "tools_and_permissions": "Repository read and write. No posting to CourseWorks, no gate decision.",
@@ -130,7 +130,7 @@
       "context": [
         "game/data/rules.json",
         "game/data/cases/",
-        "g1/01-initial-gdd.md",
+        "docs/g1/01-initial-gdd.md",
         "AGENTS.md"
       ],
       "tools_and_permissions": "Runs inside the implementation agent with its permissions. Edits only game/data/cases and the tests that list expected results.",
@@ -155,7 +155,7 @@
       "outputs": "Code, tests, real test output and an updated handoff.",
       "handoff": "Diff and test output to the rules reviewer and the student.",
       "evaluation": "The four test commands above.",
-      "human_approval": "The student runs the game, accepts or rejects the change, and commits."
+      "human_approval": "The student judges and accepts design changes. Repository commits and publication may proceed under applicable user authorization."
     },
     {
       "role": "QA: independent rules reviewer",
@@ -176,14 +176,14 @@
     },
     {
       "role": "Art Lead",
-      "native_artifact": "Planned: agent_team/art-brief.md. Today: placeholder figures drawn in code by game/scripts/ui/patient_view.gd.",
-      "status": "planned",
+      "native_artifact": "Legacy workspace: tools/art/ and game/assets/. Not yet transferred to this checkout.",
+      "status": "In progress in the legacy workspace. Procedural pixel-art assets and generator scripts were observed; review and source transfer are pending.",
       "purpose": "Keep the three look spots readable first; move to pixel art only after the loop works.",
       "context": [
-        "g1/01-initial-gdd.md section on feedback",
+        "docs/g1/01-initial-gdd.md section on feedback",
         "game/scripts/ui/"
       ],
-      "tools_and_permissions": "Repository read and write under game/assets (not created yet). Third-party assets only with recorded license terms.",
+      "tools_and_permissions": "Repository reads and writes under game/assets after source transfer. Third-party assets require recorded permissions.",
       "outputs": "A small sprite sheet per patient and a license log.",
       "handoff": "Assets to the implementation agent.",
       "evaluation": "A first-time player finds all three look spots without help (human playtest, planned).",
@@ -195,7 +195,7 @@
       "status": "planned, first to be cut",
       "purpose": "Give the attack warning and the shutter a sound.",
       "context": [
-        "g1/01-initial-gdd.md"
+        "docs/g1/01-initial-gdd.md"
       ],
       "tools_and_permissions": "Same as Art Lead.",
       "outputs": "Sound files with license terms.",
@@ -210,7 +210,7 @@
       "purpose": "Turn play logs into the few numbers the playtest question needs.",
       "context": [
         "session JSONL logs",
-        "g1/02-initial-configuration-document.md"
+        "docs/g1/02-initial-configuration-document.md"
       ],
       "tools_and_permissions": "Read logs, write summaries. No player identity is recorded.",
       "outputs": "Per-session table: verdicts, checks used, script or model or fallback counts, latency.",
@@ -263,17 +263,21 @@
     "runner_constraint": "The headless tests hold the VisitState object and could read its truth; they are written not to. GDScript cannot enforce this."
   },
   "design_target": {
-    "authority": "Student clarification on 2026-11-13; g1/01-initial-gdd.md v0.5",
+    "authority": "Student clarification on 2026-11-13; docs/g1/01-initial-gdd.md v0.5",
     "loop": "Choose optional appearance comparison, action/tool check or dialogue (including verbal pressure); compare with normal reference; choose again or decide. No fixed order or mandatory method.",
     "agent_role": "Respond within case-legal cooperation and conversational moves to the selected action or tone. Never invent diagnostic evidence.",
     "agent_hypothesis": "Test coherent responses to combinations beyond explicitly authored branches against a stateful script with the same facts, history, legal moves and limits. Useful gain must affect the next check and the player's explanation; scripts can also be reactive.",
     "motivations": {
-      "primary": ["Fantasy", "Discovery"],
-      "secondary": ["Sensation"],
-      "potential_secondary": "Chance through optional shuffled arrivals after the initial slice; case facts stay fixed."
+      "primary": [
+        "Fantasy",
+        "Discovery"
+      ],
+      "secondary": [
+        "Sensation"
+      ]
     },
     "world_owns": "Guide, fixed case assessment, visible action response, recorded evidence, verdict consequences and attack timing.",
-    "implementation_status": "Planned. Existing tests, tool ids and prompt measurements below describe the earlier scan/re-check executable.",
+    "implementation_status": "In progress in the legacy workspace; source transfer and current verification are pending. Historical tests, tool IDs and prompt measurements describe the earlier scan/re-check executable.",
     "superseded_core_rule": "Every sign must survive a re-check. Repetition may be optional in particular cases, not universal.",
     "open": [
       "exact visible patterns",
@@ -285,5 +289,11 @@
     "reference_sheet": "Expected normal appearance, states and responses; separate from observed patient evidence.",
     "dialogue_status": "Planned: authored question/tone choices, bounded request events and validation of any conversational warning patterns. Ordinary irritation is not automatically evidence.",
     "verdict_access": "The player may skip any method and decide with incomplete information; fixed case consequences still apply."
+  },
+  "repository": {
+    "url": "https://github.com/DemonRain7/before-the-cut",
+    "documents": "docs/g1/",
+    "source_transfer": "Pending. Claude/Fable is still writing in the legacy fathom workspace. See docs/development/repository-transition.md.",
+    "evidence_scope": "Runtime fields and test figures describe the earlier prototype unless separately dated. New implementation work requires fresh verification."
   }
 }
