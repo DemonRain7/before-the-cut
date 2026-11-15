@@ -1,14 +1,14 @@
-**Current student decision, November 14: autonomous patient dialogue.** The AI uses the patient's background, personality, motives and conversation history to decide what to say and how to react. It generates original responses; it is not restricted to a legal-move list, authored answer bank or fixed dialogue tree. Technical format, length and timeout checks do not select its answer. The earlier enum-constrained protocol is legacy implementation, not the current design.
+**Current student decision, November 14: autonomous patient dialogue.** The AI uses the patient's background, personality, motives and conversation history to decide what to say and how to react. It generates original responses; it is not restricted to a legal-move list, authored answer bank or fixed dialogue tree. Technical format, length and timeout checks do not select its answer. The earlier enum-constrained protocol is superseded; protocol 3 is now implemented locally and verified with mocks only.
 
 AI use: Claude drafted the earlier prototype. Codex revised this G1 document to follow the student's November 13 correction. The student chose observation-guide comparison and action-based screening; examples and numbers remain proposals.
 
 # Before the Cut: Initial Game Design Document
 
-Version 0.6, G1 Concept, 2026-11-14.
+Version 0.7, G1 Concept, 2026-11-14.
 
-**Repository update, November 14:** this is now the ongoing `before-the-cut` repository. G1 documents are in `docs/g1/`. Claude/Fable is still implementing the revised game in the legacy workspace; new case data and pixel-art work have been observed, but completion is not verified. Source transfer waits until that writer stops. Technical results below are dated evidence for the earlier prototype, not tests of the current work. See the [transition record](../development/repository-transition.md).
+**Repository status, November 14:** this public repository contains the required G1 documents and shared production-agent briefs. The active development workspace has a newer five-patient Godot prototype and protocol-3 dialogue integration. Runtime source transfer is still pending; this submission does not claim the repository already contains a runnable build. G1 proposes a three-patient evaluation slice, not a commitment to add more content.
 
-**Student decision, November 14:** replace the referral choice with **Call Trauma Team**. The player calls an emergency response unit to take over the patient situation. The exact handling, cost and consequences remain authored design choices; the call does not change case truth or give the model control over attacks. For the first slice, a short dispatch response and fixed encounter outcome are sufficient. A new combat or squad-control system is not required. Current screenshots and runtime data still use the earlier REFER label; implementation is pending while the active writer continues.
+**Student decision, November 14:** replace the referral choice with **Call Trauma Team**. The player calls an emergency response unit to take over the patient situation. The exact handling, cost and consequences remain authored design choices; the call does not change case truth or give the model control over attacks. For the first slice, a short dispatch response and fixed encounter outcome are sufficient. A new combat or squad-control system is not required. Current screenshots and runtime data still use the earlier REFER label; the terminology/outcome update remains pending in the runtime.
 
 ## 0. Design authority and implementation status
 
@@ -18,7 +18,7 @@ Version 0.6, G1 Concept, 2026-11-14.
 
 This replaces both a universal re-check rule and any implied inspect-then-action sequence. A repeat check may be available, but it is optional. Conversation is an alternative evidence-gathering method, including optional verbal pressure; no player must use it.
 
-**Build status:** the earlier three-patient prototype runs locally. Its scan/re-check rules, automatic red/green verdict hints, strain and scoring have not been migrated to this design. Existing tests and screenshots demonstrate that earlier build only. The revised observation guide, visible action responses and revised case logic are **planned**. See section 19 and the project plan. The earlier detailed specification is retained in a private local archive in the legacy workspace.
+**Current local verification, November 14:** the revised reference-sheet game runs with optional observation, tools, questions, pressure and reassurance. Autonomous dialogue transport is implemented and tested using local synthetic responses: 260 game/agent assertions, 246 UI-flow assertions, 18 proxy tests and 49 real Godot HTTP/scene integration checks passed. No live model, outside playtest, deployment or standalone export has been validated. These are program checks, not evidence of fun or model quality.
 
 Labels used below:
 
@@ -124,7 +124,7 @@ A visit-level interaction budget is a candidate if players otherwise run everyth
 
 ## 6. A short example for the G1 pitch
 
-**[Proposed, not implemented; one possible route, not required steps]**
+**[Proposed example; one possible route, not required steps. Tool interactions exist locally; the Trauma Team outcome wording remains to be integrated.]**
 
 | Moment | Player action | Game response | Interpretation and next action |
 |---|---|---|---|
@@ -145,7 +145,7 @@ This illustrates one choice of action, response, interpretation and next action.
 
 The older prototype names Kip, Rook and Vale may be reused, but their old scan tables are not automatically the new design. Do not treat the exact characters or these three roles as student-approved content.
 
-Each case needs only a brief arrival, visible details, a few authored responses, a fixed assessment, character motives and conversational context and concise outcome feedback. Avoid long branching scripts. A production agent can propose cases from this structure; a reviewer checks that the guide supports the decision before the student accepts the content.
+Each case needs only a brief arrival, visible details, offline comparison dialogue, a fixed assessment, character motives and conversational context and concise outcome feedback. Avoid long branching scripts. A production agent can propose cases from this structure; a reviewer checks that the guide supports the decision before the student accepts the content.
 
 ## 8. Evidence and outcomes
 
@@ -162,7 +162,7 @@ Exact rules for enough evidence, uncertainty and partial credit remain **[Open]*
 
 G1 needs understandable stakes, not final balance numbers. **[Proposed]** The shift report can summarize correct surgery/call-in decisions, unsupported decisions and harm prevented or suffered. Rewards should make careful screening useful without making "operate on everyone" or "call Trauma Team for everyone" the obvious best strategy.
 
-The existing prototype's 300-credit fees, 400 rent and 700 clean-shift target describe its old rules only. Revised scoring and whether credits are needed at all remain **[Open]**. No economy, upgrades or surgery simulation is added.
+The current development build has case-specific fees and a 600-credit rent target. Those balance numbers are implementation proposals, not fixed G1 requirements. Revised scoring and whether credits are needed at all remain **[Open]**. No economy, upgrades or surgery simulation is added.
 
 ## 10. Fairness and shortcuts
 
@@ -211,7 +211,7 @@ Keep the guide beside the patient. Record observations in plain language. A refu
 
 **Included target:** one counter, one normal reference sheet, simple optional appearance/action/dialogue methods (including verbal pressure), three fixed patients, surgery/call-in decisions, one defensive action, feedback and restart. Generated dialogue and the scripted comparison use the same patient backgrounds. There is no required examination order.
 
-**Excluded:** exploration, surgery minigames, trading, upgrades, free-text chat, procedural mysteries and a general-purpose case editor.
+**Excluded from the G1 minimum slice:** exploration, surgery minigames, trading, upgrades, a required free-text interface, procedural mysteries and a general-purpose case editor. Authored player prompts are sufficient to test generated patient replies.
 
 **Cut first:** sound, decorative art, extra patients and elaborate animation. Preserve the guide, readable response, judgment and feedback. The basic tool response itself is gameplay, so it cannot be replaced by final diagnostic text just to save animation work.
 
@@ -227,7 +227,7 @@ Case background gives the character continuity; it does not prescribe an approve
 
 **Technical handling:** validate transport, output shape and length; handle service failure. These checks do not pick the content of an answer. A neutral offline response can keep the visit moving during an outage and must be logged as fallback. Detailed support for physical reactions, including aggression, remains an implementation question; do not silently restore the old legal-move mechanism to decide speech.
 
-**Implementation status:** the existing move-enum proxy and rule-based patient require migration. Historical tests verify that earlier protocol only. Autonomous dialogue has not yet been tested against a live model or with players.
+**Implementation status:** protocol 3 now generates original reply/reaction text and a tool-cooperation boolean; successful replies are not replaced by authored lines. Ask, pressure and reassurance share the same per-visit conversation. The real UI and HTTP path have passed local mock checks. Character quality, live latency/cost and player benefit remain untested.
 
 ## 17. References and attribution
 
@@ -240,9 +240,11 @@ Case background gives the character continuity; it does not prescribe an approve
 
 References are described from official pages and developer material, not claimed personal play sessions. See `06-sources-and-requirements.md` for links. No reference-game assets, dialogue or source code are reused in the Godot game; this is mechanic and setting inspiration, not permission to redistribute their content.
 
-The G1 cover separately uses a student-supplied *Cyberpunk: Edgerunners* image as visual reference. It is credited in the deck notes and `assets/cyberpsychosis-reference-provenance.md`; exact frame provenance and permission are open. It is not a game asset.
+The G1 cover separately uses a student-supplied *Cyberpunk: Edgerunners* image as visual reference. It is credited in the deck notes and [cover-image provenance](assets/cyberpsychosis-reference-provenance.md); exact frame provenance and permission are open. It is not a game asset.
 
-November 14 presentation update: slide 2 shows an official *That's not my Neighbor* checklist screenshot credited to Nacho Sama, with source and use status in `assets/tnmn-checklist-reference-provenance.md`. It is not a game asset. Beside it, the restored Before the Cut screenshot illustrates the earlier clinic layout; its scan/re-check rules and verdict labels are not the current design.
+November 14 presentation update: slide 2 shows an official *That's not my Neighbor* checklist screenshot credited to Nacho Sama, with source and use status in [checklist-image provenance](assets/tnmn-checklist-reference-provenance.md). It is not a game asset. Beside it, the Before the Cut screenshot shows the November 14 reference-sheet build. Its legacy REFER label is visibly marked as awaiting the Trauma Team update.
+
+**Reference-asset terms:** the Edgerunners still and the official checklist screenshot remain copyrighted reference material, used in the course pitch with attribution. No open redistribution license or separate permission is asserted. Neither is shipped as game art. The prototype uses original procedural assets; public commercial distribution would require a separate asset review.
 
 ## 18. Open questions and tests
 
@@ -263,10 +265,8 @@ November 14 presentation update: slide 2 shows an official *That's not my Neighb
 
 ## 19. What exists and what is next
 
-**Existing, verified November 12:** a local Godot 4.7.2 counter prototype; 269 rule assertions, 141 UI-flow assertions, 28 proxy tests and 73 real-client mock checks. Those checks cover the old re-check design. No live model call, human playtest, deployed proxy or standalone export is recorded.
+**Current local verification, November 14:** the revised reference-sheet game runs with optional observation, tools, questions, pressure and reassurance. Autonomous dialogue transport is implemented and tested using local synthetic responses: 260 game/agent assertions, 246 UI-flow assertions, 18 proxy tests and 49 real Godot HTTP/scene integration checks passed. No live model, outside playtest, deployment or standalone export has been validated. These are program checks, not evidence of fun or model quality.
 
-**Revised G1 proposal, November 13:** the normal reference sheet and player-chosen observation/action/dialogue methods are the design authority. All methods, including verbal pressure, are optional. The November 14 slide combines labeled early/reference screenshots with one illustrative optional route; it does not demonstrate an implemented revision.
+The student has recorded the nine-slide concept presentation. Final duration, upload and submission are being checked separately. The recording describes the proposed three-patient experiment; the development workspace already has five case slots, which does not make five patients a required scope.
 
-**Next implementation:** write a small normal reference sheet and one fixed patient; make simple observation, action and dialogue options available without a required order; let the player skip checks and decide. Add generated patient replies and reactions and update rules/validation/tests. Add the other patients only after that loop is readable. Keep the existing agent transport and fallback where they fit.
-
-The G1 assignment asks whether the idea is clear and achievable enough to justify prototype work. It does not require the revised loop to be completed before this concept recording.
+Next: finish the Trauma Team action wording; confirm an authorized model/provider; measure real conversation behavior, latency and cost; observe at least one outside player; compare scripted and generated patient dialogue before expanding content. The G1 gate asks whether the proposal is clear and achievable enough to justify that work.

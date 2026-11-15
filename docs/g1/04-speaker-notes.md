@@ -1,66 +1,67 @@
-AI use: Codex rewrote the student's G1 narration in spoken English for first-time viewers, following the normal reference sheet and optional examination methods. Student review and recording are pending.
+AI use: Codex shortened the student's recording script. The student reviews the wording and records the presentation.
 
-# Before the Cut: G1 recording script
+# Before the Cut G1 short recording script
 
-Revised **November 14, 2026**. **543 spoken words**, matched to the existing nine slides. Read only the paragraphs under each slide title.
+Revised November 14, 2026. **249 spoken words**, matched to the existing nine slides. Read only the body paragraphs under each slide heading.
 
-At 120 words per minute, the narration is about **4:32**. The cue sheet adds short pauses and targets **4:52**. These are estimates. The required recording length is **3-5 minutes**; actual rehearsal and recording are still pending.
+At 55 to 60 words per minute, with two seconds for each slide transition, the estimate is **4:27 to 4:50**. These are estimates, not measured rehearsal times. The required video length is **3 to 5 minutes**. Rehearse at a comfortable pace; do not speed up to fit the script.
 
-Use this as a draft for your own presentation. Confirm the first-person claims before recording. An earlier scan/re-check build works locally. The revised guide and action responses are planned; live-model testing and human playtests are still pending.
+The cue sheet uses 60 words per minute. Keep explanations on the slides visible, but do not read every bullet. Point to the reference sheet on slide 2 and the system flow on slide 6.
 
 | Slide | Suggested timing | Words | Subject |
 |---|---|---|---|
-| 1 | 0:00-0:29 | 53 | Before the Cut |
-| 2 | 0:29-1:13 | 84 | How a patient visit works |
-| 3 | 1:13-1:46 | 62 | Players, motivations and pillars |
-| 4 | 1:46-2:27 | 78 | Concepts and references |
-| 5 | 2:27-3:00 | 61 | The patient agent's role |
-| 6 | 3:00-3:27 | 49 | How the game and agent work together |
-| 7 | 3:27-3:57 | 56 | Scope and budgets |
-| 8 | 3:57-4:22 | 45 | Risks and mitigations |
-| 9 | 4:22-4:52 | 55 | Prototype approval and next steps |
+| 1 | 0:00-0:30 | 28 | Before the Cut |
+| 2 | 0:30-1:06 | 34 | How a patient visit works |
+| 3 | 1:06-1:35 | 27 | Players, motivations and pillars |
+| 4 | 1:35-2:10 | 33 | Concepts and references |
+| 5 | 2:10-2:34 | 22 | The patient agent's role |
+| 6 | 2:34-2:59 | 23 | How the game and agent work together |
+| 7 | 2:59-3:37 | 36 | Scope and budgets |
+| 8 | 3:37-3:59 | 20 | Risks and mitigations |
+| 9 | 3:59-4:27 | 26 | Prototype approval and next steps |
 
 ## Slide 1: Before the Cut
 
-Before the Cut is a game about deciding whether a patient is safe for cybernetic surgery. You play a doctor who installs mechanical body parts. It's inspired by Cyberpunk 2077 and its fictional condition, cyberpsychosis, where people with extensive implants can lose control. The tension comes from examining someone who might attack you.
+Before the Cut puts you in a clinic, screening patients for implant surgery. Inspired by Cyberpunk 2077, it explores cyberpsychosis: a fictional loss of control linked to implants.
 
 ## Slide 2: How a patient visit works
 
-Here's what you do. Our prototype is on the left; a reference checklist is on the right. Your sheet describes normal appearance and behavior. You can observe, request an action, or talk, including provoking a reaction. Every method is optional, in any order. For example, you ask a patient to release a handle, but their hand stays closed. Use that clue to keep checking, approve surgery, or call in Trauma Team, an emergency response unit, to take over. If attacked, close the safety shutter.
+Here's the visit. Compare patients with a normal reference sheet. Observe, request actions, or talk; every check is optional. Then approve surgery or call Trauma Team, an emergency unit. If attacked, close the shutter.
 
 ## Slide 3: Players, motivations and pillars
 
-The audience is Cyberpunk fans and players who enjoy spotting clues. The main motivations are Fantasy, feeling like the doctor, and Discovery, uncovering a patient's condition. Sensation adds the suspense of an attack. My design pillars, or guiding priorities, are clear clues, freedom to choose checks, and patients with different personalities. I'll watch whether players explain their decisions and want another patient.
+For Cyberpunk fans and clue-spotters, Fantasy means playing the doctor; Discovery means uncovering problems. Sensation adds suspense. My pillars are clear clues, optional checks and distinct patients.
 
 ## Slide 4: Concepts and references
 
-I considered two alternatives. In the island concept, you searched for your missing sister. Time kept restarting, but you used what you'd learned to reach new clues. It needed too many locations and story events. In the shop concept, you inspected customers' objects and decided what to pay for them. I chose the clinic to keep the small counter setting while investigating people through their reactions. The references here inspired the visitor flow, appearance comparisons, and cyberpunk setting.
+I also considered finding clues on a looping island, and inspecting objects to price them. The clinic offers human reactions in one small setting. These references inform the queue, visual checks and setting.
 
 ## Slide 5: The patient agent's role
 
-AI plays each patient as a character. From their background, personality and conversation, it decides what to say and how to react. It can explain, evade, argue, or become more cooperative. I won't write every answer or use a fixed dialogue tree. I'll compare this with scripted dialogue and test whether its responses feel believable and change what players do next.
+AI gives patients their own replies. Scripted dialogue needs answers written beforehand. I'll compare both: does AI make players choose different checks?
 
 ## Slide 6: How the game and agent work together
 
-Here's the flow. Your action and the conversation go to the patient AI. It creates a reply and reaction, which the game displays and remembers. Technical checks cover formatting, length and connection failures; they don't choose the answer. If the service fails, an offline fallback keeps the visit moving.
+This diagram shows how. AI receives the character and conversation. The game controls physical evidence and outcomes, checks response format, and handles failures.
 
 ## Slide 7: Scope and budgets
 
-For scope, I'm starting with one counter and three patients, without a surgery minigame. Autonomous dialogue is the next step. Earlier cost estimates were below two cents per shift; I'll remeasure them with the new prompts. I target one-second replies, with an offline fallback after two point five seconds. Live latency and cost are still untested.
+I'll start with one counter and three patients. No surgery minigame. Targets are one-second replies and two cents per shift, estimated from twelve calls. Offline fallback starts after two point five seconds. Live performance remains untested.
 
 ## Slide 8: Risks and mitigations
 
-The biggest risks are my experience and the deadline: I'm a beginner working alone. That's what Team and Timeline mean here. I'll keep the prototype small, cut decorative polish first, and recruit playtesters. The other four rows cover originality, audience interest, technology, and repetitive gameplay.
+I'm a beginner working alone, so experience and time are the biggest risks. I'll cut decoration first and recruit playtesters.
 
 ## Slide 9: Prototype approval and next steps
 
-Finally, I'm asking to build and test this version. I chose the clinic and optional checks; the AI assistants helping me develop the game suggested three patients. I'll test whether players understand their decisions and whether patient reactions affect their choices. If players are guessing, or AI only changes wording, I'll revise before adding content.
+I'm requesting prototype approval. I chose optional checks; development agents suggested three patients. I'll revise if players cannot explain their decisions or AI only changes wording.
 
 ## Before recording
 
-- Rehearse once with a timer. Pause briefly when changing slides.
-- In slide 2, identify the early clinic prototype on the left and the checklist reference on the right, then point to our optional examination loop below. The screenshot rules are not the revised game rules. In slide 6, follow the diagram from left to right.
-- Keep the numerical budgets and the distinction between estimates and measured results. Four tenths of a cent is USD 0.004, not USD 0.40.
-- Check sound, readability and the actual 3-5 minute duration before uploading.
+- Rehearse once at a comfortable pace and check the actual duration.
+- Read only the body paragraphs. Slide headings, timings and this checklist are not spoken.
+- Pause briefly at each slide change. Leave the reference images and diagram visible while speaking.
+- Live model latency, cost and human playtest results remain unmeasured. The budget numbers are planning targets.
+- Check microphone level and intelligibility before recording the whole pitch.
 
-To revise the script later, edit narration in deck-source.mjs, rerun build-notes.mjs, and sync the saved deck notes. Sources remain in the deck notes and 06-sources-and-requirements.md.
+The previous 7 minute 14 second recording is not the submission version. A replacement video is pending.

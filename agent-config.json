@@ -1,10 +1,10 @@
 {
   "schema_version": "course-1",
-  "config_version": "0.8.0",
+  "config_version": "0.9.0",
   "project": "Before the Cut",
   "updated": "2026-11-14",
-  "status": "Current design target; running legacy protocol still requires migration.",
-  "ai_use": "Claude authored the initial implementation and manifest. Codex verified local execution and updated status on 2026-11-12.",
+  "status": "Protocol 3 implemented in active fathom runtime; verified with local mocks, not a live model.",
+  "ai_use": "Claude authored the game and initial proxy. Codex migrated autonomous dialogue and verified the current runtime on 2026-11-14.",
   "purpose": "Generate the patient's own dialogue and reactions from character context and conversation history.",
   "tools_available": [],
   "context_sources": [
@@ -14,14 +14,15 @@
     "latest player action"
   ],
   "response_contract": {
-    "proposed_fields": {
-      "reply": "generated speech",
-      "reaction": "generated demeanor or intended behavior"
-    },
     "legal_moves": false,
     "fixed_dialogue_tree": false,
     "answer_bank": false,
-    "status": "Proposed; game/proxy adapter and physical-action support need implementation."
+    "status": "Implemented in proxy and game UI. Physical readings, attacks and scoring remain engine systems.",
+    "implemented_fields": {
+      "reply": "generated speech",
+      "reaction": "generated demeanor or intended behavior",
+      "cooperates": "Boolean required for exam requests; model decides tool cooperation, not restricted to authored options."
+    }
   },
   "validation": "Transport shape, nonempty text, length and timeouts only; do not choose or reject an answer for differing from scripted dialogue.",
   "limits": {
@@ -35,17 +36,17 @@
     "typical_latency_target_ms": 1000,
     "status": "Targets. Remeasure autonomous dialogue; previous token/cost estimates described the old protocol."
   },
-  "fallback": "Neutral offline response on service failure, separately logged; scripted mode is also a comparison condition, not the normal model policy.",
-  "memory_policy": "Bounded per-visit conversation history and context summary; isolate patients and sessions.",
+  "fallback": "Authored offline comparison/fallback, separately labelled in UI and logs; no substitution on successful model replies.",
+  "memory_policy": "Last 24 conversation messages in memory per visit; reset for next patient; no server-side cross-visit transcript.",
   "agent_team": [
     {
       "role": "Producer",
-      "native_artifact": "HANDOFF.md, NEXT_AGENT_PROMPT.md, docs/g1/03-initial-project-plan-and-risk-register.md",
+      "native_artifact": "HANDOFF.md, NEXT_AGENT_PROMPT.md, g1/03-initial-project-plan-and-risk-register.md",
       "status": "Handoff files created by Codex on 2026-11-12. Fresh-agent usability not yet tested.",
       "purpose": "Keep scope, dates, risks and the next three tasks current so any coding agent can continue.",
       "context": [
         "HANDOFF.md",
-        "docs/g1/",
+        "g1/",
         "course dates recorded in HANDOFF.md"
       ],
       "tools_and_permissions": "Repository read and write. No posting to CourseWorks, no gate decision.",
@@ -62,7 +63,7 @@
       "context": [
         "game/data/rules.json",
         "game/data/cases/",
-        "docs/g1/01-initial-gdd.md",
+        "g1/01-initial-gdd.md",
         "AGENTS.md"
       ],
       "tools_and_permissions": "Runs inside the implementation agent with its permissions. Edits only game/data/cases and the tests that list expected results.",
@@ -87,7 +88,7 @@
       "outputs": "Code, tests, real test output and an updated handoff.",
       "handoff": "Diff and test output to the rules reviewer and the student.",
       "evaluation": "The four test commands above.",
-      "human_approval": "The student judges and accepts design changes. Repository commits and publication may proceed under applicable user authorization."
+      "human_approval": "The student runs the game, accepts or rejects the change, and commits."
     },
     {
       "role": "QA: independent rules reviewer",
@@ -108,14 +109,14 @@
     },
     {
       "role": "Art Lead",
-      "native_artifact": "Legacy workspace: tools/art/ and game/assets/. Not yet transferred to this checkout.",
-      "status": "In progress in the legacy workspace. Procedural pixel-art assets and generator scripts were observed; review and source transfer are pending.",
+      "native_artifact": "Planned: agent_team/art-brief.md. Today: placeholder figures drawn in code by game/scripts/ui/patient_view.gd.",
+      "status": "planned",
       "purpose": "Keep the three look spots readable first; move to pixel art only after the loop works.",
       "context": [
-        "docs/g1/01-initial-gdd.md section on feedback",
+        "g1/01-initial-gdd.md section on feedback",
         "game/scripts/ui/"
       ],
-      "tools_and_permissions": "Repository reads and writes under game/assets after source transfer. Third-party assets require recorded permissions.",
+      "tools_and_permissions": "Repository read and write under game/assets (not created yet). Third-party assets only with recorded license terms.",
       "outputs": "A small sprite sheet per patient and a license log.",
       "handoff": "Assets to the implementation agent.",
       "evaluation": "A first-time player finds all three look spots without help (human playtest, planned).",
@@ -127,7 +128,7 @@
       "status": "planned, first to be cut",
       "purpose": "Give the attack warning and the shutter a sound.",
       "context": [
-        "docs/g1/01-initial-gdd.md"
+        "g1/01-initial-gdd.md"
       ],
       "tools_and_permissions": "Same as Art Lead.",
       "outputs": "Sound files with license terms.",
@@ -142,7 +143,7 @@
       "purpose": "Turn play logs into the few numbers the playtest question needs.",
       "context": [
         "session JSONL logs",
-        "docs/g1/02-initial-configuration-document.md"
+        "g1/02-initial-configuration-document.md"
       ],
       "tools_and_permissions": "Read logs, write summaries. No player identity is recorded.",
       "outputs": "Per-session table: verdicts, checks used, script or model or fallback counts, latency.",
@@ -167,10 +168,7 @@
     }
   ],
   "repository": {
-    "url": "https://github.com/DemonRain7/before-the-cut",
-    "documents": "docs/g1/",
-    "source_transfer": "Pending. Claude/Fable is still writing in the legacy fathom workspace. See docs/development/repository-transition.md.",
-    "evidence_scope": "Runtime fields and test figures describe the earlier prototype unless separately dated. New implementation work requires fresh verification."
+    "url": "https://github.com/DemonRain7/before-the-cut"
   },
   "design_target": {
     "loop": "Choose optional observation, actions or dialogue; compare observations and speech; continue, approve surgery or call Trauma Team.",
@@ -194,5 +192,14 @@
     ]
   },
   "historical_evidence": "November 12: 269 game, 141 UI, 28 proxy and 73 mock integration checks of the older constrained protocol; no autonomous-dialogue validation is claimed.",
-  "prompt_artifact": "agent_team/patient-character-prompt.md"
+  "prompt_artifact": "agent_team/patient-character-prompt.md",
+  "current_verification": {
+    "date": "2026-11-14",
+    "game_checks": 260,
+    "ui_checks": 246,
+    "proxy_tests": 18,
+    "http_integration_checks": 49,
+    "live_model_calls": 0,
+    "record": "CODEX_RUNTIME_HANDOFF.md"
+  }
 }

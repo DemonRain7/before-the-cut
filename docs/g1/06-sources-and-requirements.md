@@ -2,8 +2,8 @@
 
 ## Course sources
 
-- [G1 Concept pitch assignment](https://courseworks2.columbia.edu/courses/258228/discussion_topics/1701307). The authenticated assignment was checked on November 13, 2026. It asks for a 3–5 minute recording and repository links to the Initial GDD, Initial Configuration Document and Initial Project Plan.
-- [Corrected course announcement](https://courseworks2.columbia.edu/courses/258228/discussion_topics/1701304). The corrected text supplied by the student on November 14 confirms an individual project, the G1 pitch due November 15 at 11:59 p.m., and two self-selected Braintrust replies due November 19 at 11:59 p.m., New York time. G1 is the only submission due before Monday's class. The course links require enrollment/sign-in.
+- [G1 Concept pitch assignment](https://courseworks2.columbia.edu/courses/258228/discussion_topics/1701307). The authenticated assignment was rechecked on November 14, 2026. It asks for a 3–5 minute recording and repository links to the Initial GDD, Initial Configuration Document and Initial Project Plan.
+- [Corrected course announcement](https://courseworks2.columbia.edu/courses/258228/discussion_topics/1701304). The corrected announcement, rechecked in authenticated Chrome on November 14, confirms an individual project, the G1 pitch due November 15 at 11:59 p.m., and two self-selected Braintrust replies due November 19 at 11:59 p.m., New York time. G1 is the only submission due before Monday's class. The course links require enrollment/sign-in.
 - [Game Development Framework reader](https://github.com/columbia-university-ai-games/game-dev-f26/blob/main/docs/gdf.md)
 - [Motivation Atlas](https://github.com/columbia-university-ai-games/motivation-atlas/blob/main/content/player-motivations.md). The pitch uses Fantasy and Discovery as primary hypotheses, with Sensation secondary.
 

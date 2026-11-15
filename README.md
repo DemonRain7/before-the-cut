@@ -33,7 +33,7 @@ This repository was renamed from `before-the-cut-g1` to `before-the-cut` so late
 
 The [agent manifest](agent-config.json) and [production-agent artifacts](agent_team/) describe the bounded patient agent and planned development roles. The patient AI creates original replies and reactions from its character context and conversation history. Its normal replies are not selected by a fixed rule table. An offline scripted version must remain playable.
 
-Older local tests cover the earlier scan/re-check prototype. New case data and pixel-art work are in progress in the active workspace; those old results do not validate the new implementation. No new game test, live-model evaluation or human playtest is claimed by this repository reorganization.
+Current local protocol-3 evidence records 260 game checks, 246 UI checks, 18 proxy tests and 49 HTTP/scene checks with controlled mocks. See the [dated verification record](docs/g1/07-verification-record.md). This submission audit did not change game code or rerun those suites. Live-model evaluation and human playtesting remain pending.
 
 Personal settings, credentials, generated caches, local evidence and private CourseWorks material stay out of Git. Reference images in the separately prepared pitch deck are not game assets.
 
