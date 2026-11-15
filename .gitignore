@@ -9,7 +9,7 @@
 ~$*
 
 # Local build products and evidence, not source assets.
-*.import
+# Godot import settings (*.import) are committed; only the .godot/ cache is ignored.
 **/.wrangler/
 *.log
 artifacts/

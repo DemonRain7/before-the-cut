@@ -1,0 +1,980 @@
+"""The five patients of the shift, drawn as layered busts. See people.py for the layer list.
+
+Left and right in notes are the patient's own; on screen the patient's right is on our left.
+Optional layers: pupils_b (a second glyph for display eyes), pupils_react.
+
+The two patients who can turn on the player also carry the layers of that scene:
+  turn / turn_clean    face overlay: dark threads under the skin, the eyes, and (not in the
+                       clean one) blood
+  mouth_turn / _b      two frames of the scream
+  mouth_turn_clean, mouth_turn_b_clean
+                       the same two frames with nothing on the teeth or the chin
+  attack / _b          the wind-up: weapon raised, free hand open (two frames, so the weapon runs)
+  attack_s1 / _b       first blow: the free hand flat on the glass
+  attack_s2 / _b       second blow: the weapon on the glass as well
+  attack_s1_clean, attack_s1_b_clean, attack_s2_clean, attack_s2_b_clean
+                       the same four blow poses with a dry palm
+The _clean layers are what the --less-blood option shows.
+"""
+import json
+import os
+import sys
+
+import numpy as np
+
+import people as P
+from people import (BASE_Y, CLOTH, H, OUTLINE, SKIN, W, almond, blink, blood_run, brows_set, eye_whites, finish,
+                    fist, grow, hand_rest, head_mask, layer, lid_lines, mouth_frames, natural_pupil, nose, paint,
+                    palm_flat, palm_up, silhouette, sleeve, smooth, stroke, threads)
+from px import ASSETS, OUT, Canvas, contact_sheet
+
+CX = 80
+GAUNTLET = ["140e10", "2a1a1a", "3e2620", "5a3a2a", "7a4630", "a86a3c"]
+GLOVE = CLOTH["glove"] + ["f0dba8"]
+
+
+def new_patient():
+    return {"body": layer(), "pupils": layer(), "head": layer(), "lids": layer(),
+            "hands_a": layer(), "hands_b": layer(), "hands_react": layer()}
+
+
+def torso(c, pts, cloth, **kw):
+    m = smooth(c.poly(pts), 2)
+    yy, _ = c.grid()
+    m &= yy < BASE_Y
+    paint(c, m, cloth, round_px=9, **kw)
+    return m
+
+
+def neck(c, x0, x1, y0, y1, skin, shadow=3):
+    m = c.rect(x0, y0, x1, y1)
+    paint(c, m, skin, round_px=5, bias=-0.1)
+    yy, _ = c.grid()
+    c.fill(m & (yy < y0 + shadow), skin[1])
+    c.dither(m & (yy >= y0 + shadow) & (yy < y0 + shadow + 4), skin[1], 0.5)
+    return m
+
+
+def wrist_port(c, x, y, burnt=False, scar=None):
+    c.fill(c.ell(x, y, 3.2, 3.2), "steel1")
+    c.fill(c.ell(x, y, 2.4, 2.4), "steel4")
+    c.fill(c.ell(x, y, 1.2, 1.2), "ink0")
+    c.px(x - 1, y - 2, "steel5")
+    if burnt:
+        for dx, dy in ((-4, 1), (3, 3), (-3, -3), (4, -1), (0, 4), (-5, -1)):
+            c.px(x + dx, y + dy, "ink1")
+        c.px(x, y, "warm4")
+        c.px(x + 1, y - 1, "warm3")
+    if scar:
+        stroke(c, [(x + 4, y - 5), (x + 7, y + 2)], scar)
+
+
+def rictus(cx, my, skin, hw=9, gape=0, bloody=True, teeth="paper3"):
+    """A mouth dragged back off the teeth. gape drops the jaw."""
+    c = layer()
+    dark = "1a0c10"
+    top, bot = my - 3, my + 4 + gape
+    m = c.rrect(cx - hw, top, cx + hw, bot, 3)
+    for s in (-1, 1):                                    # the corners pull up and back
+        m |= c.seg([(cx + s * hw, top + 2), (cx + s * (hw + 2), top - 1)], 2)
+    c.fill(m, dark)
+    for x in range(cx - hw + 2, cx + hw - 1):
+        c.px(x, top + 1, teeth)
+        if (x - cx) % 3 != 0:
+            c.px(x, top + 2, teeth)
+    for x in range(cx - hw + 3, cx + hw - 2):
+        c.px(x, bot - 1, teeth)
+        if gape and (x - cx) % 3 != 1:
+            c.px(x, bot - 2, teeth)
+    if gape >= 3:
+        tongue = c.ell(cx, bot - 4, hw - 4, 1.8) & m
+        c.fill(tongue, "8a3038")
+        c.px(cx - 1, bot - 5, "c0505a")
+    c.outline(skin[1], m)
+    if bloody:
+        for dx in (-4, 2, 5):
+            c.px(cx + dx, top + 2, "red1")
+        c.px(cx - 2, bot - 1, "red1")
+        blood_run(c, [(cx + hw - 1, bot + 1), (cx + hw, bot + 5)])
+        blood_run(c, [(cx - 3, bot + 1), (cx - 3, bot + 3)], bead=False)
+    return c
+
+
+def saw_disc(c, cx, cy, r, phase=0.0):
+    """Vale's rig: a toothed disc. phase turns it between frames."""
+    yy, xx = c.grid()
+    d = np.hypot(xx - cx, yy - cy)
+    a = np.arctan2(yy - cy, xx - cx) / (2 * np.pi)
+    n = max(10, int(round(r * 1.15)))
+    teeth = (d < r + 2.3) & (d >= r - 0.5) & (((a * n + phase) % 1.0) < 0.5)
+    disc = d < r
+    c.fill(grow(disc | teeth, 1), "ink0")
+    c.fill(teeth, "dbe6e0")
+    c.fill(disc, "steel3")
+    c.fill(disc & (d > r - 3.4), "steel4")
+    c.fill(disc & (d > r - 1.7), "steel5")
+    c.fill(disc & (d < r - 4.5) & (d > 3.6) & (((a * 5 + phase * 0.6) % 1.0) < 0.26), "steel1")
+    lit = (xx - cx) * -0.75 + (yy - cy) * 0.5
+    c.dither(disc & (lit > r * 0.35), "dbe6e0", 0.45)
+    for k in range(3):                                   # the blur of it turning
+        a0 = phase * 0.37 + k * 0.31
+        arc = disc & (np.abs(d - (r - 4.5 - k * 2.6)) < 0.7) & (((a - a0) % 1.0) < 0.2)
+        c.fill(arc, "white")
+    c.fill(d < 3.3, "steel1")
+    c.fill(d < 1.7, "red2")
+    c.px(int(cx), int(cy), "red3")
+
+
+def glyph(c, cx, cy, rows, color, color2=None):
+    for r, row in enumerate(rows):
+        for q, ch in enumerate(row):
+            if ch == "#":
+                c.px(cx - 2 + q, cy - 2 + r, color2 if (color2 and r >= 2) else color)
+
+
+# ====================================================================== Kip
+def kip():
+    p = new_patient()
+    skin, hair, cloth = SKIN["kip"], CLOTH["ginger"], CLOTH["hivis"]
+    cy = 78
+    body, head = p["body"], p["head"]
+    yy, xx = body.grid()
+
+    # jacket, too big for him
+    jm = torso(body, [(CX - 46, 136), (CX - 30, 119), (CX + 30, 119), (CX + 46, 136), (CX + 50, 162), (CX - 50, 162)], cloth)
+    hood = body.poly([(CX - 13, 114), (CX + 13, 114), (CX, 140)])
+    paint(body, hood, CLOTH["hood"], round_px=4)
+    band = jm & (yy >= 146) & (yy <= 150) & ~hood
+    body.fill(band, "steel4")
+    body.dither(band, "steel5", np.clip(1.0 - (xx - 30) / 90.0, 0, 1))
+    body.fill(jm & (yy == 151), cloth[1])
+    stroke(body, [(CX, 140), (CX, 160)], "steel2")
+    stroke(body, [(CX + 1, 140), (CX + 1, 160)], cloth[1])
+    strap = body.seg([(CX + 30, 118), (CX - 22, 162)], 7) & jm
+    paint(body, strap, CLOTH["hood"], round_px=3)
+    body.fill(body.rect(CX + 4, 139, CX + 9, 144) & strap, "steel4")
+    finish(body, jm)
+    for s in (-1, 1):
+        flap = body.poly([(CX + s * 9, 112), (CX + s * 26, 116), (CX + s * 21, 134), (CX + s * 6, 126)])
+        paint(body, flap, cloth, round_px=4, bias=0.1 if s < 0 else -0.05)
+        body.outline(OUTLINE, flap)
+    nk = neck(body, CX - 7, CX + 7, 104, 118, skin)
+    body.outline(OUTLINE, nk & (yy < 113))
+
+    # head
+    for s in (-1, 1):
+        ear = head.ell(CX + s * 25, cy + 3, 4, 6)
+        paint(head, ear, skin, round_px=3)
+        head.outline(OUTLINE, ear)
+    hm = head_mask(head, CX, cy, 50, 58, jaw=0.78, chin=0.42)
+    paint(head, hm, skin, round_px=13, round_amt=0.7)
+    head.fill(head.edge(hm, 1, 0), P.RIM)
+    for fx, fy in ((-17, 9), (-13, 11), (-20, 12), (12, 10), (16, 12), (19, 9), (-15, 13)):
+        head.px(CX + fx, cy + fy, skin[2])
+    nose(head, CX, cy + 1, cy + 11, skin)
+    head.outline(OUTLINE, hm)
+
+    # natural right eye (our left), cheap cracked optic on the left (our right)
+    eye_r = almond(head, CX - 13, cy, 7, 4.6)
+    eye_whites(body, [eye_r])
+    head.erase(eye_r)
+    lid_lines(head, eye_r, skin)
+    natural_pupil(p["pupils"], CX - 13, cy, ("4a2a16", "9a6230"))
+    ox, oy = CX + 13, cy
+    head.fill(head.ell(ox, oy, 8.6, 8.6), OUTLINE)
+    ring = head.ell(ox, oy, 7.6, 7.6)
+    paint(head, ring, CLOTH["chrome"], round_px=3, bias=-0.05)
+    head.fill(head.ell(ox, oy, 5.2, 5.2), "ink0")
+    head.fill(head.ell(ox, oy, 4.2, 4.2), "cyan0")
+    head.fill(head.ell(ox, oy, 2.2, 2.2), "ink0")
+    head.px(ox - 2, oy - 3, "cyan2")
+    head.px(ox - 3, oy - 2, "cyan1")
+    stroke(head, [(ox - 4, oy - 5), (ox + 1, oy), (ox, oy + 3), (ox + 4, oy + 6)], "cyan3")
+    stroke(head, [(ox + 1, oy), (ox + 5, oy - 2)], "cyan3")
+    head.px(ox - 9, oy - 5, "steel2")
+    head.px(ox + 9, oy + 5, "steel2")
+    blink(p["lids"], eye_r, skin)
+
+    # ginger hair, slept on
+    hmask = head.ell(CX, cy - 16, 27.5, 18) & (yy < cy - 14)
+    for tri in ([(56, 62), (48, 42), (68, 52)], [(64, 54), (63, 33), (78, 50)], [(74, 52), (84, 30), (92, 50)],
+                [(86, 52), (102, 35), (102, 56)], [(98, 58), (113, 47), (107, 66)],
+                [(57, 60), (62, 68), (69, 60)], [(68, 60), (75, 66), (82, 60)], [(98, 60), (100, 67), (104, 60)],
+                [(54, 60), (55, 75), (58, 64)], [(103, 60), (106, 73), (106, 60)]):
+        hmask |= head.poly(tri)
+    hmask = smooth(hmask, 1)
+    paint(head, hmask, hair, round_px=8, round_amt=0.7, contrast=1.1)
+    for a, b in (((62, 58), (58, 46)), ((72, 54), (70, 40)), ((82, 52), (85, 38)), ((92, 54), (98, 42))):
+        stroke(head, [a, b], hair[4])
+    head.fill(head.edge(hmask, 1, 0), P.RIM)
+    head.outline(OUTLINE, hmask)
+
+    # courier headset on his right ear
+    cup = head.ell(CX - 27, cy + 3, 5, 8)
+    paint(head, cup, CLOTH["vest"], round_px=3)
+    head.outline(OUTLINE, cup)
+    head.px(CX - 28, cy + 1, "cyan2")
+    stroke(head, [(CX - 27, cy + 11), (CX - 22, cy + 20), (CX - 13, cy + 22)], "steel1")
+    head.fill(head.rect(CX - 14, cy + 21, CX - 11, cy + 23), "ink0")
+    stroke(head, [(CX - 29, cy - 5), (CX - 33, cy - 22)], "steel2")
+    head.px(CX - 33, cy - 23, "cyan2")
+
+    brows = brows_set(CX, cy, 13, hair[0], width=2, lift=-1)
+    mouths = mouth_frames(CX, cy + 19, skin, width=9, curve=-0.5)
+
+    # hands
+    for name, lifts in (("hands_a", ((1,), ())), ("hands_b", ((), (0, 2)))):
+        c = p[name]
+        for i, x in enumerate((CX - 24, CX + 24)):
+            sl = sleeve(c, x, 144, 153, 16, cloth)
+            c.outline(OUTLINE, sl)
+            wr = c.rect(x - 5, 153, x + 5, 158)
+            paint(c, wr, skin, round_px=3)
+            c.outline(OUTLINE, wr)
+            if i == 0:
+                wrist_port(c, x, 155)
+            hand_rest(c, x, 158, 17, skin, lifted=lifts[i], side=1 if i == 0 else -1)
+    c = p["hands_react"]
+    for i, x in enumerate((CX - 34, CX + 34)):
+        sl = c.seg([(x - (4 if i == 0 else -4), 162), (x, 138)], 13)
+        paint(c, sl, cloth, round_px=4)
+        c.outline(OUTLINE, sl)
+        palm_up(c, x, 122, 17, skin, side=-1 if i == 0 else 1)
+        if i == 0:
+            wrist_port(c, x, 139)
+
+    p.update({"brows_" + k: v for k, v in brows.items()})
+    p.update({"mouth_" + k: v for k, v in mouths.items()})
+    meta = {"zones": {"eyes": [54, 66, 52, 22], "hands": [42, 157, 76, 17], "port": [46, 143, 20, 14]},
+            "face": {"brows": "worried", "mouth": "closed"}, "blink": [1.4, 3.2], "mouth_y": cy + 19}
+    return p, meta
+
+
+# ====================================================================== Rook
+def rook():
+    p = new_patient()
+    skin = SKIN["rook"]
+    cy = 70
+    body, head = p["body"], p["head"]
+    yy, xx = body.grid()
+
+    tm = torso(body, [(2, 140), (26, 119), (134, 119), (158, 140), (160, 162), (0, 162)], CLOTH["thermal"])
+    trap = body.poly([(CX - 19, 98), (CX + 19, 98), (CX + 52, 123), (CX - 52, 123)])
+    paint(body, trap, skin, round_px=6, bias=-0.1)
+    body.fill(trap & (yy < 106), skin[1])
+    body.dither(trap & (yy >= 106) & (yy < 110), skin[1], 0.5)
+    finish(body, tm | trap)
+    vest = smooth(body.poly([(30, 121), (130, 121), (137, 162), (23, 162)]), 2)
+    vest &= ~body.poly([(CX - 19, 118), (CX + 19, 118), (CX, 148)]) & (yy < BASE_Y)
+    paint(body, vest, CLOTH["vest"], round_px=8)
+    stroke(body, [(CX - 19, 121), (CX - 1, 147)], "c98a22", 2)
+    stroke(body, [(CX + 19, 121), (CX + 1, 147)], "8a5a22", 2)
+    body.outline(OUTLINE, vest)
+    for s in (-1, 1):
+        pad = body.poly([(CX + s * 40, 117), (CX + s * 70, 127), (CX + s * 75, 142), (CX + s * 44, 135)])
+        paint(body, pad, CLOTH["hivis"], round_px=4, bias=0.08 if s < 0 else -0.12)
+        body.fill(pad & (((xx + yy * s) // 4) % 2 == 0), "ink1")
+        body.outline(OUTLINE, pad)
+        body.px(CX + s * 45, 123, "steel5")
+        body.px(CX + s * 68, 132, "steel5")
+    tag = body.rect(CX + 26, 142, CX + 40, 148)
+    body.fill(tag, "steel1")
+    stroke(body, [(CX + 28, 144), (CX + 38, 144)], "steel4")
+    stroke(body, [(CX + 28, 146), (CX + 35, 146)], "steel3")
+
+    for s in (-1, 1):
+        ear = head.ell(CX + s * 29, cy + 2, 5, 7)
+        paint(head, ear, skin, round_px=3)
+        head.outline(OUTLINE, ear)
+        head.px(CX + s * 29, cy + 1, skin[1])
+        head.px(CX + s * 29, cy + 3, skin[1])
+    hm = head_mask(head, CX, cy, 58, 62, jaw=0.96, chin=0.62)
+    paint(head, hm, skin, round_px=14, round_amt=0.7)
+    head.dither(hm & (yy < cy - 13), skin[1], np.clip((cy - 11 - yy) / 16.0, 0, 0.55))
+    beard = hm & ((yy > cy + 14) | ((np.abs(xx - CX) > 20) & (yy > cy + 6)))
+    head.dither(beard & ~head.ell(CX, cy + 21, 9, 5), skin[1], 0.4)
+    head.dither(hm & head.rect(CX - 25, cy - 7, CX + 25, cy - 4), skin[1], 0.6)
+    head.fill(head.edge(hm, 1, 0), P.RIM)
+    nose(head, CX, cy + 1, cy + 13, skin, w=4)
+    stroke(head, [(CX + 1, cy + 3), (CX - 1, cy + 7)], skin[5])
+    stroke(head, [(CX + 22, cy - 15), (CX + 19, cy + 10)], skin[5])
+    for t in (-10, -4, 6):
+        stroke(head, [(CX + 18, cy + t), (CX + 23, cy + t + 1)], skin[1])
+    head.outline(OUTLINE, hm)
+    holes = [almond(head, CX + s * 14, cy, 5.6, 3.4) for s in (-1, 1)]
+    eye_whites(body, holes)
+    for i, hmk in enumerate(holes):
+        s = -1 if i == 0 else 1
+        g = grow(hmk, 1)
+        body.dither(g, "e09080", 0.4)
+        body.px(CX + s * 18, cy, "red2")
+        body.px(CX + s * 10, cy + 1, "red2")
+        head.erase(hmk)
+        lid_lines(head, hmk, skin)
+        head.fill(g & ~hmk & (yy > cy), "a8483c")
+        natural_pupil(p["pupils"], CX + s * 14, cy, ("20120c", "5a3820"), r=2.9)
+        blink(p["lids"], hmk, skin)
+
+    brows = brows_set(CX, cy, 14, "100a0c", width=3, lift=-3, span=9)
+    mouths = mouth_frames(CX, cy + 22, skin, width=11, curve=-1.0)
+
+    def arm_and_hand(c, i, ox, oy, lifted):
+        x = CX + (-34 if i == 0 else 34)
+        arm = c.rrect(x - 10 + ox, 142 + oy, x + 10 + ox, 158 + oy, 3)
+        paint(c, arm, skin, round_px=5)
+        c.outline(OUTLINE, arm)
+        cuff = c.rrect(x - 12, 137, x + 12, 143, 2)
+        paint(c, cuff, CLOTH["thermal"], round_px=3)
+        c.outline(OUTLINE, cuff)
+        if i == 0:
+            wrist_port(c, x + ox, 151 + oy, burnt=True, scar=skin[5])
+        hand_rest(c, x + ox, 158 + oy, 23, skin, lifted=lifted, side=1 if i == 0 else -1, h=14)
+        for k in range(4):
+            c.px(x + ox - 9 + k * 6, 162 + oy, "b0403a")
+            c.px(x + ox - 8 + k * 6, 162 + oy, "c8483c")
+
+    for name, jerk in (("hands_a", False), ("hands_b", True)):
+        for i in (0, 1):
+            j = jerk and i == 0
+            arm_and_hand(p[name], i, -2 if j else 0, -2 if j else 0, (0, 1, 2, 3) if j else ())
+    c = p["hands_react"]
+    for i, x in enumerate((CX - 30, CX + 30)):
+        arm = c.seg([(x + (-9 if i == 0 else 9), 138), (x, 158)], 21)
+        paint(c, arm, skin, round_px=5)
+        c.outline(OUTLINE, arm)
+        if i == 0:
+            wrist_port(c, x - 5, 148, burnt=True, scar=skin[5])
+        fist(c, x, 158, 26, skin, knuckle="c8483c", h=13, side=1 if i == 0 else -1)
+        for dx in (-19, -16, 16, 19):
+            stroke(c, [(x + dx, 172), (x + dx + (3 if dx > 0 else -3), 167)], "warm7")
+
+    p.update({"brows_" + k: v for k, v in brows.items()})
+    p.update({"mouth_" + k: v for k, v in mouths.items()})
+    meta = {"zones": {"eyes": [CX - 26, cy - 10, 52, 20], "hands": [CX - 50, 157, 100, 18], "port": [CX - 46, 141, 24, 16]},
+            "face": {"brows": "angry", "mouth": "closed"}, "blink": [3.0, 6.0], "mouth_y": cy + 22}
+    return p, meta
+
+
+# ====================================================================== Vale
+def vale():
+    p = new_patient()
+    skin, suit, hair = SKIN["vale"], CLOTH["suit"], CLOTH["black"]
+    cy = 68
+    body, head = p["body"], p["head"]
+    yy, xx = body.grid()
+
+    jm = torso(body, [(CX - 54, 136), (CX - 40, 120), (CX + 40, 120), (CX + 54, 136), (CX + 56, 162), (CX - 56, 162)], suit)
+    finish(body, jm)
+    # off-centre closure, buttons, pocket square and a company badge
+    stroke(body, [(CX + 9, 122), (CX + 9, 159)], "ink0")
+    stroke(body, [(CX + 10, 123), (CX + 10, 159)], suit[3])
+    for by in (129, 141, 153):
+        body.px(CX + 5, by, "steel5")
+        body.px(CX + 5, by + 1, "steel2")
+    for s in (-1, 1):
+        stroke(body, [(CX + s * 30, 123), (CX + s * 46, 133)], suit[3])
+    stroke(body, [(CX - 34, 139), (CX - 25, 139)], "paper3")
+    stroke(body, [(CX - 34, 140), (CX - 27, 140)], "paper1")
+    badge = body.rect(CX + 22, 137, CX + 34, 143)
+    body.fill(badge, "steel1")
+    stroke(body, [(CX + 24, 139), (CX + 32, 139)], "steel4")
+    stroke(body, [(CX + 24, 141), (CX + 29, 141)], "amber")
+    # the collar, buttoned to the jaw
+    colm = body.rrect(CX - 13, 92, CX + 13, 121, 2)
+    paint(body, colm, suit, round_px=5, bias=0.1)
+    stroke(body, [(CX - 12, 92), (CX + 12, 92)], "paper3")
+    stroke(body, [(CX - 12, 93), (CX + 12, 93)], "paper1")
+    stroke(body, [(CX, 96), (CX, 120)], "ink0")
+    for by in (104, 110, 116):
+        body.px(CX + 2, by, "steel5")
+    body.fill(body.edge(colm, 1, 0), P.RIM)
+    body.outline(OUTLINE, colm)
+    for dx, dy, colr in ((0, 0, "red2"), (-1, 1, "red2"), (0, 1, "red3"), (1, 1, "red1"), (0, 2, "red1")):
+        body.px(CX - 7 + dx, 108 + dy, colr)
+
+    for s in (-1, 1):
+        ear = head.ell(CX + s * 24, cy + 3, 3.6, 6)
+        paint(head, ear, skin, round_px=3)
+        head.outline(OUTLINE, ear)
+    hm = head_mask(head, CX, cy, 48, 64, jaw=0.8, chin=0.42)
+    paint(head, hm, skin, round_px=13, round_amt=0.7)
+    for s in (-1, 1):
+        head.dither(hm & head.ell(CX + s * 15, cy + 15, 5, 8), skin[2], 0.5)
+    head.fill(head.edge(hm, 1, 0), P.RIM)
+    nose(head, CX, cy + 1, cy + 13, skin, w=2)
+    head.outline(OUTLINE, hm)
+    # combat optics: no whites, no lids. The lens is a hole; the emitter sits behind it.
+    housings = head.none()
+    for s in (-1, 1):
+        ex = CX + s * 13
+        hs = head.rrect(ex - 8, cy - 4, ex + 8, cy + 4, 2)
+        housings |= grow(hs, 1)
+        head.fill(hs, "steel1")
+        stroke(head, [(ex - 6, cy - 4), (ex + 6, cy - 4)], "steel4")
+        stroke(head, [(ex - 6, cy + 4), (ex + 6, cy + 4)], "steel0")
+        head.outline("ink0", hs)
+        stroke(head, [(ex + s * 9, cy), (CX + s * 23, cy - 1)], "steel1")
+        lens = head.rrect(ex - 6, cy - 2, ex + 6, cy + 2, 1)
+        body.fill(grow(lens, 2), "ink0")
+        head.erase(lens)
+        stroke(p["pupils"], [(ex - 3, cy), (ex + 3, cy)], "c9781e")
+        stroke(p["pupils"], [(ex - 1, cy), (ex + 1, cy)], "warm6")
+        p["pupils"].px(ex, cy, "warm7")
+    stroke(head, [(CX - 4, cy), (CX + 4, cy)], "steel1")
+
+    hmask = head.poly([(CX - 25, cy - 6), (CX - 25, cy - 22), (CX - 15, cy - 33), (CX + 6, cy - 37), (CX + 21, cy - 30),
+                       (CX + 26, cy - 14), (CX + 25, cy - 5), (CX + 21, cy - 16), (CX + 4, cy - 21), (CX - 6, cy - 14),
+                       (CX - 19, cy - 17)])
+    hmask = smooth(hmask, 1)
+    paint(head, hmask, hair, round_px=6, round_amt=0.6, contrast=1.0)
+    stroke(head, [(CX - 15, cy - 26), (CX + 8, cy - 33)], hair[3])
+    stroke(head, [(CX - 10, cy - 22), (CX + 14, cy - 27)], hair[2])
+    stroke(head, [(CX - 2, cy - 30), (CX + 10, cy - 33)], hair[4])
+    head.fill(head.edge(hmask, 1, 0), P.RIM)
+    head.outline(OUTLINE, hmask)
+
+    brows = brows_set(CX, cy, 13, "0e141c", width=2, lift=-1, span=7)
+    mouths = mouth_frames(CX, cy + 22, skin, width=9, curve=0.5)
+
+    def sleeves(c, spread=0):
+        for s in (-1, 1):
+            sl = c.seg([(CX + s * 38, 145), (CX + s * (19 + spread), 158)], 13)
+            paint(c, sl, suit, round_px=4)
+            c.outline(OUTLINE, sl)
+            cuff = c.seg([(CX + s * (20 + spread), 156), (CX + s * (15 + spread), 160)], 9)
+            c.fill(cuff, "paper3")
+            c.fill(c.edge(cuff, 0, 1), "paper1")
+            c.outline(OUTLINE, cuff)
+
+    for name in ("hands_a", "hands_b"):
+        c = p[name]
+        sleeves(c)
+        m = c.rrect(CX - 15, 157, CX + 15, 169, 4)
+        paint(c, m, skin, round_px=4, round_amt=0.5)
+        for i in range(-3, 4):
+            stroke(c, [(CX + i * 4, 159), (CX + i * 4, 167)], skin[2] if i % 2 else skin[1])
+        stroke(c, [(CX - 12, 158), (CX + 12, 158)], skin[5])
+        c.outline(OUTLINE, m)
+    c = p["hands_react"]
+    sleeves(c, spread=2)
+    fist(c, CX - 13, 157, 20, skin, knuckle="white", h=12, side=1)
+    hand_rest(c, CX + 13, 158, 17, skin, side=-1)
+
+    # ---- the turn: what shows once he stops pretending
+    face_skin = hm & ~hmask & ~housings
+
+    def turn_face(bloody):
+        t = layer()
+        roots = [(CX - 11, 93, -1.75, 30), (CX - 5, 93, -1.45, 22), (CX + 6, 93, -1.6, 26), (CX + 12, 93, -1.3, 32),
+                 (CX - 22, cy + 5, 0.9, 12), (CX + 22, cy + 5, 2.2, 12), (CX - 15, cy - 6, -1.9, 9), (CX + 15, cy - 6, -1.2, 9)]
+        threads(t, face_skin, roots, seed=31)
+        for s in (-1, 1):                                # optics down to pinpoints
+            ex = CX + s * 13
+            t.glow(t.all(), "red1", ex, cy, 12, amt=0.85)
+            t.fill(t.rrect(ex - 6, cy - 2, ex + 6, cy + 2, 1), "red0")
+            stroke(t, [(ex - 1, cy), (ex + 1, cy)], "red2")
+            stroke(t, [(ex, cy - 1), (ex, cy + 1)], "red2")
+            t.px(ex, cy, "white")
+        if bloody:                                       # the housings weep
+            blood_run(t, [(CX - 16, cy + 5), (CX - 17, cy + 12), (CX - 16, cy + 21)], wide=True)
+            blood_run(t, [(CX - 10, cy + 5), (CX - 10, cy + 11)])
+            blood_run(t, [(CX + 15, cy + 5), (CX + 16, cy + 15), (CX + 15, cy + 27)], wide=True)
+            blood_run(t, [(CX + 9, cy + 5), (CX + 9, cy + 9)])
+            blood_run(t, [(CX - 2, cy + 14), (CX - 2, cy + 18)], bead=False)
+            blood_run(t, [(CX + 2, cy + 14), (CX + 2, cy + 17)], bead=False)
+        return t
+
+    p["turn"] = turn_face(True)
+    p["turn_clean"] = turn_face(False)
+    for tag, bloody in (("", True), ("_clean", False)):
+        p["mouth_turn" + tag] = rictus(CX, cy + 22, skin, hw=9, gape=0, bloody=bloody)
+        p["mouth_turn_b" + tag] = rictus(CX, cy + 22, skin, hw=9, gape=4, bloody=bloody)
+
+    def saw_arm(c, elbow, wrist, hub, r, phase, show_fist=True):
+        (ax, ay), (bx, by), (hx, hy) = elbow, wrist, hub
+        arm = c.seg([elbow, wrist], 15)
+        paint(c, arm, suit, round_px=4)
+        c.outline(OUTLINE, arm)
+        # the sleeve has split along the forearm; the casing under it stands open and lit
+        slot = c.seg([(ax + (bx - ax) * 0.2, ay + (by - ay) * 0.2), wrist], 5) & arm
+        c.fill((grow(slot, 1) & ~slot) & arm, "steel4")
+        c.fill(slot, "ink0")
+        for t_ in (0.35, 0.55, 0.75, 0.92):
+            x, y = int(ax + (bx - ax) * t_), int(ay + (by - ay) * t_)
+            c.px(x, y, "red2")
+            c.px(x + 1, y, "red3")
+        for s in (-1, 1):                                # what is left of the cuff
+            flap = c.poly([(bx + s * 4, by + 2), (bx + s * 11, by - 3), (bx + s * 9, by + 5)])
+            c.fill(flap, "paper3")
+            c.outline(OUTLINE, flap)
+        if show_fist:
+            fist(c, int(bx), int(by) - 13, 20, skin, knuckle="white", h=13, side=1)
+        for s in (-1, 1):                                # the yoke that carries the disc
+            prong = c.seg([(bx + s * 5, by - 2), (hx + s * 4, hy)], 3)
+            c.fill(prong, "steel2")
+            c.fill(c.edge(prong, -1, 0) & prong, "steel4")
+            c.outline("ink0", prong)
+        saw_disc(c, hx, hy, r, phase)
+
+    def free_hand(c, flat, wet=True):
+        if flat:
+            sl = c.seg([(CX + 52, 170), (140, 132)], 15)
+            paint(c, sl, suit, round_px=4)
+            c.outline(OUTLINE, sl)
+            cuff = c.rrect(131, 125, 148, 131, 2)
+            c.fill(cuff, "paper3")
+            c.outline(OUTLINE, cuff)
+            palm_flat(c, 138, 109, 25, skin, side=-1, h=15, wet=wet)
+        else:
+            sl = c.seg([(CX + 44, 168), (CX + 36, 142)], 14)
+            paint(c, sl, suit, round_px=4)
+            c.outline(OUTLINE, sl)
+            cuff = c.rrect(CX + 28, 136, CX + 44, 141, 2)
+            c.fill(cuff, "paper3")
+            c.outline(OUTLINE, cuff)
+            palm_up(c, CX + 36, 122, 21, skin, side=-1, h=13)
+
+    for tag, phase in (("", 0.0), ("_b", 0.5)):
+        a = layer()                                      # wind-up
+        saw_arm(a, (CX - 50, 170), (CX - 42, 132), (CX - 40, 104), 14, phase)
+        free_hand(a, False)
+        p["attack" + tag] = a
+        for clean, wet in (("", True), ("_clean", False)):
+            a = layer()                                  # first blow: the palm
+            saw_arm(a, (CX - 50, 170), (CX - 42, 132), (CX - 40, 104), 14, phase + 0.25)
+            free_hand(a, True, wet)
+            p["attack_s1" + tag + clean] = a
+            a = layer()                                  # second blow: the saw goes to the glass
+            saw_arm(a, (CX - 44, 170), (39, 139), (32, 114), 18, phase, show_fist=False)
+            free_hand(a, True, wet)
+            p["attack_s2" + tag + clean] = a
+
+    p.update({"brows_" + k: v for k, v in brows.items()})
+    p.update({"mouth_" + k: v for k, v in mouths.items()})
+    meta = {"zones": {"eyes": [CX - 24, cy - 9, 48, 18], "hands": [CX - 42, 150, 84, 23], "port": [CX - 14, 98, 28, 24]},
+            "face": {"brows": "neutral", "mouth": "closed"}, "blink": None, "mouth_y": cy + 22,
+            "attack": {"style": "saw", "hand": [138, 108], "tool": [32, 114], "head": [CX, cy - 16], "face": [CX, cy + 8]}}
+    return p, meta
+
+
+# ====================================================================== Juno
+HEART = [".#.#.", "#####", "#####", ".###.", "..#.."]
+NOTE = ["..###", "..#.#", "..#..", "###..", "###.."]
+SQUINT_L = ["#....", ".##..", "...##", ".##..", "#...."]
+SQUINT_R = [r[::-1] for r in SQUINT_L]
+
+
+def juno():
+    p = new_patient()
+    skin, hair, chrome = SKIN["juno"], CLOTH["violet"], CLOTH["chrome"]
+    cy = 76
+    body, head = p["body"], p["head"]
+    yy, xx = body.grid()
+
+    jm = torso(body, [(CX - 48, 142), (CX - 34, 123), (CX + 34, 123), (CX + 48, 142), (CX + 50, 162), (CX - 50, 162)], CLOTH["leather"])
+    top = body.poly([(CX - 15, 121), (CX + 15, 121), (CX + 9, 162), (CX - 9, 162)]) & (yy < BASE_Y)
+    for i, colr in enumerate(("cyan0", "cyan1", "cyan2", "cyan1")):
+        body.fill(top & ((yy // 2) % 4 == i), colr)
+    body.dither(top, "mag1", np.clip((xx - CX + 2) / 24.0, 0, 0.6))
+    finish(body, jm)
+    for bx, by in ((35, 139), (39, 133), (43, 127)):
+        spike = body.poly([(bx - 3, by + 2), (bx + 3, by - 4), (bx - 7, by - 10)])
+        paint(body, spike, chrome, round_px=2, bias=0.12)
+        body.outline(OUTLINE, spike)
+    for s in (-1, 1):
+        lap = body.poly([(CX + s * 14, 120), (CX + s * 31, 125), (CX + s * 21, 150), (CX + s * 8, 162)]) & (yy < BASE_Y)
+        paint(body, lap, CLOTH["leather"], round_px=4, bias=0.16 if s < 0 else 0.04)
+        body.outline(OUTLINE, lap)
+        for t in (0.15, 0.4, 0.65, 0.9):
+            body.px(int(CX + s * (29 - 9 * t)), int(127 + 24 * t), "steel5")
+    # neck: voice box grille on her right, four jacks on her left, scars and a cable burn
+    nk = neck(body, CX - 9, CX + 9, 100, 126, skin, shadow=7)
+    vb = body.rrect(CX - 7, 109, CX - 2, 119, 1)
+    body.fill(vb, "steel1")
+    for gy in (111, 113, 115, 117):
+        stroke(body, [(CX - 6, gy), (CX - 3, gy)], "steel4")
+    body.px(CX - 5, 118, "cyan2")
+    body.outline("ink0", vb)
+    for i in range(4):
+        y = 108 + i * 4
+        body.fill(body.rect(CX + 4, y, CX + 6, y + 2), "steel4")
+        body.px(CX + 5, y + 1, "ink0")
+    stroke(body, [(CX + 1, 108), (CX + 2, 122)], skin[5])
+    stroke(body, [(CX + 7, 110), (CX + 8, 115)], skin[5])
+    for dx, dy in ((7, 118), (8, 119), (7, 120), (8, 121), (6, 121)):
+        body.px(CX + dx, dy, "7a4630")
+    body.px(CX + 7, 119, "4a2a22")
+    body.outline(OUTLINE, nk & (yy < 121))
+
+    for s in (-1, 1):
+        ear = head.ell(CX + s * 25, cy + 3, 3.6, 5.6)
+        paint(head, ear, skin, round_px=3)
+        head.outline(OUTLINE, ear)
+    hm = head_mask(head, CX, cy, 50, 56, jaw=0.8, chin=0.44)
+    paint(head, hm, skin, round_px=13, round_amt=0.7)
+    head.dither(hm & (xx > CX + 9) & (yy < cy - 9), hair[1], 0.55)
+    jawm = hm & head.poly([(CX - 32, cy + 4), (CX - 9, cy + 13), (CX + 9, cy + 13), (CX + 32, cy + 4), (CX + 32, cy + 44), (CX - 32, cy + 44)])
+    paint(head, jawm, chrome, round_px=6, round_amt=0.6, bias=-0.04)
+    stroke(head, [(CX - 26, cy + 6), (CX - 9, cy + 13), (CX + 9, cy + 13), (CX + 26, cy + 6)], "ink1")
+    head.px(CX - 20, cy + 12, "white")
+    head.px(CX + 20, cy + 12, "steel5")
+    stroke(head, [(CX, cy + 25), (CX, cy + 28)], chrome[1])
+    head.fill(head.edge(hm, 1, 0), P.RIM)
+    nose(head, CX, cy + 1, cy + 9, skin, w=2)
+    head.outline(OUTLINE, hm)
+    ring = head.ell(CX + 27, cy + 13, 5, 6) & ~head.ell(CX + 27, cy + 13, 3.4, 4.4)
+    head.fill(ring, "d4a040")
+    head.px(CX + 24, cy + 10, "f4d880")
+    head.outline(OUTLINE, ring)
+    head.px(CX + 26, cy + 1, "steel5")
+    head.px(CX + 26, cy + 4, "cyan2")
+    # display eyes: the screens are holes, the glyphs sit behind them
+    for s in (-1, 1):
+        ex = CX + s * 13
+        hs = head.rrect(ex - 8, cy - 5, ex + 8, cy + 5, 2)
+        head.fill(hs, "steel1")
+        stroke(head, [(ex - 6, cy - 5), (ex + 6, cy - 5)], "steel4")
+        stroke(head, [(ex - 6, cy + 5), (ex + 6, cy + 5)], "steel0")
+        head.outline("ink0", hs)
+        scr = head.rrect(ex - 6, cy - 3, ex + 6, cy + 3, 1)
+        body.fill(grow(scr, 2), "0a2e34")
+        head.erase(scr)
+        glyph(p["pupils"], ex, cy, HEART, "cyan3", "cyan2")
+        glyph(p.setdefault("pupils_b", layer()), ex, cy, NOTE, "cyan3", "cyan2")
+        r = p.setdefault("pupils_react", layer())
+        r.fill(grow(scr, 2), "cyan3")
+        glyph(r, ex, cy, SQUINT_L if s < 0 else SQUINT_R, "14484f")
+        p["lids"].fill(scr, "0a2e34")
+        stroke(p["lids"], [(ex - 4, cy), (ex + 4, cy)], "cyan1")
+
+    # big violet hair swept to her right, the other side shaved
+    hmask = head.ell(CX - 10, cy - 27, 26, 20) & (yy < cy - 14)
+    hmask |= head.poly([(CX - 36, cy - 16), (CX - 44, cy - 42), (CX - 26, cy - 58), (CX + 2, cy - 56), (CX + 16, cy - 44), (CX + 12, cy - 24)])
+    hmask |= head.poly([(CX - 37, cy - 28), (CX - 40, cy + 10), (CX - 32, cy + 22), (CX - 25, cy + 4), (CX - 25, cy - 14)])
+    hmask |= head.poly([(CX + 14, cy - 28), (CX - 20, cy - 9), (CX - 28, cy - 24)])
+    hmask = smooth(hmask, 2)
+    paint(head, hmask, hair, round_px=10, round_amt=0.8, contrast=1.1)
+    for a, b in (((CX - 32, cy - 30), (CX - 20, cy - 52)), ((CX - 24, cy - 24), (CX - 8, cy - 50)),
+                 ((CX - 12, cy - 20), (CX + 8, cy - 44)), ((CX - 35, cy - 8), (CX - 34, cy + 10))):
+        stroke(head, [a, b], hair[4])
+    stroke(head, [(CX - 28, cy - 34), (CX - 18, cy - 54)], hair[5])
+    head.dither(hmask & (yy < cy - 40), "mag2", np.clip((cy - 38 - yy) / 14.0, 0, 0.8))
+    head.dither(hmask & (yy > cy + 8), "mag2", 0.6)
+    head.fill(head.edge(hmask, 1, 0), P.RIM)
+    head.outline(OUTLINE, hmask)
+
+    brows = brows_set(CX, cy, 13, hair[0], width=2, lift=1, span=7)
+    mouths = mouth_frames(CX, cy + 20, chrome, width=9, curve=0.8, lip="a02a5e")
+
+    def chrome_hand(c, i, lifted=()):
+        x = CX + (-24 if i == 0 else 24)
+        sl = sleeve(c, x, 144, 155, 16, CLOTH["leather"])
+        c.outline(OUTLINE, sl)
+        c.px(x - 5, 153, "steel5")
+        c.px(x + 5, 153, "steel5")
+        hand_rest(c, x, 156, 17, chrome, lifted=lifted, side=1 if i == 0 else -1, seams=chrome[1], h=14)
+
+    for name, lf in (("hands_a", ()), ("hands_b", (2, 3))):
+        chrome_hand(p[name], 0)
+        chrome_hand(p[name], 1, lifted=lf)
+    c = p["hands_react"]
+    chrome_hand(c, 0)
+    arm = c.seg([(CX + 44, 166), (CX + 30, 140)], 14)
+    paint(c, arm, CLOTH["leather"], round_px=4)
+    c.outline(OUTLINE, arm)
+    fist(c, CX + 26, 124, 20, chrome, h=14, side=-1)
+    tip = c.rrect(CX + 19, 132, CX + 25, 144, 2)
+    paint(c, tip, chrome, round_px=3, bias=0.16)
+    c.px(CX + 21, 141, "white")
+    c.outline(OUTLINE, tip)
+
+    p.update({"brows_" + k: v for k, v in brows.items()})
+    p.update({"mouth_" + k: v for k, v in mouths.items()})
+    meta = {"zones": {"eyes": [CX - 24, cy - 9, 48, 18], "hands": [CX - 40, 156, 80, 18], "port": [CX - 12, 104, 24, 20]},
+            "face": {"brows": "neutral", "mouth": "closed"}, "blink": [2.0, 4.5], "mouth_y": cy + 20}
+    return p, meta
+
+
+# ====================================================================== Maren
+def maren():
+    p = new_patient()
+    skin, hair, chrome = SKIN["maren"], CLOTH["grey"], CLOTH["chrome"]
+    cy = 82
+    body, head = p["body"], p["head"]
+    yy, xx = body.grid()
+
+    jm = torso(body, [(CX - 60, 142), (CX - 44, 122), (CX + 44, 122), (CX + 60, 142), (CX + 62, 162), (CX - 62, 162)], CLOTH["canvas"])
+    und = body.poly([(CX - 12, 119), (CX + 12, 119), (CX, 136)])
+    paint(body, und, CLOTH["thermal"], round_px=3)
+    bib = body.rect(CX - 20, 138, CX + 20, 162) & (yy < BASE_Y)
+    paint(body, bib, CLOTH["apron"], round_px=6)
+    for s in (-1, 1):
+        st = body.seg([(CX + s * 19, 138), (CX + s * 30, 122)], 4) & jm
+        paint(body, st, CLOTH["apron"], round_px=2)
+        body.px(CX + s * 18, 140, "d4a040")
+    stroke(body, [(CX + 11, 143), (CX + 11, 133)], "e2c58a")
+    body.px(CX + 11, 132, "ink0")
+    body.outline(OUTLINE, bib)
+    # steel shoulder guard on the welding arm (her right)
+    pad = body.poly([(CX - 63, 141), (CX - 45, 121), (CX - 29, 125), (CX - 34, 146), (CX - 63, 153)]) & (yy < BASE_Y)
+    paint(body, pad, chrome, round_px=5, bias=-0.06)
+    stroke(body, [(CX - 56, 137), (CX - 34, 132)], chrome[1])
+    stroke(body, [(CX - 59, 146), (CX - 35, 140)], chrome[1])
+    body.px(CX - 42, 127, "white")
+    body.px(CX - 37, 143, "steel5")
+    finish(body, jm | pad)
+    body.outline(OUTLINE, pad)
+    for s in (-1, 1):
+        flap = body.poly([(CX + s * 10, 117), (CX + s * 25, 122), (CX + s * 18, 133), (CX + s * 8, 127)])
+        paint(body, flap, CLOTH["canvas"], round_px=4, bias=0.12 if s < 0 else 0.0)
+        body.outline(OUTLINE, flap)
+    nk = neck(body, CX - 9, CX + 9, 108, 121, skin, shadow=6)
+    body.outline(OUTLINE, nk & (yy < 116))
+
+    for s in (-1, 1):
+        ear = head.ell(CX + s * 27, cy + 3, 4, 6)
+        paint(head, ear, skin, round_px=3)
+        head.outline(OUTLINE, ear)
+    hm = head_mask(head, CX, cy, 54, 58, jaw=0.9, chin=0.54)
+    paint(head, hm, skin, round_px=13, round_amt=0.7)
+    for s in (-1, 1):
+        head.dither(hm & head.ell(CX + s * 15, cy + 8, 9, 5), "c8705e", 0.4)
+        head.dither(hm & head.ell(CX + s * 23, cy - 2, 4, 6), "c8705e", 0.4)
+        stroke(head, [(CX + s * 18, cy + 6), (CX + s * 9, cy + 7)], skin[2])
+        stroke(head, [(CX + s * 7, cy + 14), (CX + s * 10, cy + 21)], skin[2])
+        stroke(head, [(CX + s * 22, cy - 1), (CX + s * 25, cy - 3)], skin[2])
+    head.fill(head.edge(hm, 1, 0), P.RIM)
+    nose(head, CX, cy + 2, cy + 12, skin, w=3)
+    head.outline(OUTLINE, hm)
+    holes = [almond(head, CX + s * 13, cy + 1, 6.6, 3.7) for s in (-1, 1)]
+    eye_whites(body, holes)
+    for i, hmk in enumerate(holes):
+        s = -1 if i == 0 else 1
+        head.erase(hmk)
+        lid_lines(head, hmk, skin, lash=2)
+        natural_pupil(p["pupils"], CX + s * 13, cy + 1, ("2c3a26", "7a9460"), r=3.0)
+        blink(p["lids"], hmk, skin)
+
+    hmask = head.ell(CX, cy - 17, 28.5, 18) & (yy < cy - 13)
+    hmask |= head.ell(CX + 9, cy - 39, 11, 9)
+    for s in (-1, 1):
+        hmask |= head.poly([(CX + s * 27, cy - 14), (CX + s * 29, cy + 1), (CX + s * 24, cy - 8)])
+    hmask = smooth(hmask, 1)
+    paint(head, hmask, hair, round_px=8, round_amt=0.7)
+    for a, b in (((CX - 16, cy - 30), (CX - 22, cy - 20)), ((CX + 14, cy - 31), (CX + 21, cy - 22)), ((CX + 4, cy - 44), (CX + 13, cy - 44))):
+        stroke(head, [a, b], hair[4])
+    head.fill(head.edge(hmask, 1, 0), P.RIM)
+    head.outline(OUTLINE, hmask)
+    # welding goggles pushed up on the forehead
+    strap = head.rect(CX - 28, cy - 23, CX + 28, cy - 19) & (hmask | hm)
+    head.fill(strap, CLOTH["apron"][1])
+    head.fill(strap & (yy == cy - 23), CLOTH["apron"][3])
+    for s in (-1, 1):
+        gx, gy = CX + s * 11, cy - 22
+        rim_ = head.ell(gx, gy, 8.4, 7.4)
+        paint(head, rim_, chrome, round_px=3)
+        glass = head.ell(gx, gy, 5.6, 4.8)
+        head.fill(glass, "0e2418")
+        head.dither(glass, "1f4a2c", 0.5)
+        stroke(head, [(gx - 3, gy - 2), (gx - 1, gy - 3)], "8fe07a")
+        head.outline(OUTLINE, rim_)
+    stroke(head, [(CX - 3, cy - 23), (CX + 3, cy - 23)], "steel2")
+
+    brows = brows_set(CX, cy + 1, 13, "4a5458", width=2, lift=0, span=7)
+    mouths = mouth_frames(CX, cy + 21, skin, width=9, curve=0.4)
+
+    def torch_hand(c, x, y):
+        arm = c.rrect(x - 10, y - 15, x + 10, y + 1, 3)
+        paint(c, arm, chrome, round_px=5, bias=-0.08)
+        stroke(c, [(x - 9, y - 9), (x + 9, y - 9)], chrome[1])
+        stroke(c, [(x - 9, y - 4), (x + 9, y - 4)], chrome[1])
+        c.px(x - 7, y - 12, "white")
+        c.px(x + 7, y - 7, "steel0")
+        c.outline(OUTLINE, arm)
+        hand_rest(c, x, y, 21, GAUNTLET, side=1, seams=GAUNTLET[1], h=14)
+        tube = c.rrect(x - 3, y - 6, x + 3, y + 8, 2)
+        paint(c, tube, chrome, round_px=2, bias=-0.1)
+        c.outline(OUTLINE, tube)
+        c.fill(c.ell(x, y + 7, 2.4, 2), "ink0")
+        c.px(x, y + 7, "cyan1")
+
+    def glove_cuff(c, x, y=142):
+        cuff = c.rrect(x - 10, y, x + 10, y + 16, 3)
+        paint(c, cuff, GLOVE, round_px=5)
+        stroke(c, [(x - 8, y + 4), (x + 8, y + 4)], GLOVE[1])
+        stroke(c, [(x - 8, y + 5), (x + 8, y + 5)], GLOVE[4])
+        c.outline(OUTLINE, cuff)
+
+    for name, closed in (("hands_a", False), ("hands_b", True)):
+        c = p[name]
+        torch_hand(c, CX - 30, 157)
+        glove_cuff(c, CX + 30)
+        if closed:
+            fist(c, CX + 30, 158, 21, GLOVE, knuckle=GLOVE[4], h=12, side=-1)
+        else:
+            hand_rest(c, CX + 30, 158, 21, GLOVE, side=-1, seams=GLOVE[1], h=14)
+    c = p["hands_react"]
+    torch_hand(c, CX - 30, 155)
+    glove_cuff(c, CX + 30, 140)
+    hand_rest(c, CX + 30, 156, 21, GLOVE, lifted=(0, 1, 2, 3), side=-1, seams=GLOVE[1], h=14)
+
+    # ---- the turn: her arm decides, and she watches it happen
+    face_skin = (hm | body.rect(CX - 9, 108, CX + 9, 121)) & ~hmask & (yy > cy - 12)
+
+    def turn_face(bloody):
+        t = layer()
+        ty, tx = t.grid()
+        roots = [(CX - 6, 121, -1.7, 34), (CX + 1, 121, -1.5, 26), (CX + 7, 121, -1.35, 36),
+                 (CX - 25, cy + 5, 0.5, 12), (CX + 25, cy + 5, 2.6, 12), (CX - 21, cy - 5, 1.2, 8), (CX + 21, cy - 5, 1.9, 8)]
+        threads(t, face_skin, roots, seed=47)
+        for s in (-1, 1):                                # eyes forced wide, pupils shrunk to dots
+            ex, ey = CX + s * 13, cy + 1
+            wide = almond(t, ex, ey, 8.0, 5.4)
+            t.fill(grow(wide, 1), OUTLINE)
+            t.fill(wide, "paper3")
+            t.fill(wide & (ty <= ey - 4), "paper1")
+            for dx, dy in ((-6, 0), (-5, 1), (6, 1), (5, -1), (-4, -2)):
+                t.px(ex + s * dx, ey + dy, "red2" if bloody else "c8705e")
+            t.fill(t.ell(ex, ey, 2.3, 2.3), "2c3a26")
+            t.fill(t.ell(ex, ey, 1.1, 1.1), "ink0")
+            t.px(ex - 1, ey - 1, "white")
+            t.fill((grow(wide, 1) & ~wide) & (ty > ey + 1), "red1" if bloody else skin[1])
+            stroke(t, [(ex + s * 5, cy + 7), (ex + s * 6, cy + 15)], "dbe6e0")       # tears
+            t.px(ex + s * 6, cy + 16, "white")
+        if bloody:
+            for s in (-1, 1):
+                ex = CX + s * 13
+                blood_run(t, [(ex - s * 2, cy + 7), (ex - s * 3, cy + 13), (ex - s * 2, cy + 19)], wide=(s < 0))
+                blood_run(t, [(ex + s * 1, cy + 7), (ex + s * 1, cy + 11)])
+            blood_run(t, [(CX - 2, cy + 14), (CX - 2, cy + 17)], bead=False)
+            blood_run(t, [(CX + 3, cy + 14), (CX + 3, cy + 17)], bead=False)
+        return t
+
+    p["turn"] = turn_face(True)
+    p["turn_clean"] = turn_face(False)
+    for tag, bloody in (("", True), ("_clean", False)):
+        p["mouth_turn" + tag] = rictus(CX, cy + 21, skin, hw=7, gape=5, bloody=bloody)
+        p["mouth_turn_b" + tag] = rictus(CX, cy + 21, skin, hw=7, gape=2, bloody=bloody)
+
+    def torch_arm(c, elbow, block, flare, big, phase):
+        (bx, by), (fx, fy) = block, flare
+        arm = c.seg([elbow, (bx, by + 10)], 18)
+        paint(c, arm, chrome, round_px=5, bias=-0.06)
+        c.outline(OUTLINE, arm)
+        hw = 14 if big else 12
+        blk = c.rrect(bx - hw, by - hw, bx + hw, by + hw, 4)
+        paint(c, blk, GAUNTLET, round_px=5)
+        c.outline(OUTLINE, blk)
+        r = 30 if big else 24
+        c.glow(c.all(), "cyan1", fx, fy, r, amt=0.9)
+        c.glow(c.all(), "cyan2", fx, fy, r * 0.6, amt=1.0)
+        rng = np.random.default_rng(11 + int(phase * 10) + (5 if big else 0))
+        n = 9 if big else 7
+        for i in range(n):                               # the flare spits
+            ang = 2 * np.pi * (i + phase) / n + rng.uniform(-0.2, 0.2)
+            ln = rng.uniform(0.5, 1.0) * r * 0.8
+            stroke(c, [(fx, fy), (fx + np.cos(ang) * ln, fy + np.sin(ang) * ln)], "cyan3")
+            stroke(c, [(fx, fy), (fx + np.cos(ang) * ln * 0.5, fy + np.sin(ang) * ln * 0.5)], "white")
+        core = 8 if big else 7
+        c.fill(c.ell(fx, fy, core, core), "cyan3")
+        c.fill(c.ell(fx, fy, core - 3, core - 3), "white")
+        for _ in range(8):
+            ang, d = rng.uniform(0, 2 * np.pi), rng.uniform(r * 0.5, r)
+            c.px(int(fx + np.cos(ang) * d), int(fy + np.sin(ang) * d), "white")
+
+    def free_hand(c, flat, wet=True):
+        if flat:
+            gl = c.seg([(CX + 54, 170), (140, 136)], 16)
+            paint(c, gl, CLOTH["canvas"], round_px=5)
+            c.outline(OUTLINE, gl)
+            glove_cuff(c, 138, 123)
+            palm_flat(c, 138, 109, 25, GLOVE, side=-1, h=15, wet=wet)
+        else:
+            gl = c.seg([(CX + 46, 166), (CX + 36, 142)], 16)
+            paint(c, gl, CLOTH["canvas"], round_px=5)
+            c.outline(OUTLINE, gl)
+            glove_cuff(c, CX + 34, 126)
+            palm_up(c, CX + 34, 114, 21, GLOVE, side=1, h=13)
+
+    for tag, phase in (("", 0.0), ("_b", 0.5)):
+        a = layer()                                      # the hands rise before she does
+        torch_arm(a, (CX - 50, 166), (CX - 32, 116), (CX - 32, 112), False, phase)
+        free_hand(a, False)
+        p["attack" + tag] = a
+        for clean, wet in (("", True), ("_clean", False)):
+            a = layer()                                  # first blow: the glove
+            torch_arm(a, (CX - 50, 166), (CX - 32, 116), (CX - 32, 112), False, phase + 0.25)
+            free_hand(a, True, wet)
+            p["attack_s1" + tag + clean] = a
+            a = layer()                                  # second blow: the torch against the glass
+            torch_arm(a, (CX - 46, 170), (34, 118), (32, 114), True, phase)
+            free_hand(a, True, wet)
+            p["attack_s2" + tag + clean] = a
+
+    p.update({"brows_" + k: v for k, v in brows.items()})
+    p.update({"mouth_" + k: v for k, v in mouths.items()})
+    meta = {"zones": {"eyes": [CX - 26, cy - 8, 52, 18], "hands": [CX - 44, 157, 88, 18], "port": [CX + 18, 141, 24, 16]},
+            "face": {"brows": "neutral", "mouth": "closed"}, "blink": [3.0, 6.0], "mouth_y": cy + 21,
+            "attack": {"style": "torch", "hand": [138, 108], "tool": [32, 114], "head": [CX, cy - 22], "face": [CX, cy + 8]}}
+    return p, meta
+
+
+# ====================================================================== export
+ORDER = ["body", "pupils", "head"]
+
+
+def compose(p, brows="neutral", mouth="closed", hands="hands_a", lids=False, bg=None, pupils="pupils", turn=None):
+    c = Canvas(W, H, bg)
+    c.blit(p["body"])
+    c.blit(p[pupils if pupils in p else "pupils"])
+    c.blit(p["head"])
+    c.blit(p["brows_" + brows])
+    if turn:
+        c.blit(p[turn])
+    c.blit(p["mouth_" + mouth])
+    if lids:
+        c.blit(p["lids"])
+    c.blit(p[hands])
+    return c
+
+
+BUILDERS = {"kip": kip, "rook": rook, "vale": vale, "juno": juno, "maren": maren}
+
+
+def main(only=None):
+    metas = {}
+    meta_path = os.path.join(ASSETS, "patients", "meta.json")
+    if os.path.exists(meta_path):
+        with open(meta_path, encoding="utf-8") as f:
+            metas = json.load(f)
+    for pid, fn in BUILDERS.items():
+        if only and pid not in only:
+            continue
+        p, meta = fn()
+        for k, c in p.items():
+            c.save("patients/%s/%s.png" % (pid, k))
+        sil = silhouette([p["body"], p["head"]])
+        sil.save("patients/%s/hallcam.png" % pid)
+        meta["layers"] = sorted(p.keys())
+        metas[pid] = meta
+        sheet = [("neutral", compose(p, bg="teal2")),
+                 ("default", compose(p, meta["face"]["brows"], meta["face"]["mouth"], bg="teal2")),
+                 ("talk a", compose(p, meta["face"]["brows"], "a", "hands_b", bg="teal2", pupils="pupils_b")),
+                 ("talk b / blink", compose(p, "neutral", "b", "hands_b", lids=True, bg="teal2")),
+                 ("upset", compose(p, "worried", "upset", "hands_react", bg="teal2")),
+                 ("angry", compose(p, "angry", "angry", "hands_react", bg="teal2", pupils="pupils_react")),
+                 ("cam", sil)]
+        if "attack" in p:
+            b = "angry" if meta["attack"]["style"] == "saw" else "worried"
+            sheet += [("turn", compose(p, b, "turn", "attack", bg="teal2", turn="turn")),
+                      ("blow 1", compose(p, b, "turn_b", "attack_s1_b", bg="teal2", turn="turn")),
+                      ("blow 2", compose(p, b, "turn", "attack_s2", bg="teal2", turn="turn")),
+                      ("blow 2 b, clean", compose(p, b, "turn_b_clean", "attack_s2_b_clean", bg="teal2", turn="turn_clean"))]
+        contact_sheet(sheet, os.path.join(OUT, "patient_%s.png" % pid), scale=3, per_row=4)
+    with open(meta_path, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(metas, f, indent=1, sort_keys=True)
+    print("patients written:", ", ".join(sorted(metas)))
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:] or None)

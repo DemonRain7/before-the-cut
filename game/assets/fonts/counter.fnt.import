@@ -1,0 +1,17 @@
+[remap]
+
+importer="font_data_bmfont"
+type="FontFile"
+uid="uid://sg251yq7gy1t"
+path="res://.godot/imported/counter.fnt-f48b0b89c484ff640d228148d566abd8.fontdata"
+
+[deps]
+
+source_file="res://assets/fonts/counter.fnt"
+dest_files=["res://.godot/imported/counter.fnt-f48b0b89c484ff640d228148d566abd8.fontdata"]
+
+[params]
+
+fallbacks=[]
+compress=true
+scaling_mode=2

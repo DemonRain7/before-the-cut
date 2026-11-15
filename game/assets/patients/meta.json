@@ -1,0 +1,311 @@
+{
+ "juno": {
+  "blink": [
+   2.0,
+   4.5
+  ],
+  "face": {
+   "brows": "neutral",
+   "mouth": "closed"
+  },
+  "layers": [
+   "body",
+   "brows_angry",
+   "brows_neutral",
+   "brows_worried",
+   "hands_a",
+   "hands_b",
+   "hands_react",
+   "head",
+   "lids",
+   "mouth_a",
+   "mouth_angry",
+   "mouth_b",
+   "mouth_closed",
+   "mouth_upset",
+   "pupils",
+   "pupils_b",
+   "pupils_react"
+  ],
+  "mouth_y": 96,
+  "zones": {
+   "eyes": [
+    56,
+    67,
+    48,
+    18
+   ],
+   "hands": [
+    40,
+    156,
+    80,
+    18
+   ],
+   "port": [
+    68,
+    104,
+    24,
+    20
+   ]
+  }
+ },
+ "kip": {
+  "blink": [
+   1.4,
+   3.2
+  ],
+  "face": {
+   "brows": "worried",
+   "mouth": "closed"
+  },
+  "layers": [
+   "body",
+   "brows_angry",
+   "brows_neutral",
+   "brows_worried",
+   "hands_a",
+   "hands_b",
+   "hands_react",
+   "head",
+   "lids",
+   "mouth_a",
+   "mouth_angry",
+   "mouth_b",
+   "mouth_closed",
+   "mouth_upset",
+   "pupils"
+  ],
+  "mouth_y": 97,
+  "zones": {
+   "eyes": [
+    54,
+    66,
+    52,
+    22
+   ],
+   "hands": [
+    42,
+    157,
+    76,
+    17
+   ],
+   "port": [
+    46,
+    143,
+    20,
+    14
+   ]
+  }
+ },
+ "maren": {
+  "attack": {
+   "face": [
+    80,
+    90
+   ],
+   "hand": [
+    138,
+    108
+   ],
+   "head": [
+    80,
+    60
+   ],
+   "style": "torch",
+   "tool": [
+    32,
+    114
+   ]
+  },
+  "blink": [
+   3.0,
+   6.0
+  ],
+  "face": {
+   "brows": "neutral",
+   "mouth": "closed"
+  },
+  "layers": [
+   "attack",
+   "attack_b",
+   "attack_s1",
+   "attack_s1_b",
+   "attack_s1_b_clean",
+   "attack_s1_clean",
+   "attack_s2",
+   "attack_s2_b",
+   "attack_s2_b_clean",
+   "attack_s2_clean",
+   "body",
+   "brows_angry",
+   "brows_neutral",
+   "brows_worried",
+   "hands_a",
+   "hands_b",
+   "hands_react",
+   "head",
+   "lids",
+   "mouth_a",
+   "mouth_angry",
+   "mouth_b",
+   "mouth_closed",
+   "mouth_turn",
+   "mouth_turn_b",
+   "mouth_turn_b_clean",
+   "mouth_turn_clean",
+   "mouth_upset",
+   "pupils",
+   "turn",
+   "turn_clean"
+  ],
+  "mouth_y": 103,
+  "zones": {
+   "eyes": [
+    54,
+    74,
+    52,
+    18
+   ],
+   "hands": [
+    36,
+    157,
+    88,
+    18
+   ],
+   "port": [
+    98,
+    141,
+    24,
+    16
+   ]
+  }
+ },
+ "rook": {
+  "blink": [
+   3.0,
+   6.0
+  ],
+  "face": {
+   "brows": "angry",
+   "mouth": "closed"
+  },
+  "layers": [
+   "body",
+   "brows_angry",
+   "brows_neutral",
+   "brows_worried",
+   "hands_a",
+   "hands_b",
+   "hands_react",
+   "head",
+   "lids",
+   "mouth_a",
+   "mouth_angry",
+   "mouth_b",
+   "mouth_closed",
+   "mouth_upset",
+   "pupils"
+  ],
+  "mouth_y": 92,
+  "zones": {
+   "eyes": [
+    54,
+    60,
+    52,
+    20
+   ],
+   "hands": [
+    30,
+    157,
+    100,
+    18
+   ],
+   "port": [
+    34,
+    141,
+    24,
+    16
+   ]
+  }
+ },
+ "vale": {
+  "attack": {
+   "face": [
+    80,
+    76
+   ],
+   "hand": [
+    138,
+    108
+   ],
+   "head": [
+    80,
+    52
+   ],
+   "style": "saw",
+   "tool": [
+    32,
+    114
+   ]
+  },
+  "blink": null,
+  "face": {
+   "brows": "neutral",
+   "mouth": "closed"
+  },
+  "layers": [
+   "attack",
+   "attack_b",
+   "attack_s1",
+   "attack_s1_b",
+   "attack_s1_b_clean",
+   "attack_s1_clean",
+   "attack_s2",
+   "attack_s2_b",
+   "attack_s2_b_clean",
+   "attack_s2_clean",
+   "body",
+   "brows_angry",
+   "brows_neutral",
+   "brows_worried",
+   "hands_a",
+   "hands_b",
+   "hands_react",
+   "head",
+   "lids",
+   "mouth_a",
+   "mouth_angry",
+   "mouth_b",
+   "mouth_closed",
+   "mouth_turn",
+   "mouth_turn_b",
+   "mouth_turn_b_clean",
+   "mouth_turn_clean",
+   "mouth_upset",
+   "pupils",
+   "turn",
+   "turn_clean"
+  ],
+  "mouth_y": 90,
+  "zones": {
+   "eyes": [
+    56,
+    59,
+    48,
+    18
+   ],
+   "hands": [
+    38,
+    150,
+    84,
+    23
+   ],
+   "port": [
+    66,
+    98,
+    28,
+    24
+   ]
+  }
+ }
+}

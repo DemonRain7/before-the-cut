@@ -1,0 +1,56 @@
+# Settings for the patient-dialogue proxy. Copy this file to ".dev.vars" and edit the copy.
+# ".dev.vars" is ignored by Git. Never commit real keys and never put them in the Godot project.
+# "npm run dev" loads .dev.vars if it exists. Wrangler reads the same file for local Worker runs.
+
+# mock   = a transport fixture. It returns one fixed, labelled patient line and one fixed, labelled
+#          transcript. It is not intelligent and it cannot hear. No network, no key, no cost. Default.
+# google = Gemini through the Gemini API or Vertex AI. Never called against the live service yet.
+# openai = OpenAI through an API key. Never called against the live service yet.
+BTC_PROVIDER=mock
+
+# The patient's lines come from BTC_MODEL. Defaults: gemini-3.5-flash-lite for google,
+# gpt-6-luna for openai. Uncomment one when you switch providers.
+# BTC_MODEL=gemini-3.5-flash-lite
+# BTC_MODEL=gpt-6-luna
+
+# Push-to-talk: the model that turns a spoken clip into text.
+#   google: leave it out to use BTC_MODEL, which must then accept audio input (not checked live).
+#   openai: defaults to gpt-4o-mini-transcribe; gpt-transcribe also works with the same request.
+# BTC_STT_MODEL=
+
+# --- OpenAI (BTC_PROVIDER=openai) ---
+# An API key from the OpenAI API platform (platform.openai.com, API keys). ChatGPT sign-in does
+# not work here and does not draw on API credit. Paste the key only into ".dev.vars".
+# OPENAI_API_KEY=
+# none (default) for gpt-6-luna; minimal for gpt-5-nano; empty to leave the setting out.
+# BTC_REASONING_EFFORT=none
+
+# --- Google (BTC_PROVIDER=google) ---
+
+# Option 1, Gemini API key:
+# GEMINI_API_KEY=
+
+# Option 2, Vertex AI (the course default). The token is short-lived; print one with:
+#   gcloud auth application-default print-access-token
+# GOOGLE_CLOUD_PROJECT=
+# GOOGLE_CLOUD_LOCATION=global
+# GOOGLE_ACCESS_TOKEN=
+
+# Local server address.
+# BTC_HOST=127.0.0.1
+# BTC_PORT=8787
+
+# How long the proxy waits for a patient line, in milliseconds (default 3500).
+# Keep it below the game's own deadline: rules.json, agent.timeout_ms = 4000.
+# BTC_UPSTREAM_TIMEOUT_MS=3500
+
+# How long the proxy waits for a transcript, in milliseconds (default 6000).
+# Keep it below the game's own deadline: rules.json, agent.voice.timeout_ms = 7000.
+# BTC_TRANSCRIBE_TIMEOUT_MS=6000
+
+# Mock only: force a failure on every call, to watch the game fall back to its authored lines
+# or show its push-to-talk hints. One of:
+#   both routes:   timeout, slow:<ms>, http_error, invalid_shape
+#   patient lines: invalid_json, long_line, readout_line (an accepted line, kept as a fixture)
+#   transcripts:   stt_empty, stt_long, stt_fancy
+# BTC_MOCK_FAIL=timeout

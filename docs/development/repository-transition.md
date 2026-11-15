@@ -1,6 +1,18 @@
 # Repository transition
 
-Status on November 14, 2026: repository naming and documentation organization are ready; source transfer is deferred because the student confirmed that Claude/Fable is still writing in the legacy workspace.
+**Status on November 15, 2026: the transfer is complete.** This checkout is the only active one; `fathom` is an archive until the student chooses to remove it. The student gave the transfer to the next agent to schedule; Claude did it after its own work in `fathom` stopped, with no other writer running.
+
+What was done, step by step against the list below:
+
+1. Read the legacy `HANDOFF.md` and the source. Claude was the only writer.
+2. Copied `game/` (without `.godot/`), `agent_proxy/` (without `node_modules/`, `.dev.vars`, `.wrangler/`), `tools/art/` (without `out/` and `__pycache__/`), `tools/gd_static_check.py`, `tools/run_hidden.py`, `tools/run_proxy_integration.mjs`, `run-game.ps1`, and `DIRECTION.md` as `docs/development/direction.md`. Not copied: the one-off G1 and migration scripts (`prepare_g1_repository.py`, `revise_g1_*.py`, `build_g1_script_docx.py`, `migrate_autonomous_runtime.py`), the legacy handoff files, `g1/` media and deck sources, `exports/`, `history/`. Removed the three `.gitkeep` files.
+3. `*.import` is no longer ignored: Godot's import settings and resource ids belong in the repository, only the `.godot/` cache does not. `agent_proxy/.dev.vars.example` holds empty placeholders only. `validation/` was copied locally for the evidence links and stays ignored.
+4. `docs/g1/05` and `docs/g1/README.md` now record the submitted post. `docs/g1/01`-`04`, `06` and `07` are the submitted G1 versions and were not changed. Paths that named the `fathom` folder now name the repository root; `agent_proxy/README.md` links `docs/g1/`.
+5. Imported `game/project.godot` fresh and ran every check here (results in `HANDOFF.md`; logs in the local `validation/2026-11-15/transfer-checks/`). A capture run on a hidden desktop drew 122 frames; the first 38, which include every text screen of the first patient, are pixel-identical to the frames drawn in `fathom`. No paid call was made.
+6. Scanned the staged files for keys, tokens and personal details: none found.
+7. Updated the root `HANDOFF.md`, `NEXT_AGENT_PROMPT.md`, `README.md`, `AGENTS.md` and `agent-config.json`.
+
+The checklist below is kept as the record of the plan.
 
 ## One project, one eventual working checkout
 

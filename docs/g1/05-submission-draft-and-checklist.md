@@ -1,6 +1,6 @@
 # G1 submission checklist
 
-Updated November 14, 2026, New York time. **Prepared for student review; not posted.** Uploading files and publishing repository documents do not submit the discussion post. The final **Reply** click belongs to the student.
+Updated November 14, 2026, 23:41 New York time. **Submitted by the student at 23:16; recording link updated at 23:41.** The original main post remains in place. Use **Recording (MP4 - updated)**; Canvas retained the older graded attachment, which the new link explicitly supersedes.
 
 ## Confirmed deadlines
 
@@ -21,13 +21,15 @@ Updated November 14, 2026, New York time. **Prepared for student review; not pos
 - [x] Upload the final MP4 as the discussion attachment and verify its CourseWorks filename and file size. The media-embed route did not retain the video; use the actual file attachment and recording link.
 - [x] Prepare the main-post title, explanation, links and accurate AI-use disclosure in the discussion editor.
 
-## Student review and final click
+## Main post submitted and video updated
 
-- [ ] Review the draft at the [G1 discussion](https://courseworks2.columbia.edu/courses/258228/discussion_topics/1701307). Confirm that the recording and PDF links and the MP4 attachment are present. The repository links are already in the body.
-- [ ] Click the blue **Reply** button under the completed editor by **November 15, 11:59 p.m.** This publishes the main G1 post. Do not press Cancel or reload the unsubmitted draft.
-- [ ] Verify that the new post appears under the student's name. Record the actual post URL and time; neither is claimed yet.
+- [x] The student reviewed and published the main post at **November 14, 23:16 New York**.
+- [x] Verify the existing entry under the student's name in the [G1 discussion](https://courseworks2.columbia.edu/courses/258228/discussion_topics/1701307).
+- [x] At the student's request, retain 00:00-02:21 of the 23:24:28 recording and append the complete 23:27:32 recording. Current file: `before-the-cut-g1-recording-updated.mp4`, **5:30.33**, with no speed change.
+- [x] Upload the new video and save the new recording link in the same post at **23:41**. Verify that all non-video text and links are unchanged.
+- [x] Explain beside the link that the updated video supersedes the older graded attachment retained by Canvas.
 
-The final video is **5:49.17**. The student explicitly chose to retain its duration. The assignment's three-to-five-minute criterion is not claimed as met. No other part of the video was shortened or sped up.
+The assignment's three-to-five-minute criterion is not claimed as met. The student explicitly declined duration editing. Video verification and the posted-state screenshot are local evidence, not published: `validation/2026-11-14/recording-update-2327/` in the student's checkout. The media preview was still processing when checked; the uploaded file page, size and published status were verified. Other-account access and a download checksum were not tested.
 
 ## After the G1 main post
 
@@ -42,9 +44,9 @@ The final video is **5:49.17**. The student explicitly chose to retain its durat
 These are next development tasks, not extra November 15 deliverables:
 
 - Move the project plan into Asana after G1.
-- Resume the separately prepared Claude/Fable and voice handoffs when the student chooses to continue development.
+- Continue development from the current [handoff](../../HANDOFF.md).
 - Verify the newer Trauma Team encounter, connect an authorized live model, measure real latency/cost/dialogue quality, and observe an outside playtester.
-- Transfer the active game source into the shared repository after the active writer reaches a safe checkpoint. The current public repository contains the G1 documents and production-agent briefs; it does not yet claim a runnable game.
+- Done on November 15: the game, the patient-AI proxy and the tools were transferred into this repository (`game/`, `agent_proxy/`, `tools/`) and checked here. See the [handoff](../../HANDOFF.md) for what has and has not been verified.
 
 The earlier November 23 / November 28 / December 5 gate plan remains in the Initial Project Plan and must be reconfirmed against the corresponding current assignments when active.
 

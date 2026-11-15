@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "title": "NORMAL REFERENCE SHEET",
+  "subtitle": "What a steady patient looks like.",
+  "rows": [
+    {"id": "eyes", "label": "EYES",
+     "normal": "Pupils tighten in light. Both eyes follow it.",
+     "ordinary": "Implants don't tighten. They still follow."},
+    {"id": "hands", "label": "HANDS",
+     "normal": "Lets go on 'release', inside one second.",
+     "ordinary": "Shakes, twitches and a weak grip."},
+    {"id": "port", "label": "PORT",
+     "normal": "Calm skin at the socket. No dark threads.",
+     "ordinary": "Burnt pins, scars, cheap cable marks."},
+    {"id": "speech", "label": "SPEECH",
+     "normal": "Says 'I' and 'my'. Remembers what they did.",
+     "ordinary": "Nerves, rudeness, a skipping voice box."},
+    {"id": "temper", "label": "TEMPER",
+     "normal": "Pushed, face and voice react together.",
+     "ordinary": "Anger, swearing, walking out."}
+  ],
+  "footer": [
+    "One broken line, no ordinary cause: TRAUMA TEAM.",
+    "Strange is not sick. A refusal is not a sign."
+  ]
+}

@@ -1,34 +1,130 @@
-**Current G1 checkpoint, November 14:** The revised script has **419 spoken words** after removal of the development-assistant recommendation sentence from the ending. The saved deck is version **50**; its PDF is `before-the-cut-g1-revised.pdf`. The student supplied a new final-slide take and requested replacing everything after **04:53** in the 22:24 recording. The splice is verified in `before-the-cut-g1-recording-final.mp4`; the MP4 and PDF are uploaded to the CourseWorks draft. Preserve the rest of the recording and its pace; the student explicitly declined duration editing. The CourseWorks draft is prepared for review; the final Reply click belongs to the student. No course post or peer reply has been submitted. Older checkpoints below are historical.
+# Before the Cut: handoff
 
-**Next three tasks:** (1) the student reviews the prepared CourseWorks draft and clicks Reply by November 15 at 23:59 New York; (2) verify the posted entry and record its URL/time; (3) prepare two Braintrust replies for student review by November 19 at 23:59. Game development and the separate voice handoff remain outside this submission task.
+Updated **November 15, 2026**, about 16:00 New York time, by Claude. Communicate with the student in Chinese; write game text, code comments and project files in English.
 
-**Latest recording files:** `before-the-cut-g1-autonomous-dialogue.pdf` and `before-the-cut-recording-script-autonomous-dialogue.docx`. Autonomous-dialogue revision: 543 spoken words, estimated 4:52 including slide changes; actual recording is pending. Runtime code still needs migration at the active writer's next checkpoint.
+**This repository is the only active checkout.** On November 15 the game, the patient-AI proxy and the tools were moved here from the legacy `fathom` workspace and checked here ([transition record](docs/development/repository-transition.md)). `fathom` is an archive; its long layered handoffs (`HANDOFF.md`, `CODEX_RUNTIME_HANDOFF.md`, `CLAUDE_VOICE_HANDOFF.md`, `CODEX_NEXT_HANDOFF.md`) are history, not instructions.
 
-**Current student decision, November 14: autonomous patient dialogue.** The AI uses the patient's background, personality, motives and conversation history to decide what to say and how to react. It generates original responses; it is not restricted to a legal-move list, authored answer bank or fixed dialogue tree. Technical format, length and timeout checks do not select its answer. The earlier enum-constrained protocol is legacy implementation, not the current design.
+AI use: Claude wrote this file after doing the November 15 work it describes. No student review of it is recorded.
 
-**Latest decision, November 14:** replace referral with calling Trauma Team to take over. The live deck is version 21; slide 2 narration still has 84 words and the total remains 555. Current recording files in the legacy g1 folder are `before-the-cut-g1-trauma-team.pdf` and `before-the-cut-recording-script-trauma-team.docx`. Runtime button labels, normal-sheet text and case outcomes still need implementation. The response team is an authored outcome, not an additional model agent. Do not change the active writer's game files mid-run; apply the action change at its next checkpoint.
+## Where things stand
 
-# Before the Cut: repository handoff
+- **G1 is submitted.** The student published the main post on November 14 at 23:16 New York and replaced its recording link at 23:41 (`before-the-cut-g1-recording-updated.mp4`, 5:30.33). See [docs/g1/05](docs/g1/05-submission-draft-and-checklist.md). The deck, PDF, Word script and video stay in the student's local workspace.
+- **Still due:** two Braintrust replies to classmates' G1 pitches by **Thursday, November 19, 23:59 New York**. Draft them for the student's review; never send them. Then read the instructor's Approve/Hold comment.
+- **The game** is version 0.3.0: one night at the counter with five fixed patients (Kip, Rook, Vale, Juno, Maren), a Normal Reference Sheet, optional looks, tools, questions, reassurance and pressure in any order, a typing line, push-to-talk, TREAT or Trauma Team, attacks and the shutter, slips and an end-of-shift report. Controls, rules and spoilers: [game/README.md](game/README.md). Look, sound and design choices: [docs/development/direction.md](docs/development/direction.md).
+- **The patient AI** (protocol 3) writes every reply and reaction from the character brief and the conversation so far; the authored script is the offline comparison and the fallback. It has only ever run against the local **mock**. No live model and no speech service has been called.
 
-Updated November 14, 2026. The student asked to make the G1 repository the ongoing home for the codebase and to improve its name and structure.
+## Student decisions, November 15
 
-## Current state
+1. Recording is finished: the game window, mouse, keyboard, audio and microphone may be used for testing.
+2. The student wants a supervised live model test, has OpenAI API credit, and asked whether an OAuth sign-in can replace an API key. Answer and cost below; **no paid call has been made, and none may be made before the student says yes to the provider, the model, the number of calls and the cost.**
+3. The cap stays at 16 patient replies per visit.
+4. The sentence in `AGENTS.md` that called voice a future task was replaced (done).
+5. The repository transfer was left to the agent to schedule (done, November 15).
 
-- The same GitHub repository is now `DemonRain7/before-the-cut`. Its existing history is preserved.
-- Required course documents live in `docs/g1/`. Former `g1/` paths forward to them.
-- `game/`, `agent_proxy/` and `tools/` are reserved for the implementation. They contain placeholders until source transfer.
-- The student confirmed that Claude/Fable is **still running in `../fathom`**. That directory remains the active implementation workspace. Do not rename it, replace its files or switch the active agent to this checkout mid-run.
-- New case data and pixel-art assets were observed there. Their completion and verification are unknown. Historical November 12 tests cover the earlier prototype only.
-- A preliminary read-only copy is retained locally under ignored `artifacts/implementation-snapshot-2026-11-14/`. It may already be stale and is not an authoritative migration source.
+## Game runtime: current state
 
-The current G1 package includes nine slides and a 555-word English script. Word/PDF exports, editable deck assets, reference images and detailed local history remain in the legacy workspace; this change does not republish them. The student's own recording, deck sharing, CourseWorks post and two Braintrust replies remain separate tasks. See `docs/g1/05-submission-draft-and-checklist.md`.
+### What was done on November 15
+
+- **Agent-operated play in a real window** (`validation/2026-11-15/claude-window-play/`). Claude drove the built game in a real Windows window on the real GPU and sound driver through posted window messages, captured screens with `PrintWindow`, and recorded the master mix. Offline: two full shifts plus part of a third, every pad, the typing line, both decisions, false calls and alarms, both attacks with a late and an early shutter, a walk-out, the reports, a 3x window and `--less-blood`. Everything behaved as designed; the console logs have no error, warning or leak line. **This is not a human playtest and not a listening test: nobody watched or listened.**
+- **Sound measured, not heard.** Peak -1.0 dBFS with no clipped samples; the rain and drone bed sits near -33 dBFS RMS and never drops out; attacks reach about -6 to -9 dBFS, a jump of about 27 dB from the bed. Loop seams are clean. `whine.wav` stops abruptly behind an early shutter. Both need a person with headphones.
+- **Push-to-talk freeze found and fixed** (`validation/2026-11-15/claude-mock-voice/`). With the real microphone and the mock proxy, every TAB press froze the game for about 450 ms, because opening the Windows input device blocks; about 300-500 ms of every press was lost (a 0.48 s press arrived as 168 ms and was refused as a tap). `game/scripts/core/voice_input.gd` now opens the device on a worker thread. Until it is ready the strip says **OPENING THE MICROPHONE...** and "Speak when it says LISTENING."; letting go before then sends nothing and says so. Measured after the fix: no frame gap over 50 ms at any press, the device ready after 465-472 ms, the push-to-talk duck down to -18 dB and back within about 150 ms, focus loss throwing the clip away, a decision during transcription dropping the late transcript, and a slow service (5 s) falling back to the authored line after 3.5 s. New tests: 7 rule checks with a slow simulated device, 4 scene checks over HTTP.
+- **OpenAI route added** to the proxy (`agent_proxy/src/providers.mjs`, `BTC_PROVIDER=openai`): the Responses API with a strict JSON schema, `store: false`, no retry, and `/v1/audio/transcriptions` for push-to-talk. Six new tests against a fake network; it has never called OpenAI.
+- `tools/art/measure_text.py` now also measures every fixed hint in `main.gd` against the 376 px strip (widest 288 px).
+- `AGENTS.md`'s outdated voice sentence was replaced, and the source was transferred into this repository.
+
+### Results in this checkout
+
+Run on November 15 at about 15:34 New York, after the transfer and a fresh import. Logs: local `validation/2026-11-15/transfer-checks/` (`validation/` is not in the repository). PowerShell, from the repository root:
+
+```powershell
+$GODOT = "$env:LOCALAPPDATA\CodexTools\Godot\4.7.2\Godot_v4.7.2-stable_win64_console.exe"
+```
+
+| Check | Command | Result |
+|---|---|---|
+| Fresh import | `& $GODOT --headless --audio-driver Dummy --path game --import` | exit 0; one `Parameter "t" is null` error from the headless dummy renderer |
+| Rules, outcomes, agent and voice units | `& $GODOT --headless --audio-driver Dummy --path game --script res://tests/run_tests.gd` | 485 passed, 0 failed |
+| Three shifts through the real scene, offline | `& $GODOT --headless --audio-driver Dummy --fixed-fps 60 --path game --script res://tests/run_ui_smoke.gd` | 325 passed, 0 failed |
+| The same, less blood | add ` -- --less-blood` | 325 passed, 0 failed |
+| Window close | `& $GODOT --headless --audio-driver Dummy --verbose --path game --script res://tests/run_close_check.gd` | 5 passed, 0 failed |
+| Proxy unit tests | `npm test` in `agent_proxy` | 38 passed, 0 failed |
+| Game and proxy over HTTP, local mocks, simulated microphone | `node tools/run_proxy_integration.mjs $GODOT validation/2026-11-15/transfer-checks/http-integration` | 179 passed, 0 failed; wire checks 15 passed, 0 failed |
+| Every text fits | `python measure_text.py` inside `tools/art` | 301 lines, 0 problems |
+| Rough GDScript lint | `python tools/gd_static_check.py` | 27 scripts, no findings |
+| Capture script, dry run | `& $GODOT --headless --audio-driver Dummy --fixed-fps 60 --path game --script res://tests/capture_shift.gd` | 122 frames named, 0 missed |
+| Capture drawn on a hidden desktop | `python tools/run_hidden.py ...` (command in its header) | 122 frames saved, no window on the student's desktop; the first 38 are pixel-identical to the `fathom` capture |
+| Main scene boots | `--quit-after 240`, default and `-- --agent-url=http://127.0.0.1:9 --model` | exit 0 both; the known `4 ObjectDB instances were leaked` warning that `--quit-after` causes |
+
+These are automated checks with the dummy audio driver, a simulated microphone and the mock. They show the flow holds together, not that it is fun.
+
+### Launch
+
+```powershell
+.\run-game.ps1                      # offline; -LessBlood, -Mute, -Seed 123, -GodotPath <exe>
+cd agent_proxy; npm run dev         # patient service (mock unless .dev.vars says otherwise)
+.\run-game.ps1 -Model -AgentUrl http://127.0.0.1:8787   # second terminal, repository root
+```
+
+The window's corner reads `AI DIALOGUE`, `MOCK TRANSPORT` or `OFFLINE FALLBACK`.
+
+### The live model test: route, what is needed, cost
+
+- **OAuth cannot use the OpenAI credit.** A ChatGPT sign-in draws on a ChatGPT plan, not on API credit, and the API takes project API keys only. The OpenAI route therefore needs an **API key** from platform.openai.com in `agent_proxy/.dev.vars` (copy `.dev.vars.example`; ignored by Git): `BTC_PROVIDER=openai`, `OPENAI_API_KEY=...`. The student pastes the key into that file; it never goes into the game, a command line, chat, a log or a commit.
+- **OAuth works for Google** (Vertex AI with a short-lived token from `gcloud auth application-default print-access-token` and the course project), if the student prefers that route. Its billing state is unconfirmed, and whether `gemini-3.5-flash-lite` accepts audio for push-to-talk is unverified.
+- **Proposed OpenAI test:** `gpt-6-luna` (reasoning effort `none`) for the patient and `gpt-4o-mini-transcribe` for speech. List prices read on November 15 on OpenAI's pricing page: USD 0.10 per million input tokens, 0.50 per million output tokens, USD 0.003 per minute of audio. Measured prompts are 2,281-3,818 characters (about 600-1,000 tokens). About 30 patient lines and 10 spoken clips would cost about **USD 0.006**; a full three-shift session at the caps (240 calls) about USD 0.05. These are estimates from list prices, not measurements.
+- During the run, read `latency_ms`, `input_tokens` and `output_tokens` in the proxy log; compare with the 3.5 s / 4 s deadlines; judge whether the patient stays in character and never contradicts the fixed evidence; check transcription on the student's own voice.
+
+### Limits (both places: `game/data/rules.json` `agent`, `agent_proxy/src/core.mjs` `DEFAULT_LIMITS`)
+
+| Limit | Value |
+|---|---|
+| Patient replies per visit / per session | 16 / 240 (student: keep 16) |
+| Proxy deadline / game deadline | 3.5 s / 4 s |
+| Reply length | asked for 110 characters, refused only over 220 |
+| Conversation memory | 48 entries per visit, cleared for the next patient |
+| Spoken clips | 0.35-10 s, 24 per visit, 360 per session; 6 s / 7 s deadlines |
+| Provider calls per proxy process | 2,000, shared by both routes |
+
+Do not raise them before a supervised live run has measured latency and tokens. `maxOutputTokens` (256) is unchecked against a live model.
+
+### Not done, not verified
+
+- No live model, no speech service, no human playtest, no listening test, no tuning, no Windows export build. Nobody has spoken into the microphone for a check.
+- Keyboard layouts, input methods and a denied Windows microphone permission are untested. A device that fails to open after the press is covered only by reading the code.
+- A typed or spoken provocation has no rule effect; only the PRESS pad costs patience. The patient does not speak aloud. The typing line has no paste.
+- The Worker entry (`agent_proxy/src/worker.mjs`) has never been deployed.
+- Leftovers: `agent_proxy/src/scripted.mjs` is no longer imported; `move_validator.gd` keeps an old name for a shape check.
+
+### For the student to decide (seen, not changed)
+
+- While the patient is answering, every action waits (up to about 3.5 s with a slow service).
+- The patient order is the same every shift; the seed changes details only.
+- Blood and broken glass stay until the shift ends.
+- The attack is about 27 dB louder than the room; the whine cuts off behind an early shutter.
+- Open questions in the direction document: should a typed provocation count as pressure, should the patient speak aloud, how much blood by default.
+
+### Documents behind the runtime
+
+`docs/g1/01`-`04`, `06` and `07` are the submitted G1 versions and were left as submitted: the Configuration document and risk R3 still describe four calls per visit and 2-2.5 s deadlines, and `07` says voice is not implemented. `agent-config.json` was brought up to date on November 15.
 
 ## Next three tasks
 
-1. Let the active Claude/Fable run finish. Read its final handoff and fresh source files in `fathom` before copying anything.
-2. Follow `docs/development/repository-transition.md`: transfer reviewed source into this checkout, keep private files excluded, update internal paths, and run checks here. Preserve the old workspace and the existing repository history.
-3. Commit and push the verified transfer; switch future work to this checkout and record the actual results. Test the revised optional-examination loop with a person before claiming enjoyment or agent benefit.
+1. **Braintrust replies** (due November 19, 23:59): the student picks two G1 pitches with fewer than two replies; draft specific, moment-based notes in English for review; the student sends them.
+2. **Supervised live run**, after the student's yes on provider, model, call count and cost: play two or three visits by typing and speaking, record latency, tokens, cost and transcription quality, then tune the prompt and deadlines. Keep 16 replies per visit.
+3. **Human playtest**: the student plays a shift with headphones and a microphone; tune patience, fees, rent and pacing from what happens, and settle the decisions listed above.
 
-No runtime code was changed or retested by the repository reorganization. No course post, paid call or deployment was performed.
+## Evidence (local, not in Git)
 
-Repository checks: the manifest parses, 28 local Markdown links resolve, all five legacy document paths point to their replacements, the recording script text is unchanged, and staged files exclude runtime snapshots, private settings and credentials. Git whitespace checks pass. Local details are retained in ignored `artifacts/restructure-validation.json`.
+- `validation/2026-11-15/transfer-checks/`: every check in this checkout, the hidden-desktop capture.
+- `validation/2026-11-15/claude-mock-voice/`: the push-to-talk freeze, before and after the fix.
+- `validation/2026-11-15/claude-window-play/`: agent-operated offline play and the sound measurements.
+- `validation/2026-11-15/claude-final-checks/`, `claude-rendered-checks/`: the same checks in `fathom` and the earlier rendered captures.
+- Older folders under `validation/2026-11-14/` and `2026-11-12/` describe earlier builds; their counts are not results for this one.
+
+## Rules that do not change
+
+- Never add `Co-Authored-By` or any AI attribution to Git commits.
+- Keep `.claude/`, credentials, caches, private course pages and `validation/` out of Git.
+- Never call a mock run a live-model result, automated checks a human playtest, or an agent-operated run a playtest or listening test.
+- Logs hold lengths and stages, never typed words, clips or transcripts.
+- Course posts, peer replies, paid model calls and deployment each need the student's own yes.

@@ -1,10 +1,10 @@
 {
   "schema_version": "course-1",
-  "config_version": "0.9.0",
+  "config_version": "0.10.0",
   "project": "Before the Cut",
-  "updated": "2026-11-14",
-  "status": "Protocol 3 implemented in active fathom runtime; verified with local mocks, not a live model.",
-  "ai_use": "Claude authored the game and initial proxy. Codex migrated autonomous dialogue and verified the current runtime on 2026-11-14.",
+  "updated": "2026-11-15",
+  "status": "Protocol 3 runtime transferred into this repository on 2026-11-15 (game/, agent_proxy/). Verified with local mocks, a simulated microphone, and an agent-operated real window with the real microphone and a mock transcript. No live model or speech service has been called.",
+  "ai_use": "Claude authored the game and the initial proxy and added typing, push-to-talk and the OpenAI route. Codex migrated autonomous dialogue and verified the runtime on 2026-11-14. Claude transferred the source into this repository on 2026-11-15.",
   "purpose": "Generate the patient's own dialogue and reactions from character context and conversation history.",
   "tools_available": [],
   "context_sources": [
@@ -27,17 +27,23 @@
   "validation": "Transport shape, nonempty text, length and timeouts only; do not choose or reject an answer for differing from scripted dialogue.",
   "limits": {
     "max_output_tokens": 256,
-    "request_timeout_seconds": 2.5,
+    "request_timeout_seconds": 4.0,
+    "proxy_upstream_timeout_seconds": 3.5,
     "request_attempts": 1,
-    "live_calls_per_visit": 4
+    "live_calls_per_visit": 16,
+    "live_calls_per_session": 240,
+    "provider_calls_per_proxy_process": 2000,
+    "reply_chars_asked": 110,
+    "reply_chars_refused_over": 220,
+    "source": "game/data/rules.json (agent) and agent_proxy/src/core.mjs (DEFAULT_LIMITS); change both together"
   },
   "budgets": {
     "cost_target_usd_per_shift": 0.02,
     "typical_latency_target_ms": 1000,
-    "status": "Targets. Remeasure autonomous dialogue; previous token/cost estimates described the old protocol."
+    "status": "Targets set before the 16-call cap. A visit at the cap is 16 patient calls and a shift 80, plus one transcription per spoken line. Remeasure in a supervised live run before changing limits."
   },
   "fallback": "Authored offline comparison/fallback, separately labelled in UI and logs; no substitution on successful model replies.",
-  "memory_policy": "Last 24 conversation messages in memory per visit; reset for next patient; no server-side cross-visit transcript.",
+  "memory_policy": "Last 48 conversation entries in memory per visit; reset for the next patient; no server-side cross-visit transcript.",
   "agent_team": [
     {
       "role": "Producer",
@@ -194,12 +200,38 @@
   "historical_evidence": "November 12: 269 game, 141 UI, 28 proxy and 73 mock integration checks of the older constrained protocol; no autonomous-dialogue validation is claimed.",
   "prompt_artifact": "agent_team/patient-character-prompt.md",
   "current_verification": {
-    "date": "2026-11-14",
-    "game_checks": 260,
-    "ui_checks": 246,
-    "proxy_tests": 18,
-    "http_integration_checks": 49,
+    "date": "2026-11-15",
+    "game_checks": 485,
+    "ui_checks": 325,
+    "ui_checks_less_blood": 325,
+    "close_checks": 5,
+    "proxy_tests": 38,
+    "http_integration_checks": 179,
+    "http_wire_checks": 15,
+    "text_lines_measured": 301,
     "live_model_calls": 0,
-    "record": "CODEX_RUNTIME_HANDOFF.md"
+    "human_playtests": 0,
+    "record": "HANDOFF.md"
+  },
+  "speech_to_text": {
+    "route": "POST /v1/transcribe on the same proxy; push-to-talk only, never always-on",
+    "clip_seconds": [
+      0.35,
+      10
+    ],
+    "clips_per_visit": 24,
+    "clips_per_session": 360,
+    "timeout_seconds": {
+      "proxy": 6,
+      "game": 7
+    },
+    "privacy": "Clips stay in memory and are never written to disk; logs hold lengths and stages, never words or audio.",
+    "status": "Tested with the real microphone and a mock transcript only."
+  },
+  "providers": {
+    "default": "mock (fixed labelled line and transcript; no network, no cost)",
+    "google": "Gemini API key, or Vertex AI with an OAuth access token from gcloud application-default credentials; default model gemini-3.5-flash-lite",
+    "openai": "API key only (ChatGPT sign-in does not use API credit); default models gpt-6-luna and gpt-4o-mini-transcribe",
+    "status": "Both live routes are tested only against fake networks."
   }
 }

@@ -1,0 +1,17 @@
+[remap]
+
+importer="font_data_bmfont"
+type="FontFile"
+uid="uid://c4mvfn64tk3pw"
+path="res://.godot/imported/counter_big.fnt-354cd185560d42d276940d27bedb2e4b.fontdata"
+
+[deps]
+
+source_file="res://assets/fonts/counter_big.fnt"
+dest_files=["res://.godot/imported/counter_big.fnt-354cd185560d42d276940d27bedb2e4b.fontdata"]
+
+[params]
+
+fallbacks=[]
+compress=true
+scaling_mode=2

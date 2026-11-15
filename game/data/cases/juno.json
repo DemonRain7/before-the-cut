@@ -1,0 +1,100 @@
+{
+  "id": "juno",
+  "version": 2,
+  "name": "Juno Reyes",
+  "role": "Street singer",
+  "age": 27,
+  "truth": "stable",
+  "request": "Swap skipping voice box",
+  "fee": 350,
+  "patience": 6,
+  "sprite": "juno",
+  "voice": {"pitch": 1.2, "rate": 1.0, "glitch": true},
+  "teaser": "Two bright eyes in the dark hall. Literally bright. Someone is humming.",
+  "brief": "You are Juno Reyes, 27, a street singer wearing a lot of cheap, bright chrome. You are warm, cheeky and quick with a joke. Your voice box skips, so now and then a word st-stutters. You need it swapped tonight because singing pays your rent. You are proud of your chrome and touchy when people stare at it or treat it as a warning sign.",
+  "opening": [
+    "H-hey, doc. Don't mind the st-static.",
+    "My voice box skips. I sing for rent. Can you swap it tonight?"
+  ],
+  "eyes": {
+    "left": {"kind": "display", "tightens": false, "follows": true},
+    "right": {"kind": "display", "tightens": false, "follows": true}
+  },
+  "grip": {"release_ms": 400, "tremor": 0},
+  "port": {"covered": false},
+  "idle": {"hands": "tap", "gaze": "wander"},
+  "looks": {
+    "eyes": "Display eyes: small screens, glyphs flicker.",
+    "hands": "Chrome fingers tap a beat, always in time.",
+    "port": "Neck port: scars, four jacks, a cable burn."
+  },
+  "checks": {
+    "penlight": {"first": ["comply"], "insist": "comply",
+      "note": "Light: screens stay bright. Both follow it."},
+    "grip": {"first": ["comply"], "insist": "comply",
+      "note": "Grip: steady. Let go {t} s after 'release'."},
+    "port": {"first": ["comply"], "insist": "comply",
+      "note": "Neck port: scars, four jacks, a cable burn."}
+  },
+  "claims": {},
+  "topics": [
+    {"id": "why", "q": "What's wrong with the voice?",
+      "keys": ["wrong", "problem", "happen", "reason", "trouble", "brings", "bring", "matter", "here", "came", "come", "voice", "sing", "song", "skip", "stutter", "throat", "note", "notes"],
+      "a": "My v-voice box skips. I lose the high notes. I need my voice back, doc.",
+      "note": "\"I need my v-voice back, doc.\"", "first": ["answer"]},
+    {"id": "chrome", "q": "That's a lot of chrome. Any of it act up?",
+      "keys": ["own", "itself", "control", "glitch", "malfunction", "twitch", "strange", "weird", "act", "acts", "acting", "chrome", "implant", "metal", "parts", "piece", "pieces"],
+      "a": "It's all me. I picked every p-piece. Only the box is broken.",
+      "deflect": "W-wow. You ask everybody that?",
+      "note": "\"It's all me. I picked every p-piece.\"", "first": ["deflect", "answer"]},
+    {"id": "sleep", "q": "How are you sleeping?",
+      "keys": ["sleep", "slept", "rest", "tired", "awake", "night", "bed", "dream", "insomnia", "exhaust", "nap"],
+      "a": "Late. I play till two. I sleep f-fine after.",
+      "note": "\"I play till two. I sleep f-fine after.\"", "first": ["answer"]}
+  ],
+  "script": [
+    {"on": "ask:chrome", "move": "deflect"}
+  ],
+  "lines": {
+    "comply": ["Go for it.", "Sure thing."],
+    "comply:penlight": "Go for it. They do t-tricks.",
+    "comply:port": "It's not p-pretty. Look anyway.",
+    "stall": ["Nope."],
+    "refuse": "I said n-no.",
+    "deflect": ["Pass."],
+    "reassure": ["Okay. We're c-cool."],
+    "spent": "Doc, I've got a set at midnight. Yes or no?",
+    "after:grip": "Chrome's g-good for something."
+  },
+  "press": [
+    {"line": "Excuse me? I'm a s-singer, not a headline. Check your own wiring!",
+      "face": "angry", "hands": "point", "note": "Eyes flashed, voice jumped: all at once."},
+    {"line": "I'll sing through the static. Bye.", "end": "walkout"}
+  ],
+  "attack": {"on_refer": false, "telegraph": "", "line": ""},
+  "exit": {
+    "treat": "Yes! Doc, you're a s-star.",
+    "refer": "Trauma Team? For st-static?",
+    "taken": "Easy! The chrome's p-paid for!"
+  },
+  "rows": {
+    "eyes": {"ok": true, "text": "Display eyes never tighten: they are implants. Both followed the light.",
+      "evidence": ["check:penlight"]},
+    "hands": {"ok": true, "text": "Chrome, quick and clean.", "evidence": ["check:grip"]},
+    "port": {"ok": true, "text": "Scars and a cable burn are ordinary. No threads.",
+      "evidence": ["look:port", "check:port"]},
+    "speech": {"ok": true, "text": "The stutter is the voice box. Every line is 'I' and 'my'.",
+      "evidence": ["ask:why", "ask:chrome", "ask:sleep"]},
+    "temper": {"ok": true, "text": "Pushed, everything flares together.", "evidence": ["press"]}
+  },
+  "outcomes": {
+    "treat": {"title": "NEW VOICE BOX",
+      "text": "Juno runs a scale, clean to the top, and sings herself out the door. The fee is all small coins."},
+    "refer": {"title": "FALSE CALL",
+      "text": "They scan Juno twice on the way out and find a singer. The most chrome in the room was the steadiest person in it. The call-out goes on your bill."},
+    "walkout": {"title": "WALKED OUT",
+      "text": "Juno takes her static back to the street. The hat stays empty tonight."},
+    "false_alarm": {"title": "FALSE ALARM",
+      "text": "The shutter drops on a singer with a broken voice box. She looked strange. She was fine. That costs you."}
+  }
+}

@@ -1,42 +1,35 @@
-**Current G1 checkpoint, November 14:** The revised script has **419 spoken words** after removal of the development-assistant recommendation sentence from the ending. The saved deck is version **50**; its PDF is `before-the-cut-g1-revised.pdf`. The student supplied a new final-slide take and requested replacing everything after **04:53** in the 22:24 recording. The splice is verified in `before-the-cut-g1-recording-final.mp4`; the MP4 and PDF are uploaded to the CourseWorks draft. Preserve the rest of the recording and its pace; the student explicitly declined duration editing. The CourseWorks draft is prepared for review; the final Reply click belongs to the student. No course post or peer reply has been submitted. Older checkpoints below are historical.
-
-**Next three tasks:** (1) the student reviews the prepared CourseWorks draft and clicks Reply by November 15 at 23:59 New York; (2) verify the posted entry and record its URL/time; (3) prepare two Braintrust replies for student review by November 19 at 23:59. Game development and the separate voice handoff remain outside this submission task.
-
-**Current student decision, November 14: autonomous patient dialogue.** The AI uses the patient's background, personality, motives and conversation history to decide what to say and how to react. It generates original responses; it is not restricted to a legal-move list, authored answer bank or fixed dialogue tree. Technical format, length and timeout checks do not select its answer. The earlier enum-constrained protocol is legacy implementation, not the current design.
-
-**Latest decision, November 14:** replace referral with calling Trauma Team to take over. The live deck is version 21; slide 2 narration still has 84 words and the total remains 555. Current recording files in the legacy g1 folder are `before-the-cut-g1-trauma-team.pdf` and `before-the-cut-recording-script-trauma-team.docx`. Runtime button labels, normal-sheet text and case outcomes still need implementation. The response team is an authored outcome, not an additional model agent. Do not change the active writer's game files mid-run; apply the action change at its next checkpoint.
-
 # Before the Cut: working instructions
 
-Read `README.md`, `HANDOFF.md` and `docs/development/repository-transition.md` first. This is the ongoing Before the Cut repository, formerly named before-the-cut-g1. Source transfer is pending while Claude/Fable is working in the legacy sibling `fathom` directory. Do not start a competing implementation in this checkout or move files out from under that process.
+Read `README.md`, `HANDOFF.md` and `NEXT_AGENT_PROMPT.md` first. This is the ongoing Before the Cut repository (formerly before-the-cut-g1) and, since November 15, 2026, the only active checkout: the game, the patient-AI proxy and the tools live here. The sibling `fathom` folder is an archive; do not write to it.
 
 Communicate with the student in Chinese. Write game text, comments, documents, slides, scripts and handoffs in English.
 
+The student's recording is finished (decision of November 15): the game window, mouse, keyboard, audio and microphone may be used for testing. Voice input (hold TAB to speak) is built; it has been tested with the real microphone and a mock transcript, not with a live speech service. Do not change slides or narration.
+
 ## Agreed design
 
-- Godot 4, 2D pixel art, initially a clinic counter. The player is an implant doctor examining patients before surgery.
+- Godot 4, 2D pixel art, a clinic counter. The player is an implant doctor examining patients before surgery.
 - A Normal Reference Sheet shows expected appearance, states and responses. Players compare it with the patient and make their own judgments.
-- Observation, requested actions/tool interactions, ordinary dialogue and provocative verbal pressure are optional and unordered. Players may skip any method and decide early. Do not reinstate a mandatory checklist, universal re-check or fixed examination sequence.
-- Patient backgrounds provide continuity. The AI generates original dialogue and reactions, including evasive or deceptive claims. Technical checks do not select its answers; implementation of generated physical actions remains open. Refusal or irritation alone is not an automatic diagnosis.
-- Keep a stateful scripted baseline and playable offline fallback. Model benefit is a hypothesis to test.
-- Fantasy and Discovery are primary motivations; Sensation supports the suspense. The pitch does not promise shuffled arrivals.
-- The student wants Claude/Fable to develop the art, presentation and implementation creatively. Exact signs, cases, balance and patient counts are proposals, not frozen requirements.
+- Observation, tools, ordinary dialogue and provocative verbal pressure are optional and unordered. Players may skip any method and decide early. Do not reinstate a mandatory checklist, universal re-check or fixed examination sequence.
+- The player either approves surgery (TREAT) or calls Trauma Team to take the patient; a patient who turns is stopped with the shutter.
+- Patient backgrounds provide continuity. The AI generates original dialogue and reactions, including evasive or deceptive claims, from the character brief and the conversation so far; there is no legal-move list, answer bank or dialogue tree. Technical checks (shape, length, timeouts) do not select its answers. Refusal or irritation alone is not a diagnosis. The game owns case truth, readings, attacks and scoring.
+- Keep the stateful scripted patient as the offline comparison and fallback. Model benefit is a hypothesis to test.
+- Fantasy and Discovery are the primary motivations; Sensation supports the suspense.
+- The student wants the agents to develop art, presentation and implementation creatively. Exact signs, cases, balance and patient counts are proposals, not frozen requirements. The cap of 16 patient replies per visit stays (student, November 15).
 
 ## Project organization
 
-Game files belong in `game/`, runtime API files in `agent_proxy/`, production-agent artifacts in `agent_team/`, G1 materials in `docs/g1/`, and reusable development tools in `tools/`. Keep game and proxy relative paths intact during the transfer. Original presentation reference images are separate from game assets; record asset permissions before publication.
+Game files belong in `game/`, the runtime API in `agent_proxy/`, production-agent artifacts in `agent_team/`, G1 materials in `docs/g1/`, development notes in `docs/development/`, and reusable tools in `tools/`. Local evidence goes in dated folders under `validation/`, which Git ignores. `docs/g1/01`-`04`, `06` and `07` are the submitted G1 versions; leave them as submitted unless the student asks. Former `g1/` paths forward to `docs/g1/`. Do not use the older documentation-only export or its preparation script on this repository.
 
-Preserve the published G1 links under `g1/` as forwarding documents. Do not use the older documentation-only export checkout or its preparation script to overwrite this repository.
-
-The corrected announcement supplied by the student on November 14 sets G1 for November 15, 2026 at 23:59 and two self-selected Braintrust replies for November 19 at 23:59, New York time. G1 is the only submission due before Monday's class. Use `docs/g1/06-sources-and-requirements.md`; do not add superseded pre-class notes or syllabus-only tasks.
+Each limit lives in two places, `game/data/rules.json` (`agent`) and `agent_proxy/src/core.mjs` (`DEFAULT_LIMITS`); change both together. Art and sound are generated by `tools/art/`; do not hand-edit `game/assets/`. Commit `.import` and `.uid` files with the assets they belong to.
 
 ## Evidence and permissions
 
-Distinguish old test results from current runs, mocks from live-model calls, automated checks from human playtests, and repository publication from course submission. Current source is in progress; do not claim the new implementation passes historical tests.
+Distinguish old results from current runs, mocks from live-model calls, automated checks from human playtests, an agent operating the window from a person playing it, and repository publication from course submission.
 
-The student authorized the repository rename, restructuring and eventual source consolidation. Finish the active legacy editing session before transferring its latest files. Preserve unrelated work. Course posts, peer messages, paid model calls and deployment need applicable user authorization; repository authorization does not cover them.
+Routine local edits, reversible setup, tests and normal pushes to `main` are covered by the student's continuation requests. Course posts, peer replies, paid model calls and deployment each need the student's own explicit yes; for a paid call that means the provider, the model, the number of calls and the cost. API keys go only into `agent_proxy/.dev.vars`, filled in by the student, never into the game, a command line, chat, a log or a commit. Logs hold lengths and stages, never typed words, clips or transcripts.
 
-Update `HANDOFF.md` and `NEXT_AGENT_PROMPT.md` at checkpoints, including actual results, limitations and the next three tasks.
+Update `HANDOFF.md` and `NEXT_AGENT_PROMPT.md` at checkpoints and before stopping, with actual results, limitations and the next three tasks.
 
 - NEVER add `Co-Authored-By` or any AI attribution to Git commits.
 - Keep `.claude/` ignored. Do not commit personal settings, secrets, caches, private course pages or local evidence archives.

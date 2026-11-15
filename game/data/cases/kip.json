@@ -1,0 +1,96 @@
+{
+  "id": "kip",
+  "version": 2,
+  "name": "Kip Marlow",
+  "role": "Courier",
+  "age": 22,
+  "truth": "stable",
+  "request": "Swap cracked left optic",
+  "fee": 250,
+  "patience": 6,
+  "sprite": "kip",
+  "voice": {"pitch": 1.45, "rate": 1.25},
+  "teaser": "A kid in a courier jacket, bouncing on his heels and checking the time.",
+  "brief": "You are Kip Marlow, 22, a bike courier with a night run starting soon. You talk fast, apologise a lot and keep glancing at the clock. You want the cracked lens in your left eye swapped and nothing more. Clinics make you nervous, and so does anything that could end up in a report to your dispatcher.",
+  "opening": [
+    "Hey. Hi. Sorry, I'm on the clock.",
+    "Left eye's cracked. I just need the lens swapped before my night run."
+  ],
+  "eyes": {
+    "left": {"kind": "optic", "tightens": false, "follows": true, "cracked": true},
+    "right": {"kind": "natural", "tightens": true, "follows": true}
+  },
+  "grip": {"release_ms": 300, "tremor": 2},
+  "port": {"covered": false},
+  "idle": {"hands": "drum", "gaze": "dart"},
+  "looks": {
+    "eyes": "Left: cheap optic, cracked. Right: natural.",
+    "hands": "Drumming the counter. Chewed nails.",
+    "port": "Wrist socket, scuffed rim. Calm skin."
+  },
+  "checks": {
+    "penlight": {"first": ["comply"], "insist": "comply",
+      "note": "Light: R tightens, L optic fixed. Both follow."},
+    "grip": {"first": ["comply"], "insist": "comply",
+      "note": "Grip: jittery. Let go {t} s after 'release'."},
+    "port": {"first": ["comply"], "insist": "comply",
+      "note": "Wrist socket, scuffed rim. Calm skin."}
+  },
+  "claims": {},
+  "topics": [
+    {"id": "why", "q": "What happened to the eye?",
+      "keys": ["wrong", "problem", "happen", "reason", "trouble", "brings", "bring", "matter", "here", "came", "come", "eye", "lens", "crack", "accident", "fall", "fell", "crash", "bike"],
+      "a": "I ate pavement on Ninth. Bike's fine. My eye isn't. I can't read addresses in the rain.",
+      "note": "\"I ate pavement on Ninth.\"", "first": ["answer"]},
+    {"id": "sleep", "q": "How are you sleeping?",
+      "keys": ["sleep", "slept", "rest", "tired", "awake", "night", "bed", "dream", "insomnia", "exhaust", "nap"],
+      "a": "Four hours, maybe? I work doubles. I'm tired, I'm not broken.",
+      "note": "\"I'm tired, I'm not broken.\"", "first": ["answer"]},
+    {"id": "implant", "q": "Does the optic ever act on its own?",
+      "keys": ["own", "itself", "control", "glitch", "malfunction", "twitch", "strange", "weird", "act", "acts", "acting", "optic", "implant", "chrome"],
+      "a": "No? It just sits there being cracked. I'm the one who's late.",
+      "note": "\"It just sits there being cracked.\"", "first": ["answer"]}
+  ],
+  "script": [],
+  "lines": {
+    "comply": ["Sure, yeah.", "Okay. Quick, though."],
+    "comply:penlight": "Sure. Just don't blind the good one.",
+    "comply:grip": "Okay. Like this?",
+    "stall": ["Do we have to?"],
+    "refuse": "I said no, okay?",
+    "deflect": ["Uh. Can we skip that one?"],
+    "reassure": ["Okay. Okay. Thanks. Long night."],
+    "spent": "I really have to go. Are you doing it or not?",
+    "after:grip": "Sorry. Too much coffee."
+  },
+  "press": [
+    {"line": "What? No! I'm not... I just need a lens! Why would you say that?",
+      "face": "upset", "hands": "raise", "note": "Flinched, voice cracked. All at once."},
+    {"line": "Forget it. I'll find a doc who doesn't treat me like a bomb.", "end": "walkout"}
+  ],
+  "attack": {"on_refer": false, "telegraph": "", "line": ""},
+  "exit": {
+    "treat": "Yes! Thank you. You're a lifesaver.",
+    "refer": "Wait, what? Trauma Team? For a lens?",
+    "taken": "Hey! I'm fine! Ask my dispatcher, I'm fine!"
+  },
+  "rows": {
+    "eyes": {"ok": true, "text": "The cracked optic never tightens: it is an implant. Both eyes follow.",
+      "evidence": ["check:penlight"]},
+    "hands": {"ok": true, "text": "Shaky, but he lets go at once.", "evidence": ["check:grip"]},
+    "port": {"ok": true, "text": "Scuffed rim, calm skin.", "evidence": ["look:port", "check:port"]},
+    "speech": {"ok": true, "text": "Nervous and fast, but it is all 'I' and 'my'.",
+      "evidence": ["ask:why", "ask:sleep", "ask:implant"]},
+    "temper": {"ok": true, "text": "Pushed, the whole kid reacts at once.", "evidence": ["press"]}
+  },
+  "outcomes": {
+    "treat": {"title": "LENS SWAPPED",
+      "text": "Kip reads the clinic sign out loud, grins, and is gone before the receipt prints."},
+    "refer": {"title": "FALSE CALL",
+      "text": "Two visors walk a steady kid out by the elbows. \"It's a lens!\" He misses his night run. Trauma Team bills you for the call-out."},
+    "walkout": {"title": "WALKED OUT",
+      "text": "Kip leaves with the lens still cracked. Nobody gets paid."},
+    "false_alarm": {"title": "FALSE ALARM",
+      "text": "The shutter slams in a courier's face. Couriers talk. That costs you."}
+  }
+}
