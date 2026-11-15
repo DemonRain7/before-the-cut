@@ -2,23 +2,11 @@ AI use: Codex revised this script using the student's recorded explanation and t
 
 # Before the Cut G1 recording script
 
-**434 spoken words**, matched to the nine slides. This version replaces the rejected 249-word draft. Read only the body paragraphs under each slide heading.
+**419 spoken words**, matched to the nine slides. This version replaces the rejected 249-word draft. Read only the body paragraphs under each slide heading.
 
-At 95 to 105 words per minute, with brief slide changes, the estimate is **4:26 to 4:52**. The cue sheet below uses 100 words per minute. These are estimates, not a timed rehearsal. The required recording length is **3 to 5 minutes**.
+The student recorded the presentation and replaced the final-slide segment. This script is a drafting aid, not a verbatim transcript or the duration of the final recording.
 
-The revision preserves the explanations and transitions in the student's recording: how a patient visit works, why the island and shop ideas were dropped, why patients use AI, and which choices belong to the student or development assistants. Local speech recognition estimated about 940 words in the original recording, including added explanations and repetitions. The old 543-word file was not an accurate measure of the spoken presentation.
-
-| Slide | Suggested timing | Words | Subject |
-|---|---|---|---|
-| 1 | 0:00-0:34 | 53 | Before the Cut |
-| 2 | 0:34-1:18 | 70 | How a patient visit works |
-| 3 | 1:18-1:48 | 47 | Players, motivations and pillars |
-| 4 | 1:48-2:24 | 57 | Concepts and references |
-| 5 | 2:24-2:52 | 44 | The patient agent's role |
-| 6 | 2:52-3:14 | 34 | How the game and agent work together |
-| 7 | 3:14-3:43 | 45 | Scope and budgets |
-| 8 | 3:43-4:01 | 26 | Risks and mitigations |
-| 9 | 4:01-4:38 | 58 | Prototype approval and next steps |
+The revision preserves the explanations and transitions in the student's recording: how a patient visit works, why the island and shop ideas were dropped, why patients use AI, and the student's design choices. Local speech recognition estimated about 940 words in the original recording, including added explanations and repetitions. The old 543-word file was not an accurate measure of the spoken presentation.
 
 ## Slide 1: Before the Cut
 
@@ -54,14 +42,8 @@ That small scope also addresses my biggest risks: this is my first game, and I'm
 
 ## Slide 9: Prototype approval and next steps
 
-I'm asking for approval to build and test this version. I chose the clinic setting and wanted players to decide how to examine each patient. The AI assistants helping me build it suggested three patients to keep the workload manageable. If the clues confuse players, or AI dialogue does not affect their decisions, I'll revise before adding content.
+I'm asking for approval to build and test this version. I chose the clinic setting and wanted players to decide how to examine each patient. If the clues confuse players, or AI dialogue does not affect their decisions, I'll revise before adding content.
 
-## Before recording
+## Current recording status
 
-- Rehearse at a comfortable pace and check the actual duration.
-- Read only the body paragraphs. Headings and timings are cues, not spoken lines.
-- Pause briefly when changing slides. The script provides the explanation; the slides provide the images and supporting detail.
-- Live model latency, cost and human playtest results remain unmeasured.
-- Check microphone level before recording the whole pitch.
-
-The earlier 7 minute 14 second video exceeds the recording limit. A replacement is pending. The rejected 249-word draft is archived and should not be used.
+The November 14 recording is the base video. Everything after 04:53 was replaced with the student's new final-slide take. Do not speed up, shorten, or rewrite the other sections. The student explicitly chose to retain the overall duration. The MP4 and PDF are uploaded to the CourseWorks draft; the student's final Reply click is pending.

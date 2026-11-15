@@ -8,7 +8,7 @@ Version 0.7, G1 Concept, 2026-11-14.
 
 **Repository status, November 14:** this public repository contains the required G1 documents and shared production-agent briefs. The active development workspace has a newer five-patient Godot prototype and protocol-3 dialogue integration. Runtime source transfer is still pending; this submission does not claim the repository already contains a runnable build. G1 proposes a three-patient evaluation slice, not a commitment to add more content.
 
-**Student decision, November 14:** replace the referral choice with **Call Trauma Team**. The player calls an emergency response unit to take over the patient situation. The exact handling, cost and consequences remain authored design choices; the call does not change case truth or give the model control over attacks. For the first slice, a short dispatch response and fixed encounter outcome are sufficient. A new combat or squad-control system is not required. Current screenshots and runtime data still use the earlier REFER label; the terminology/outcome update remains pending in the runtime.
+**Student decision, November 14:** replace the referral choice with **Call Trauma Team**. The player calls an emergency response unit to take over the patient situation. The exact handling, cost and consequences remain authored design choices; the call does not change case truth or give the model control over attacks. For the first slice, a short dispatch response and fixed encounter outcome are sufficient. A new combat or squad-control system is not required. The pitch screenshot captures the earlier REFER label. A November 14 source inspection found a newer Trauma Team call, dispatch dialogue and crew sequence in the active development workspace; that sequence has not been separately retested during this submission audit.
 
 ## 0. Design authority and implementation status
 
@@ -269,4 +269,4 @@ November 14 presentation update: slide 2 shows an official *That's not my Neighb
 
 The student has recorded the nine-slide concept presentation. Final duration, upload and submission are being checked separately. The recording describes the proposed three-patient experiment; the development workspace already has five case slots, which does not make five patients a required scope.
 
-Next: finish the Trauma Team action wording; confirm an authorized model/provider; measure real conversation behavior, latency and cost; observe at least one outside player; compare scripted and generated patient dialogue before expanding content. The G1 gate asks whether the proposal is clear and achievable enough to justify that work.
+Next: verify the newer Trauma Team sequence in play; confirm an authorized model/provider; measure real conversation behavior, latency and cost; observe at least one outside player; compare scripted and generated patient dialogue before expanding content. The G1 gate asks whether the proposal is clear and achievable enough to justify that work.

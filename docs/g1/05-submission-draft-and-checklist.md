@@ -1,49 +1,51 @@
-AI use: Claude helped develop the prototype and initial documents. Codex prepared this submission draft and checked local implementation evidence. The student must review, record and submit the work.
+# G1 submission checklist
 
-# G1 posting draft and submission checklist
+Updated November 14, 2026, New York time. **Prepared for student review; not posted.** Uploading files and publishing repository documents do not submit the discussion post. The final **Reply** click belongs to the student.
 
-**Status: prepared locally, not posted.** The replacement recording is pending. The final deck is prepared for CourseWorks attachment; its uploaded link must be verified. Repository and project-plan links were published and verified without authentication on November 14. Replace them with tested, accessible URLs before posting. Do not paste this entire preparation checklist as the submission.
+## Confirmed deadlines
 
-Current requirement scope: the G1 assignment (discussion 1701307) and corrected announcement (1701304) supplied by the student on November 14. G1 is due Sunday, November 15, 23:59 New York, and is the only submission due before Monday's class. Two self-selected Braintrust replies are due Thursday, November 19, 23:59. Do not add an assigned pre-class note or tasks sourced only from the syllabus. Existing truthful AI-use disclosures are retained in the prepared materials.
+- **G1 main post: Sunday, November 15, 2026, 11:59 p.m., New York time.** This is the only submission due before Monday's class.
+- **Two Braintrust replies: Thursday, November 19, 2026, 11:59 p.m., New York time.** Choose two classmates yourself, starting with pitches that have fewer than two replies.
+- Authority: [G1 assignment](https://courseworks2.columbia.edu/courses/258228/discussion_topics/1701307) and [corrected announcement](https://courseworks2.columbia.edu/courses/258228/discussion_topics/1701304), rechecked in authenticated Chrome. No extra assigned pre-class note or syllabus-only midterm task is included.
 
-## Main-post draft
+## Prepared
 
-AI use: Claude and Codex assisted with research, prototype implementation, testing, and preparing these materials. I directed the project concept and design goals.
+- [x] Recheck the current assignment, corrected announcement and rubric.
+- [x] Review the nine-slide deck for the concept, player/motivation hypothesis, loop, pillars, two alternatives, references, systems diagram, agent comparison, scope, budgets, six risks and approval/Hold conditions.
+- [x] Remove the development-assistant recommendation sentence from the ending. The saved deck is version **50**; the Word and Markdown scripts now have **419 words**. These are drafting scripts, not verbatim transcripts of the recorded presentation.
+- [x] Replace the base recording after **04:53** with the student's new final-slide take. Preserve the earlier content and speech pace. Check the splice, sampled slides and full decoding. Final file: `before-the-cut-g1-recording-final.mp4`.
+- [x] Prepare the current nine-page PDF: `before-the-cut-g1-revised.pdf`.
+- [x] Publish and verify the [Initial GDD](https://github.com/DemonRain7/before-the-cut/blob/main/docs/g1/01-initial-gdd.md), [Initial Configuration Document](https://github.com/DemonRain7/before-the-cut/blob/main/docs/g1/02-initial-configuration-document.md), and [Initial Project Plan](https://github.com/DemonRain7/before-the-cut/blob/main/docs/g1/03-initial-project-plan-and-risk-register.md). Open questions, planned agent-role coverage, gate dates and first prototype tasks are included.
+- [x] Add the [references and asset credits](https://github.com/DemonRain7/before-the-cut/blob/main/docs/g1/06-sources-and-requirements.md) to the submission links.
+- [x] Upload the PDF to CourseWorks and verify its file page.
+- [x] Upload the final MP4 as the discussion attachment and verify its CourseWorks filename and file size. The media-embed route did not retain the video; use the actual file attachment and recording link.
+- [x] Prepare the main-post title, explanation, links and accurate AI-use disclosure in the discussion editor.
 
-**Before the Cut - G1 Concept**
+## Student review and final click
 
-Before the Cut is a fixed-counter game about examining patients for signs of cyberpsychosis before surgery. The intended experience is the suspense of deciding who is safe to treat. A normal reference sheet shows expected appearance, states and responses, so players can compare the current patient and notice mismatches. Players freely choose appearance inspection, tool or movement checks, and conversation, including provocative remarks to observe a reaction. Every method is optional, with no fixed order or requirement to finish a checklist before deciding. They can continue examining, approve surgery, call in Trauma Team, or close the shutter if threatened. Exact criteria remain open for testing.
+- [ ] Review the draft at the [G1 discussion](https://courseworks2.columbia.edu/courses/258228/discussion_topics/1701307). Confirm that the recording and PDF links and the MP4 attachment are present. The repository links are already in the body.
+- [ ] Click the blue **Reply** button under the completed editor by **November 15, 11:59 p.m.** This publishes the main G1 post. Do not press Cancel or reload the unsubmitted draft.
+- [ ] Verify that the new post appears under the student's name. Record the actual post URL and time; neither is claimed yet.
 
-The primary motivations are Fantasy and Discovery: choosing as an implant doctor and uncovering each patient's condition. Sensation adds suspense about a possible attack. Each patient's truth and evidence remain fixed.
+The final video is **5:49.17**. The student explicitly chose to retain its duration. The assignment's three-to-five-minute criterion is not claimed as met. No other part of the video was shortened or sped up.
 
-The target slice is one counter, one normal reference sheet, optional checks and three proposed patients. The patient AI generates its own replies and reactions from background, personality, motives and conversation history. It is not restricted to a fixed answer tree or legal-move list. I will compare it with authored dialogue and test whether conversations stay believable and change the player's next action. Technical checks handle format, length and connection failures; an offline fallback keeps the visit moving. Autonomous dialogue is implemented and tested locally with controlled mocks. The public repository contains the G1 documents; current game source remains in the development workspace pending transfer. Live-model evaluation and human playtesting remain pending.
+## After the G1 main post
 
-- Recording: **RECORDING_URL**
-- Deck: **DECK_URL**
-- Repository: https://github.com/DemonRain7/before-the-cut
-- Initial GDD: https://github.com/DemonRain7/before-the-cut/blob/main/docs/g1/01-initial-gdd.md
-- Initial Configuration Document: https://github.com/DemonRain7/before-the-cut/blob/main/docs/g1/02-initial-configuration-document.md
-- Initial Project Plan, including the prepared risk register: https://github.com/DemonRain7/before-the-cut/blob/main/docs/g1/03-initial-project-plan-and-risk-register.md
+- [ ] Select two classmates' G1 pitches with fewer than two replies.
+- [ ] Watch each recording. For each note, identify a specific moment or timestamp that was unclear or missing, describe what you understood or experienced, and only then suggest a cause. Agent hypotheses and scope are useful topics.
+- [ ] Prepare both replies in English for student review. Do not send them before that review.
+- [ ] Publish both by **November 19, 11:59 p.m.** Current completed count: **0 of 2**.
+- [ ] Read the instructor's Approve/Hold comment when it arrives and address any named corrective work.
 
-I request approval to implement and test this bounded prototype experiment. If the agent only changes wording, or players cannot explain their decisions, I will revise the rule or agent role before expanding the content.
+## Development after G1
 
-## Before posting
+These are next development tasks, not extra November 15 deliverables:
 
-- [ ] Review the proposed rules, case facts, terminology, audience and scope.
-- [ ] Update the draft's first-person disclosure to reflect the review and changes actually completed. Do not claim a review that has not happened.
-- [ ] Record the student's own presentation. Enter the actual duration: **replacement pending**; the first recording was 7:14.54 and will not be submitted.
-- [ ] Keep the recording between 3:00 and 5:00. Use the speaker notes as a draft, not a claim that a rehearsal occurred.
-- [ ] Export or share the deck and verify that the instructor can open it.
-- [x] Publish the GDD and Configuration Document in the intended repository. Completed November 14; public links are above.
-- [x] Link the project plan and risk register. The repository and all three required documents were checked without authentication on November 14. Recording and deck access still need checking.
-- [x] Rechecked the G1 assignment and corrected announcement in authenticated Chrome on November 14.
-- [ ] Post by the recorded G1 deadline: November 15, 2026, 11:59 p.m., New York time.
-- [ ] Record the actual post URL and submission time in `../../HANDOFF.md`.
+- Move the project plan into Asana after G1.
+- Resume the separately prepared Claude/Fable and voice handoffs when the student chooses to continue development.
+- Verify the newer Trauma Team encounter, connect an authorized live model, measure real latency/cost/dialogue quality, and observe an outside playtester.
+- Transfer the active game source into the shared repository after the active writer reaches a safe checkpoint. The current public repository contains the G1 documents and production-agent briefs; it does not yet claim a runnable game.
 
-## After the main post
+The earlier November 23 / November 28 / December 5 gate plan remains in the Initial Project Plan and must be reconfirmed against the corresponding current assignments when active.
 
-The corrected announcement supplied on November 14 sets **two Braintrust replies in the G1 discussion for Thursday, November 19, 2026, 11:59 p.m., New York time**. Choose the two pitches yourself, starting with posts with fewer than two replies. This supersedes the earlier provisional November 18 target. The project remains individual.
-
-For each reply, first watch the actual recording. Record a timestamp, what you saw, what you expected, and what remained unclear. Distinguish an observation from a proposed explanation. Do not fabricate classmates, comments, timecodes or playtest experiences.
-
-The corrected announcement explicitly says G1 is the only submission due before Monday's class. There is no additional assigned pre-class note in this checklist. The student's standing instruction is to review both reply drafts on their pages before they are sent. No reply has been drafted or posted yet; the last observed G1 discussion hid classmates' posts until the student's main post. Syllabus-only midterm notes remain outside this checklist.
+AI use: Claude and Codex assisted with research, implementation, checks and preparation. The student chose the design, recorded the presentation and retains final review and submission.

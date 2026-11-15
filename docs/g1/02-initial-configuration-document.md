@@ -80,7 +80,7 @@ Current logs contain action identifiers, source (`model`, `script`, `fallback`),
 
 The implementation uses `patient_agent.gd`, `model_client.gd`, `move_validator.gd` (a retained filename for format validation), `visit_state.gd`, `main.gd`, and `agent_proxy/src/core.mjs`. The offline `scripted_brain.gd` is a comparison/fallback only. Tests cover novel speech surviving unchanged, cooperation outside authored options, per-patient memory reset, malformed transport, deadlines and actual scene display.
 
-The public repository currently hosts documents; implementation source still lives in the active development workspace. Trauma Team runtime wording, an authorized live provider, deployment and human evaluation remain pending.
+The public repository currently hosts documents; implementation source still lives in the active development workspace. A newer Trauma Team sequence was found in the active source and still needs a focused play check. An authorized live provider, deployment and human evaluation remain pending.
 
 ## A8. Historical evidence
 

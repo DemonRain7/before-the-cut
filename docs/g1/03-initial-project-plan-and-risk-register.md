@@ -13,7 +13,7 @@ Version 0.7, G1 Concept, 2026-11-14. Schedule updated from the corrected announc
 - **Student decisions:** individual project; clinic counter; Godot 4 / 2D pixel art; a normal reference sheet; optional unordered appearance, action and dialogue methods; autonomous patient replies; Call Trauma Team as the proposed second decision.
 - **Local build:** five-patient development shift with the revised guide/tool loop; three patients remain the proposed evaluation scope in the pitch.
 - **Current verification:** 260 game/agent assertions, 246 UI assertions, 18 proxy tests and 49 real-client/scene mock checks passed. These are automated checks only.
-- **Pending:** Trauma Team runtime wording, live model quality/cost/latency, outside playtest, deployment, standalone export and source transfer to this repository.
+- **Pending:** focused verification of the newer Trauma Team sequence, live model quality/cost/latency, outside playtest, deployment, standalone export and source transfer to this repository.
 - **Submission:** the student recorded the nine-slide pitch. Final recording duration and upload are being audited. The main CourseWorks post has not been submitted.
 
 Hour estimates are provisional; the student's available weekly hours are unknown and they are new to Godot.
