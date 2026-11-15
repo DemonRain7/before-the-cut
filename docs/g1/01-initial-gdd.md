@@ -1,3 +1,5 @@
+**Current student decision, November 14: autonomous patient dialogue.** The AI uses the patient's background, personality, motives and conversation history to decide what to say and how to react. It generates original responses; it is not restricted to a legal-move list, authored answer bank or fixed dialogue tree. Technical format, length and timeout checks do not select its answer. The earlier enum-constrained protocol is legacy implementation, not the current design.
+
 AI use: Claude drafted the earlier prototype. Codex revised this G1 document to follow the student's November 13 correction. The student chose observation-guide comparison and action-based screening; examples and numbers remain proposals.
 
 # Before the Cut: Initial Game Design Document
@@ -143,7 +145,7 @@ This illustrates one choice of action, response, interpretation and next action.
 
 The older prototype names Kip, Rook and Vale may be reused, but their old scan tables are not automatically the new design. Do not treat the exact characters or these three roles as student-approved content.
 
-Each case needs only a brief arrival, visible details, a few authored responses, a fixed assessment, permitted cooperation choices and concise outcome feedback. Avoid long branching scripts. A production agent can propose cases from this structure; a reviewer checks that the guide supports the decision before the student accepts the content.
+Each case needs only a brief arrival, visible details, a few authored responses, a fixed assessment, character motives and conversational context and concise outcome feedback. Avoid long branching scripts. A production agent can propose cases from this structure; a reviewer checks that the guide supports the decision before the student accepts the content.
 
 ## 8. Evidence and outcomes
 
@@ -191,7 +193,7 @@ More patients and returning visitors are stretch ideas only. Test the initial th
 
 **[Proposed]** Click to inspect, request an action or choose a dialogue line/tone; optionally guide a simple tool; click a verdict whenever ready; press Space for the shutter. All examination methods are accessible from the same visit screen. Do not require a LOOK action before allowing conversation.
 
-Keep the guide beside the patient. Record observations in plain language. A refusal means "test not performed," not "abnormal test." On timeout the scripted patient responds. No model is needed for animation timing or the defensive window.
+Keep the guide beside the patient. Record observations in plain language. A refusal means "test not performed," not "abnormal test." On service failure a labeled offline fallback keeps the visit moving. No model is needed for animation timing or the defensive window.
 
 ## 14. Technical edge cases to cover
 
@@ -200,32 +202,32 @@ Keep the guide beside the patient. Record observations in plain language. A refu
 | Patient refuses | No invented result; retain another authored evidence route |
 | The same completed action is repeated | Apply the authored case rule; the model cannot randomly reroll evidence |
 | Player skips a method or decides early | Allow the decision; preserve uncertainty and fixed case consequences. Do not force completion or treat missing evidence as normal |
-| Player provokes the patient | Use only case-legal responses; ordinary anger is not automatically a diagnosis |
+| Player provokes the patient | Let the patient AI generate its own reaction; ordinary anger is not automatically a diagnosis |
 | An animation is hard to see | Replay or a descriptive caption; no diagnostic answer revealed |
-| Model answer is invalid or late | Use the stateful script for that turn |
+| Model answer is invalid or late | Use an offline fallback for transport failure, not for a reply that differs from a script |
 | Threat begins | Local warning and shutter timing; no text-reading or model delay consumes the window |
 
 ## 15. Scope and first cuts
 
-**Included target:** one counter, one normal reference sheet, simple optional appearance/action/dialogue methods (including verbal pressure), three fixed patients, surgery/call-in decisions, one defensive action, feedback and restart. Script baseline and bounded patient agent use the same evidence. There is no required examination order.
+**Included target:** one counter, one normal reference sheet, simple optional appearance/action/dialogue methods (including verbal pressure), three fixed patients, surgery/call-in decisions, one defensive action, feedback and restart. Generated dialogue and the scripted comparison use the same patient backgrounds. There is no required examination order.
 
 **Excluded:** exploration, surgery minigames, trading, upgrades, free-text chat, procedural mysteries and a general-purpose case editor.
 
 **Cut first:** sound, decorative art, extra patients and elaborate animation. Preserve the guide, readable response, judgment and feedback. The basic tool response itself is gameplay, so it cannot be replaced by final diagnostic text just to save animation work.
 
-## 16. Patient agent hypothesis and boundary
+## 16. Autonomous patient agent and comparison
 
-The agent selects cooperation, refusal or a permitted conversational response to the player's chosen action or tone. The game's fixed case determines physical test results and any conversational pattern that counts as diagnostic evidence. The agent can vary permitted social behavior and wording, but cannot invent symptoms, change reference criteria, rewrite the case assessment or directly trigger attacks. Adding tone-aware events and validating diagnostic dialogue patterns is planned work, not a feature of the old executable.
+The AI plays the patient as a character. It receives a compact background, personality, motives, what the patient knows, current observations and the conversation so far. It decides what to say and how to react, generating original dialogue rather than choosing from a legal-move enum, answer bank or fixed dialogue tree. It can explain, conceal, evade, argue, volunteer information or change attitude as the conversation develops.
 
-**Hypothesis:** the agent may respond coherently to combinations of optional checks and tones beyond the combinations explicitly covered by authored branches. If those responses give players a reason to change their next check, visits may feel less routine.
+Case background gives the character continuity; it does not prescribe an approved answer for each player action. A patient may lie or contradict another statement. Do not reject a reply merely because it differs from a scripted expectation. The normal reference sheet and physical observations help the player interpret what the patient says. The player decides what to believe and whether to examine further, approve surgery or call Trauma Team.
 
-**Baseline:** a stateful authored script with the same facts, legal moves and limits. A script can also respond to history; the comparison is with our implemented baseline, not a claim that scripts cannot be reactive.
+**Hypothesis:** spontaneous, coherent patient responses make visits feel less predictable and affect the player's next action. Judge whether the character remains believable across several exchanges, whether the response uses the player's actual question or tone, and whether the player can explain a decision. Varied phrasing alone is insufficient.
 
-**What may be lost with that baseline:** flexibility beyond its explicitly authored branches. For example, a player might combine a reassuring question, a provocative remark and a new action request. The comparison should test whether the response remains consistent with that sequence and changes the player's next choice. This is a proposed test situation, not an implemented feature or a claim that a script cannot handle the same sequence. Extend the baseline fairly to cover common situations; do not deliberately make it unresponsive. The examination loop remains playable without AI.
+**Comparison:** authored dialogue with the same character background and player scenarios. The scripted version is a comparison condition and a separate offline mode; its branches do not constrain the model's replies. Compare conversation quality, meaningful choices, latency and cost.
 
-**Playtest:** give both conditions the same case facts, visit history, legal moves and limits, then compare next-action choices and players' reasons. Inspect coherence and waiting separately. Wording alone does not establish a useful agent, and equal results would not support an agent advantage. No result has been measured yet.
+**Technical handling:** validate transport, output shape and length; handle service failure. These checks do not pick the content of an answer. A neutral offline response can keep the visit moving during an outage and must be logged as fallback. Detailed support for physical reactions, including aggression, remains an implementation question; do not silently restore the old legal-move mechanism to decide speech.
 
-Configuration A0 describes how this target maps to the earlier bounded interface.
+**Implementation status:** the existing move-enum proxy and rule-based patient require migration. Historical tests verify that earlier protocol only. Autonomous dialogue has not yet been tested against a live model or with players.
 
 ## 17. References and attribution
 
@@ -265,6 +267,6 @@ November 14 presentation update: slide 2 shows an official *That's not my Neighb
 
 **Revised G1 proposal, November 13:** the normal reference sheet and player-chosen observation/action/dialogue methods are the design authority. All methods, including verbal pressure, are optional. The November 14 slide combines labeled early/reference screenshots with one illustrative optional route; it does not demonstrate an implemented revision.
 
-**Next implementation:** write a small normal reference sheet and one fixed patient; make simple observation, action and dialogue options available without a required order; let the player skip checks and decide. Add case-legal tone responses and update rules/validation/tests. Add the other patients only after that loop is readable. Keep the existing agent transport and fallback where they fit.
+**Next implementation:** write a small normal reference sheet and one fixed patient; make simple observation, action and dialogue options available without a required order; let the player skip checks and decide. Add generated patient replies and reactions and update rules/validation/tests. Add the other patients only after that loop is readable. Keep the existing agent transport and fallback where they fit.
 
 The G1 assignment asks whether the idea is clear and achievable enough to justify prototype work. It does not require the revised loop to be completed before this concept recording.

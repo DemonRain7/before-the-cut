@@ -1,3 +1,5 @@
+**Current student decision, November 14: autonomous patient dialogue.** The AI uses the patient's background, personality, motives and conversation history to decide what to say and how to react. It generates original responses; it is not restricted to a legal-move list, authored answer bank or fixed dialogue tree. Technical format, length and timeout checks do not select its answer. The earlier enum-constrained protocol is legacy implementation, not the current design.
+
 # Before the Cut
 
 A Godot 4 game about examining patients before cybernetic surgery. You compare a patient's appearance and responses with a sheet of normal states, choose examinations or dialogue in any order, and decide whether to approve surgery or call in Trauma Team. Every examination is optional. Defend yourself if threatened.
@@ -29,7 +31,7 @@ This repository was renamed from `before-the-cut-g1` to `before-the-cut` so late
 
 ## Design and verification
 
-The [agent manifest](agent-config.json) and [production-agent artifacts](agent_team/) describe the bounded patient agent and planned development roles. The game owns case truth, evidence, attacks and scoring; the agent may only choose permitted responses. An offline scripted version must remain playable.
+The [agent manifest](agent-config.json) and [production-agent artifacts](agent_team/) describe the bounded patient agent and planned development roles. The patient AI creates original replies and reactions from its character context and conversation history. Its normal replies are not selected by a fixed rule table. An offline scripted version must remain playable.
 
 Older local tests cover the earlier scan/re-check prototype. New case data and pixel-art work are in progress in the active workspace; those old results do not validate the new implementation. No new game test, live-model evaluation or human playtest is claimed by this repository reorganization.
 

@@ -2,9 +2,9 @@ AI use: Codex rewrote the student's G1 narration in spoken English for first-tim
 
 # Before the Cut: G1 recording script
 
-Revised **November 14, 2026**. **555 spoken words**, matched to the existing nine slides. Read only the paragraphs under each slide title.
+Revised **November 14, 2026**. **543 spoken words**, matched to the existing nine slides. Read only the paragraphs under each slide title.
 
-At 120 words per minute, the narration is about **4:38**. The cue sheet adds short pauses and targets **4:57**. These are estimates. The required recording length is **3-5 minutes**; actual rehearsal and recording are still pending.
+At 120 words per minute, the narration is about **4:32**. The cue sheet adds short pauses and targets **4:52**. These are estimates. The required recording length is **3-5 minutes**; actual rehearsal and recording are still pending.
 
 Use this as a draft for your own presentation. Confirm the first-person claims before recording. An earlier scan/re-check build works locally. The revised guide and action responses are planned; live-model testing and human playtests are still pending.
 
@@ -14,11 +14,11 @@ Use this as a draft for your own presentation. Confirm the first-person claims b
 | 2 | 0:29-1:13 | 84 | How a patient visit works |
 | 3 | 1:13-1:46 | 62 | Players, motivations and pillars |
 | 4 | 1:46-2:27 | 78 | Concepts and references |
-| 5 | 2:27-3:02 | 66 | The patient agent's role |
-| 6 | 3:02-3:30 | 52 | How the game and agent work together |
-| 7 | 3:30-4:02 | 60 | Scope and budgets |
-| 8 | 4:02-4:27 | 45 | Risks and mitigations |
-| 9 | 4:27-4:57 | 55 | Prototype approval and next steps |
+| 5 | 2:27-3:00 | 61 | The patient agent's role |
+| 6 | 3:00-3:27 | 49 | How the game and agent work together |
+| 7 | 3:27-3:57 | 56 | Scope and budgets |
+| 8 | 3:57-4:22 | 45 | Risks and mitigations |
+| 9 | 4:22-4:52 | 55 | Prototype approval and next steps |
 
 ## Slide 1: Before the Cut
 
@@ -38,15 +38,15 @@ I considered two alternatives. In the island concept, you searched for your miss
 
 ## Slide 5: The patient agent's role
 
-Those reactions are where AI comes in. It plays the patient, choosing whether to cooperate, refuse, or answer. A refusal might make you try another examination; refusal alone isn't a symptom. I'll compare AI with written response rules that remember the visit. AI might handle combinations those rules don't cover. The test is whether that flexibility changes the player's next check, not just the dialogue's wording.
+AI plays each patient as a character. From their background, personality and conversation, it decides what to say and how to react. It can explain, evade, argue, or become more cooperative. I won't write every answer or use a fixed dialogue tree. I'll compare this with scripted dialogue and test whether its responses feel believable and change what players do next.
 
 ## Slide 6: How the game and agent work together
 
-This diagram shows how that works. AI receives a character brief, the visit so far, and your action. The game checks its reply, using a prepared response if it breaks the rules or arrives too late. Symptoms, attacks and scoring follow fixed game rules. AI cannot invent evidence or change the answer.
+Here's the flow. Your action and the conversation go to the patient AI. It creates a reply and reaction, which the game displays and remembers. Technical checks cover formatting, length and connection failures; they don't choose the answer. If the service fails, an offline fallback keeps the visit moving.
 
 ## Slide 7: Scope and budgets
 
-For scope, I'm proposing one counter and three patients, without a surgery minigame. The earlier prototype works, and the revised examinations are next. Ten AI requests per shift would cost about four tenths of a cent, below a two-cent limit. Replies should take one second, switching to prepared responses after two point five seconds. These are estimates, awaiting live testing.
+For scope, I'm starting with one counter and three patients, without a surgery minigame. Autonomous dialogue is the next step. Earlier cost estimates were below two cents per shift; I'll remeasure them with the new prompts. I target one-second replies, with an offline fallback after two point five seconds. Live latency and cost are still untested.
 
 ## Slide 8: Risks and mitigations
 

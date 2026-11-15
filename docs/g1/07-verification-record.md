@@ -1,3 +1,5 @@
+**Autonomous-dialogue materials, November 14:** saved deck version 22 updates slides 5-7, their narration and the current design/configuration documents. The script has 543 spoken words, with an estimated 4:52 including transitions. Nine PDF pages match the reviewed slide renders; all three Word pages were reviewed. The earlier move-enum runtime is not changed or newly validated by this documentation update. New provider cost and latency remain unmeasured.
+
 # Verification summary
 
 These results describe local automated checks on November 12, 2026, of the earlier scan/re-check prototype. They do not verify the revised optional-examination design or establish player enjoyment.

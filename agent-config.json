@@ -1,110 +1,42 @@
 {
-  "ai_use": "Claude authored the initial implementation and manifest. Codex verified local execution and updated status on 2026-11-12.",
   "schema_version": "course-1",
+  "config_version": "0.8.0",
   "project": "Before the Cut",
-  "config_version": "0.7.0",
   "updated": "2026-11-14",
-  "status": "Initial (G1). Written by an AI assistant from the student's concept; 'planned' and 'not run' are marked on every item they apply to.",
-  "purpose": "Play one patient at the clinic counter: pick one legal move (comply, stall, deflect, or explain with a prepared reason) and say one short line. The patient's choices change which check the player wants to run next.",
+  "status": "Current design target; running legacy protocol still requires migration.",
+  "ai_use": "Claude authored the initial implementation and manifest. Codex verified local execution and updated status on 2026-11-12.",
+  "purpose": "Generate the patient's own dialogue and reactions from character context and conversation history.",
   "tools_available": [],
-  "prohibited_actions": [
-    "change the case truth, a check result, a lead state, strain, the attack or the score",
-    "choose a move that is not on the legal list sent with the request",
-    "start an attack, leave, pay, bargain or end the visit",
-    "put machine readouts, stage directions, lists or markup into the spoken line",
-    "read the truth flag, check table and readouts, look texts, outcomes, attack data, fee, teaser or script",
-    "receive player free text (version 1 has none), player identity or credentials"
-  ],
-  "memory_policy": "No memory between requests or between visits. Each request carries the public state of the current visit. The proxy stores only call counters in process memory.",
   "context_sources": [
-    "game/data/cases/<case>.json, these fields only: name, tagline, request, brief, opening_line, leads.*.label, claims.*.text, sample lines for the legal moves",
-    "game/scripts/core/visit_state.gd snapshot(): strain, checks left, lead states, reasons already given, tests run (normal or abnormal), stalls used, last history tags",
-    "game/scripts/core/visit_state.gd legal_moves_for_ask() and legal_moves_for_check(): the legal move list",
-    "game/data/rules.json: tool labels"
+    "patient background, personality, needs and motives",
+    "what the patient knows",
+    "conversation history and recent observations",
+    "latest player action"
   ],
-  "knowledge_boundary": {
-    "world_state_owner": "game/scripts/core/visit_state.gd in the Godot client",
-    "agent_may_know": "The patient's authored first-person brief. For one patient this includes the fact that he is hiding a fault, the way an actor knows a role.",
-    "agent_never_receives": [
-      "truth.dangerous and truth.summary",
-      "checks.*.result and checks.*.readout for tests not yet run, and the readout text of any test",
-      "looks.*.text",
-      "attack, outcomes, fee, teaser, script"
-    ],
-    "agent_cannot_change": "Anything. Its answer is one enum value plus one line; the game applies the move through the same rule code as the script."
-  },
-  "model_choice": {
-    "default_mode": "script",
-    "modes": {
-      "script": "Rule list in each case file, read by game/scripts/core/scripted_brain.gd. No network. This is the scripted baseline.",
-      "mock": "agent_proxy mock provider. Replays the same rule list through the HTTP path. Answers carry mock:true.",
-      "live": "agent_proxy google provider (Vertex AI or Gemini API). Written, never called against the live service."
+  "response_contract": {
+    "proposed_fields": {
+      "reply": "generated speech",
+      "reaction": "generated demeanor or intended behavior"
     },
-    "live_providers": [
-      "vertex",
-      "gemini-api"
-    ],
-    "live_model": "BTC_MODEL. Planned first choice gemini-3.5-flash-lite, comparison gemini-3.8-flash. The resolved model id is recorded per call when the API returns it.",
-    "planned_not_written": "anthropic adapter using the official SDK"
+    "legal_moves": false,
+    "fixed_dialogue_tree": false,
+    "answer_bank": false,
+    "status": "Proposed; game/proxy adapter and physical-action support need implementation."
   },
-  "prompts_or_system_instructions": "agent_proxy/src/core.mjs: buildPrompt()",
-  "named_failure_modes": [
-    "illegal move (not on the legal list)",
-    "answer is not JSON or lacks move or line",
-    "line too long, empty, or containing control characters",
-    "line imitates a readout or carries markup (forbidden tokens)",
-    "line gives away what the brief says the patient hides (not detected by code today)",
-    "provider timeout, quota or HTTP error",
-    "call cap reached for the visit, the session or the proxy process",
-    "game and proxy hold different versions of a case"
-  ],
-  "evaluation_cases": "Verified 2026-11-12: 28 proxy tests, 269 Godot rule assertions, 141 main-scene assertions, 73 real Godot HTTP checks against mock providers. No live model call or human playtest.",
-  "logging_policy": "Game: one JSONL file per session under user://logs on the player's machine, with case id, seed, events, legal and chosen moves, the patient's line, source (script, model or fallback), fallback reason, latency and reported token usage. Proxy: one JSON line per request with ids, status, error code, latency, token counts and the chosen move; it never logs prompts or patient lines. Neither log holds player identity or credentials.",
-  "human_override_points": [
-    "start without --model, or press F2 in the game: script mode",
-    "SHUTTER (Space) at any time during a visit",
-    "restart the shift",
-    "stop the proxy: every request then falls back to the script",
-    "BTC_PROVIDER=mock: no model spend"
-  ],
-  "test_command": "cd agent_proxy && npm test   |   python tools/gd_static_check.py   |   godot --headless --path game --script res://tests/run_tests.gd   |   godot --headless --path game --script res://tests/run_ui_smoke.gd",
-  "ci_workflow_path": "Not created. Local main branch exists without commits or remote. Planned: .github/workflows/checks.yml.",
-  "native_artifact": "agent_proxy/src/core.mjs: an HTTP function-calling interface (POST /v1/patient-move) with an enum-constrained structured answer. Game side: game/scripts/core/patient_agent.gd, model_client.gd, move_validator.gd.",
+  "validation": "Transport shape, nonempty text, length and timeouts only; do not choose or reject an answer for differing from scripted dialogue.",
   "limits": {
-    "question_characters": 0,
-    "response_characters": 110,
     "max_output_tokens": 256,
     "request_timeout_seconds": 2.5,
-    "proxy_upstream_timeout_seconds": 2.0,
     "request_attempts": 1,
-    "live_calls_per_visit": 4,
-    "live_calls_per_session": 60,
-    "live_calls_per_proxy_process": 2000,
-    "request_body_bytes": 8192
+    "live_calls_per_visit": 4
   },
   "budgets": {
-    "label": "Targets and estimates. Nothing here is measured against a live model.",
-    "latency_target_ms_p50": 1000,
-    "latency_hard_limit_ms": 2500,
-    "prompt_size_measured_characters": "2,043 to 2,828 (mean 2,432) over 10 real Godot-to-mock calls on 2026-11-12; validation/2026-11-12/prompt-measurements.json",
-    "input_tokens_estimate_per_call": "Measured characters suggest about 510-710, mean 610, at 4 characters per token. Conservative planning uses 730 typical / 930 high. No provider token counts.",
-    "output_tokens_estimate_per_call": "60 typical (one move plus a line of at most 110 characters), 256 at the cap. Hidden reasoning tokens, if the model uses any, are unknown until measured.",
-    "calls_per_shift": "Earlier build: 10 measured mock requests; revised target: provisional planning assumption of 10, capped at 12 across three visits. Remeasure after migration.",
-    "cost_estimate_usd_per_shift_typical": 0.004,
-    "cost_estimate_usd_per_shift_at_caps": 0.011,
     "cost_target_usd_per_shift": 0.02,
-    "price_basis": "gemini-3.5-flash-lite global standard: USD 0.30 per 1M input tokens and USD 2.50 per 1M output tokens. Rechecked https://cloud.google.com/model-garden/pricing on 2026-11-12."
+    "typical_latency_target_ms": 1000,
+    "status": "Targets. Remeasure autonomous dialogue; previous token/cost estimates described the old protocol."
   },
-  "fallback": "Verified locally with the real Godot HTTP client and mock servers. Proxy deadline: scripted fallback at 2,068 ms. Client deadline: fallback at 2,504 ms. Invalid move: fallback at 54 ms. No live provider was contacted.",
-  "limitations": [
-    "The revised observation/action design is being implemented in the active legacy workspace. Completion is unverified; older tests do not verify it.",
-    "No live model call has been made. Live latency, provider tokens, cost and line quality are unmeasured.",
-    "Mock and GDScript moves agree on the tested 10-turn evidence path, not exhaustively.",
-    "Nothing is deployed. The Worker entry has only been called in Node.",
-    "Proxy call caps are per process. Deployment needs shared limits and authentication.",
-    "No human playtest or standalone Windows export has occurred.",
-    "The ongoing public repository contains the G1 documents and structure. Runtime source transfer waits for the active writer to stop. Course submission and recording remain pending."
-  ],
+  "fallback": "Neutral offline response on service failure, separately logged; scripted mode is also a comparison condition, not the normal model policy.",
+  "memory_policy": "Bounded per-visit conversation history and context summary; isolate patients and sessions.",
   "agent_team": [
     {
       "role": "Producer",
@@ -126,7 +58,7 @@
       "role": "Design Lead and Narrative: case-author skill",
       "native_artifact": "agent_team/case-author/SKILL.md",
       "status": "written on 2026-11-11, not yet used",
-      "purpose": "Draft a fixed case whose observable responses match the observation guide; keep cooperation choices separate from diagnostic evidence.",
+      "purpose": "Draft patient backgrounds, motives and observable clues for autonomous character dialogue.",
       "context": [
         "game/data/rules.json",
         "game/data/cases/",
@@ -136,7 +68,7 @@
       "tools_and_permissions": "Runs inside the implementation agent with its permissions. Edits only game/data/cases and the tests that list expected results.",
       "outputs": "A case file, updated test expectations and a short change note.",
       "handoff": "The change note and diff go to the rules reviewer.",
-      "evaluation": "Guide-to-response consistency, fair evidence access under refusals and justified call-in outcomes, and meaningful tests for the revised schema. Old strategy totals are historical.",
+      "evaluation": "Readable clues, believable character continuity and meaningful player decisions; no legal-move dialogue gating.",
       "human_approval": "The student approves each patient's truth and tone before it ships."
     },
     {
@@ -161,7 +93,7 @@
       "role": "QA: independent rules reviewer",
       "native_artifact": "agent_team/rules-reviewer.md, tools/gd_static_check.py, game/tests/, agent_proxy/test/",
       "status": "Reviewer brief written, separate reviewer not used. Proxy, game and HTTP mock integration checks pass as of 2026-11-12.",
-      "purpose": "Check, in a fresh context that did not write the change, that truth stays fixed, evidence is fair, the agent boundary holds and reported results are real.",
+      "purpose": "Review autonomous dialogue, context continuity, transport handling and honest evidence.",
       "context": [
         "the diff and change note",
         "game/data/",
@@ -171,7 +103,7 @@
       "tools_and_permissions": "Read and search only.",
       "outputs": "Findings as [blocking | should fix | note] file:line, or 'No findings'.",
       "handoff": "Findings to the student; blocking findings return to the implementation agent.",
-      "evaluation": "Seeded faults are found (planned check).",
+      "evaluation": "Generated replies outside old branches work; isolation and outage handling pass meaningful checks.",
       "human_approval": "The student decides every finding. The reviewer cannot approve or merge."
     },
     {
@@ -234,39 +166,17 @@
       "human_approval": "The student submits everything personally."
     }
   ],
-  "playing_agent_interface": {
-    "native_artifact": "game/scripts/core/visit_state.gd, driven without UI by game/tests/run_tests.gd",
-    "status": "Verified: game/tests/run_tests.gd ran five baseline strategies on 2026-11-12. This is a deterministic test runner, not a separate intelligent playing agent.",
-    "operations": {
-      "player": [
-        "look(spot)",
-        "apply_ask(lead, move)",
-        "tool_status(tool)",
-        "apply_check(...)",
-        "push / back off",
-        "decide verdict",
-        "shutter"
-      ],
-      "runner": [
-        "new visit from case data and seed",
-        "snapshot()",
-        "outcome and score"
-      ]
-    },
-    "sees": "snapshot(): phase, strain, checks left, lead states, claims, tools run, history",
-    "never_sees": [
-      "truth",
-      "checks table before a test is run",
-      "script",
-      "attack data"
-    ],
-    "runner_constraint": "The headless tests hold the VisitState object and could read its truth; they are written not to. GDScript cannot enforce this."
+  "repository": {
+    "url": "https://github.com/DemonRain7/before-the-cut",
+    "documents": "docs/g1/",
+    "source_transfer": "Pending. Claude/Fable is still writing in the legacy fathom workspace. See docs/development/repository-transition.md.",
+    "evidence_scope": "Runtime fields and test figures describe the earlier prototype unless separately dated. New implementation work requires fresh verification."
   },
   "design_target": {
-    "authority": "Student clarification on 2026-11-13; docs/g1/01-initial-gdd.md v0.5",
-    "loop": "Choose optional appearance comparison, action/tool check or dialogue (including verbal pressure); compare with normal reference; choose again or decide. No fixed order or mandatory method.",
-    "agent_role": "Respond within case-legal cooperation and conversational moves to the selected action or tone. Never invent diagnostic evidence.",
-    "agent_hypothesis": "Test coherent responses to combinations beyond explicitly authored branches against a stateful script with the same facts, history, legal moves and limits. Useful gain must affect the next check and the player's explanation; scripts can also be reactive.",
+    "loop": "Choose optional observation, actions or dialogue; compare observations and speech; continue, approve surgery or call Trauma Team.",
+    "agent_role": "Autonomously generate the reply and reaction; no enumerated reply choices.",
+    "hypothesis": "Believable, context-sensitive conversations change the next player action.",
+    "comparison": "Authored dialogue with the same backgrounds and scenarios.",
     "motivations": {
       "primary": [
         "Fantasy",
@@ -276,29 +186,13 @@
         "Sensation"
       ]
     },
-    "world_owns": "Guide, fixed case assessment, visible action response, recorded evidence, verdict consequences and attack timing.",
-    "implementation_status": "In progress in the legacy workspace; source transfer and current verification are pending. Historical tests, tool IDs and prompt measurements describe the earlier scan/re-check executable.",
-    "superseded_core_rule": "Every sign must survive a re-check. Repetition may be optional in particular cases, not universal.",
     "open": [
-      "exact visible patterns",
-      "interaction set",
-      "evidence threshold",
-      "visit limits",
-      "scoring"
-    ],
-    "reference_sheet": "Expected normal appearance, states and responses; separate from observed patient evidence.",
-    "dialogue_status": "Planned: authored question/tone choices, bounded request events and validation of any conversational warning patterns. Ordinary irritation is not automatically evidence.",
-    "verdict_access": "The player may skip any method and decide with incomplete information; fixed case consequences still apply.",
-    "player_outcomes": [
-      "Approve surgery",
-      "Call Trauma Team to take over"
-    ],
-    "call_in_status": "Student decision, November 14. Runtime REFER labels and outcomes are pending migration by the active implementation writer. The response team is game-authored, not another AI agent."
+      "presentation of generated nonverbal reactions",
+      "support for AI-initiated physical actions",
+      "context length and memory summary",
+      "live provider and measured latency/cost"
+    ]
   },
-  "repository": {
-    "url": "https://github.com/DemonRain7/before-the-cut",
-    "documents": "docs/g1/",
-    "source_transfer": "Pending. Claude/Fable is still writing in the legacy fathom workspace. See docs/development/repository-transition.md.",
-    "evidence_scope": "Runtime fields and test figures describe the earlier prototype unless separately dated. New implementation work requires fresh verification."
-  }
+  "historical_evidence": "November 12: 269 game, 141 UI, 28 proxy and 73 mock integration checks of the older constrained protocol; no autonomous-dialogue validation is claimed.",
+  "prompt_artifact": "agent_team/patient-character-prompt.md"
 }

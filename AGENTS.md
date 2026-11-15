@@ -1,3 +1,5 @@
+**Current student decision, November 14: autonomous patient dialogue.** The AI uses the patient's background, personality, motives and conversation history to decide what to say and how to react. It generates original responses; it is not restricted to a legal-move list, authored answer bank or fixed dialogue tree. Technical format, length and timeout checks do not select its answer. The earlier enum-constrained protocol is legacy implementation, not the current design.
+
 **Latest decision, November 14:** replace referral with calling Trauma Team to take over. The live deck is version 21; slide 2 narration still has 84 words and the total remains 555. Current recording files in the legacy g1 folder are `before-the-cut-g1-trauma-team.pdf` and `before-the-cut-recording-script-trauma-team.docx`. Runtime button labels, normal-sheet text and case outcomes still need implementation. The response team is an authored outcome, not an additional model agent. Do not change the active writer's game files mid-run; apply the action change at its next checkpoint.
 
 # Before the Cut: working instructions
@@ -11,7 +13,7 @@ Communicate with the student in Chinese. Write game text, comments, documents, s
 - Godot 4, 2D pixel art, initially a clinic counter. The player is an implant doctor examining patients before surgery.
 - A Normal Reference Sheet shows expected appearance, states and responses. Players compare it with the patient and make their own judgments.
 - Observation, requested actions/tool interactions, ordinary dialogue and provocative verbal pressure are optional and unordered. Players may skip any method and decide early. Do not reinstate a mandatory checklist, universal re-check or fixed examination sequence.
-- Case truth and evidence are fixed. The game controls physical/conversational evidence, attacks and scoring. The patient agent chooses only permitted cooperation, refusal and dialogue. Refusal or irritation alone is not an automatic diagnosis.
+- Patient backgrounds provide continuity. The AI generates original dialogue and reactions, including evasive or deceptive claims. Technical checks do not select its answers; implementation of generated physical actions remains open. Refusal or irritation alone is not an automatic diagnosis.
 - Keep a stateful scripted baseline and playable offline fallback. Model benefit is a hypothesis to test.
 - Fantasy and Discovery are primary motivations; Sensation supports the suspense. The pitch does not promise shuffled arrivals.
 - The student wants Claude/Fable to develop the art, presentation and implementation creatively. Exact signs, cases, balance and patient counts are proposals, not frozen requirements.

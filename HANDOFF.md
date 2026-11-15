@@ -1,3 +1,7 @@
+**Latest recording files:** `before-the-cut-g1-autonomous-dialogue.pdf` and `before-the-cut-recording-script-autonomous-dialogue.docx`. Autonomous-dialogue revision: 543 spoken words, estimated 4:52 including slide changes; actual recording is pending. Runtime code still needs migration at the active writer's next checkpoint.
+
+**Current student decision, November 14: autonomous patient dialogue.** The AI uses the patient's background, personality, motives and conversation history to decide what to say and how to react. It generates original responses; it is not restricted to a legal-move list, authored answer bank or fixed dialogue tree. Technical format, length and timeout checks do not select its answer. The earlier enum-constrained protocol is legacy implementation, not the current design.
+
 **Latest decision, November 14:** replace referral with calling Trauma Team to take over. The live deck is version 21; slide 2 narration still has 84 words and the total remains 555. Current recording files in the legacy g1 folder are `before-the-cut-g1-trauma-team.pdf` and `before-the-cut-recording-script-trauma-team.docx`. Runtime button labels, normal-sheet text and case outcomes still need implementation. The response team is an authored outcome, not an additional model agent. Do not change the active writer's game files mid-run; apply the action change at its next checkpoint.
 
 # Before the Cut: repository handoff
