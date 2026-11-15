@@ -25,11 +25,13 @@ Existing-build evidence on 2026-11-12 (before the observation-guide revision): t
 
 **Repository update, November 14:** this is now the ongoing `before-the-cut` repository. G1 documents are in `docs/g1/`. Claude/Fable is still implementing the revised game in the legacy workspace; new case data and pixel-art work have been observed, but completion is not verified. Source transfer waits until that writer stops. Technical results below are dated evidence for the earlier prototype, not tests of the current work. See the [transition record](../development/repository-transition.md).
 
+**Student decision, November 14:** replace the referral choice with **Call Trauma Team**. The player calls an emergency response unit to take over the patient situation. The exact handling, cost and consequences remain authored design choices; the call does not change case truth or give the model control over attacks. For the first slice, a short dispatch response and fixed encounter outcome are sufficient. A new combat or squad-control system is not required. Current screenshots and runtime data still use the earlier REFER label; implementation is pending while the active writer continues.
+
 ## A0. Revised gameplay contract and migration boundary
 
 **Student direction, clarified November 13:** a normal reference sheet shows expected appearance, states and responses. The player chooses appearance comparison, a requested action/tool interaction, ordinary dialogue or provocative language. All methods are optional, can be combined or skipped, and have no fixed order. A universal re-check or inspect-then-action sequence is superseded.
 
-**Target, not yet implemented:** choose any available examination method or decide with current information. Compare the resulting observation with the normal reference, then choose another method or treatment/referral. No checklist-completion gate unlocks a verdict. An immediate threat is separate from an elevated risk assessment.
+**Target, not yet implemented:** choose any available examination method or decide with current information. Compare the resulting observation with the normal reference, then choose another method or surgery/call-in. No checklist-completion gate unlocks a verdict. An immediate threat is separate from an elevated risk assessment.
 
 The runtime agent remains the patient. It may cooperate, refuse or offer an authored explanation. Cooperation determines whether an interaction proceeds; it does not determine what symptoms the completed interaction reveals. Refusal records no test result. The game owns the guide, case risk, visible response, evidence record, outcomes and attack timing. The agent cannot invent gestures as diagnostic evidence through its dialogue.
 
@@ -37,7 +39,7 @@ For optional conversation and verbal pressure, the proposed first slice uses aut
 
 The existing `comply`, `stall`, `deflect` and `explain:<claim>` interface is reusable infrastructure. The current tool ids, scan/re-check evidence states, strain rules and case files below describe the **earlier executable**, not approved mechanics for the revised design. Before the new loop is called implemented, update its case schema, reference-to-response mapping, optional dialogue/tone events, validators, prompts, stateful baseline, presentation and meaningful tests together. Keep the timeout and offline path.
 
-**Fairness target:** every legal cooperation/refusal sequence leaves an evidence-based route or a fair defer/referral option. A patient who declines is not automatically abnormal. Both model and scripted conditions use the same guide and authored responses.
+**Fairness target:** every legal cooperation/refusal sequence leaves an authored evidence route, so the agent cannot force an unsupported emergency call. A patient who declines is not automatically abnormal. Both model and scripted conditions use the same guide and authored responses.
 
 The game-specific configuration details in A4-A18 are the current technical baseline unless explicitly labeled target. Their November 12 verification does not validate the new observation loop.
 
@@ -161,7 +163,7 @@ The initial planning notes report a 32-prompt sample on November 11: 2,064-3,723
 | Live-model set | The 17 fixed game states already used with the mock, each run at least 10 times against the live model: share of legal moves, share passing validation, latency, token use, and a human read of every line for leaks and tone | Unresolved. Needs provider access |
 | Script-versus-model playtest | Whether the patient's choices change what players check next (see the playtest question below) | Unresolved. Needs a running game and players |
 
-**Playtest question for G2/G3.** With the same guide, patients and authored responses, does model-driven cooperation or disclosure change the next interaction and the player's reason for choosing it? Can players connect an observed or spoken response to the normal reference, choose or skip methods freely, and explain treatment or referral? Compare with the stateful script; separately record whether waiting is disruptive. Different wording alone is not a successful result.
+**Playtest question for G2/G3.** With the same guide, patients and authored responses, does model-driven cooperation or disclosure change the next interaction and the player's reason for choosing it? Can players connect an observed or spoken response to the normal reference, choose or skip methods freely, and explain approving surgery or calling Trauma Team? Compare with the stateful script; separately record whether waiting is disruptive. Different wording alone is not a successful result.
 
 ## A12. Logging
 
@@ -340,6 +342,6 @@ Steps 2 and 4 have not been exercised yet.
 | Area | Verified | Implemented, not run | Unresolved |
 |---|---|---|---|
 | Runtime agent | Local proxy and game validators, fallback and logs. Real HTTP mock shift and deadline paths | Google adapter tested only against fake fetch | Live model call, real latency and cost, leak check, deployment, shared limit storage |
-| Baseline | Earlier build: three cases, five strategy totals, four UI-flow shifts and the 10-turn mock comparison | | Observation-guide migration, fair referral paths, revised strategy comparison and player evaluation |
+| Baseline | Earlier build: three cases, five strategy totals, four UI-flow shifts and the 10-turn mock comparison | | Observation-guide migration, fair evidence paths and call-in outcomes, revised strategy comparison and player evaluation |
 | Production team | Implementation agent in use; lint; proxy tests | Case-author skill; reviewer brief; handoff set | CI; art, audio, analysis and release artifacts; a first independent review |
 | Evidence from people | | | Any playtest |

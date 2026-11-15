@@ -1,3 +1,5 @@
+**Latest decision, November 14:** replace referral with calling Trauma Team to take over. The live deck is version 21; slide 2 narration still has 84 words and the total remains 555. Current recording files in the legacy g1 folder are `before-the-cut-g1-trauma-team.pdf` and `before-the-cut-recording-script-trauma-team.docx`. Runtime button labels, normal-sheet text and case outcomes still need implementation. The response team is an authored outcome, not an additional model agent. Do not change the active writer's game files mid-run; apply the action change at its next checkpoint.
+
 # Before the Cut: repository handoff
 
 Updated November 14, 2026. The student asked to make the G1 repository the ongoing home for the codebase and to improve its name and structure.

@@ -17,7 +17,7 @@ Read the current GDD, the diff and the author's change note. Report findings; do
 
 ## Review case and rule changes
 
-Check that every material response has a guide entry, that the written assessment follows the authored evidence, and that missing observations remain unknown. Enumerate legal refusal sequences: each needs an evidence route or a fair defer/referral outcome. Demeanor alone must not predict the assessment.
+Check that every material response has a guide entry, that the written assessment follows the authored evidence, and that missing observations remain unknown. Enumerate legal refusal sequences: each must retain an authored evidence route; refusal alone must not force an emergency call. Demeanor alone must not predict the assessment.
 
 When reviewing new-flow code, check action ids, response data, evidence recording, verdict rules, case version matching and stateful script compatibility. When reviewing a legacy-only fix, apply that executable's old invariants and label the result as legacy maintenance. Do not reimpose its universal re-check rule on the new design.
 

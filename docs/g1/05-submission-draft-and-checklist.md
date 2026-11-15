@@ -12,7 +12,7 @@ AI use: Claude and Codex assisted with research, prototype implementation, testi
 
 **Before the Cut - G1 Concept**
 
-Before the Cut is a fixed-counter game about examining patients for signs of cyberpsychosis before surgery. The intended experience is the suspense of deciding who is safe to treat. A normal reference sheet shows expected appearance, states and responses, so players can compare the current patient and notice mismatches. Players freely choose appearance inspection, tool or movement checks, and conversation, including provocative remarks to observe a reaction. Every method is optional, with no fixed order or requirement to finish a checklist before deciding. They can continue examining, treat, refer, or close the shutter if threatened. Exact criteria remain open for testing.
+Before the Cut is a fixed-counter game about examining patients for signs of cyberpsychosis before surgery. The intended experience is the suspense of deciding who is safe to treat. A normal reference sheet shows expected appearance, states and responses, so players can compare the current patient and notice mismatches. Players freely choose appearance inspection, tool or movement checks, and conversation, including provocative remarks to observe a reaction. Every method is optional, with no fixed order or requirement to finish a checklist before deciding. They can continue examining, approve surgery, call in Trauma Team, or close the shutter if threatened. Exact criteria remain open for testing.
 
 The primary motivations are Fantasy and Discovery: choosing as an implant doctor and uncovering each patient's condition. Sensation adds suspense about a possible attack. Each patient's truth and evidence remain fixed.
 

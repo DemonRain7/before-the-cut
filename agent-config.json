@@ -2,7 +2,7 @@
   "ai_use": "Claude authored the initial implementation and manifest. Codex verified local execution and updated status on 2026-11-12.",
   "schema_version": "course-1",
   "project": "Before the Cut",
-  "config_version": "0.6.0",
+  "config_version": "0.7.0",
   "updated": "2026-11-14",
   "status": "Initial (G1). Written by an AI assistant from the student's concept; 'planned' and 'not run' are marked on every item they apply to.",
   "purpose": "Play one patient at the clinic counter: pick one legal move (comply, stall, deflect, or explain with a prepared reason) and say one short line. The patient's choices change which check the player wants to run next.",
@@ -136,7 +136,7 @@
       "tools_and_permissions": "Runs inside the implementation agent with its permissions. Edits only game/data/cases and the tests that list expected results.",
       "outputs": "A case file, updated test expectations and a short change note.",
       "handoff": "The change note and diff go to the rules reviewer.",
-      "evaluation": "Guide-to-response consistency, fair referral under refusals, and meaningful tests for the revised schema. Old strategy totals are historical.",
+      "evaluation": "Guide-to-response consistency, fair evidence access under refusals and justified call-in outcomes, and meaningful tests for the revised schema. Old strategy totals are historical.",
       "human_approval": "The student approves each patient's truth and tone before it ships."
     },
     {
@@ -288,7 +288,12 @@
     ],
     "reference_sheet": "Expected normal appearance, states and responses; separate from observed patient evidence.",
     "dialogue_status": "Planned: authored question/tone choices, bounded request events and validation of any conversational warning patterns. Ordinary irritation is not automatically evidence.",
-    "verdict_access": "The player may skip any method and decide with incomplete information; fixed case consequences still apply."
+    "verdict_access": "The player may skip any method and decide with incomplete information; fixed case consequences still apply.",
+    "player_outcomes": [
+      "Approve surgery",
+      "Call Trauma Team to take over"
+    ],
+    "call_in_status": "Student decision, November 14. Runtime REFER labels and outcomes are pending migration by the active implementation writer. The response team is game-authored, not another AI agent."
   },
   "repository": {
     "url": "https://github.com/DemonRain7/before-the-cut",

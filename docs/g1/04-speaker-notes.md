@@ -26,7 +26,7 @@ Before the Cut is a game about deciding whether a patient is safe for cybernetic
 
 ## Slide 2: How a patient visit works
 
-Here's what you do. On the left is our early prototype; on the right is a reference game's checklist. Your sheet describes normal appearance and behavior. You can inspect their appearance, ask them to move, or talk, including provoking a reaction. Every method is optional, in any order. For example, you ask a patient to release a handle, but their hand stays closed. Use that clue to decide whether to check more, approve surgery, or refer them elsewhere. If attacked, close the safety shutter.
+Here's what you do. Our prototype is on the left; a reference checklist is on the right. Your sheet describes normal appearance and behavior. You can observe, request an action, or talk, including provoking a reaction. Every method is optional, in any order. For example, you ask a patient to release a handle, but their hand stays closed. Use that clue to keep checking, approve surgery, or call in Trauma Team, an emergency response unit, to take over. If attacked, close the safety shutter.
 
 ## Slide 3: Players, motivations and pillars
 

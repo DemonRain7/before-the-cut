@@ -21,3 +21,7 @@
 - [Google model pricing](https://cloud.google.com/model-garden/pricing): the configuration document records the November 12 planning assumptions. Recheck provider access and prices before a live run. No live-provider bill or measured latency is claimed.
 
 Reference descriptions are based on official pages and developer material, not claimed personal play sessions. The project's characters, screening rules and game content are original proposals. No source-game code or assets are distributed here.
+
+## Trauma Team terminology update
+
+[CD PROJEKT RED official introduction](https://www.cyberpunk.net/en/news/22136/cyberpunk-2077-e3-2018-trailer-frame-by-frame-ep12-trauma-team) describes combat-trained paramedics who stabilize and extract covered clients. The student's clinic call-in is an adaptation for this game; contract and dispatch details remain open. Use "call in Trauma Team to take over" in the pitch.

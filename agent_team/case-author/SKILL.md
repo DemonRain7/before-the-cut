@@ -23,9 +23,9 @@ Use established student decisions; propose unspecified content with a clear labe
 4. Specify the player action, the visible response and its meaning. The game owns this response; dialogue cannot invent it.
 5. Identify which appearance cues are enough and which invite a follow-up. Repetition is optional and case-specific.
 6. List legal cooperation, refusal and conversational responses for the chosen action or tone. Verbal pressure is optional; ordinary irritation is not automatically a symptom. Any diagnostic response pattern must be constrained by case data. Refusal is not an abnormal completed test.
-7. Make an evidence-based path or a fair referral outcome reachable under every allowed refusal sequence.
+7. Keep another authored evidence route reachable under every allowed refusal sequence; refusal alone must not force an emergency call.
 8. Write concise outcome feedback that names the observation supporting the decision.
-9. Add an attack only if this case needs it. Keep a local warning and one defensive action; a referral does not inherently trigger violence.
+9. Add an attack only if this case needs it. Keep a local warning and one defensive action; calling Trauma Team does not inherently trigger violence.
 
 Do not add long biographies, free-text interrogation, an economy or additional systems to make a case interesting.
 

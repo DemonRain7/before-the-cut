@@ -6,6 +6,8 @@ Version 0.6, G1 Concept, 2026-11-14.
 
 **Repository update, November 14:** this is now the ongoing `before-the-cut` repository. G1 documents are in `docs/g1/`. Claude/Fable is still implementing the revised game in the legacy workspace; new case data and pixel-art work have been observed, but completion is not verified. Source transfer waits until that writer stops. Technical results below are dated evidence for the earlier prototype, not tests of the current work. See the [transition record](../development/repository-transition.md).
 
+**Student decision, November 14:** replace the referral choice with **Call Trauma Team**. The player calls an emergency response unit to take over the patient situation. The exact handling, cost and consequences remain authored design choices; the call does not change case truth or give the model control over attacks. For the first slice, a short dispatch response and fixed encounter outcome are sufficient. A new combat or squad-control system is not required. Current screenshots and runtime data still use the earlier REFER label; implementation is pending while the active writer continues.
+
 ## 0. Design authority and implementation status
 
 **Current direction [Student]:** a reference sheet shows normal appearance, states and responses, similar to the comparison/checklist structure of the earlier impostor-game reference. The player compares the current patient with that reference to notice mismatches and judge possible cyberpsychosis risk before surgery.
@@ -31,7 +33,7 @@ Working title: **Before the Cut**. Fixed counter, Godot 4, 2D, individual projec
 
 The concept is inspired by *Cyberpunk 2077*. Cyberpsychosis is a fictional condition in the Cyberpunk setting, associated with heavy augmentation and loss of control. We use it as a familiar premise, not as a claim that the term originated in the 2077 video game. The observation guide and screening rules in this project are invented gameplay, not canonical diagnostic criteria or real clinical tests.
 
-The player's task is **risk screening before a procedure**, not proving a complete psychiatric diagnosis. A concerning presentation can justify referral without guaranteeing an attack.
+The player's task is **risk screening before a procedure**, not proving a complete psychiatric diagnosis. A concerning presentation can justify calling Trauma Team without guaranteeing an attack.
 
 ## 2. Player and motivation
 
@@ -45,7 +47,7 @@ The player's task is **risk screening before a procedure**, not proving a comple
 
 | Hypothesis | Observable playtest behavior |
 |---|---|
-| Fantasy, primary | Explains a treatment/referral decision in the doctor's role and chooses or skips methods for a stated purpose |
+| Fantasy, primary | Explains a surgery/call-in decision in the doctor's role and chooses or skips methods for a stated purpose |
 | Discovery, primary | Voluntarily tries a useful check, revises an impression after a response, or chooses to meet another patient when stopping is available |
 | Sensation, secondary | Notices a threat cue, responds with the shutter, and reports suspense rather than confusion or an unfair loss |
 | Possible rival motivation | Chases a perfect score or attacks rather than examining patients; report that observation instead of forcing the original interpretation |
@@ -66,7 +68,7 @@ Explaining a mismatch shows rule comprehension; it does not alone establish curi
 2. **Choose freely:** compare appearance, request an action or use a tool, start a conversation (calm or provocative), or make a decision with the information already available.
 3. **Receive feedback if a check was chosen:** see a detail, a movement, a refusal or a conversational response. No action-test stage follows automatically.
 4. **Compare and interpret:** use the sheet's normal reference to identify what differs and how much the evidence supports a conclusion.
-5. **Choose again or decide:** switch methods, repeat a useful check, or select treatment/referral. No method-completion gate blocks a verdict.
+5. **Choose again or decide:** switch methods, repeat a useful check, or select surgery/call-in. No method-completion gate blocks a verdict.
 6. **Resolve:** receive concise feedback showing which observations supported the result, then meet the next visitor. If an authored threat occurs, use the shutter.
 
 The repeated decision is **do I know enough, or which optional check would help?** The list above describes a decision loop, not an ordered examination protocol. A player can skip all movement tests, skip all dialogue, or decide from appearance alone. Skipping a method may leave uncertainty; it does not prevent progression or rewrite the case truth.
@@ -94,7 +96,7 @@ A visible feature may be sufficient when the guide explicitly says so; other fea
 - Optionally inspect a body area and compare it with the reference sheet.
 - Optionally move a simple tool or select an instruction such as "Grip" and "Release."
 - Optionally choose a conversational approach, including a confrontational or provocative remark, and observe the response.
-- Compare whatever was observed, then choose another method or make the treatment/referral decision.
+- Compare whatever was observed, then choose another method or make the surgery/call-in decision.
 
 These are choices available to the player, not steps to complete in order. **[Proposed implementation]** Use a small menu of authored questions and tones in the first slice rather than requiring typed free-text conversation. Verbal pressure is an available choice, never a required test.
 
@@ -126,10 +128,10 @@ A visit-level interaction budget is a candidate if players otherwise run everyth
 |---|---|---|---|
 | Arrival | Inspect a hand that twitches | The hand briefly contracts | A guide entry suggests checking voluntary release |
 | Interaction | Ask the patient to grip a handle, then release | They agree, but the hand keeps gripping after the cue | Compare the continued grip with the guide's warning pattern |
-| Decision | Defer the procedure and refer the patient | The visit resolves according to the fixed case | The feedback identifies the observed warning and what it supported |
+| Decision | Defer the procedure and call in Trauma Team to take over | The visit resolves according to the fixed case | The feedback identifies the observed warning and what it supported |
 | Optional threat branch | Respond if a lunge is visibly telegraphed | The game opens the defensive window | Close the shutter; no model call runs here |
 
-This illustrates one choice of action, response, interpretation and next action. The player could instead compare appearance only, talk first, apply verbal pressure, or stop checking earlier. No action test is compulsory. This example does not imply that every referred patient attacks or that one failed movement diagnoses every case.
+This illustrates one choice of action, response, interpretation and next action. The player could instead compare appearance only, talk first, apply verbal pressure, or stop checking earlier. No action test is compulsory. This example does not imply that every patient attacks when Trauma Team is called or that one failed movement diagnoses every case.
 
 ## 7. Initial patients and content authoring
 
@@ -148,7 +150,7 @@ Each case needs only a brief arrival, visible details, a few authored responses,
 The game has a fixed underlying case assessment. It does not change the truth to agree with the player's guess.
 
 - **Proceed with the requested procedure:** always selectable during a visit; whether it is well supported depends on the evidence gathered and the fixed case. No mandatory method checklist unlocks it.
-- **Refer / defer:** appropriate for elevated or unresolved risk according to the authored rules. Referral is a normal screening outcome, not inherently a mistake.
+- **Call Trauma Team:** ask an emergency response unit to take over when the player judges the patient unsafe to treat. This is a consequential decision: an unsupported call can carry a case-authored cost. The call itself does not guarantee an attack.
 - **Emergency shutter:** a protective response to an immediate threat. A risk indicator and an immediate threat are separate facts.
 - **Continue examining:** useful while an available interaction could change the decision.
 
@@ -156,7 +158,7 @@ Exact rules for enough evidence, uncertainty and partial credit remain **[Open]*
 
 ## 9. Scoring and losing
 
-G1 needs understandable stakes, not final balance numbers. **[Proposed]** The shift report can summarize correct treatment/referral decisions, unsupported decisions and harm prevented or suffered. Rewards should make careful screening useful without making "operate on everyone" or "reject everyone" the obvious best strategy.
+G1 needs understandable stakes, not final balance numbers. **[Proposed]** The shift report can summarize correct surgery/call-in decisions, unsupported decisions and harm prevented or suffered. Rewards should make careful screening useful without making "operate on everyone" or "call Trauma Team for everyone" the obvious best strategy.
 
 The existing prototype's 300-credit fees, 400 rent and 700 clean-shift target describe its old rules only. Revised scoring and whether credits are needed at all remain **[Open]**. No economy, upgrades or surgery simulation is added.
 
@@ -164,7 +166,7 @@ The existing prototype's 300-credit fees, 400 rent and 700 clean-shift target de
 
 - Appearance should direct attention; it should not reduce every case to one reused cosmetic tell.
 - A refusal, accent, rude line or calm personality must not become the diagnosis.
-- When the agent blocks an interaction, another authored route or a fair referral outcome must remain possible.
+- When the agent blocks an interaction, another authored evidence route must remain available. A refusal alone must not force an unsupported emergency call.
 - Symptoms and their meaning must be stable for a given case and version.
 - A repeat test is permitted when a case needs it, not required for every sign.
 - Feedback must explain an outcome using evidence the player could have obtained.
@@ -195,7 +197,7 @@ Keep the guide beside the patient. Record observations in plain language. A refu
 
 | Case | Required behavior |
 |---|---|
-| Patient refuses | No invented result; offer a permitted alternative or allow a fair referral |
+| Patient refuses | No invented result; retain another authored evidence route |
 | The same completed action is repeated | Apply the authored case rule; the model cannot randomly reroll evidence |
 | Player skips a method or decides early | Allow the decision; preserve uncertainty and fixed case consequences. Do not force completion or treat missing evidence as normal |
 | Player provokes the patient | Use only case-legal responses; ordinary anger is not automatically a diagnosis |
@@ -205,7 +207,7 @@ Keep the guide beside the patient. Record observations in plain language. A refu
 
 ## 15. Scope and first cuts
 
-**Included target:** one counter, one normal reference sheet, simple optional appearance/action/dialogue methods (including verbal pressure), three fixed patients, treatment/referral decisions, one defensive action, feedback and restart. Script baseline and bounded patient agent use the same evidence. There is no required examination order.
+**Included target:** one counter, one normal reference sheet, simple optional appearance/action/dialogue methods (including verbal pressure), three fixed patients, surgery/call-in decisions, one defensive action, feedback and restart. Script baseline and bounded patient agent use the same evidence. There is no required examination order.
 
 **Excluded:** exploration, surgery minigames, trading, upgrades, free-text chat, procedural mysteries and a general-purpose case editor.
 
@@ -246,14 +248,14 @@ November 14 presentation update: slide 2 shows an official *That's not my Neighb
 |---|---|
 | Which two or three visible patterns are readable and distinct? | Build one simple response at a time and ask a new player to describe it |
 | Which appearance cues are sufficient, and which need an action? | Draft guide entries, then check every case against them |
-| How much evidence supports treatment or referral? | Author fixed case expectations before coding; test explanations after each decision |
+| How much evidence supports approving surgery or calling Trauma Team? | Author fixed case expectations before coding; test explanations after each decision |
 | Does tool movement add useful interaction? | Compare a simple gesture with a button-issued instruction |
 | Is a check limit needed? | Watch whether players inspect purposefully or run every action |
 | Can players tell that every method is optional? | Check whether they feel forced to finish all rows or ask every question before a verdict |
 | Does verbal pressure reveal useful information? | Compare authored reactions; check that players do not equate ordinary irritation with risk |
 | Are refusal and symptoms being confused? | Include a clear refusal without an abnormal completed response |
 | Does the patient agent change the next action? | Compare script/model action sequences and player explanations |
-| Can every allowed refusal sequence be handled fairly? | Enumerate reachable paths and allowed referral outcomes |
+| Can every allowed refusal sequence be handled fairly? | Enumerate reachable paths and evidence routes and call-in outcomes |
 | Do attacks add suspense without dominating screening? | Observe warnings and defensive actions during a playtest |
 | Is another visitor appealing? | Ask whether the player wants to continue and observe their choice |
 
