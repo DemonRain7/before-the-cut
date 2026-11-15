@@ -92,6 +92,7 @@ func _initialize() -> void:
 	test_shutter()
 	test_settlement_rows()
 	test_shift()
+	test_arrivals()
 	test_brain()
 	await test_agent()
 	await test_conversation()
@@ -450,6 +451,42 @@ func test_shift() -> void:
 	ok(int(rules["scoring"]["false_call"]) < int(rules["scoring"]["false_alarm"]),
 		"calling an armed crew on a steady patient costs more than a false alarm")
 	ok(shift.is_done() and shift.current_id() == "", "shift ends after five")
+
+
+## The arrival order (added November 15): drawn from the shift seed, always the same five, the
+## first shift of a session opening with a steady patient, and the listed order when it is off.
+func test_arrivals() -> void:
+	var listed: Array = rules["shift_order"]
+	var sorted_listed := listed.duplicate()
+	sorted_listed.sort()
+	var orders := {}
+	var all_same_five := true
+	var all_repeatable := true
+	var first_always_steady := true
+	var later_opens_drifting := false
+	for s in range(1, 41):
+		var a: Array = ShiftState.arrival_order(rules, cases, s, true)
+		var b: Array = ShiftState.arrival_order(rules, cases, s, true)
+		var sorted_a := a.duplicate()
+		sorted_a.sort()
+		all_same_five = all_same_five and sorted_a == sorted_listed
+		all_repeatable = all_repeatable and a == b
+		first_always_steady = first_always_steady and str(cases[str(a[0])]["truth"]) == "stable"
+		orders[JSON.stringify(a)] = true
+		var later: Array = ShiftState.arrival_order(rules, cases, s, false)
+		later_opens_drifting = later_opens_drifting or str(cases[str(later[0])]["truth"]) == "drifting"
+	ok(all_same_five, "arrivals: every drawn order holds the same five patients once each")
+	ok(all_repeatable, "arrivals: the same seed always gives the same order")
+	ok(first_always_steady, "arrivals: the first shift of a session opens with a steady patient")
+	ok(orders.size() >= 10, "arrivals: forty seeds give many orders (%d)" % orders.size())
+	ok(later_opens_drifting, "arrivals: a later shift may open with a drifting patient")
+	var off := rules.duplicate(true)
+	off["arrivals"]["shuffle"] = false
+	eq(ShiftState.arrival_order(off, cases, 7, true), listed, "arrivals: with shuffle off the listed order stands")
+	var drawn: Array = ShiftState.arrival_order(rules, cases, 7, true)
+	var shift := ShiftState.new(rules, drawn)
+	eq(shift.current_id(), str(drawn[0]), "arrivals: the shift follows the order it was given")
+	eq(ShiftState.new(rules).current_id(), str(listed[0]), "arrivals: given no order, a shift keeps the listed one")
 
 
 func test_brain() -> void:

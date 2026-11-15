@@ -1,5 +1,5 @@
 extends RefCounted
-## One shift: the fixed queue of patients and the running totals.
+## One shift: the queue of patients and the running totals.
 ## Used as: const ShiftState = preload("res://scripts/core/shift_state.gd")
 
 var rules: Dictionary = {}
@@ -11,6 +11,35 @@ var records: Array = []   # one settlement per finished visit
 func _init(p_rules: Dictionary = {}, p_order: Array = []) -> void:
 	rules = p_rules
 	order = p_order.duplicate() if not p_order.is_empty() else (rules.get("shift_order", []) as Array).duplicate()
+
+
+## Who comes in tonight, and in what order. rules.json `shift_order` lists the patients in
+## their authored order; with `arrivals.shuffle` the order is drawn from the shift seed, so the
+## same seed always gives the same night. With `arrivals.first_shift_opens_steady` the first
+## shift of a session opens with a steady patient (truth "stable"), so a new player meets the
+## desk before anyone can turn on them. Later shifts may open with anyone.
+static func arrival_order(p_rules: Dictionary, p_cases: Dictionary, p_seed: int, first_of_session: bool) -> Array:
+	var ids: Array = (p_rules.get("shift_order", []) as Array).duplicate()
+	var arrivals: Dictionary = p_rules.get("arrivals", {})
+	if not bool(arrivals.get("shuffle", false)) or ids.size() < 2:
+		return ids
+	var rng := RandomNumberGenerator.new()      # its own generator: the shift's beats stay as they were
+	rng.seed = p_seed
+	for i in range(ids.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var swap: Variant = ids[i]
+		ids[i] = ids[j]
+		ids[j] = swap
+	if first_of_session and bool(arrivals.get("first_shift_opens_steady", false)):
+		for i in ids.size():
+			var c: Dictionary = p_cases.get(str(ids[i]), {})
+			if str(c.get("truth", "")) == "stable":
+				if i > 0:
+					var steady: Variant = ids[i]
+					ids.remove_at(i)
+					ids.insert(0, steady)
+				break
+	return ids
 
 
 func current_id() -> String:

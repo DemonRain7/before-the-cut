@@ -50,6 +50,7 @@ func _run() -> void:
 		asked_at = -2
 		quit(1)
 		return
+	main.authored_order = true      # the checks below follow the listed order of patients
 	root.add_child(main)
 	await process_frame
 	main.mic.simulated = true      # an automated run never opens a microphone

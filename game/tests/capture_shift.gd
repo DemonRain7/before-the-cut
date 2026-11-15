@@ -79,6 +79,7 @@ func _on_watchdog() -> void:
 func _run() -> void:
 	var scene: PackedScene = load("res://scenes/main.tscn")
 	main = scene.instantiate() as MainScript
+	main.authored_order = true      # the checks below follow the listed order of patients
 	root.add_child(main)
 	await process_frame
 	main.set_process_input(false)      # only the driver moves the pointer during a capture run

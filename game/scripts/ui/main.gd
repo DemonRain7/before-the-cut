@@ -8,6 +8,7 @@ extends Control
 ##
 ## Launch options (after "--" on the command line), all optional:
 ##   --seed=123                          fixed shift seed
+##   --authored-order                    patients in the order rules.json lists them (tests, captures)
 ##   --agent-url=http://127.0.0.1:8787   patient-agent proxy (or environment BTC_AGENT_URL)
 ##   --model                             autonomous patient dialogue through the proxy
 ##   --mute                              start with sound off
@@ -42,6 +43,12 @@ const CALL_ARM_TIME := 3.5                      # how long the Trauma Team line 
 # a patient who turns hits the glass three times before it gives: these are the moments of
 # the blows, as fractions of the attack window (rules.json: attack.window_ms)
 const BLOW_AT := [0.06, 0.36, 0.66]
+## Every sound of an attack plays this much under its own level. Measured on November 15 from a
+## silent recording of the master bus (nobody listened): untrimmed, the loudest second of an
+## attack sat about 24 dB over the room and a landed attack held the limiter in 59% of its
+## 50 ms windows. At -9 dB: 19 dB (caught) and 22 dB (landed) over the room, limiter 0% and 8%.
+## One number to change after a listening test.
+const ATTACK_TRIM_DB := -9.0
 const DENT_SPOTS := [Vector2(156, 84), Vector2(64, 58), Vector2(126, 44)]       # caught: where the shutter bulges
 const DENT_SPOTS_LOCKED := [Vector2(150, 80), Vector2(70, 66), Vector2(118, 118)]
 const FACE_CLEAR := Rect2(186, 76, 236, 208)      # the first blood on the view keeps off the attacker's face
@@ -92,6 +99,8 @@ const DISPATCH_LINE := "Trauma Team dispatch. A unit is rolling to your counter.
 const CREW_LINE := "Trauma Team. Step back from the glass. You are coming with us."
 const CREW_AFTER_LINE := "A siren outside. Boots in the hall. It does not take them long."
 const WAIT_HINT := "Click the hall camera or press ENTER to buzz them in."
+const THINK_HINT := "Still answering. You can look meanwhile, or decide now."
+const THINK_QUIET := 1.6          # how long a look made while the patient is answering stays readable
 const SAY_HINT := "ENTER says it. ESC takes it back."
 const SAY_FULL_HINT := "That is all you can say in one go. ENTER says it."
 const SAY_OFFLINE_HINT := "Offline patient: it only knows its script. ASK lists what it can answer."
@@ -141,6 +150,7 @@ var shift_seed: int = 0
 var shift_number: int = 0
 var fixed_seed: int = 0
 var has_fixed_seed: bool = false
+var authored_order: bool = false     # true: rules.json shift_order as written, never shuffled
 var agent_url: String = ""
 var use_model: bool = false
 var start_muted: bool = false
@@ -171,6 +181,7 @@ var _skip: bool = false           # a click that asks the current line to hurry 
 var _thinking: bool = false       # waiting for the patient brain
 var _think_t: float = 0.0
 var _lock: bool = false           # a short sequence that must not be interrupted by another action
+var _think_quiet: float = 0.0     # seconds the thinking dots stay away, so a look made meanwhile can be read
 var _held: String = ""            # the stamp in the player's hand
 var _armed: float = 0.0           # seconds left in which a second press drops the shutter
 var _call_armed: float = 0.0      # seconds left in which a second press calls Trauma Team
@@ -253,6 +264,8 @@ func _read_launch_options() -> void:
 			start_muted = true
 		elif a == "--less-blood":
 			less_blood = true
+		elif a == "--authored-order":
+			authored_order = true
 	if agent_url == "":
 		use_model = false
 
@@ -491,7 +504,20 @@ func _mark_new_notes(before: Dictionary) -> bool:
 
 
 func _can_act() -> bool:
-	return state == State.EXAM and visit != null and visit.in_exam() and not _thinking and not _lock
+	return _can_decide() and not _thinking and not _lock
+
+
+## The exam is open, whether or not the patient is in the middle of an answer. Looking, picking
+## up the stamp, opening the call line and deciding need only this: none of them has to wait
+## for the patient to finish thinking (student request of November 15).
+func _can_decide() -> bool:
+	return state == State.EXAM and visit != null and visit.in_exam()
+
+
+## The patient is still answering the last thing that was asked: the model has not replied yet,
+## or the doctor's own line is still on screen.
+func _answer_pending() -> bool:
+	return _thinking or _lock
 
 
 ## Every new action puts away whatever was in hand and stops the sequence that was running.
@@ -542,6 +568,10 @@ func _desk_for_exam() -> void:
 
 func _desk_off() -> void:
 	_close_say()
+	_drop_stamp(false)              # a stamp picked up while the patient was still answering
+	if _call_armed > 0.0:           # or a call line opened then
+		_call_armed = 0.0
+		_alert_hint = ""
 	desk.set_all(false)
 	desk.active = ""
 	desk.held = ""
@@ -611,7 +641,8 @@ func _start_shift() -> void:
 	shift_number += 1
 	shift_seed = fixed_seed if has_fixed_seed else int(_boot_rng.randi())
 	_rng.seed = shift_seed
-	shift = ShiftState.new(rules)
+	var order: Array = [] if authored_order else ShiftState.arrival_order(rules, cases, shift_seed, shift_number == 1)
+	shift = ShiftState.new(rules, order)
 	var client: Variant = null
 	if agent_url != "":
 		client = model_client
@@ -630,6 +661,7 @@ func _start_shift() -> void:
 	for c in _mess.get_children():
 		c.queue_free()
 	_stop_attack_audio()
+	audio.trim_db = 0.0
 	clinic.set_cam("")
 	clinic.corner_text = ""
 	_log("shift_start", {"shift": shift_number, "seed": shift_seed, "order": shift.order, "agent_mode": agent.mode})
@@ -758,9 +790,17 @@ func _show_upcoming() -> void:
 # ================================================================ exam actions
 
 func act_look(zone: String) -> void:
-	if not _can_act() or not VisitState.ZONES.has(zone):
+	if not VisitState.ZONES.has(zone):
 		return
-	var token := _begin_action()
+	# a look does not interrupt: while the patient is still answering it happens beside the answer
+	var meanwhile := _can_decide() and _answer_pending()
+	if not _can_act() and not meanwhile:
+		return
+	var token := _seq
+	if meanwhile:
+		_think_quiet = THINK_QUIET
+	else:
+		token = _begin_action()
 	var before := _note_keys()
 	var res: Dictionary = visit.look(zone)
 	if not bool(res.get("ok", false)):
@@ -801,7 +841,8 @@ func act_tool(tool: String) -> void:
 	match result:
 		"granted":
 			var ok: bool = await _patient_line(line, token, 0.25)
-			if ok:
+			# not over a stamp or an open call line picked up while they answered: the tool waits
+			if ok and _held == "" and _call_armed <= 0.0:
 				_open_scope(tool)
 		"explained":
 			_base_hint = "They gave a reason instead. Insist (costs %d) or reassure." % visit.check_cost(tool)
@@ -819,6 +860,7 @@ func _decide(event: Dictionary, legal: Array, ask_line: String, token: int) -> D
 	_thinking = true
 	_lock = true
 	_think_t = 0.0
+	_think_quiet = 0.0
 	_doctor_say(ask_line)
 	event = event.duplicate(true)
 	event["text"] = ask_line
@@ -1327,12 +1369,18 @@ func act_mark(row: String) -> void:
 
 
 func act_pick_stamp(kind: String) -> void:
-	if not _can_act() or kind != "treat":
+	if kind != "treat":
+		return
+	var meanwhile := _can_decide() and _answer_pending()
+	if not _can_act() and not meanwhile:
 		return
 	if _held == kind:
 		act_cancel()
 		return
-	_begin_action()
+	if meanwhile:
+		_disarm()                      # the answer still comes; only what is in hand changes
+	else:
+		_begin_action()
 	_held = kind
 	desk.held = kind
 	clipboard.armed = kind
@@ -1360,12 +1408,16 @@ func act_stamp_record() -> void:
 ## The call box. Trauma Team cannot be called back, so it takes two presses: the first opens
 ## the line, the second sends the crew. Like TREAT it is allowed at any moment of the exam.
 func act_call_team() -> void:
-	if not _can_act():
+	var meanwhile := _can_decide() and _answer_pending()
+	if not _can_act() and not meanwhile:
 		return
 	if _call_armed > 0.0:
 		act_verdict("refer")
 		return
-	_begin_action()
+	if meanwhile:
+		_drop_stamp(false)             # the answer still comes; only what is in hand changes
+	else:
+		_begin_action()
 	_call_armed = CALL_ARM_TIME
 	desk.armed = "refer"
 	_alert_hint = "TRAUMA TEAM LINE OPEN. Press again to call them in. Right-click hangs up."
@@ -1376,8 +1428,14 @@ func act_call_team() -> void:
 ## The two decisions: TREAT, or hand the patient over to Trauma Team (in the data that one is
 ## still called "refer"). Allowed at any moment of the exam; nothing has to be checked first.
 func act_verdict(kind: String) -> void:
-	if not _can_act() or not (kind == "treat" or kind == "refer"):
+	if not _can_decide() or not (kind == "treat" or kind == "refer"):
 		return
+	if _answer_pending():
+		# deciding does not wait for the answer: the reply still on its way is dropped, unread
+		_log("reply_dropped", {"by": kind, "stage": "thinking" if _thinking else "line"})
+		_thinking = false
+		_lock = false
+		dialogue.thinking = false
 	var token := _begin_action()
 	var res: Dictionary = visit.verdict(kind)
 	var next := str(res.get("next", ""))
@@ -1591,6 +1649,7 @@ func _attack_sequence(lead_line: String, token: int) -> void:
 	clinic.hall_dark = 0.82
 	desk.pulse = "shutter"
 	_alert_hint = "DROP THE SHUTTER!   [SPACE]"
+	audio.trim_db = ATTACK_TRIM_DB      # back to 0 when the result slip prints
 	audio.play("turn_hit")
 	audio.play("scream", _scream_pitch(), -1.0)
 	audio.play("whine")
@@ -2002,6 +2061,7 @@ func act_shutter() -> void:
 	var token := _bump()
 	_thinking = false
 	_lock = false
+	audio.fade_out("whine", 0.12)      # a rising whine stopped dead would click behind the shutter
 	var reaction_ms := int(_attack_t * 1000.0) if _telegraphed else -1
 	var res: Dictionary = visit.shutter()
 	var outcome := str(res.get("result", ""))
@@ -2094,6 +2154,7 @@ func _resolve() -> void:
 	_slip_data = s
 	_slip_index = shift.index + 1
 	_slip_mode = "print"
+	audio.trim_db = 0.0
 	_slip_y = -SLIP_H
 	_slip_age = 0.0
 	audio.play("printer")
@@ -2395,7 +2456,9 @@ func _process(delta: float) -> void:
 		rig.talking = _patient_talking and dialogue.is_revealing()
 	if _thinking:
 		_think_t += delta
-		if _think_t > 0.5 and not dialogue.typing and not dialogue.thinking and visit != null:
+		if _think_quiet > 0.0 and not dialogue.typing:
+			_think_quiet -= delta
+		if _think_t > 0.5 and _think_quiet <= 0.0 and not dialogue.typing and not dialogue.thinking and visit != null:
 			dialogue.speaker = _patient_name()
 			dialogue.speaker_color = Gfx.WARM6
 			dialogue.thinking = true
@@ -2555,6 +2618,8 @@ func _update_hint() -> void:
 		dialogue.set_hint(_alert_hint, Gfx.RED3 if fmod(_t, 0.4) < 0.28 else Gfx.RED2)
 	elif _hover_hint != "" and not news:
 		dialogue.set_hint(_hover_hint, Gfx.TEAL5)
+	elif _base_hint == "" and _thinking and _think_t > 0.8 and state == State.EXAM:
+		dialogue.set_hint(THINK_HINT, Gfx.TEAL4)
 	else:
 		dialogue.set_hint(_base_hint, Gfx.TEAL4)
 

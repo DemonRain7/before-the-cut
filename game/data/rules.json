@@ -2,6 +2,7 @@
   "version": 3,
   "note": "First-pass numbers chosen by the assistant on 2026-11-14. None has been tuned with players. Version 3: the second decision is a call to Trauma Team (ids still say 'refer'); a call on a steady patient now costs the call-out (false_call). Agent limits were raised for typed and spoken conversation: 16 patient-model calls per visit, a 4 s wait, replies asked to stay within 110 characters and shown up to 220 (two pages of the strip); the proxy must hold the same numbers. Push-to-talk (agent.voice): a clip is at most 10 s, 24 clips per visit, 7 s to wait for its words; quieter than silence_peak is not sent.",
   "shift_order": ["kip", "rook", "vale", "juno", "maren"],
+  "arrivals": {"shuffle": true, "first_shift_opens_steady": true, "note": "Added 2026-11-15: shift_order is who comes in; each shift draws the order from its seed. The first shift of a session opens with a steady patient. --authored-order keeps the listed order (tests and captures)."},
   "rent": 600,
   "costs": {"check": 1, "insist": 1, "ask": 1, "press": 2},
   "reassure": {"gain": 1, "uses": 2},

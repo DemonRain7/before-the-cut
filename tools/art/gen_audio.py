@@ -340,7 +340,8 @@ def whine():
     ph = 2 * np.pi * np.cumsum(f) / SR
     tone = np.sin(ph) * 0.6 + np.sign(np.sin(ph * 2.01)) * 0.12 + np.sin(ph * 3.0) * 0.15
     trem = 0.75 + 0.25 * np.sin(2 * np.pi * (6 + 18 * x / sec) * x)
-    return lp(tone, 6000) * trem * np.clip(x / 0.05, 0, 1) * (0.35 + 0.65 * x / sec)
+    # a 60 ms release: the file used to end at 0.6 of full scale, which clicks wherever it stops
+    return lp(tone, 6000) * trem * np.clip(x / 0.05, 0, 1) * (0.35 + 0.65 * x / sec) * fade(np.ones(len(x)), 0.0, 0.06)
 
 
 def alarm():

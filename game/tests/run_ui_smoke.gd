@@ -44,6 +44,7 @@ func _run() -> void:
 		print("RESULT: scenes/main.tscn does not use scripts/ui/main.gd")
 		quit(1)
 		return
+	main.authored_order = true      # the checks below follow the listed order of patients
 	root.add_child(main)
 	await process_frame
 	main.audio.set_muted(true)
@@ -469,13 +470,18 @@ func shift_odds_and_ends() -> void:
 	await d.press()
 	check(v.in_exam() and note_count(v, "temper") == 1, "the first line gets a flat reaction")
 	await d.settle()
+	main.audio.set_muted(false)      # the players must run for a fade to be seen; the dummy driver is silent
 	await d.press()
 	check(main.state == MainScript.State.ATTACK and v.attack_cause == "press", "the second line turns him")
 	var warned: bool = await d.wait_for_telegraph()
 	check(warned, "the warning comes")
+	check(main.audio.trim_db == main.ATTACK_TRIM_DB, "the attack's sounds start %.0f dB under the exam's" % -main.ATTACK_TRIM_DB)
 	d.click(d.pad_pos("shutter"))
 	check(v.outcome == "caught", "one click on the lever drops the shutter")
+	check(main.audio.fading() > 0, "the warning whine is faded out, not cut dead, when the shutter drops on it")
 	await finish_visit("Vale")
+	check(main.audio.trim_db == 0.0 and main.audio.fading() == 0, "the trim is gone once the slip has printed, and so is the fade")
+	main.audio.set_muted(true)
 
 	section("Juno: the question list opens and closes")
 	v = await enter("juno")
@@ -489,7 +495,22 @@ func shift_odds_and_ends() -> void:
 	await d.ask(1)
 	await d.settle()
 	check(v.answered.has("chrome"), "her dodge and her answer both play")
-	await d.stamp("treat")
+	# the patient need not finish answering: looking and deciding go ahead meanwhile
+	await d.settle()
+	main.act_reassure()
+	check(main._lock and not main._thinking and main.dialogue.speaker == "YOU", "a reassuring line is on its way")
+	var seq: int = main._seq
+	main.act_look("eyes")
+	check(main._lock and main._seq == seq and v.seen.has("look:eyes") and main.dialogue.speaker == "EYES",
+		"a look while that line is still out happens, and does not cancel it")
+	main.act_pick_stamp("treat")
+	check(main._held == "treat" and main._lock, "neither does picking up the stamp")
+	main.act_stamp_record()
+	check(v.outcome == "treated_ok" and not main._lock and not main._thinking and v.reassure_used == 0,
+		"TREAT does not wait for the answer, and the dropped answer changed nothing")
+	var dropped: Array = main.event_log.memory.filter(func(r: Dictionary) -> bool: return str(r.get("type", "")) == "reply_dropped")
+	check(dropped.size() == 1 and str(dropped[0].get("stage", "")) == "line" and str(dropped[0].get("by", "")) == "treat",
+		"the dropped answer is logged once, with its stage")
 	await finish_visit("Juno")
 
 	section("Maren: the shutter during the exam")

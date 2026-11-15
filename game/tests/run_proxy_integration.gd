@@ -497,9 +497,50 @@ func typed_conversation(main: MainScript, driver: PlayDriver) -> void:
 	check(main.agent.calls_this_visit == calls_before + 1, "one sentence, one call, however many times ENTER is pressed")
 
 
+## While the patient is still answering (the slow server replies after the game's own deadline),
+## looking, the stamp and the call line do not wait for the answer and do not cancel it; a
+## decision made then drops the answer that is still on its way (student request, November 15).
+func meanwhile(main: MainScript, driver: PlayDriver) -> void:
+	await driver.settle()
+	check(main.agent.calls_this_visit + 2 <= main.agent.max_calls, "meanwhile: two calls are left in this visit")
+	client.base_url = str(urls.slow)
+	var fallbacks: int = main.agent.fallbacks_this_visit
+	var seq: int = main._seq
+	main.act_say("Take your time with this one.")
+	check(main._thinking and main._seq == seq + 1, "meanwhile: the slow patient is thinking")
+	await driver.seconds(0.3)
+	var seen_before: bool = main.visit.seen.has("look:hands")
+	main.act_look("hands")
+	check(main._thinking and main._seq == seq + 1, "meanwhile: a look does not cancel the answer on its way")
+	check(main.visit.seen.has("look:hands") and main.dialogue.speaker == "HANDS", "meanwhile: the look happens and is shown (seen before: %s)" % seen_before)
+	check(main._think_quiet > 0.0 and not main.dialogue.thinking, "meanwhile: the thinking dots stay away while the look is read")
+	check(await driver.until(func() -> bool: return not main._thinking and not main._lock, 20.0), "meanwhile: the answer still arrives after the look")
+	check(main.agent.fallbacks_this_visit == fallbacks + 1 and main.dialogue.speaker == main._patient_name(),
+		"meanwhile: it is the patient's line (the authored one: this server is slower than the deadline)")
+	await driver.settle()
+	var history: int = main.agent.conversation_history.size()
+	main.act_say("One more question, then.")
+	check(main._thinking, "meanwhile: thinking again")
+	main.act_pick_stamp("treat")
+	check(main._held == "treat" and main._thinking, "meanwhile: the TREAT stamp can be picked up while they answer")
+	main.act_call_team()
+	check(main._call_armed > 0.0 and main._held == "" and main._thinking, "meanwhile: so can the call line be opened (the stamp goes back)")
+	main.act_call_team()
+	check(not main._thinking and not main._lock and main.state != MainScript.State.EXAM, "meanwhile: the second press decides without waiting")
+	var dropped := 0
+	for rec in main.event_log.memory:
+		if str(rec.get("type", "")) == "reply_dropped":
+			dropped += 1
+	check(dropped == 1, "meanwhile: the dropped answer is logged once, by stage, without words")
+	check(await driver.wait_for_slip(40.0), "meanwhile: the visit ends as a Trauma Team call")
+	check(main.agent.conversation_history.size() == history, "meanwhile: the late answer never joins the conversation")
+	client.base_url = str(urls.normal)
+
+
 func test_scene() -> void:
 	Engine.time_scale = 4.0
 	var main: MainScript = load("res://scenes/main.tscn").instantiate()
+	main.authored_order = true      # the checks below follow the listed order of patients
 	root.add_child(main)
 	await process_frame
 	main.audio.set_muted(true)
@@ -528,6 +569,7 @@ func test_scene() -> void:
 	check(main.agent.fallbacks_this_visit == 0, "successful UI interactions do not fall back")
 	await typed_conversation(main, driver)
 	await spoken_conversation(main, driver)
+	await meanwhile(main, driver)
 	main.event_log.stop()
 	main.queue_free()
 	await process_frame

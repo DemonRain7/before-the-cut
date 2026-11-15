@@ -47,7 +47,7 @@ Controls and rules are in [game/README.md](game/README.md); providers, keys and 
 
 The [agent manifest](agent-config.json) and [production-agent artifacts](agent_team/) describe the bounded patient agent and planned development roles. The patient AI creates original replies and reactions from its character context and conversation history. Its normal replies are not selected by a fixed rule table. An offline scripted version must remain playable.
 
-On November 15, 2026, in this checkout: 485 rule checks, 325 scene checks (and 325 with less blood), 5 window-close checks, 38 proxy tests and 179 game-and-proxy HTTP checks pass, all automated with a dummy audio driver, a simulated microphone and a local mock patient service. An agent also operated the game in a real window with the real microphone and the mock. No live model has been called, and no person has played this version or listened to it. Current results and limits: [HANDOFF.md](HANDOFF.md).
+On November 15, 2026, in this checkout: 493 rule checks, 333 scene checks (and 333 with less blood), 5 window-close checks, 38 proxy tests and 193 game-and-proxy HTTP checks pass, all automated with a dummy audio driver, a simulated microphone and a local mock patient service. An agent also operated the game in a real window with the real microphone and the mock. No live model has been called, and no person has played this version or listened to it. Current results and limits: [HANDOFF.md](HANDOFF.md).
 
 Personal settings, credentials, generated caches, local evidence and private CourseWorks material stay out of Git. Reference images in the separately prepared pitch deck are not game assets.
 

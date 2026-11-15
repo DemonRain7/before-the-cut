@@ -42,6 +42,8 @@ The script looks for Godot in `$env:GODOT_BIN`, then in
 
 Without the script: `godot --path game -- --agent-url=http://127.0.0.1:8787 --model --less-blood --mute --seed=123`
 (everything after `--` is optional). The environment variable `BTC_AGENT_URL` also sets the address.
+`--authored-order` (no script option) keeps the patients in the order `rules.json` lists them;
+the tests and the capture script use it.
 
 On November 15 the script was run once by an agent (offline, title screen, closed with the
 window's close message): the game started and left cleanly. The main scene also boots
@@ -124,8 +126,11 @@ lines; it is not another AI agent.
 
 ## The five patients (spoilers)
 
-The order is fixed: `rules.json`, `shift_order`. Each case file in `data/cases/` holds the
-truth, the evidence for every line of the sheet, the authored offline lines and the outcome text.
+Who comes in is `rules.json`, `shift_order`. Since November 15 each shift shuffles that order
+from its seed, and the first shift of a session opens with a steady patient (`arrivals`; set
+`shuffle` to false for the listed order). Each case file in `data/cases/` holds the truth, the
+evidence for every line of the sheet, the authored offline lines and the outcome text. The table
+is in the listed order.
 
 | Patient | Wants | Truth | What the sheet shows |
 | --- | --- | --- | --- |
@@ -172,6 +177,11 @@ Hold TAB, or hold the mouse on the SPEAK button, and talk; let go to stop.
   Trauma Team stay with the game. The corner of the window shows `AI DIALOGUE`,
   `MOCK TRANSPORT` or `OFFLINE FALLBACK` with the calls used this visit (16 at most).
 - If a call fails, is late (4 s) or the budget is spent, the authored line is used and labelled.
+- While a reply is on its way, or its first line is still typing, you can look, mark the sheet,
+  pick up the TREAT stamp, open the Trauma Team line and use the shutter. A look shows its own
+  line and keeps the dots away for 1.6 s. TREAT or the call decide at once and drop the reply
+  (`reply_dropped` in the event log). Asking, tools, CALM, PRESS, typing and speaking wait;
+  after 0.8 s the strip says "Still answering. You can look meanwhile, or decide now."
 
 The proxy, its limits and what a live setup needs are in `../agent_proxy/README.md`.
 
@@ -188,20 +198,21 @@ None of these opens a window, plays sound or opens a microphone. In Git Bash, wr
 
 | Check | Command | Result on November 15, in this checkout |
 | --- | --- | --- |
-| Rules | `& $GODOT --headless --audio-driver Dummy --path game --script res://tests/run_tests.gd` | 485 passed, 0 failed |
-| Scene, offline | `& $GODOT --headless --audio-driver Dummy --fixed-fps 60 --path game --script res://tests/run_ui_smoke.gd` | 325 passed, 0 failed |
-| Scene, less blood | the same, with ` -- --less-blood` at the end | 325 passed, 0 failed |
+| Rules | `& $GODOT --headless --audio-driver Dummy --path game --script res://tests/run_tests.gd` | 493 passed, 0 failed |
+| Scene, offline | `& $GODOT --headless --audio-driver Dummy --fixed-fps 60 --path game --script res://tests/run_ui_smoke.gd` | 333 passed, 0 failed |
+| Scene, less blood | the same, with ` -- --less-blood` at the end | 333 passed, 0 failed |
 | Window close | `& $GODOT --headless --audio-driver Dummy --verbose --path game --script res://tests/run_close_check.gd` | 5 passed, 0 failed; no "Leaked instance" in the exit report |
 | Proxy | `npm test` in `agent_proxy` (no install needed) | 38 passed, 0 failed |
-| Game and proxy over HTTP | `node tools/run_proxy_integration.mjs $GODOT validation/2026-11-15/transfer-checks/http-integration` | 179 passed, 0 failed; wire checks 15 passed, 0 failed |
-| Text fits | `python measure_text.py`, run inside `tools/art` | 301 lines (every case text, slip, report line and fixed hint), 0 problems |
+| Game and proxy over HTTP | `node tools/run_proxy_integration.mjs $GODOT validation/2026-11-15/claude-mix-fixes/checks/http-integration-final` | 193 passed, 0 failed; wire checks 15 passed, 0 failed |
+| Text fits | `python measure_text.py`, run inside `tools/art` | 302 lines (every case text, slip, report line and fixed hint), 0 problems |
 | Rough lint | `python tools/gd_static_check.py` | 27 scripts, no findings |
 | Capture script, dry | `& $GODOT --headless --audio-driver Dummy --fixed-fps 60 --path game --script res://tests/capture_shift.gd` | 122 frames named, 0 moments missed, nothing saved |
 
-These results are from the run in this checkout on November 15, about 15:34 New York time,
-after the source was transferred here and imported fresh (`--import`). Its logs are in
-`../validation/2026-11-15/transfer-checks/`. `validation/` is local evidence and is not in the
-repository. A fresh import prints one `Parameter "t" is null` error from the headless dummy
+These results are from the run in this checkout on the evening of November 15, after the
+attack trim, the whine fade, the shuffled arrivals and acting while the patient answers. Logs:
+`../validation/2026-11-15/claude-mix-fixes/checks/`. `validation/` is local evidence and is not
+in the repository. The fresh import was last run at 15:34 that day, after the transfer
+(`transfer-checks/`): it prints one `Parameter "t" is null` error from the headless dummy
 renderer; the checks after it are unaffected.
 
 The scene tests drive the real scene through the same input functions a player uses
@@ -277,11 +288,13 @@ repository; commit them with the assets. (Godot marks the font atlas pictures `s
   into it for a check, and no speech service has heard it. Keyboard layouts and input methods
   are untested. A denied Windows microphone permission should show the "no microphone" or
   "heard nothing" hint; that is untested.
-- While the patient is answering (up to 4 s with a slow service), every action waits.
+- While the patient is answering (up to 4 s with a slow service), asking, tools, CALM, PRESS,
+  typing and speaking wait; looking, the stamp, the call line and the shutter do not (above).
 - The typing line has no paste. Transcripts that are not in Latin letters are refused with a hint.
 - A typed provocation has no rule effect of its own: only the PRESS pad moves patience and
   can set a patient off. Exit, attack and Trauma Team lines are authored in both modes.
-- The order of patients is fixed and there is one shift. No save, no settings screen, no export build.
+- The same five patients come every shift, in a shuffled order. No save, no settings screen,
+  no export build.
 - `--less-blood` was judged from 65 captured frames and five picture checks in the scene test.
   Blood that only shows between the captured moments would have been missed.
 - Closing the window stops every sound and leaves 0.2 seconds later, which ends Godot's
@@ -289,7 +302,11 @@ repository; commit them with the assets. (Godot marks the font atlas pictures `s
   audio driver only. A run that ends the engine another way while the ambience plays, such as
   `--quit-after`, still prints the warning.
 - Only an agent has operated this version, through posted window messages. Its sound has been
-  measured, not listened to: the jump from the rain to an attack is about 27 dB, and the
-  rising whine stops abruptly if the shutter drops early. Both need a person with headphones.
+  measured, not listened to. On November 15 the attack sounds were turned down 9 dB
+  (`ATTACK_TRIM_DB` in `main.gd`): measured from a silent recording of the mix, the loudest
+  second of an attack went from about 24 dB over the rain to 19 dB (caught) and 22 dB
+  (landed), and the limiter from 21% / 59% of the time to 0% / 8%. The whine now fades in
+  0.12 s when the shutter drops early, and the file ends with a 60 ms release instead of a
+  cut. Whether that is loud enough, or too loud, needs a person with headphones.
 - Blood and broken glass from an attack stay until the shift ends.
 - No play session by a person is recorded for this version.
