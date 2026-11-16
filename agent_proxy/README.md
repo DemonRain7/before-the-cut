@@ -54,8 +54,11 @@ WAV file with `language=en`. Defaults: `BTC_MODEL=gpt-6-luna`,
 `gpt-5-nano`, or to an empty value to leave the field out). An effort above `minimal` raises the
 output allowance so that thinking does not cut the JSON short.
 
-**No live provider call has been made for any route.** Availability, cost, latency,
-transcription quality and whether the default model accepts audio are all unverified.
+**OpenAI was tested live on November 15:** 30 patient replies and ten transcriptions of
+Windows-synthesized English speech, all successful. Dialogue median/p90/max: 1.32/1.84/2.54 s;
+transcription: 0.66/1.27/1.33 s. The 12 requests played in the game had no fallbacks. Human
+speech accuracy and the live microphone path remain unverified; Google/Vertex have not been
+tested live. See [the dated report](../docs/development/live-model-results-2026-11-15.md).
 
 The local server defaults to 127.0.0.1:8787. `BTC_HOST`, `BTC_PORT`, `BTC_UPSTREAM_TIMEOUT_MS`
 and `BTC_TRANSCRIBE_TIMEOUT_MS` are configurable. Deployment remains untested; the Worker

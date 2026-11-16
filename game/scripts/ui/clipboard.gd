@@ -224,8 +224,19 @@ func _draw_findings() -> void:
 		var id := str(ROWS[i])
 		var y := _row_frame(i, id)
 		var row: Dictionary = rows[i] if i < rows.size() else {}
-		var ok := bool(row.get("ok", true))
 		_draw_mark(Vector2(410, y + 13.0), int(row.get("mark", 0)), false)
+		if str(row.get("assessment", "")) == "reported":
+			Gfx.text(self, Vector2(REC_TEXT_X, y + 1.0), "PATIENT SAID", Gfx.INKS, true)
+			var excerpt := Gfx.printable(str(row.get("text", "")))
+			var wrapped := Gfx.wrap_text(excerpt, REC_TEXT_W)
+			if wrapped.size() > 2:
+				var last := wrapped[1]
+				while Gfx.text_w(last + "...") > REC_TEXT_W and last.length() > 0:
+					last = last.left(last.length() - 1)
+				excerpt = wrapped[0] + "\n" + last + "..."
+			Gfx.paragraph(self, Vector2(REC_TEXT_X, y + 10.0), excerpt, REC_TEXT_W, Gfx.INKT, false, 2, 9)
+			continue
+		var ok := bool(row.get("ok", true))
 		var truth := Gfx.tex("ui/truth_ok.png" if ok else "ui/truth_bad.png")
 		if truth != null:
 			draw_texture(truth, Vector2(424, y + 13.0))

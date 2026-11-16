@@ -3,6 +3,9 @@
 This accompanies [the original brief](live-model-test.md). It is a test procedure, not evidence
 that a live call or a human playtest succeeded. Use one local proxy and one game window.
 
+**Completed November 15:** 30 live dialogue requests and ten synthetic-speech transcriptions.
+The ledger is stopped; do not restart this completed session. See [the actual results](live-model-results-2026-11-15.md).
+
 ## Authorization and configuration
 
 On November 15, 2026, the student supplied an API key and authorized up to USD 50 for the requested
@@ -10,10 +13,9 @@ OpenAI test. That authorization covers this initial run; do not ask for the same
 The narrower run limits still apply: approximately 30 dialogue calls and 10 spoken clips, with
 hard stops of 40 and 15. The credential itself is not documented here.
 
-The handoff separately requires the student to fill the ignored `agent_proxy/.dev.vars`.
-A blank template was prepared without opening or copying an existing credential file. The
-student was asked to confirm configuration, or explicitly replace that manual-entry instruction.
-No reading, printing or searching of that file is needed. Node loads it when starting the app.
+The student explicitly revoked the handoff's manual-entry-only requirement and authorized the
+assistant to configure the ignored `agent_proxy/.dev.vars`. No reading, printing or searching
+of that file is needed. Node loads it when starting the app.
 
 Models: `gpt-6-luna`, reasoning `none`; `gpt-4o-mini-transcribe`. On November 15, the official
 [Luna page](https://developers.openai.com/api/docs/models/gpt-6-luna) lists USD 0.10 input and
@@ -74,8 +76,10 @@ Say who operated the window and who judged it; agent operation is not a human pl
 
 ## Ten voice prompts
 
-The following are authored test inputs, not recordings or transcripts. The student reads them.
+The following are authored test inputs, not recordings or transcripts. For a human test, the student reads them.
 Do not synthesize a voice or replay unrelated recordings and call that a student microphone test.
+For the completed run the student requested assistant-supplied audio; Windows TTS was used in
+memory and every result was labeled synthetic. It tested the HTTP speech route, not the microphone.
 Wait for **LISTENING**, then speak; release TAB and inspect the recognized text before Enter.
 For the WER-only check, dismiss the typed line after inspecting it: Enter would add a dialogue call.
 

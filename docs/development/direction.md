@@ -75,7 +75,7 @@ Raised on November 14 so that a typed or spoken conversation is possible: 16 pat
 - More replies means more provider calls: a five-patient shift at the cap is 80 patient calls, and each spoken sentence adds one transcription call.
 - The earlier planning target was USD 0.02 per shift, estimated for about ten calls. Eighty calls would be about USD 0.03 by simple proportion, so the new cap is above that target; about ten replies per visit would meet it. That is arithmetic on an old estimate, not a price. Keeping 16 or lowering it is a decision for the student.
 - A longer wait means fewer authored fallbacks and a longer worst-case pause at a locked counter.
-- None of this has been priced or timed. No live model or speech service has been called; real cost, latency and believability must be measured on a first supervised run before these limits go up again. Details: `agent_proxy/README.md`.
+- The November 15 live run measured 30 patient replies and ten synthetic-speech transcriptions: dialogue median 1.32 s, p90 1.84 s, maximum 2.54 s; zero fallbacks in the 12 replies played through the game. The whole run is estimated below one cent. This sample does not justify raising limits and is not a human playtest. See [the live report](live-model-results-2026-11-15.md).
 
 ## Open questions for the student
 

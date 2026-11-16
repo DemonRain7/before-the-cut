@@ -1,10 +1,10 @@
 {
   "schema_version": "course-1",
-  "config_version": "0.10.0",
+  "config_version": "0.10.1",
   "project": "Before the Cut",
   "updated": "2026-11-15",
-  "status": "Protocol 3 runtime transferred into this repository on 2026-11-15 (game/, agent_proxy/). Verified with local mocks, a simulated microphone, and an agent-operated real window with the real microphone and a mock transcript. No live model or speech service has been called.",
-  "ai_use": "Claude authored the game and the initial proxy and added typing, push-to-talk and the OpenAI route. Codex migrated autonomous dialogue and verified the runtime on 2026-11-14. Claude transferred the source into this repository on 2026-11-15.",
+  "status": "Protocol 3 runtime tested live with OpenAI on 2026-11-15: 30 patient requests (12 in the real game window, 18 HTTP probes) and ten transcriptions of local synthetic speech, all successful. No human microphone or playtest result is claimed. See docs/development/live-model-results-2026-11-15.md.",
+  "ai_use": "Claude authored the game and the initial proxy and added typing, push-to-talk and the OpenAI route. Codex migrated autonomous dialogue and verified the runtime on 2026-11-14. Claude transferred the source into this repository on 2026-11-15. Codex ran the first live OpenAI test and corrected generated-speech feedback on 2026-11-15.",
   "purpose": "Generate the patient's own dialogue and reactions from character context and conversation history.",
   "tools_available": [],
   "context_sources": [

@@ -33,6 +33,8 @@ var reassured: Dictionary = {}   # tool -> true: a refusal cleared by reassuranc
 var claims: Array = []           # claim ids the patient has offered
 var asked: Dictionary = {}       # topic id -> times asked
 var answered: Dictionary = {}    # topic id -> true
+var has_generated_speech: bool = false
+var last_recorded_speech: String = ""  # memory only; never written to the event log
 var press_count: int = 0
 var reassure_left: int = 0
 var reassure_used: int = 0
@@ -285,6 +287,8 @@ func apply_dialogue(topic_id: String, reply: String, reaction: String = "") -> D
 	asked[topic_id] = int(asked.get(topic_id, 0)) + 1
 	answered[topic_id] = true
 	seen["ask:" + topic_id] = true
+	has_generated_speech = true
+	last_recorded_speech = reply
 	var key := "dialogue:%s:%d" % [topic_id, int(asked[topic_id])]
 	add_note("speech", key, "Says: " + reply)
 	if reaction != "":
@@ -333,6 +337,7 @@ func apply_ask(topic_id: String, move: String) -> Dictionary:
 		seen["ask:" + topic_id] = true
 		res["result"] = "answered"
 		res["line"] = str(t.get("a", ""))
+		last_recorded_speech = str(res["line"])
 		res["new"] = add_note("speech", "ask:" + topic_id, str(t.get("note", "")))
 	_note("ask:%s:%s" % [topic_id, move])
 	return res
@@ -492,13 +497,21 @@ func settlement() -> Dictionary:
 	var row_specs: Dictionary = case_data.get("rows", {})
 	for row in ROWS:
 		var spec: Dictionary = row_specs.get(row, {})
-		rows.append({
+		var finding := {
 			"id": row,
 			"ok": bool(spec.get("ok", true)),
 			"text": str(spec.get("text", "")),
 			"seen": row_seen(row),
 			"mark": int(marks.get(row, 0)),
-		})
+		}
+		# An autonomous answer may evade the authored clue entirely. Do not quote the
+		# script as if it was heard, or turn a patient's claim into a physical reading.
+		if row == "speech" and has_generated_speech:
+			finding["assessment"] = "reported"
+			finding["ok"] = null
+			finding["text"] = last_recorded_speech
+			finding["seen"] = true
+		rows.append(finding)
 	return {
 		"case_id": str(case_data.get("id", "")),
 		"name": str(case_data.get("name", "")),

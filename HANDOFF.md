@@ -1,50 +1,64 @@
 # Before the Cut: handoff
 
-Updated **November 15, 2026**, about 19:15 New York time. Communicate with the student in Chinese; write game text, code comments and project files in English.
+Updated **November 15, 2026**. Communicate with the student in Chinese; write game text, code comments and project files in English.
 
 **This repository is the only active checkout.** On November 15 the game, the patient-AI proxy and the tools were moved here from the legacy `fathom` workspace and checked here ([transition record](docs/development/repository-transition.md)). `fathom` is an archive; its long layered handoffs (`HANDOFF.md`, `CODEX_RUNTIME_HANDOFF.md`, `CLAUDE_VOICE_HANDOFF.md`, `CODEX_NEXT_HANDOFF.md`) are history, not instructions.
 
-AI use: Claude wrote the earlier runtime history; Codex added the current test-preparation checkpoint. No student review of this update is recorded.
+AI use: Claude wrote the earlier runtime history; Codex added the live-test results and speech-feedback correction. No student review of this update is recorded.
 
-## Current checkpoint: live test prepared, not yet run
+## Current checkpoint: first live run complete
 
-Codex pulled `main` at `98eda57` (already current), reread the handoff and test brief, and ran the
-free checks: proxy **38/38**, Godot rules **493/493**, and the new test guard **6/6**. These are
-automated checks, not live-model evidence. No one played or spoke in this checkpoint.
+The [dated report](docs/development/live-model-results-2026-11-15.md) is the source of truth.
+The student explicitly authorized up to USD 50, revoked manual-only credential entry and
+asked the assistant to supply voice input. The ignored local credential was configured
+without reading or printing it. The completed run used **30 live dialogue calls and 10 live
+transcriptions of Windows-synthesized speech**. The proxy and test windows are stopped;
+the persistent ledger is stopped at 30/10. No additional paid run was made.
 
-The student explicitly authorized the requested OpenAI test with a **USD 50 ceiling**. The test
-still targets about 30 dialogue calls and 10 voice clips, with hard stops of 40 and 15. Provider
-and model prices were rechecked on November 15; see [the session sheet](docs/development/live-test-session.md).
-Do not request the same budget authorization again.
+- Dialogue: median **1.32 s**, p90 **1.84 s**, max **2.54 s**, 30/30 successful.
+- Transcription: median **0.66 s**, p90 **1.27 s**, max **1.33 s**, 10/10 successful.
+  Synthetic WER: **0 errors / 80 words**. This is not the student's voice or a live microphone test.
+- Reported usage: dialogue 20,917 input / 1,597 output tokens; speech 502 / 110.
+  Published-token-price estimate: **USD 0.0040677**, not an inspected invoice.
+- Codex operated two real game visits (Kip, Vale), six model calls each, with zero game fallbacks.
+  Kip was correctly treated. Vale attacked after the correct Trauma Team call; the operator
+  missed the shutter timing and was injured. Another 18 calls were HTTP probes across three
+  characters. No human played or listened.
+- 29 replies were inspected; one port reply was replaced by the tool result before review.
+  The inspected replies stayed in character. One allowed deceptive claim contradicted a
+  physical sign; the game's actual reading stayed fixed.
+- Measured bug fixed: the results screen falsely quoted an authored sleep line that the
+  model never said. Generated speech feedback now shows the actual recorded reply under
+  neutral **PATIENT SAID**, without automatic normal/abnormal grading. Physical facts,
+  outcomes, scoring and the fully scripted comparison retain their behavior.
+- Checks after the correction: **505 rule checks**, **333 scene checks**, **5 normal-close
+  checks** pass. Earlier proxy 38/38 and guard 6/6 checks remain applicable. The smoke harness
+  has pre-existing shutdown resource warnings; do not describe it as warning-free.
+- No prompt or limit tuning was warranted: retain **16 replies/visit**, **256 output tokens**
+  and the existing deadlines.
 
-Credential entry is the unresolved step. The handoff requires the student to fill `.dev.vars`;
-Codex created an ignored blank template without reading an existing file, then asked the student
-to confirm it was filled or explicitly authorize assistant configuration instead. The application
-startup check reported a missing credential and exited before starting the server. The separate
-question about participation in ten real voice clips is also pending. **Paid calls: 0; cost: USD 0.**
+Limits of this run: automatic text entry could not fill the game's field (paste is unsupported);
+free dialogue was probed via HTTP. The automated GRIP hold was too short to complete that
+physical measurement. A final synthetic feedback preview returned black; activation recovery
+ended with `GetCursorPos` access denied. It was stopped, with no further desktop input.
+The feedback change has regression coverage but still needs visual approval on an available desktop.
 
-`tools/live_model_session.mjs` is a bounded test launcher, not a game behavior change. It loads
-credentials through Node's environment-file option, pauses after the first reply for inspection,
-blocks continuation after a failed first reply, and persists separate call caps across restarts.
-It logs metadata and numeric usage only. `tools/live_model_guard.test.mjs` verifies the caps,
-first-call behavior, concurrent rejection and metadata filtering with fake providers. No runtime
-limits were tuned; 16 replies per visit and 256 output tokens remain unchanged.
-
-Evidence is in local `validation/2026-11-15/codex-live-test/`. Its README and summary explicitly
-mark live latency, token usage, character quality, game fallbacks and voice WER as unmeasured.
-The operator sheet includes launch commands, coverage and ten authored voice prompts.
+Local evidence: `validation/2026-11-15/codex-live-test/`, containing numeric metadata and
+judgments only, no live replies, transcripts, audio or credential archive. The student was
+asked whether to retain or clear the configured local key after testing; absent a new instruction,
+it remains in the ignored file for normal application loading.
 
 ## Where things stand
 
 - **G1 is submitted.** The student published the main post on November 14 at 23:16 New York and replaced its recording link at 23:41 (`before-the-cut-g1-recording-updated.mp4`, 5:30.33). See [docs/g1/05](docs/g1/05-submission-draft-and-checklist.md). The deck, PDF, Word script and video stay in the student's local workspace.
 - **Still due:** two Braintrust replies to classmates' G1 pitches by **Thursday, November 19, 23:59 New York**. Draft them for the student's review; never send them. Then read the instructor's Approve/Hold comment.
 - **The game** is version 0.3.0: one night at the counter with five patients (Kip, Rook, Vale, Juno, Maren) in a shuffled order, the first of a session steady, a Normal Reference Sheet, optional looks, tools, questions, reassurance and pressure in any order, a typing line, push-to-talk, TREAT or Trauma Team, attacks and the shutter, slips and an end-of-shift report. Controls, rules and spoilers: [game/README.md](game/README.md). Look, sound and design choices: [docs/development/direction.md](docs/development/direction.md).
-- **The patient AI** (protocol 3) writes every reply and reaction from the character brief and the conversation so far; the authored script is the offline comparison and the fallback. It has only ever run against the local **mock**. No live model and no speech service has been called.
+- **The patient AI** (protocol 3) writes every reply and reaction from the character brief and the conversation so far; the authored script is the offline comparison and the fallback. The first live OpenAI run is complete; see the checkpoint above. Google and Vertex remain untested live.
 
 ## Student decisions, November 15
 
 1. Recording is finished: the game window, mouse, keyboard, audio and microphone may be used for testing.
-2. The student requested a supervised live model test and subsequently authorized the specified OpenAI run with a USD 50 ceiling. No paid call has been made yet; see the current checkpoint for credential and voice readiness.
+2. The student authorized the specified OpenAI run with a USD 50 ceiling, allowed assistant credential configuration and asked the assistant to supply voice input. The completed test used local synthetic speech and is explicitly not a human voice test.
 3. The cap stays at 16 patient replies per visit.
 4. The sentence in `AGENTS.md` that called voice a future task was replaced (done).
 5. The repository transfer was left to the agent to schedule (done, November 15).
@@ -67,7 +81,7 @@ Earlier on November 15:
 - **Agent-operated play in a real window** (`validation/2026-11-15/claude-window-play/`). Claude drove the built game in a real Windows window on the real GPU and sound driver through posted window messages, captured screens with `PrintWindow`, and recorded the master mix. Offline: two full shifts plus part of a third, every pad, the typing line, both decisions, false calls and alarms, both attacks with a late and an early shutter, a walk-out, the reports, a 3x window and `--less-blood`. Everything behaved as designed; the console logs have no error, warning or leak line. **This is not a human playtest and not a listening test: nobody watched or listened.**
 - **Sound measured, not heard.** Peak -1.0 dBFS with no clipped samples; the rain and drone bed sits near -33 dBFS RMS and never drops out; attacks reach about -6 to -9 dBFS, a jump of about 27 dB from the bed. Loop seams are clean. `whine.wav` stops abruptly behind an early shutter. Both need a person with headphones.
 - **Push-to-talk freeze found and fixed** (`validation/2026-11-15/claude-mock-voice/`). With the real microphone and the mock proxy, every TAB press froze the game for about 450 ms, because opening the Windows input device blocks; about 300-500 ms of every press was lost (a 0.48 s press arrived as 168 ms and was refused as a tap). `game/scripts/core/voice_input.gd` now opens the device on a worker thread. Until it is ready the strip says **OPENING THE MICROPHONE...** and "Speak when it says LISTENING."; letting go before then sends nothing and says so. Measured after the fix: no frame gap over 50 ms at any press, the device ready after 465-472 ms, the push-to-talk duck down to -18 dB and back within about 150 ms, focus loss throwing the clip away, a decision during transcription dropping the late transcript, and a slow service (5 s) falling back to the authored line after 3.5 s. New tests: 7 rule checks with a slow simulated device, 4 scene checks over HTTP.
-- **OpenAI route added** to the proxy (`agent_proxy/src/providers.mjs`, `BTC_PROVIDER=openai`): the Responses API with a strict JSON schema, `store: false`, no retry, and `/v1/audio/transcriptions` for push-to-talk. Six new tests against a fake network; it has never called OpenAI.
+- **OpenAI route added** to the proxy (`agent_proxy/src/providers.mjs`, `BTC_PROVIDER=openai`): the Responses API with a strict JSON schema, `store: false`, no retry, and `/v1/audio/transcriptions` for push-to-talk. At this earlier checkpoint only six fake-network tests had run; the later live result is recorded above.
 - `tools/art/measure_text.py` now also measures every fixed hint in `main.gd` against the 376 px strip (widest 288 px).
 - `AGENTS.md`'s outdated voice sentence was replaced, and the source was transferred into this repository.
 
@@ -108,7 +122,7 @@ The window's corner reads `AI DIALOGUE`, `MOCK TRANSPORT` or `OFFLINE FALLBACK`.
 
 ### The live model test: route, what is needed, cost
 
-- **OAuth cannot use the OpenAI credit.** A ChatGPT sign-in draws on a ChatGPT plan, not on API credit, and the API takes project API keys only. The OpenAI route therefore needs an **API key** from platform.openai.com in `agent_proxy/.dev.vars` (copy `.dev.vars.example`; ignored by Git): `BTC_PROVIDER=openai`, `OPENAI_API_KEY=...`. The student pastes the key into that file; it never goes into the game, a command line, chat, a log or a commit.
+- **OpenAI configuration:** the API uses a project key in the ignored `agent_proxy/.dev.vars`, loaded by Node. The student explicitly authorized assistant configuration on November 15. Do not read, print or copy this file, or place its credential in the game, command lines, logs or Git.
 - **OAuth works for Google** (Vertex AI with a short-lived token from `gcloud auth application-default print-access-token` and the course project), if the student prefers that route. Its billing state is unconfirmed, and whether `gemini-3.5-flash-lite` accepts audio for push-to-talk is unverified.
 - **Proposed OpenAI test:** `gpt-6-luna` (reasoning effort `none`) for the patient and `gpt-4o-mini-transcribe` for speech. List prices read on November 15 on OpenAI's pricing page: USD 0.10 per million input tokens, 0.50 per million output tokens, USD 0.003 per minute of audio. Measured prompts are 2,281-3,818 characters (about 600-1,000 tokens). About 30 patient lines and 10 spoken clips would cost about **USD 0.006**; a full three-shift session at the caps (240 calls) about USD 0.05. These are estimates from list prices, not measurements.
 - **The step-by-step brief for the agent who runs it** (written for Codex, November 15): [docs/development/live-model-test.md](docs/development/live-model-test.md).
@@ -125,11 +139,11 @@ The window's corner reads `AI DIALOGUE`, `MOCK TRANSPORT` or `OFFLINE FALLBACK`.
 | Spoken clips | 0.35-10 s, 24 per visit, 360 per session; 6 s / 7 s deadlines |
 | Provider calls per proxy process | 2,000, shared by both routes |
 
-Do not raise them before a supervised live run has measured latency and tokens. `maxOutputTokens` (256) is unchecked against a live model.
+The live run's maximum output was 66 tokens and maximum response time 2.54 seconds. No increase to the 256-token budget or deadlines was warranted.
 
 ### Not done, not verified
 
-- No live model, no speech service, no human playtest, no listening test, no tuning, no Windows export build. Nobody has spoken into the microphone for a check.
+- No human playtest, human speech-accuracy check, listening test or Windows export build. The live-model run and synthetic-speech service check are complete; nobody spoke into the microphone in this run. Google/Vertex remain untested live.
 - The -9 dB attack trim and the whine fade were judged from measurements of a silent recording only. How long a live reply keeps the dots up is unknown.
 - Keyboard layouts, input methods and a denied Windows microphone permission are untested. A device that fails to open after the press is covered only by reading the code.
 - A typed or spoken provocation has no rule effect; only the PRESS pad costs patience. The patient does not speak aloud. The typing line has no paste.
@@ -150,13 +164,13 @@ Do not raise them before a supervised live run has measured latency and tokens. 
 
 ## Next three tasks
 
-1. **Supervised live dialogue run**, already authorized: resolve credential entry, start the bounded launcher in [the session sheet](docs/development/live-test-session.md), inspect the first reply, then play two or three visits. Tune only from measurements. Keep 16 replies per visit.
-2. **Real voice test and human playtest**: use the student's actual voice for the ten WER clips, or leave this pending if unavailable. A shift with headphones is still needed to assess pacing and attack loudness.
+1. **Feedback visual review** on an available desktop: inspect the corrected neutral speech row. Consider adding paste support; the live test did not change the typing field.
+2. **Real voice test and human playtest**: use the student's actual voice for WER when available. A shift with headphones is still needed to assess pacing and attack loudness; synthetic speech is not a substitute.
 3. **Braintrust replies** (due November 19, 23:59): the student picks two G1 pitches with fewer than two replies; draft specific, moment-based notes in English for review; the student sends them.
 
 ## Evidence (local, not in Git)
 
-- `validation/2026-11-15/codex-live-test/`: free-check logs, persistent zero-call ledger, and an explicit not-yet-run report. No live call, voice clip or game play has been recorded in this checkpoint.
+- `validation/2026-11-15/codex-live-test/`: completed 30/10 ledger, metadata from live requests, game events, numeric quality and synthetic-WER scores, and regression logs. No live reply text, transcript or audio archive.
 - `validation/2026-11-15/claude-mix-fixes/`: the mix measurements before and after (caught and landed, -6 and -9 dB), the whine file, every check on the final tree, the hidden-desktop capture, the probe scripts.
 - `validation/2026-11-15/transfer-checks/`: every check right after the transfer.
 - `validation/2026-11-15/claude-mock-voice/`: the push-to-talk freeze, before and after the fix.

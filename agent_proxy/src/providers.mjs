@@ -224,7 +224,7 @@ const REASONING_ALLOWANCE = { "": 0, none: 0, minimal: 256, low: 2048, medium: 4
  *   push-to-talk:  POST /v1/audio/transcriptions (multipart WAV), language en
  * `reasoningEffort` is sent as reasoning.effort unless it is "". Use "none" (or "minimal" on the
  * GPT-5 models that have it) to keep a line inside the proxy's 3.5 s deadline.
- * Written from the public REST reference. No live call has been made with it yet.
+ * Verified live on November 15, 2026: patient replies and synthetic-speech transcription.
  */
 export function createOpenAIProvider({ model, sttModel = "gpt-4o-mini-transcribe", apiKey = "", reasoningEffort = "none", baseUrl = "https://api.openai.com/v1", fetchImpl = fetch }) {
 	if (!model) throw new Error("openai provider: BTC_MODEL is empty");

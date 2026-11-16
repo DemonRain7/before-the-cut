@@ -4,7 +4,7 @@ Read `README.md`, `HANDOFF.md` and `NEXT_AGENT_PROMPT.md` first. This is the ong
 
 Communicate with the student in Chinese. Write game text, comments, documents, slides, scripts and handoffs in English.
 
-The student's recording is finished (decision of November 15): the game window, mouse, keyboard, audio and microphone may be used for testing. Voice input (hold TAB to speak) is built; it has been tested with the real microphone and a mock transcript, not with a live speech service. Do not change slides or narration.
+The student's recording is finished (decision of November 15): the game window, mouse, keyboard, audio and microphone may be used for testing. Voice input (hold TAB to speak) is built. The November 15 live run tested 30 OpenAI patient replies and ten real transcriptions of local synthetic speech; that is not a human microphone or accent test. See `docs/development/live-model-results-2026-11-15.md`. Do not change slides or narration.
 
 ## Agreed design
 
@@ -27,7 +27,7 @@ Each limit lives in two places, `game/data/rules.json` (`agent`) and `agent_prox
 
 Distinguish old results from current runs, mocks from live-model calls, automated checks from human playtests, an agent operating the window from a person playing it, and repository publication from course submission.
 
-Routine local edits, reversible setup, tests and normal pushes to `main` are covered by the student's continuation requests. Course posts, peer replies, paid model calls and deployment each need the student's own explicit yes; for a paid call that means the provider, the model, the number of calls and the cost. API keys go only into `agent_proxy/.dev.vars`, filled in by the student, never into the game, a command line, chat, a log or a commit. Logs hold lengths and stages, never typed words, clips or transcripts.
+Routine local edits, reversible setup, tests and normal pushes to `main` are covered by the student's continuation requests. Course posts, peer replies, paid model calls and deployment each need the student's own explicit yes; for a paid call that means the provider, the model, the number of calls and the cost. Existing explicit authorization remains valid; do not ask for it again. API keys go only into `agent_proxy/.dev.vars`, never into the game, a command line, chat, a log or a commit. On November 15 the student explicitly revoked the manual-entry-only rule and authorized assistant configuration. Do not open, print or search that file; the app loads it normally. Logs hold lengths and stages, never typed words, clips or transcripts.
 
 Update `HANDOFF.md` and `NEXT_AGENT_PROMPT.md` at checkpoints and before stopping, with actual results, limitations and the next three tasks.
 

@@ -28,6 +28,7 @@ if (command === "continue") {
 } else if (command === "report") {
   const entries = readLines("proxy.log").filter((row) => row.latency_ms !== undefined);
   const upstream = readLines("upstream-usage.jsonl");
+  // This is the rate snapshot for the authorized November 15 run, not a live billing API.
   const report = { budget: guard.state(), pricing_date: "2026-11-15", routes: {} };
   for (const route of ["dialogue", "transcribe"]) {
     const rows = entries.filter((row) => (row.route === "transcribe" ? "transcribe" : "dialogue") === route);
@@ -43,12 +44,17 @@ if (command === "continue") {
       timeouts: rows.filter((row) => row.code === "upstream_timeout").length,
       invalid_output: rows.filter((row) => row.code === "invalid_model_output").length,
       input_tokens: sum("input_tokens"), output_tokens: sum("output_tokens"),
+      cached_input_tokens: sum("cached_input_tokens"), audio_input_tokens: sum("audio_input_tokens"),
+      text_input_tokens: sum("text_input_tokens"),
       input_per_response: tokenStats(input), output_per_response: tokenStats(output),
       responses_without_usage: usages.filter((row) => row.input_tokens === null).length,
       attempts_without_response_metadata: guard.state()[route] - usages.length,
       audio_seconds: rows.reduce((n, row) => n + (row.audio_seconds || 0), 0),
-      // Uncached list-price estimate. The billing dashboard is authoritative.
-      known_tokens_list_usd: route === "dialogue" ? (sum("input_tokens") * 0.1 + sum("output_tokens") * 0.5) / 1e6 : null };
+      // Published token-price estimate. The billing dashboard is authoritative.
+      known_tokens_list_usd: route === "dialogue"
+        ? ((sum("input_tokens") - sum("cached_input_tokens")) * 0.1 + sum("cached_input_tokens") * 0.01 + sum("output_tokens") * 0.5) / 1e6
+        : (sum("input_tokens") * 1.25 + sum("output_tokens") * 5) / 1e6,
+      audio_duration_estimate_usd: route === "transcribe" ? rows.reduce((n, row) => n + (row.audio_seconds || 0), 0) / 60 * 0.003 : null };
   }
   fs.writeFileSync(path.join(directory, "metrics.json"), JSON.stringify(report, null, 2) + "\n");
   console.log(JSON.stringify(report, null, 2));

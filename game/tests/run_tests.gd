@@ -91,6 +91,7 @@ func _initialize() -> void:
 	test_press_and_attack()
 	test_shutter()
 	test_settlement_rows()
+	test_generated_speech_findings()
 	test_shift()
 	test_arrivals()
 	test_brain()
@@ -365,6 +366,39 @@ func test_settlement_rows() -> void:
 	eq(int(rows[0]["mark"]), 2, "player mark is carried to the slip")
 	ok(not bool(rows[1]["ok"]) and not bool(rows[1]["seen"]), "hands: broken, not checked")
 	ok(bool(rows[2]["ok"]), "maren's port is fine")
+
+
+## A generated answer can hide the authored speech clue. Feedback must describe what was heard.
+func test_generated_speech_findings() -> void:
+	var v := visit("vale")
+	var actual := "I prefer to discuss the repair, doctor."
+	v.apply_dialogue("sleep", actual)
+	v.verdict("refer")
+	v.shutter()
+	var s := v.settlement()
+	var speech: Dictionary = s.rows[3]
+	eq(speech.get("assessment"), "reported", "generated speech is a reported claim, not a fixed finding")
+	eq(speech.get("ok"), null, "an evasive answer is not automatically graded as an abnormal utterance")
+	eq(speech.text, actual, "feedback retains the answer actually heard")
+	ok(speech.text != cases.vale.rows.speech.text, "feedback does not substitute the authored sleep quote")
+	ok(bool(speech.seen), "the recorded answer was heard")
+	eq([s.truth, s.outcome, s.credits], ["drifting", "caught", 120], "dialogue does not alter truth, attack or payment")
+	eq([s.rows[0].ok, s.rows[2].ok], [false, false], "physical findings remain fixed")
+	var free := visit("kip")
+	free.apply_dialogue("free", "I want to get back to work.")
+	free.verdict("treat")
+	ok(bool(free.settlement().rows[3].seen), "free dialogue is heard even without an authored topic")
+	eq([free.settlement().truth, free.settlement().credits], ["stable", 250], "free dialogue does not change the diagnosis or fee")
+	var mixed := visit("vale")
+	mixed.apply_dialogue("free", "A generated reply.")
+	mixed.apply_ask("sleep", "answer")
+	mixed.verdict("treat")
+	eq(mixed.settlement().rows[3].text, str(mixed.topic("sleep").a), "a later scripted fallback is recorded accurately")
+	var offline := visit("vale")
+	offline.apply_ask("sleep", "answer")
+	offline.verdict("treat")
+	ok(not offline.settlement().rows[3].has("assessment"), "the scripted comparison keeps its authored findings")
+	eq(offline.settlement().rows[3].text, cases.vale.rows.speech.text, "offline feedback still matches its actual script")
 
 
 ## calls: case id -> "treat" | "refer" | "shutter". A patient who turns on the call is shut out in
