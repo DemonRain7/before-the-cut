@@ -48,6 +48,22 @@ judgments only, no live replies, transcripts, audio or credential archive. After
 student explicitly chose to retain the configured key in the Git-ignored `.dev.vars` for future
 game runs. Keep it there; do not read, print or commit it.
 
+## Background interface captures, November 15
+
+The student asked for game screenshots and an explanation while continuing to use the
+computer. `tools/run_hidden.py` ran `game/tests/capture_shift.gd` on a separate Windows
+desktop that was never displayed, with the Dummy audio driver and simulated microphone.
+The real renderer saved **122 frames, zero missed moments**, and exited normally after
+84.2 seconds. The runner reported **no game windows on the user's desktop**. No mouse or
+keyboard input was sent to that desktop and no model service was called.
+
+Evidence is in `validation/2026-11-15/background-guide/`: `frames/`, `capture.log` and
+`hidden-run.json`. Selected frames were visually inspected for the main interface,
+penlight, grip, reassurance, Trauma Team call, attack, visit receipt and shift report.
+These are authored/offline automated captures; the voice frames are staged, not real speech.
+They do not resolve the separate pending visual check of generated-speech feedback.
+The stale mock-only verification paragraph in `game/README.md` was corrected.
+
 ## Where things stand
 
 - **G1 is submitted.** The student published the main post on November 14 at 23:16 New York and replaced its recording link at 23:41 (`before-the-cut-g1-recording-updated.mp4`, 5:30.33). See [docs/g1/05](docs/g1/05-submission-draft-and-checklist.md). The deck, PDF, Word script and video stay in the student's local workspace.

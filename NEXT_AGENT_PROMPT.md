@@ -35,6 +35,14 @@ has known shutdown resource warnings. A final synthetic preview was blocked by d
 access errors (black capture, GetCursorPos access denied); it was stopped. Do not claim visual
 approval of the corrected feedback or a human voice/listening/playtest.
 
+The student's latest request was for screenshots and a gameplay explanation without
+interrupting computer use. The hidden-desktop capture runner saved 122 real-renderer frames
+with zero missed moments in validation/2026-11-15/background-guide/. It exited normally;
+no game window appeared on the user's desktop, no input was sent there, and no paid API or
+microphone was used. Selected interface/tool/decision/attack/report frames were inspected.
+These authored captures do not verify the corrected generated-speech feedback. Continue to
+respect background-only operation unless the student changes that instruction.
+
 Keep the design: Normal Reference Sheet; optional, unordered observations/tools/questions/
 pressure; early decisions; TREAT or Trauma Team; shutter defense. The model writes its own
 speech and can evade or lie. The game owns truth and physical results. Keep the offline
