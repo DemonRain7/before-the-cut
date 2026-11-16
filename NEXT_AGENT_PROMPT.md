@@ -18,8 +18,8 @@ The first authorized OpenAI test is complete:
 
 The student authorized up to USD 50 and explicitly revoked the manual-only credential rule.
 The assistant configured agent_proxy/.dev.vars. Do not open, print, search or copy it; Node
-loads it normally. The student was asked whether to retain or clear the key after testing;
-it currently remains configured unless a later answer says otherwise. Do not reproduce a key.
+loads it normally. After testing, the student explicitly chose to retain the key in the
+Git-ignored file for future game runs. Keep it configured; do not reproduce or commit it.
 The paid proxy is stopped. The completed ledger in validation/2026-11-15/codex-live-test is
 stopped at 30 dialogue / 10 clips; do not reset it or silently start another paid run.
 

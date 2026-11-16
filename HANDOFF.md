@@ -44,9 +44,9 @@ ended with `GetCursorPos` access denied. It was stopped, with no further desktop
 The feedback change has regression coverage but still needs visual approval on an available desktop.
 
 Local evidence: `validation/2026-11-15/codex-live-test/`, containing numeric metadata and
-judgments only, no live replies, transcripts, audio or credential archive. The student was
-asked whether to retain or clear the configured local key after testing; absent a new instruction,
-it remains in the ignored file for normal application loading.
+judgments only, no live replies, transcripts, audio or credential archive. After testing, the
+student explicitly chose to retain the configured key in the Git-ignored `.dev.vars` for future
+game runs. Keep it there; do not read, print or commit it.
 
 ## Where things stand
 
