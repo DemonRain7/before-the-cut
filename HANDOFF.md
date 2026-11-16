@@ -1,10 +1,38 @@
 # Before the Cut: handoff
 
-Updated **November 15, 2026**, about 18:30 New York time, by Claude. Communicate with the student in Chinese; write game text, code comments and project files in English.
+Updated **November 15, 2026**, about 19:15 New York time. Communicate with the student in Chinese; write game text, code comments and project files in English.
 
 **This repository is the only active checkout.** On November 15 the game, the patient-AI proxy and the tools were moved here from the legacy `fathom` workspace and checked here ([transition record](docs/development/repository-transition.md)). `fathom` is an archive; its long layered handoffs (`HANDOFF.md`, `CODEX_RUNTIME_HANDOFF.md`, `CLAUDE_VOICE_HANDOFF.md`, `CODEX_NEXT_HANDOFF.md`) are history, not instructions.
 
-AI use: Claude wrote this file after doing the November 15 work it describes. No student review of it is recorded.
+AI use: Claude wrote the earlier runtime history; Codex added the current test-preparation checkpoint. No student review of this update is recorded.
+
+## Current checkpoint: live test prepared, not yet run
+
+Codex pulled `main` at `98eda57` (already current), reread the handoff and test brief, and ran the
+free checks: proxy **38/38**, Godot rules **493/493**, and the new test guard **6/6**. These are
+automated checks, not live-model evidence. No one played or spoke in this checkpoint.
+
+The student explicitly authorized the requested OpenAI test with a **USD 50 ceiling**. The test
+still targets about 30 dialogue calls and 10 voice clips, with hard stops of 40 and 15. Provider
+and model prices were rechecked on November 15; see [the session sheet](docs/development/live-test-session.md).
+Do not request the same budget authorization again.
+
+Credential entry is the unresolved step. The handoff requires the student to fill `.dev.vars`;
+Codex created an ignored blank template without reading an existing file, then asked the student
+to confirm it was filled or explicitly authorize assistant configuration instead. The application
+startup check reported a missing credential and exited before starting the server. The separate
+question about participation in ten real voice clips is also pending. **Paid calls: 0; cost: USD 0.**
+
+`tools/live_model_session.mjs` is a bounded test launcher, not a game behavior change. It loads
+credentials through Node's environment-file option, pauses after the first reply for inspection,
+blocks continuation after a failed first reply, and persists separate call caps across restarts.
+It logs metadata and numeric usage only. `tools/live_model_guard.test.mjs` verifies the caps,
+first-call behavior, concurrent rejection and metadata filtering with fake providers. No runtime
+limits were tuned; 16 replies per visit and 256 output tokens remain unchanged.
+
+Evidence is in local `validation/2026-11-15/codex-live-test/`. Its README and summary explicitly
+mark live latency, token usage, character quality, game fallbacks and voice WER as unmeasured.
+The operator sheet includes launch commands, coverage and ten authored voice prompts.
 
 ## Where things stand
 
@@ -16,7 +44,7 @@ AI use: Claude wrote this file after doing the November 15 work it describes. No
 ## Student decisions, November 15
 
 1. Recording is finished: the game window, mouse, keyboard, audio and microphone may be used for testing.
-2. The student wants a supervised live model test, has OpenAI API credit, and asked whether an OAuth sign-in can replace an API key. Answer and cost below; **no paid call has been made, and none may be made before the student says yes to the provider, the model, the number of calls and the cost.**
+2. The student requested a supervised live model test and subsequently authorized the specified OpenAI run with a USD 50 ceiling. No paid call has been made yet; see the current checkpoint for credential and voice readiness.
 3. The cap stays at 16 patient replies per visit.
 4. The sentence in `AGENTS.md` that called voice a future task was replaced (done).
 5. The repository transfer was left to the agent to schedule (done, November 15).
@@ -122,12 +150,13 @@ Do not raise them before a supervised live run has measured latency and tokens. 
 
 ## Next three tasks
 
-1. **Braintrust replies** (due November 19, 23:59): the student picks two G1 pitches with fewer than two replies; draft specific, moment-based notes in English for review; the student sends them.
-2. **Supervised live run** (the student is giving it to Codex), following [docs/development/live-model-test.md](docs/development/live-model-test.md), after the student's yes on provider, model, call count and cost: play two or three visits by typing and speaking, record latency, tokens, cost and transcription quality, then tune the prompt and deadlines. Keep 16 replies per visit.
-3. **Human playtest**: the student plays a shift with headphones and a microphone; tune patience, fees, rent and pacing from what happens, check the attack trim by ear, and settle the decisions listed above.
+1. **Supervised live dialogue run**, already authorized: resolve credential entry, start the bounded launcher in [the session sheet](docs/development/live-test-session.md), inspect the first reply, then play two or three visits. Tune only from measurements. Keep 16 replies per visit.
+2. **Real voice test and human playtest**: use the student's actual voice for the ten WER clips, or leave this pending if unavailable. A shift with headphones is still needed to assess pacing and attack loudness.
+3. **Braintrust replies** (due November 19, 23:59): the student picks two G1 pitches with fewer than two replies; draft specific, moment-based notes in English for review; the student sends them.
 
 ## Evidence (local, not in Git)
 
+- `validation/2026-11-15/codex-live-test/`: free-check logs, persistent zero-call ledger, and an explicit not-yet-run report. No live call, voice clip or game play has been recorded in this checkpoint.
 - `validation/2026-11-15/claude-mix-fixes/`: the mix measurements before and after (caught and landed, -6 and -9 dB), the whine file, every check on the final tree, the hidden-desktop capture, the probe scripts.
 - `validation/2026-11-15/transfer-checks/`: every check right after the transfer.
 - `validation/2026-11-15/claude-mock-voice/`: the push-to-talk freeze, before and after the fix.
