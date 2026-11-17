@@ -4,6 +4,9 @@ extends RefCounted
 ## The player may look, run a tool, ask, reassure, press, stamp TREAT, call Trauma Team or
 ## drop the shutter, in any order and at any time. Nothing has to be done before a verdict.
 ## The call to Trauma Team keeps its first id in the rules and the data: "refer".
+## Tests, questions and pressure cost patience. At 0 the patient gives an ultimatum; if nobody
+## decides or reassures them in time they leave by themselves (outcome "gave_up": no fee, no
+## bill, no call). The wait is the director's clock; the rule and its length are here.
 ## This class owns the truth, the evidence, patience, attacks and the result. The patient
 ## AI supplies original dialogue and decides exam cooperation. The offline script alone
 ## uses authored move choices. Physical test readings, scoring and attack timing stay here.
@@ -39,6 +42,7 @@ var press_count: int = 0
 var reassure_left: int = 0
 var reassure_used: int = 0
 var attack_cause: String = ""    # "refer" or "press"
+var blows_taken: int = 0         # blows that reached the glass before the shutter was down
 var verdict_kind: String = ""    # "treat", "refer" or ""
 var outcome: String = ""
 var history: Array = []          # short tags, newest last (sent to the patient brain)
@@ -113,6 +117,33 @@ func is_drifting() -> bool:
 
 func in_exam() -> bool:
 	return phase == Phase.EXAM
+
+
+## Patience is gone and the visit is still open: the patient is about to leave.
+func is_spent() -> bool:
+	return phase == Phase.EXAM and patience <= 0
+
+
+## How long a patient with no patience left waits before leaving, in ms. 0: they go at once.
+func leave_ms() -> int:
+	return maxi(0, int(_rule("patience", "leave_ms", 8000)))
+
+
+## The player's own crosses on the record. Advice only: nothing scores or gates them.
+func crossed() -> int:
+	var n := 0
+	for row in ROWS:
+		if int(marks.get(row, 0)) == 2:
+			n += 1
+	return n
+
+
+func ticked() -> int:
+	var n := 0
+	for row in ROWS:
+		if int(marks.get(row, 0)) == 1:
+			n += 1
+	return n
 
 
 func port_covered() -> bool:
@@ -437,6 +468,34 @@ func attack_timeout() -> Dictionary:
 	return {"result": outcome}
 
 
+## A blow reached the glass while the shutter was still up. Returns how many have.
+func take_blow() -> int:
+	if phase == Phase.ATTACK:
+		blows_taken += 1
+	return blows_taken
+
+
+## How the shutter was timed against a patient who turned: "clean" (down before any blow
+## landed), "cracked" (blows landed first), "through" (not down in time), "" (no attack).
+func shutter_grade() -> String:
+	match outcome:
+		"caught":
+			return "clean" if blows_taken == 0 else "cracked"
+		"hit":
+			return "through"
+	return ""
+
+
+## Patience ran out and nobody decided: the patient leaves by themselves. Nothing is earned
+## and nothing is billed, whoever they were. The director calls this when the wait is over.
+func give_up() -> Dictionary:
+	if not is_spent():
+		return {"result": ""}
+	_note("gave_up")
+	_finish("gave_up")
+	return {"result": outcome}
+
+
 func _finish(p_outcome: String) -> void:
 	outcome = p_outcome
 	phase = Phase.DONE
@@ -526,4 +585,7 @@ func settlement() -> Dictionary:
 		"rows": rows,
 		"patience_left": patience,
 		"press_count": press_count,
+		"crossed": crossed(),
+		"blows": blows_taken,
+		"grade": shutter_grade(),
 	}

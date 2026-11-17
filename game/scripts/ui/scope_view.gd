@@ -5,14 +5,21 @@ extends Node2D
 ##   port:     a close look at the socket
 ## It shows what the case data says and nothing else. It never judges what it shows: when
 ## the interaction has run its course it emits `completed` and the director writes the note.
+##
+## The picture is 220 x 186 and is shown at twice its size, like everything else beyond the
+## glass, cut off at the edges of the window. What the instrument says (the caption, the grip
+## meter) is lettered over it in screen pixels.
 
 const Gfx = preload("res://scripts/ui/gfx.gd")
 
 signal completed(tool: String)
 
+const ORIGIN := Vector2(100, -20)    # where the picture's top-left corner is on the screen
+const SCALE := 2.0
 const EYE_R := Vector2(60, 86)       # the patient's right eye, on the left of the screen
 const EYE_L := Vector2(160, 86)
-const WINDOW := Rect2(5, 5, 210, 154)
+const WINDOW := Rect2(5, 12, 210, 146)   # where the pointer can go, in the picture's own pixels
+const PLATE := Color(0.027, 0.035, 0.047, 0.84)
 const REACH := {
 	"natural": Vector2(12, 4), "optic": Vector2(8, 5), "combat": Vector2(10, 3), "display": Vector2(11, 4),
 }
@@ -35,6 +42,7 @@ var _pid: String = ""
 var _mouse := Vector2(110, 60)
 var _down: bool = false
 var _t: float = 0.0
+var _clip := Control.new()
 var _layers := Node2D.new()
 var _hud := Node2D.new()
 var _light: Sprite2D = null
@@ -52,7 +60,14 @@ var _rng := RandomNumberGenerator.new()
 
 
 func _ready() -> void:
-	add_child(_layers)
+	_clip.position = Gfx.WINDOW.position
+	_clip.size = Gfx.WINDOW.size
+	_clip.clip_contents = true
+	_clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_clip)
+	_layers.position = ORIGIN - Gfx.WINDOW.position
+	_layers.scale = Vector2(SCALE, SCALE)
+	_clip.add_child(_layers)
 	add_child(_hud)
 	_hud.draw.connect(_draw_hud)
 	visible = false
@@ -103,8 +118,14 @@ func set_result(text: String) -> void:
 	done = true
 
 
+## The pointer, in the picture's own pixels.
 func pointer(local: Vector2) -> void:
 	_mouse = Vector2(clampf(local.x, WINDOW.position.x, WINDOW.end.x), clampf(local.y, WINDOW.position.y, WINDOW.end.y))
+
+
+## The pointer, given where it is on the screen.
+func pointer_screen(pos: Vector2) -> void:
+	pointer((pos - ORIGIN) / SCALE)
 
 
 func button(down: bool) -> void:
@@ -169,7 +190,6 @@ func _build_eyes() -> void:
 	_light.material = Gfx.additive()
 	_light.modulate = Color(1, 1, 1, 0.85)
 	_layer("scope/vignette.png")
-	_layer("scope/frame.png")
 
 
 func _update_eyes(delta: float) -> void:
@@ -215,7 +235,6 @@ func _build_grip() -> void:
 	_layer("scope/grip_bg.png")
 	_hand = _layer("scope/%s/grip_open.png" % _pid)
 	_layer("scope/vignette.png")
-	_layer("scope/frame.png")
 	var grip: Dictionary = _case.get("grip", {})
 	_release_s = float(int(grip.get("release_ms", 400))) / 1000.0
 	_tremor = int(grip.get("tremor", 0))
@@ -265,7 +284,6 @@ func _build_port() -> void:
 	_light.material = Gfx.additive()
 	_light.modulate = Color(1, 1, 1, 0.4)
 	_layer("scope/vignette.png")
-	_layer("scope/frame.png")
 	_port_t = 0.0
 
 
@@ -300,18 +318,23 @@ func _draw_hud() -> void:
 		return
 	var text := result if (done and result != "") else caption
 	var col: Color = Gfx.WARM7 if (done and result != "") else Gfx.TEAL6
-	Gfx.text(_hud, Vector2(11, 167), text, col)
-	if tool == "penlight" and not done:
-		for i in _eyes.size():
-			var eye: Dictionary = _eyes[i]
-			var ok := float(eye["lit"]) >= LIT_NEEDED
-			Gfx.text(_hud, Vector2(196 + 9 * i, 167), "●" if ok else "○", Gfx.WARM6 if ok else Gfx.TEAL4)
+	var dots := tool == "penlight" and not done
+	if text != "" or dots:
+		# one line under the patience lamps, the width of the window
+		var plate := Rect2(Gfx.WINDOW.position.x + 4.0, Gfx.WINDOW.position.y + 15.0, Gfx.WINDOW.size.x - 8.0, 12)
+		_hud.draw_rect(plate, PLATE)
+		Gfx.text(_hud, plate.position + Vector2(4, 1), text, col)
+		if dots:
+			for i in _eyes.size():
+				var eye: Dictionary = _eyes[i]
+				var ok := float(eye["lit"]) >= LIT_NEEDED
+				Gfx.text(_hud, Vector2(plate.end.x - 22.0 + 9.0 * float(i), plate.position.y + 1.0), "●" if ok else "○", Gfx.WARM6 if ok else Gfx.TEAL4)
 	if tool == "grip":
 		_draw_grip_readout()
 
 
 func _draw_grip_readout() -> void:
-	var r := Rect2(9, 9, 64, 45)
+	var r := Rect2(Gfx.WINDOW.position.x + 6.0, Gfx.WINDOW.position.y + 31.0, 64, 45)
 	_hud.draw_rect(r, Gfx.INK0)
 	_hud.draw_rect(r, Gfx.TEAL3, false, 1.0)
 	var shown := 0.0

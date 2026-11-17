@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "title": "NORMAL REFERENCE SHEET",
   "subtitle": "What a steady patient looks like.",
   "rows": [
@@ -19,8 +19,10 @@
      "normal": "Pushed, face and voice react together.",
      "ordinary": "Anger, swearing, walking out."}
   ],
+  "threshold": 2,
+  "threshold_note": "The house rule printed in the footer: this many broken lines mean drifting. Every drifting case must break at least this many (case_db checks it), and the record counts the player's own crosses against it. The count is advice: nothing scores it or stops a decision.",
   "footer": [
-    "One broken line, no ordinary cause: TRAUMA TEAM.",
+    "Two broken lines = drifting: call TRAUMA TEAM.",
     "Strange is not sick. A refusal is not a sign."
   ]
 }

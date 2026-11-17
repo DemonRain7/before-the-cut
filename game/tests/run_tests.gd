@@ -1,6 +1,9 @@
 extends SceneTree
-## Headless rule tests for the reference-sheet loop (case data version 2, rules version 3).
-## The second decision is a call to Trauma Team; in the rules and the data its id is "refer".
+## Headless rule tests for the reference-sheet loop (case data version 2, rules version 5,
+## sheet version 3). The second decision is a call to Trauma Team; in the rules and the data its
+## id is "refer". Rules version 4 added the hourly line, the patient who leaves when patience
+## runs out, and the counter glass that remembers every blow for the rest of the shift. Rules
+## version 5 lets the doctor pay, between patients, to have a layer of that glass refitted.
 ## Run from the repository root:  godot --headless --path game --script res://tests/run_tests.gd
 ## These check program rules only. They are not a playtest and say nothing about fun.
 
@@ -18,6 +21,7 @@ const NOTE_MAX_PX := 186   # width of the note column on the patient record
 var passed := 0
 var failed := 0
 var rules: Dictionary = {}
+var sheet: Dictionary = {}
 var cases: Dictionary = {}
 
 
@@ -82,6 +86,7 @@ func _initialize() -> void:
 	var db: Dictionary = CaseDB.load_all()
 	eq(db["errors"], [], "shipped data validates")
 	rules = db["rules"]
+	sheet = db["sheet"]
 	cases = db["cases"]
 	test_data()
 	test_verdict_any_time()
@@ -90,9 +95,14 @@ func _initialize() -> void:
 	test_talk()
 	test_press_and_attack()
 	test_shutter()
+	test_patience_walkout()
+	test_marks()
 	test_settlement_rows()
 	test_generated_speech_findings()
 	test_shift()
+	test_line()
+	test_glass()
+	test_repair()
 	test_arrivals()
 	test_brain()
 	await test_agent()
@@ -262,6 +272,11 @@ func test_checks() -> void:
 	eq(r["result"], "spent", "no patience: the request is not granted")
 	ok(not v.granted.has("penlight"), "nothing was granted")
 	eq(v.verdict("treat")["next"], "done", "a verdict is still possible at zero patience")
+	v = visit("rook")
+	v.patience = 1
+	eq(v.apply_check("penlight", "comply")["result"], "granted", "the last patience still buys its test")
+	ok(v.is_spent(), "and then the patient is about to leave")
+	ok(bool(v.complete_check("penlight")["ok"]), "the test that spent it still runs to the end")
 
 
 func test_talk() -> void:
@@ -351,6 +366,95 @@ func test_shutter() -> void:
 	eq(v.shutter()["result"], "", "shutter does nothing after the visit")
 
 
+## Patience (rules version 4): at 0 the patient gives an ultimatum and, unless the player decides
+## or reassures them, leaves by themselves: no fee, no bill, no call. The director runs the
+## clock; these check the rule.
+func test_patience_walkout() -> void:
+	eq(visit("kip").leave_ms(), int(rules["patience"]["leave_ms"]), "the wait comes from the rules")
+	ok(visit("kip").leave_ms() >= 3000, "the wait is long enough to read the ultimatum and decide")
+	for id in cases.keys():
+		var v := visit(id)
+		ok(not v.is_spent(), "%s: a fresh patient is not about to leave" % id)
+		eq(v.give_up()["result"], "", "%s: nobody leaves while there is patience" % id)
+		eq(v.phase, VisitState.Phase.EXAM, "%s: and the visit stays open" % id)
+		v.patience = 0
+		ok(v.is_spent(), "%s: at zero the patient is about to leave" % id)
+		eq(v.give_up()["result"], "gave_up", "%s: left alone, they go" % id)
+		var s := v.settlement()
+		eq(s["credits"], 0, "%s: no fee and no bill" % id)
+		ok(not bool(s["correct"]), "%s: no call was made, so it is not a right one" % id)
+		ok(not bool(s["injured"]), "%s: nobody is hurt by a patient who leaves" % id)
+		eq(s["title"], "OUT OF PATIENCE", "%s: the slip says why" % id)
+		ok(str(s["text"]) != "", "%s: and what it meant" % id)
+		eq(s["verdict"], "", "%s: no verdict is recorded" % id)
+		eq(v.give_up()["result"], "", "%s: they only leave once" % id)
+		eq(v.verdict("treat")["next"], "", "%s: and cannot be decided on afterwards" % id)
+		ok(str(cases[id]["exit"]["gave_up"]) != "", "%s: has a parting line" % id)
+	# spending the last patience starts it; reassurance holds them; a decision still counts
+	var k := visit("kip")
+	k.apply_check("penlight", "comply")
+	k.apply_check("grip", "comply")
+	k.apply_ask("why", "answer")
+	k.apply_ask("sleep", "answer")
+	ok(not k.is_spent() and k.patience == 2, "four paid actions leave Kip two patience")
+	eq(k.press()["result"], "react", "the press that takes the last of it still gets its reaction")
+	ok(k.is_spent(), "and now he is about to leave")
+	eq(k.apply_ask("implant", "answer")["result"], "spent", "nothing more can be asked")
+	eq(str(k.look("eyes")["text"]) != "", true, "looking is still free")
+	eq(k.reassure()["result"], "ok", "reassurance still works")
+	ok(not k.is_spent() and k.patience == 1, "and holds him: one patience back")
+	eq(k.give_up()["result"], "", "a reassured patient does not leave")
+	k.apply_ask("implant", "answer")
+	ok(k.is_spent(), "the next question spends it again")
+	eq(k.verdict("treat")["next"], "done", "a decision is still possible while he waits")
+	eq(k.outcome, "treated_ok", "and it counts as usual")
+	eq(k.give_up()["result"], "", "a decided visit cannot be walked out of")
+	# a patient who has turned does not wander off
+	var a := visit("vale")
+	a.patience = 0
+	a.verdict("refer")
+	ok(not a.is_spent(), "an attack is not a patient waiting to leave")
+	eq(a.give_up()["result"], "", "and it cannot be waited out")
+	eq(a.phase, VisitState.Phase.ATTACK, "the attack stands")
+
+
+## The player's own ticks and crosses, and the house rule they are counted against (sheet
+## version 3). The count is advice: it never scores, gates or changes anything.
+func test_marks() -> void:
+	var threshold := int(sheet["threshold"])
+	eq(threshold, 2, "the house rule asks for two broken lines")
+	ok(str(sheet["footer"][0]).to_lower().contains("two broken lines"), "and the sheet prints it")
+	for id in cases.keys():
+		var broken := 0
+		for row in VisitState.ROWS:
+			if not bool(cases[id]["rows"][row]["ok"]):
+				broken += 1
+		if str(cases[id]["truth"]) == "drifting":
+			ok(broken >= threshold, "%s: a drifting patient breaks at least the house rule's number of lines (%d)" % [id, broken])
+		else:
+			eq(broken, 0, "%s: a steady patient breaks none" % id)
+	var v := visit("maren")
+	eq([v.crossed(), v.ticked()], [0, 0], "a new record has no marks")
+	v.cycle_mark("eyes")
+	eq([v.crossed(), v.ticked()], [0, 1], "first click: a tick")
+	v.cycle_mark("eyes")
+	eq([v.crossed(), v.ticked()], [1, 0], "second click: a cross")
+	v.cycle_mark("hands")
+	v.cycle_mark("hands")
+	eq(v.crossed(), 2, "two crossed lines are counted")
+	v.cycle_mark("hands")
+	eq(v.crossed(), 1, "a third click clears the mark again")
+	v.cycle_mark("hands")
+	v.cycle_mark("hands")
+	eq(v.cycle_mark("nose"), 0, "a row that is not on the sheet cannot be marked")
+	eq(v.patience, v.patience_max, "marking costs no patience")
+	ok(v.seen.is_empty(), "and is not evidence")
+	eq(v.verdict("treat")["next"], "done", "two crosses do not stop a TREAT stamp")
+	var s := v.settlement()
+	eq(s["crossed"], 2, "the slip carries the count")
+	eq(s["credits"], int(rules["scoring"]["treat_drifting"]), "and the marks changed nothing about the result")
+
+
 func test_settlement_rows() -> void:
 	var v := visit("maren")
 	v.apply_check("penlight", "comply")
@@ -401,8 +505,9 @@ func test_generated_speech_findings() -> void:
 	eq(offline.settlement().rows[3].text, cases.vale.rows.speech.text, "offline feedback still matches its actual script")
 
 
-## calls: case id -> "treat" | "refer" | "shutter". A patient who turns on the call is shut out in
-## time, unless their id is in `slow`: then the shutter never comes and the blow lands.
+## calls: case id -> "treat" | "refer" | "shutter" | "gave_up" (patience spent, nobody decided).
+## A patient who turns on the call is shut out in time, unless their id is in `slow`: then the
+## shutter never comes and the blow lands.
 func play(shift: ShiftState, calls: Dictionary, slow: Array = []) -> void:
 	while not shift.is_done():
 		var id := shift.current_id()
@@ -410,6 +515,9 @@ func play(shift: ShiftState, calls: Dictionary, slow: Array = []) -> void:
 		var call := str(calls[id])
 		if call == "shutter":
 			v.shutter()
+		elif call == "gave_up":
+			v.patience = 0
+			v.give_up()
 		elif str(v.verdict(call)["next"]) == "attack":
 			if slow.has(id):
 				v.attack_timeout()
@@ -428,35 +536,39 @@ func test_shift() -> void:
 	eq(rep["total"], 1140, "perfect shift total")
 	eq(rep["correct"], 5, "perfect shift calls")
 	eq(rep["title"], "STEADY HANDS", "perfect shift title")
-	ok(bool(rep["rent_paid"]), "perfect shift pays rent")
+	eq(rep["line"], 5 * int(rules["line"]["per_hour"]), "five hours put the line at five times the hourly figure")
+	eq(rep["line"], 600, "which is 600")
+	ok(bool(rep["line_held"]), "perfect shift holds the line")
 	shift = ShiftState.new(rules)
 	play(shift, {"kip": "treat", "rook": "treat", "vale": "treat", "juno": "treat", "maren": "treat"})
 	rep = shift.report()
 	eq(rep["total"], 100, "treat-everyone total")
 	eq(rep["correct"], 3, "treat-everyone calls")
-	ok(not bool(rep["rent_paid"]), "treat-everyone misses rent")
+	ok(not bool(rep["line_held"]), "treat-everyone ends under the line")
+	eq(rep["title"], "THE CUT", "and a night under the line has one name")
 	shift = ShiftState.new(rules)
 	play(shift, {"kip": "refer", "rook": "refer", "vale": "refer", "juno": "refer", "maren": "refer"})
 	rep = shift.report()
 	eq(rep["total"], -210, "call-everyone total: three call-outs billed")
 	eq(rep["correct"], 2, "call-everyone calls")
-	ok(not bool(rep["rent_paid"]), "call-everyone misses rent")
-	eq(rep["title"], "LICENCE UNDER REVIEW", "call-everyone title")
+	ok(not bool(rep["line_held"]), "call-everyone ends under the line")
+	eq(rep["title"], "THE CUT", "call-everyone title")
 	# one needless call can be afforded, two cannot
 	var one := ShiftState.new(rules)
 	play(one, {"kip": "treat", "rook": "treat", "vale": "refer", "juno": "refer", "maren": "refer"})
 	eq(one.report()["total"], 640, "one false call total")
 	eq(one.report()["correct"], 4, "one false call leaves four right calls")
-	ok(bool(one.report()["rent_paid"]), "one false call still pays rent")
+	ok(bool(one.report()["line_held"]), "one false call still holds the line")
 	var two := ShiftState.new(rules)
 	play(two, {"kip": "treat", "rook": "refer", "vale": "refer", "juno": "refer", "maren": "refer"})
 	eq(two.report()["total"], 190, "two false calls total")
-	ok(not bool(two.report()["rent_paid"]), "two false calls miss rent")
+	ok(not bool(two.report()["line_held"]), "two false calls end under the line")
 	# the report says in words what the till means, and its title reads the whole night
-	eq(str(rep["rent_text"]), str(rules["rent_text"]["short"]), "a night that misses rent says the rent is short")
-	eq(str(one.report()["rent_text"]), str(rules["rent_text"]["paid"]), "a night that covers rent says the rent is paid")
-	eq(one.report()["title"], "A GOOD NIGHT'S WORK", "four right calls, nobody hurt, rent paid: a good night's work")
-	eq(two.report()["title"], "OPEN, BARELY", "three right calls: open, barely")
+	eq(str(rep["line_text"]), str(rules["line_text"]["short"]), "a night under the line says so")
+	eq(str(one.report()["line_text"]), str(rules["line_text"]["held"]), "a night over the line says so")
+	ok(str(rules["line_text"]["short"]) != "" and str(rules["line_text"]["held"]) != "", "both meter lines are written")
+	eq(one.report()["title"], "A GOOD NIGHT'S WORK", "four right calls, nobody hurt, line held: a good night's work")
+	eq(two.report()["title"], "THE CUT", "three right calls under the line: the cut")
 	var hurt := ShiftState.new(rules)
 	play(hurt, {"kip": "treat", "rook": "treat", "vale": "refer", "juno": "treat", "maren": "refer"}, ["vale"])
 	var hurt_rep := hurt.report()
@@ -469,22 +581,227 @@ func test_shift() -> void:
 	var thin_rep := thin.report()
 	eq(thin_rep["correct"], 4, "treating Vale is the one wrong call; locking Maren out is a right one")
 	eq(thin_rep["total"], 500, "four right calls can still leave 500 in the till")
-	ok(not bool(thin_rep["rent_paid"]), "which does not cover the rent")
-	eq(thin_rep["title"], "OPEN, BARELY", "four right calls that miss rent are not called a good night")
+	ok(not bool(thin_rep["line_held"]), "which is under the line")
+	eq(thin_rep["title"], "THE CUT", "four right calls under the line are still the cut")
 	var sore := ShiftState.new(rules)
 	for row in [[250, true, false], [300, true, false], [350, true, false], [120, true, false], [-300, false, true]]:
 		sore.record({"credits": row[0], "correct": row[1], "injured": row[2]})
 		sore.advance()
-	ok(bool(sore.report()["rent_paid"]) and int(sore.report()["correct"]) == 4, "four right calls, rent paid, one blow taken")
+	ok(bool(sore.report()["line_held"]) and int(sore.report()["correct"]) == 4, "four right calls, line held, one blow taken")
 	eq(sore.report()["title"], "OPEN, BARELY", "a night that hurt you is not called a good night either")
+	# with the line held, fewer right calls keep their own names; patients who left earn nothing
+	var three := ShiftState.new(rules)
+	play(three, {"kip": "treat", "rook": "treat", "vale": "gave_up", "juno": "treat", "maren": "gave_up"})
+	var three_rep := three.report()
+	eq([three_rep["total"], three_rep["correct"], three_rep["line_held"]], [900, 3, true], "three treated, two left unanswered: 900, line held")
+	eq(three_rep["title"], "OPEN, BARELY", "three right calls over the line: open, barely")
+	var low := ShiftState.new(rules)
+	play(low, {"kip": "treat", "rook": "gave_up", "vale": "gave_up", "juno": "treat", "maren": "gave_up"})
+	var low_rep := low.report()
+	eq([low_rep["total"], low_rep["correct"], low_rep["line_held"]], [600, 2, true], "a till exactly on the line holds it")
+	eq(low_rep["title"], "LICENCE UNDER REVIEW", "two right calls over the line: licence under review")
+	eq(low_rep["hours_under"], 1, "though one of its readings on the way was under (250 against 360)")
+	# every possible night gets a title, and THE CUT is exactly the nights that end under the line
+	var every_night_named := true
+	var cut_is_under := true
+	var options := ["treat", "refer", "shutter", "gave_up"]
+	for n in int(pow(options.size(), 5)):
+		var calls := {}
+		var code := n
+		for id in rules["shift_order"]:
+			calls[id] = options[code % options.size()]
+			code /= options.size()
+		var night := ShiftState.new(rules)
+		play(night, calls)
+		var night_rep := night.report()
+		every_night_named = every_night_named and str(night_rep["title"]) != "" and str(night_rep["text"]) != ""
+		cut_is_under = cut_is_under and ((str(night_rep["title"]) == "THE CUT") == (not bool(night_rep["line_held"])))
+	ok(every_night_named, "all 1024 combinations of calls end in a titled report")
+	ok(cut_is_under, "THE CUT is given to every night under the line and to no other")
 	for entry in rules["titles"]:
 		ok(str(entry["title"]) != "" and str(entry["text"]) != "", "report title '%s' has its text" % str(entry["title"]))
-	eq(int((rules["titles"] as Array).back()["min_correct"]), 0, "the last title fits any night")
-	ok(not (rules["titles"] as Array).back().has("max_injuries") and not (rules["titles"] as Array).back().has("rent_paid"),
-		"and asks for nothing else")
+	var first_title: Dictionary = (rules["titles"] as Array)[0]
+	ok(first_title.get("line_held") == false and int(first_title["min_correct"]) == 0 and not first_title.has("max_injuries"),
+		"the first title is the night under the line, whatever else went right")
+	eq(int((rules["titles"] as Array).back()["min_correct"]), 0, "the last title fits any night over the line")
+	ok(not (rules["titles"] as Array).back().has("max_injuries"), "and asks for no clean record")
 	ok(int(rules["scoring"]["false_call"]) < int(rules["scoring"]["false_alarm"]),
 		"calling an armed crew on a steady patient costs more than a false alarm")
 	ok(shift.is_done() and shift.current_id() == "", "shift ends after five")
+
+
+## The line (rules version 4): the lender's meter wants per_hour more in the till at every
+## hourly reading. One finished visit is one hour. Only the last reading decides the night.
+func test_line() -> void:
+	var per := int(rules["line"]["per_hour"])
+	ok(per > 0, "the line asks for something every hour")
+	var shift := ShiftState.new(rules)
+	eq(shift.line_per_hour(), per, "the hourly figure comes from the rules")
+	eq([shift.line_at(0), shift.line_at(1), shift.line_at(5), shift.line_at(9)], [0, per, 5 * per, 5 * per],
+		"hour n wants n times the hourly figure, and no hour comes after the last")
+	eq(shift.hour(), 1, "the shift opens in hour one")
+	eq([shift.reading()["hour"], shift.readings().size(), shift.hours_under()], [0, 0, 0], "no reading before the first visit ends")
+	eq(per, int(rules["scoring"]["refer_drifting"]), "a right call on a drifting patient exactly holds the line for its hour")
+	for id in cases.keys():
+		if str(cases[id]["truth"]) == "stable":
+			ok(int(cases[id]["fee"]) > per, "%s: a steady patient's fee puts the till ahead of the line" % id)
+	play(shift, {"kip": "treat", "rook": "treat", "vale": "refer", "juno": "treat", "maren": "refer"})
+	var seen: Array = []
+	for r in shift.readings():
+		seen.append([r["hour"], r["till"], r["line"], r["held"]])
+	eq(seen, [[1, 250, 120, true], [2, 550, 240, true], [3, 670, 360, true], [4, 1020, 480, true], [5, 1140, 600, true]],
+		"a perfect night: five readings, each over its line")
+	eq(shift.hours_under(), 0, "no hour of it under")
+	ok(bool(shift.reading()["last"]) and not bool(shift.reading(4)["last"]), "the fifth reading is the last one")
+	eq(shift.hour(), 5, "the clock does not run past the shift")
+	eq(shift.report()["readings"], shift.readings(), "the report carries the readings")
+	# a patient who leaves unanswered puts the till one hour behind
+	var slow := ShiftState.new(rules)
+	play(slow, {"kip": "gave_up", "rook": "treat", "vale": "refer", "juno": "treat", "maren": "refer"})
+	eq([slow.readings()[0]["held"], slow.readings()[0]["margin"]], [false, -per], "a first patient who left: one hour under at the first reading")
+	ok(bool(slow.readings()[1]["held"]), "the next fee brings the till back over")
+	eq([slow.hours_under(), slow.report()["hours_under"]], [1, 1], "one hour under is counted")
+	ok(bool(slow.report()["line_held"]), "and a reading on the way does not decide the night")
+	eq(slow.report()["title"], "A GOOD NIGHT'S WORK", "four right calls, nobody hurt, line held at closing")
+	# on the line counts as holding it; a short shift is read against its own hours
+	var even := ShiftState.new(rules, ["vale"])
+	play(even, {"vale": "refer"})
+	eq([even.reading()["held"], even.reading()["margin"], even.report()["line"]], [true, 0, per], "a till exactly on the line holds it")
+	var none := rules.duplicate(true)
+	none.erase("line")
+	var free := ShiftState.new(none)
+	play(free, {"kip": "refer", "rook": "refer", "vale": "refer", "juno": "refer", "maren": "refer"})
+	eq([free.report()["line"], free.report()["line_held"]], [0, false], "without a line the meter wants nothing, and a till below zero is still under it")
+
+
+## The glass (rules version 4): the pane takes three blows a shift. Each blow that lands before
+## the shutter is down uses one up, and the next attack comes through that much sooner.
+func test_glass() -> void:
+	var attack: Dictionary = rules["attack"]
+	var window := int(attack["window_ms"])
+	var shift := ShiftState.new(rules)
+	eq([shift.glass, shift.glass_max(), shift.glass_out], [int(attack["glass"]), int(attack["glass"]), false], "a new shift has a whole pane")
+	var plan := shift.attack_plan()
+	eq(plan["blows_ms"], [540, 990, 1440], "a whole pane takes three blows, where the rules put them")
+	eq(plan["through_ms"], window, "and the patient needs the full window to come through")
+	ok(int(plan["blows_ms"][0]) >= 450, "the first blow leaves a quick player time for a clean stop")
+	var windows: Array = [int(plan["through_ms"])]
+	while shift.glass > 0:
+		shift.glass_blow()
+		plan = shift.attack_plan()
+		eq((plan["blows_ms"] as Array).size(), shift.glass, "%d glass left: that many blows land" % shift.glass)
+		ok((plan["blows_ms"] as Array).is_empty() or int((plan["blows_ms"] as Array).back()) < int(plan["through_ms"]),
+			"%d glass left: every blow lands before the patient is through" % shift.glass)
+		windows.append(int(plan["through_ms"]))
+	eq(windows, [1800, 1440, 990, 650], "less glass, less time")
+	eq(windows.min(), int(attack["min_window_ms"]), "but never less than the floor in the rules")
+	eq(shift.glass_blow(), 0, "the glass cannot go below nothing")
+	ok(not shift.glass_out, "cracked through is not broken out")
+	shift.glass_break()
+	plan = shift.attack_plan()
+	eq([shift.glass, shift.glass_out, plan["out"], plan["through_ms"], plan["blows_ms"]], [0, true, true, 650, []],
+		"once somebody has come through there is no pane: the next one has the shortest window")
+	eq(shift.report()["glass"], 0, "the report knows what is left of the pane")
+	eq(ShiftState.new(rules).glass, int(attack["glass"]), "the next shift opens with a new pane")
+	# the visit counts the blows of its own attack and grades the shutter
+	var v := visit("vale")
+	eq(v.take_blow(), 0, "no blow counts before a patient has turned")
+	v.verdict("refer")
+	v.shutter()
+	eq([v.settlement()["grade"], v.settlement()["blows"]], ["clean", 0], "shutter down before any blow: a clean stop")
+	v = visit("vale")
+	v.verdict("refer")
+	v.take_blow()
+	eq(v.take_blow(), 2, "blows are counted while the shutter is up")
+	v.shutter()
+	eq([v.settlement()["grade"], v.settlement()["blows"]], ["cracked", 2], "two blows first: stopped, but the glass paid")
+	eq(v.settlement()["credits"], int(rules["scoring"]["refer_drifting"]), "a late stop is paid like a clean one: the glass is the cost")
+	eq(v.take_blow(), 2, "nothing lands once the shutter is down")
+	v = visit("maren")
+	v.press()
+	v.press()
+	for i in 3:
+		v.take_blow()
+	v.attack_timeout()
+	eq([v.settlement()["grade"], v.settlement()["blows"]], ["through", 3], "never down: they came through")
+	var t := visit("kip")
+	t.verdict("treat")
+	eq(t.settlement()["grade"], "", "a visit with no attack has no shutter grade")
+
+
+## Mending the glass (rules version 5): between patients the doctor can pay attack.repair_cost
+## for one layer. The money leaves the till at once, the meter counts it at every reading after
+## that, and a reading that was already taken never changes.
+func test_repair() -> void:
+	var cost := int(rules["attack"]["repair_cost"])
+	var per := int(rules["line"]["per_hour"])
+	ok(cost > 0, "a layer of glass has a price")
+	ok(cost < per, "one layer costs less than an hour of the line")
+	ok(cost * int(rules["attack"]["glass"]) <= per, "and a whole pane no more than one hour of it")
+	var shift := ShiftState.new(rules)
+	eq([shift.repair_cost(), shift.can_repair(), shift.repair_glass()], [cost, false, {}], "a whole pane has nothing to mend")
+	eq([shift.total(), shift.repairs.size(), shift.report()["repairs"]], [0, 0, 0], "and asking costs nothing")
+	shift.glass_blow()
+	ok(shift.can_repair(), "one blow on the glass: a layer can be bought")
+	var res := shift.repair_glass()
+	eq([res["cost"], res["glass"], res["glass_max"], res["till"]], [cost, 3, 3, -cost],
+		"the fitter's bill: one layer, a whole pane, and a till that may go into debt for it")
+	eq([shift.glass, shift.total(), shift.repair_total(), shift.can_repair()], [3, -cost, cost, false],
+		"the pane is whole again and the till has paid for it")
+	eq(shift.attack_plan()["blows_ms"], [540, 990, 1440], "a mended pane takes all three blows again")
+	eq(shift.attack_plan()["through_ms"], int(rules["attack"]["window_ms"]), "and gives the full window back")
+	# the meter: a reading that was taken stays as it was, the next one counts the glass
+	var night := ShiftState.new(rules)
+	var v := visit("kip")
+	v.verdict("treat")
+	night.record(v.settlement())
+	night.advance()
+	night.glass_blow()
+	var first: Dictionary = night.reading(1)
+	night.repair_glass()
+	eq([first["till"], night.reading(1)], [250, first], "glass bought after the first reading leaves that reading alone")
+	eq(night.total(), 250 - cost, "though the till is lighter at once")
+	eq(night.reading()["till"], 250, "and the latest reading is still the one that was taken")
+	v = visit("rook")
+	v.verdict("treat")
+	night.record(v.settlement())
+	night.advance()
+	eq([night.reading(2)["till"], night.reading(2)["line"], night.reading(2)["held"]], [550 - cost, 2 * per, true],
+		"the second reading counts the glass")
+	eq(night.reading(1), first, "the first one still does not")
+	# an empty frame: one layer puts glass back in it
+	var broken := ShiftState.new(rules)
+	broken.glass_break()
+	eq([broken.glass, broken.glass_out, broken.can_repair()], [0, true, true], "a frame with no glass in it can be glazed")
+	broken.repair_glass()
+	var plan := broken.attack_plan()
+	eq([broken.glass, broken.glass_out, plan["out"], plan["blows_ms"], plan["through_ms"]], [1, false, false, [540], 990],
+		"one layer: one blow lands, and the patient is through where the second would have fallen")
+	broken.repair_glass()
+	broken.repair_glass()
+	eq([broken.glass, broken.can_repair(), broken.repair_total()], [3, false, 3 * cost], "three layers make a whole pane, at three times the price")
+	eq(broken.repair_glass(), {}, "and nobody sells a fourth")
+	var rep := broken.report()
+	eq([rep["repairs"], rep["repair_total"], rep["glass"], rep["total"]], [3, 3 * cost, 3, -3 * cost], "the report carries what the glass cost")
+	# the glass comes out of the same till the line is read against
+	var tight := ShiftState.new(rules)
+	tight.glass_blow()
+	tight.repair_glass()
+	play(tight, {"kip": "treat", "rook": "gave_up", "vale": "gave_up", "juno": "treat", "maren": "gave_up"})
+	var tight_rep := tight.report()
+	eq([tight_rep["total"], tight_rep["line_held"], tight_rep["title"]], [600 - cost, false, "THE CUT"],
+		"a night that was exactly on the line cannot afford a layer")
+	eq(tight.readings()[0]["till"], 250 - cost, "glass bought before the first patient is in the first reading")
+	eq(tight_rep["correct"], 2, "paying for glass is not a call: the count of right calls is untouched")
+	tight.glass_blow()
+	ok(not tight.can_repair(), "after the last patient the fitter does not come")
+	eq(tight.repair_glass(), {}, "and takes no money")
+	# a rule set without a price: the glass stays as it is
+	var none := rules.duplicate(true)
+	none["attack"].erase("repair_cost")
+	var plain := ShiftState.new(none)
+	plain.glass_blow()
+	eq([plain.repair_cost(), plain.can_repair(), plain.repair_glass(), plain.glass], [0, false, {}, 2], "without a price nobody mends glass")
 
 
 ## The arrival order (added November 15): drawn from the shift seed, always the same five, the
@@ -937,3 +1254,48 @@ func test_bad_data() -> void:
 	c = (cases["juno"] as Dictionary).duplicate(true)
 	c["outcomes"].erase("false_alarm")
 	ok(has_error(CaseDB.validate_case(c, rules), "outcomes.false_alarm"), "missing outcome text is caught")
+	# rules version 4 and later, sheet version 3
+	for id in cases.keys():
+		eq(CaseDB.validate_case(cases[id], rules, sheet), [], "%s validates against the sheet's house rule" % id)
+	c = (cases["rook"] as Dictionary).duplicate(true)
+	c["outcomes"].erase("gave_up")
+	ok(has_error(CaseDB.validate_case(c, rules), "outcomes.gave_up"), "every patient needs a slip for leaving unanswered")
+	c = (cases["maren"] as Dictionary).duplicate(true)
+	c["exit"].erase("gave_up")
+	ok(has_error(CaseDB.validate_case(c, rules), "exit.gave_up"), "and a parting line")
+	c = (cases["vale"] as Dictionary).duplicate(true)
+	for row in ["port", "speech", "temper"]:
+		c["rows"][row]["ok"] = true
+	ok(has_error(CaseDB.validate_case(c, rules, sheet), "broken sheet lines"), "a drifting patient with fewer broken lines than the house rule is caught")
+	ok(not has_error(CaseDB.validate_case(c, rules), "broken sheet lines"), "without a sheet, one broken line is all that is asked")
+	eq(CaseDB.validate_rules(rules), [], "the shipped rules validate")
+	eq(CaseDB.validate_sheet(sheet), [], "the shipped sheet validates")
+	var bad := rules.duplicate(true)
+	bad["attack"]["blow_at"] = [0.5, 0.4, 0.8]
+	ok(has_error(CaseDB.validate_rules(bad), "blow_at must rise"), "blows out of order are caught")
+	bad = rules.duplicate(true)
+	bad["attack"]["blow_at"] = []
+	ok(has_error(CaseDB.validate_rules(bad), "at least one blow"), "an attack with no blows is caught")
+	bad = rules.duplicate(true)
+	bad["attack"]["glass"] = 4
+	ok(has_error(CaseDB.validate_rules(bad), "attack.glass"), "more glass than blows is caught")
+	bad = rules.duplicate(true)
+	bad["attack"]["min_window_ms"] = 100
+	ok(has_error(CaseDB.validate_rules(bad), "min_window_ms"), "a shutter window nobody could meet is caught")
+	bad = rules.duplicate(true)
+	bad["attack"]["repair_cost"] = -5
+	ok(has_error(CaseDB.validate_rules(bad), "repair_cost"), "a fitter who pays the doctor is caught")
+	bad = rules.duplicate(true)
+	bad["attack"].erase("repair_cost")
+	eq(CaseDB.validate_rules(bad), [], "rules without a repair price are still rules")
+	bad = rules.duplicate(true)
+	bad.erase("line")
+	ok(has_error(CaseDB.validate_rules(bad), "'line' must be an object"), "rules without a line are caught")
+	bad = rules.duplicate(true)
+	bad["patience"]["leave_ms"] = -1
+	ok(has_error(CaseDB.validate_rules(bad), "leave_ms"), "a negative wait is caught")
+	var bad_sheet := sheet.duplicate(true)
+	bad_sheet["threshold"] = 0
+	ok(has_error(CaseDB.validate_sheet(bad_sheet), "threshold"), "a sheet without a house rule is caught")
+	bad_sheet["threshold"] = 6
+	ok(has_error(CaseDB.validate_sheet(bad_sheet), "threshold"), "and one asking for more lines than the sheet has")

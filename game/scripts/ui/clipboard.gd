@@ -1,7 +1,19 @@
 extends Node2D
-## The clipboard on the right: the normal reference sheet on top, the patient's intake
-## record below. The record mirrors the five sheet lines. Notes land on it as the player
-## looks, tests and talks; nothing on it says "normal" or "abnormal" until the visit is over.
+## The doctor's two papers. Both hang on the booth walls until they are wanted (the wall
+## objects are drawn by the desk); taken down, each slides in over its own side of the window:
+##   the normal reference sheet, from the left
+##   the patient's intake card, from the right
+## The card mirrors the five sheet lines. Notes land on it as the player looks, tests and
+## talks; nothing on it says "normal" or "abnormal" until the visit is over. The box beside
+## each row is the player's own tick or cross, and the decision box counts their crosses
+## against the house rule on the sheet (sheet.json "threshold").
+##
+## A paper that is out has a small tab on its window-side edge that puts it back.
+##
+## The papers were laid out for a screen on which they sat one above the other, the sheet at
+## SHEET_HOME and the card at CARD_HOME, and their rows are still written in those
+## coordinates. Each paper is drawn by a node of its own that is moved to where the paper is
+## now. Everything that takes a pointer takes a screen position.
 
 const Gfx = preload("res://scripts/ui/gfx.gd")
 const VisitState = preload("res://scripts/core/visit_state.gd")
@@ -9,6 +21,8 @@ const VisitState = preload("res://scripts/core/visit_state.gd")
 const ROWS := ["eyes", "hands", "port", "speech", "temper"]
 const LABELS := {"eyes": "EYES", "hands": "HANDS", "port": "PORT", "speech": "SPEECH", "temper": "TEMPER"}
 
+const SHEET_HOME := Vector2(404, 3)
+const CARD_HOME := Vector2(404, 171)
 const SHEET_ROW_Y := 32.0
 const SHEET_ROW_H := 22.0
 const SHEET_TEXT_X := 451.0
@@ -17,6 +31,11 @@ const REC_ROW_H := 28.0
 const REC_TEXT_X := 448.0
 const REC_TEXT_W := 186.0
 const DECISION := Rect2(554, 182, 78, 26)
+const TALLY := "CROSSED %d/%d"    # the player's crosses, against the sheet's threshold
+const TAB := Vector2(12, 24)      # the tab that puts a paper back
+const TAB_DROP := 8.0             # how far below the paper's top edge it sits
+const SLIDE := 252.0              # how far a paper travels to be out of sight
+const SLIDE_TIME := 0.16
 
 var sheet: Dictionary = {}
 var visit: VisitState = null      # the patient at the counter, or null
@@ -27,10 +46,25 @@ var armed: String = ""            # the stamp in the player's hand
 var highlight_row: String = ""
 var hover_mark: String = ""
 var counter_text: String = ""     # "2 / 5"
+var sheet_open: bool = false      # the reference sheet is down from its board
+var card_open: bool = false       # the intake card is down from its board
+var tab_hover: String = ""        # "sheet" | "card": the tab under the pointer
 
+var _sheet_n := Node2D.new()
+var _card_n := Node2D.new()
+var _sheet_k: float = 0.0         # 0 away, 1 out
+var _card_k: float = 0.0
 var _fresh: Dictionary = {}       # note key -> seconds since it was written
 var _imprint_t: float = 9.0
 var _t: float = 0.0
+
+
+func _ready() -> void:
+	add_child(_sheet_n)
+	_sheet_n.draw.connect(_draw_sheet_paper)
+	add_child(_card_n)
+	_card_n.draw.connect(_draw_card_paper)
+	_place()
 
 
 func set_visit(p_visit: VisitState, p_counter: String) -> void:
@@ -41,13 +75,11 @@ func set_visit(p_visit: VisitState, p_counter: String) -> void:
 	imprint = ""
 	armed = ""
 	_fresh.clear()
-	queue_redraw()
 
 
 func show_findings(p_settlement: Dictionary) -> void:
 	settlement = p_settlement
 	mode = "findings"
-	queue_redraw()
 
 
 func stamp(kind: String) -> void:
@@ -60,19 +92,53 @@ func mark_fresh(key: String) -> void:
 	_fresh[key] = 0.0
 
 
+## Both papers where they are meant to be, at once (no slide).
+func snap() -> void:
+	_sheet_k = 1.0 if sheet_open else 0.0
+	_card_k = 1.0 if card_open else 0.0
+	_place()
+
+
+# ------------------------------------------------------------------ where things are
+func _sheet_shift() -> Vector2:
+	return Gfx.SHEET.position - SHEET_HOME
+
+
+func _card_shift() -> Vector2:
+	return Gfx.RECORD.position - CARD_HOME
+
+
 func in_record(pos: Vector2) -> bool:
-	return Gfx.RECORD.has_point(pos)
+	return card_open and Gfx.RECORD.has_point(pos)
 
 
 func in_sheet(pos: Vector2) -> bool:
-	return Gfx.SHEET.has_point(pos)
+	return sheet_open and Gfx.SHEET.has_point(pos)
+
+
+## The tab that puts the sheet back, on the screen.
+func sheet_tab() -> Rect2:
+	return Rect2(Gfx.SHEET.end.x, Gfx.SHEET.position.y + TAB_DROP, TAB.x, TAB.y)
+
+
+func card_tab() -> Rect2:
+	return Rect2(Gfx.RECORD.position.x - TAB.x, Gfx.RECORD.position.y + TAB_DROP, TAB.x, TAB.y)
+
+
+## "sheet" or "card" if the pointer is on the tab of a paper that is out, else "".
+func tab_at(pos: Vector2) -> String:
+	if sheet_open and sheet_tab().has_point(pos):
+		return "sheet"
+	if card_open and card_tab().has_point(pos):
+		return "card"
+	return ""
 
 
 ## The record row under the pointer, or "".
 func record_row_at(pos: Vector2) -> String:
 	if not in_record(pos):
 		return ""
-	var i := int(floor((pos.y - REC_ROW_Y) / REC_ROW_H))
+	var i := int(floor((pos.y - _card_shift().y - REC_ROW_Y) / REC_ROW_H))
 	if i < 0 or i >= ROWS.size():
 		return ""
 	return str(ROWS[i])
@@ -81,7 +147,7 @@ func record_row_at(pos: Vector2) -> String:
 func sheet_row_at(pos: Vector2) -> String:
 	if not in_sheet(pos):
 		return ""
-	var i := int(floor((pos.y - SHEET_ROW_Y) / SHEET_ROW_H))
+	var i := int(floor((pos.y - _sheet_shift().y - SHEET_ROW_Y) / SHEET_ROW_H))
 	if i < 0 or i >= ROWS.size():
 		return ""
 	return str(ROWS[i])
@@ -89,34 +155,100 @@ func sheet_row_at(pos: Vector2) -> String:
 
 ## The row whose mark box is under the pointer (the whole left column counts), or "".
 func mark_at(pos: Vector2) -> String:
-	if mode != "exam" or pos.x < 406.0 or pos.x >= 446.0:
+	var x := pos.x - _card_shift().x
+	if mode != "exam" or x < 406.0 or x >= 446.0:
 		return ""
 	return record_row_at(pos)
 
 
+## The middle of a row's mark box, on the screen.
+func mark_point(row: String) -> Vector2:
+	var i := maxi(0, ROWS.find(row))
+	return Vector2(416.0, REC_ROW_Y + REC_ROW_H * float(i) + 18.0) + _card_shift()
+
+
+## The decision box of the card, on the screen: where a stamp comes down.
+func decision_rect() -> Rect2:
+	return Rect2(DECISION.position + _card_shift(), DECISION.size)
+
+
+# ------------------------------------------------------------------ frame
 func _process(delta: float) -> void:
 	_t += delta
 	_imprint_t += delta
 	for k in _fresh.keys():
 		_fresh[k] = float(_fresh[k]) + delta
-	queue_redraw()
+	var step := delta / SLIDE_TIME
+	_sheet_k = move_toward(_sheet_k, 1.0 if sheet_open else 0.0, step)
+	_card_k = move_toward(_card_k, 1.0 if card_open else 0.0, step)
+	_place()
+	if _sheet_n.visible:
+		_sheet_n.queue_redraw()
+	if _card_n.visible:
+		_card_n.queue_redraw()
+
+
+func _place() -> void:
+	# a paper leaves fast and settles gently
+	var sk := 1.0 - (1.0 - _sheet_k) * (1.0 - _sheet_k)
+	var ck := 1.0 - (1.0 - _card_k) * (1.0 - _card_k)
+	_sheet_n.visible = _sheet_k > 0.0
+	_sheet_n.position = _sheet_shift() + Vector2(-roundf(SLIDE * (1.0 - sk)), 0.0)
+	_card_n.visible = _card_k > 0.0
+	_card_n.position = _card_shift() + Vector2(roundf(SLIDE * (1.0 - ck)), 0.0)
 
 
 # ------------------------------------------------------------------ drawing
-func _draw() -> void:
-	var board := Gfx.tex("clinic/board.png")
-	if board != null:
-		draw_texture(board, Gfx.BOARD.position)
+## A tab on the edge of a paper, with an arrow that points back to the wall it came from.
+func _draw_tab(node: Node2D, at: Vector2, to_left: bool, hot: bool) -> void:
+	var r := Rect2(at, TAB)
+	node.draw_rect(Rect2(r.position + Vector2(1, 2), r.size), Color(0, 0, 0, 0.35))
+	node.draw_rect(r, Gfx.PAPER3 if hot else Gfx.PAPER2)
+	node.draw_rect(Rect2(r.position.x, r.position.y, r.size.x, 1), Gfx.PAPER1)
+	node.draw_rect(Rect2(r.position.x, r.end.y - 1.0, r.size.x, 1), Gfx.PAPER1)
+	node.draw_rect(Rect2(r.end.x - 1.0 if to_left else r.position.x, r.position.y, 1, r.size.y), Gfx.PAPER1)
+	var col: Color = Gfx.INKT if hot else Gfx.INKS
+	var cx := r.position.x + 6.0
+	var cy := r.position.y + 12.0
+	for i in 4:      # a small arrowhead, a column at a time
+		var x := cx - 2.0 + float(i) if to_left else cx + 1.0 - float(i)
+		node.draw_rect(Rect2(x, cy - float(i), 1, 1.0 + 2.0 * float(i)), col)
+
+
+func _draw_sheet_paper() -> void:
+	var n := _sheet_n
 	var sheet_tex := Gfx.tex("clinic/sheet.png")
 	if sheet_tex != null:
-		draw_texture(sheet_tex, Gfx.SHEET.position)
-	_draw_sheet()
-	var clip := Gfx.tex("clinic/clip.png")
-	if clip != null:
-		draw_texture(clip, Vector2(488, 0))
+		n.draw_texture(sheet_tex, SHEET_HOME)
+	_draw_tab(n, SHEET_HOME + Vector2(Gfx.SHEET.size.x, TAB_DROP), true, tab_hover == "sheet")
+	Gfx.text_center(n, 520.0, 18.0, str(sheet.get("title", "NORMAL REFERENCE SHEET")), Gfx.INKT, true)
+	n.draw_rect(Rect2(410, 29, 220, 1), Gfx.PAPER1)
+	var rows: Array = sheet.get("rows", [])
+	for i in rows.size():
+		var row: Dictionary = rows[i]
+		var y := SHEET_ROW_Y + SHEET_ROW_H * float(i)
+		var id := str(row.get("id", ""))
+		if id == highlight_row:
+			n.draw_rect(Rect2(407, y - 1.0, 227, SHEET_ROW_H - 1.0), Color(Gfx.WARM6, 0.42))
+		elif i > 0:
+			n.draw_rect(Rect2(410, y - 2.0, 220, 1), Color(Gfx.PAPER1, 0.45))
+		Gfx.text(n, Vector2(408, y), str(row.get("label", "")), Gfx.INKT, true)
+		Gfx.text(n, Vector2(SHEET_TEXT_X, y), str(row.get("normal", "")), Gfx.INKT)
+		Gfx.text_right(n, SHEET_TEXT_X - 3.0, y + 10.0, "fine:", Gfx.PRINT)
+		Gfx.text(n, Vector2(SHEET_TEXT_X, y + 10.0), str(row.get("ordinary", "")), Gfx.INKS)
+	var fy := SHEET_ROW_Y + SHEET_ROW_H * float(rows.size())
+	n.draw_rect(Rect2(410, fy - 1.0, 220, 1), Gfx.PAPER1)
+	var footer: Array = sheet.get("footer", [])
+	for i in footer.size():
+		Gfx.text_center(n, 520.0, fy + 2.0 + 10.0 * float(i), str(footer[i]), Gfx.INKT if i == 0 else Gfx.INKS)
+
+
+func _draw_card_paper() -> void:
+	var n := _card_n
 	var rec_tex := Gfx.tex("clinic/record.png")
 	if rec_tex != null:
-		draw_texture(rec_tex, Gfx.RECORD.position)
+		n.draw_texture(rec_tex, CARD_HOME)
+	_draw_tab(n, CARD_HOME + Vector2(-TAB.x, TAB_DROP), false, tab_hover == "card")
 	match mode:
 		"exam":
 			_draw_header()
@@ -129,53 +261,30 @@ func _draw() -> void:
 	_draw_decision()
 
 
-func _draw_sheet() -> void:
-	Gfx.text_center(self, 520.0, 18.0, str(sheet.get("title", "NORMAL REFERENCE SHEET")), Gfx.INKT, true)
-	draw_rect(Rect2(410, 29, 220, 1), Gfx.PAPER1)
-	var rows: Array = sheet.get("rows", [])
-	for i in rows.size():
-		var row: Dictionary = rows[i]
-		var y := SHEET_ROW_Y + SHEET_ROW_H * float(i)
-		var id := str(row.get("id", ""))
-		if id == highlight_row:
-			draw_rect(Rect2(407, y - 1.0, 227, SHEET_ROW_H - 1.0), Color(Gfx.WARM6, 0.42))
-		elif i > 0:
-			draw_rect(Rect2(410, y - 2.0, 220, 1), Color(Gfx.PAPER1, 0.45))
-		Gfx.text(self, Vector2(408, y), str(row.get("label", "")), Gfx.INKT, true)
-		Gfx.text(self, Vector2(SHEET_TEXT_X, y), str(row.get("normal", "")), Gfx.INKT)
-		Gfx.text_right(self, SHEET_TEXT_X - 3.0, y + 10.0, "fine:", Gfx.PRINT)
-		Gfx.text(self, Vector2(SHEET_TEXT_X, y + 10.0), str(row.get("ordinary", "")), Gfx.INKS)
-	var fy := SHEET_ROW_Y + SHEET_ROW_H * float(rows.size())
-	draw_rect(Rect2(410, fy - 1.0, 220, 1), Gfx.PAPER1)
-	var footer: Array = sheet.get("footer", [])
-	for i in footer.size():
-		Gfx.text_center(self, 520.0, fy + 2.0 + 10.0 * float(i), str(footer[i]), Gfx.INKT if i == 0 else Gfx.INKS)
-
-
 func _draw_blank() -> void:
-	Gfx.text_center(self, 520.0, 184.0, "INTAKE RECORD", Gfx.PRINT, true)
-	Gfx.text_center(self, 520.0, 250.0, "No patient at the counter.", Gfx.PRINT)
-	Gfx.text_center(self, 520.0, 262.0, "The next card goes here.", Gfx.PAPER1)
+	Gfx.text_center(_card_n, 520.0, 184.0, "INTAKE RECORD", Gfx.PRINT, true)
+	Gfx.text_center(_card_n, 520.0, 250.0, "No patient at the counter.", Gfx.PRINT)
+	Gfx.text_center(_card_n, 520.0, 262.0, "The next card goes here.", Gfx.PAPER1)
 
 
 func _draw_header() -> void:
 	if visit == null:
 		return
 	var c: Dictionary = visit.case_data
-	Gfx.text(self, Vector2(410, 181), str(c.get("name", "")), Gfx.INKT, true)
-	Gfx.text_right(self, 550.0, 181.0, "FEE %d" % int(c.get("fee", 0)), Gfx.PRINT)
-	Gfx.text(self, Vector2(410, 191), "%s, %d" % [str(c.get("role", "")), int(c.get("age", 0))], Gfx.INKS)
-	Gfx.text(self, Vector2(410, 201), "For: " + str(c.get("request", "")), Gfx.INKT)
-	draw_rect(Rect2(410, 212, 222, 1), Gfx.PAPER1)
+	Gfx.text(_card_n, Vector2(410, 181), str(c.get("name", "")), Gfx.INKT, true)
+	Gfx.text_right(_card_n, 550.0, 181.0, "FEE %d" % int(c.get("fee", 0)), Gfx.PRINT)
+	Gfx.text(_card_n, Vector2(410, 191), "%s, %d" % [str(c.get("role", "")), int(c.get("age", 0))], Gfx.INKS)
+	Gfx.text(_card_n, Vector2(410, 201), "For: " + str(c.get("request", "")), Gfx.INKT)
+	_card_n.draw_rect(Rect2(410, 212, 222, 1), Gfx.PAPER1)
 
 
 func _row_frame(i: int, id: String) -> float:
 	var y := REC_ROW_Y + REC_ROW_H * float(i)
 	if id == highlight_row and mode == "exam":
-		draw_rect(Rect2(407, y, 227, REC_ROW_H - 1.0), Color(Gfx.WARM7, 0.5))
+		_card_n.draw_rect(Rect2(407, y, 227, REC_ROW_H - 1.0), Color(Gfx.WARM7, 0.5))
 	if i > 0:
-		draw_rect(Rect2(410, y - 1.0, 222, 1), Color(Gfx.PAPER1, 0.6))
-	Gfx.text(self, Vector2(410, y + 1.0), str(LABELS[id]), Gfx.PRINT)
+		_card_n.draw_rect(Rect2(410, y - 1.0, 222, 1), Color(Gfx.PAPER1, 0.6))
+	Gfx.text(_card_n, Vector2(410, y + 1.0), str(LABELS[id]), Gfx.PRINT)
 	return y
 
 
@@ -183,9 +292,9 @@ func _draw_mark(pos: Vector2, value: int, hot: bool) -> void:
 	var names := ["ui/mark_blank.png", "ui/mark_tick.png", "ui/mark_cross.png"]
 	var t := Gfx.tex(names[clampi(value, 0, 2)])
 	if t != null:
-		draw_texture(t, pos)
+		_card_n.draw_texture(t, pos)
 	if hot:
-		draw_rect(Rect2(pos.x - 1.0, pos.y - 1.0, 13, 13), Gfx.WARM3, false, 1.0)
+		_card_n.draw_rect(Rect2(pos.x - 1.0, pos.y - 1.0, 13, 13), Gfx.WARM3, false, 1.0)
 
 
 func _draw_notes() -> void:
@@ -215,7 +324,7 @@ func _draw_notes() -> void:
 					text = text.substr(0, reveal)
 				if age < 1.6:
 					col = Gfx.PENCIL.lerp(Gfx.RED1, clampf(1.0 - age / 1.6, 0.0, 1.0) * 0.6)
-			Gfx.text(self, Vector2(REC_TEXT_X, y + 1.0 + 9.0 * float(n)), text, col)
+			Gfx.text(_card_n, Vector2(REC_TEXT_X, y + 1.0 + 9.0 * float(n)), text, col)
 
 
 func _draw_findings() -> void:
@@ -226,35 +335,36 @@ func _draw_findings() -> void:
 		var row: Dictionary = rows[i] if i < rows.size() else {}
 		_draw_mark(Vector2(410, y + 13.0), int(row.get("mark", 0)), false)
 		if str(row.get("assessment", "")) == "reported":
-			Gfx.text(self, Vector2(REC_TEXT_X, y + 1.0), "PATIENT SAID", Gfx.INKS, true)
+			Gfx.text(_card_n, Vector2(REC_TEXT_X, y + 1.0), "PATIENT SAID", Gfx.INKS, true)
 			var excerpt := Gfx.printable(str(row.get("text", "")))
 			var wrapped := Gfx.wrap_text(excerpt, REC_TEXT_W)
 			if wrapped.size() > 2:
-				var last := wrapped[1]
+				var last: String = wrapped[1]
 				while Gfx.text_w(last + "...") > REC_TEXT_W and last.length() > 0:
 					last = last.left(last.length() - 1)
 				excerpt = wrapped[0] + "\n" + last + "..."
-			Gfx.paragraph(self, Vector2(REC_TEXT_X, y + 10.0), excerpt, REC_TEXT_W, Gfx.INKT, false, 2, 9)
+			Gfx.paragraph(_card_n, Vector2(REC_TEXT_X, y + 10.0), excerpt, REC_TEXT_W, Gfx.INKT, false, 2, 9)
 			continue
 		var ok := bool(row.get("ok", true))
 		var truth := Gfx.tex("ui/truth_ok.png" if ok else "ui/truth_bad.png")
 		if truth != null:
-			draw_texture(truth, Vector2(424, y + 13.0))
-		Gfx.text(self, Vector2(REC_TEXT_X, y + 1.0), "NORMAL" if ok else "BROKEN LINE", Gfx.GRN2 if ok else Gfx.RED1, true)
+			_card_n.draw_texture(truth, Vector2(424, y + 13.0))
+		Gfx.text(_card_n, Vector2(REC_TEXT_X, y + 1.0), "NORMAL" if ok else "BROKEN LINE", Gfx.GRN2 if ok else Gfx.RED1, true)
 		if not bool(row.get("seen", false)):
-			Gfx.text_right(self, 632.0, y + 1.0, "you did not check", Gfx.PRINT)
-		Gfx.paragraph(self, Vector2(REC_TEXT_X, y + 10.0), str(row.get("text", "")), REC_TEXT_W, Gfx.INKT, false, 2, 9)
+			Gfx.text_right(_card_n, 632.0, y + 1.0, "you did not check", Gfx.PRINT)
+		Gfx.paragraph(_card_n, Vector2(REC_TEXT_X, y + 10.0), str(row.get("text", "")), REC_TEXT_W, Gfx.INKT, false, 2, 9)
 
 
 func _draw_decision() -> void:
 	if mode == "blank":
 		return
+	var n := _card_n
 	var r := DECISION
 	if imprint != "":
 		var tex := Gfx.tex("ui/ink_%s.png" % imprint)
 		if tex != null:
 			var drop := clampf(1.0 - _imprint_t / 0.09, 0.0, 1.0)
-			draw_texture(tex, Vector2(r.position.x + 1.0, r.position.y + 1.0 - roundf(drop * 3.0)))
+			n.draw_texture(tex, Vector2(r.position.x + 1.0, r.position.y + 1.0 - roundf(drop * 3.0)))
 		return
 	var col: Color = Gfx.PAPER1
 	var label := "DECISION"
@@ -263,16 +373,30 @@ func _draw_decision() -> void:
 		if fmod(_t, 0.6) < 0.3:
 			col = col.lightened(0.25)
 		label = "STAMP HERE"
-		draw_rect(r, Color(col, 0.16))
+		n.draw_rect(r, Color(col, 0.16))
 	# a dashed frame
 	var x := r.position.x
 	while x < r.end.x:
-		draw_rect(Rect2(x, r.position.y, minf(4.0, r.end.x - x), 1), col)
-		draw_rect(Rect2(x, r.end.y - 1.0, minf(4.0, r.end.x - x), 1), col)
+		n.draw_rect(Rect2(x, r.position.y, minf(4.0, r.end.x - x), 1), col)
+		n.draw_rect(Rect2(x, r.end.y - 1.0, minf(4.0, r.end.x - x), 1), col)
 		x += 7.0
 	var yy := r.position.y
 	while yy < r.end.y:
-		draw_rect(Rect2(r.position.x, yy, 1, minf(4.0, r.end.y - yy)), col)
-		draw_rect(Rect2(r.end.x - 1.0, yy, 1, minf(4.0, r.end.y - yy)), col)
+		n.draw_rect(Rect2(r.position.x, yy, 1, minf(4.0, r.end.y - yy)), col)
+		n.draw_rect(Rect2(r.end.x - 1.0, yy, 1, minf(4.0, r.end.y - yy)), col)
 		yy += 7.0
-	Gfx.text_center(self, r.position.x + r.size.x / 2.0, r.position.y + 8.0, label, col)
+	var cx := r.position.x + r.size.x / 2.0
+	var need := int(sheet.get("threshold", 0))
+	if visit == null or mode != "exam" or need <= 0:
+		Gfx.text_center(n, cx, r.position.y + 8.0, label, col)
+		return
+	# the player's own crosses against the house rule printed on the sheet: a count of their
+	# marks, in their pencil. It is advice. Nothing scores it and it stops no decision.
+	Gfx.text_center(n, cx, r.position.y + 3.0, label, col)
+	var crossed := visit.crossed()
+	var tally: Color = Gfx.PRINT
+	if crossed >= need:
+		tally = Gfx.RED1
+	elif crossed > 0:
+		tally = Gfx.STAMP_A
+	Gfx.text_center(n, cx, r.position.y + 13.0, TALLY % [crossed, need], tally, crossed >= need)

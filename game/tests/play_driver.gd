@@ -7,6 +7,7 @@ extends RefCounted
 
 const MainScript = preload("res://scripts/ui/main.gd")
 const Gfx = preload("res://scripts/ui/gfx.gd")
+const ScopeView = preload("res://scripts/ui/scope_view.gd")
 
 var tree: SceneTree = null
 var main: MainScript = null
@@ -112,12 +113,80 @@ func pad(id: String) -> void:
 	click(pad_pos(id))
 
 
+## A part of the patient, on the screen. The patient is drawn through the window at twice the size.
 func zone_pos(zone: String) -> Vector2:
-	return main.rig.zone_rect(zone).get_center() if main.rig != null else Vector2.ZERO
+	return Gfx.to_screen(main.rig.zone_rect(zone).get_center()) if main.rig != null else Vector2.ZERO
 
 
+## A point of a tool's close-up (given in its own 220 x 186 picture), on the screen.
 func in_window(local: Vector2) -> Vector2:
-	return Gfx.HOLE.position + local
+	return ScopeView.ORIGIN + local * ScopeView.SCALE
+
+
+# ------------------------------------------------------------------ the booth walls
+
+func sheet_down() -> bool:
+	return main.clipboard.sheet_open
+
+
+func card_down() -> bool:
+	return main.clipboard.card_open
+
+
+func cam_on() -> bool:
+	return main.clinic.cam_open
+
+
+## Takes the reference sheet down from the left wall, the way a player does: a click on it.
+func take_sheet() -> void:
+	if not sheet_down():
+		click(main.desk.object_rect("sheet").get_center())
+
+
+## Takes the intake card down from the right wall.
+func take_card() -> void:
+	if not card_down():
+		click(main.desk.object_rect("card").get_center())
+
+
+## Hangs a paper back with the tab on its edge.
+func hang_sheet() -> void:
+	if sheet_down():
+		click(main.clipboard.sheet_tab().get_center())
+
+
+func hang_card() -> void:
+	if card_down():
+		click(main.clipboard.card_tab().get_center())
+
+
+## The small hall monitor on the left wall.
+func thumb_pos() -> Vector2:
+	return Gfx.THUMB.get_center()
+
+
+## Hangs back whatever paper or screen is in front of a point, as a player has to before
+## clicking what is behind it.
+func uncover(pos: Vector2) -> void:
+	match main._panel_at(pos):
+		"sheet":
+			hang_sheet()
+		"card":
+			hang_card()
+		"cam":
+			key(KEY_C)
+
+
+## The player's own tick-or-cross box beside a row of the intake record.
+func mark_pos(row: String) -> Vector2:
+	return main.clipboard.mark_point(row)
+
+
+## One click on that box: blank -> tick -> cross -> blank. The card has to be down from the
+## wall for that, so it is taken down first if it is still hanging there.
+func mark(row: String) -> void:
+	take_card()
+	click(mark_pos(row))
 
 
 # ------------------------------------------------------------------ the shift
@@ -127,16 +196,42 @@ func in_exam() -> bool:
 
 
 ## Title or report card -> the hall camera is asking to buzz the first patient in.
-func open_counter() -> bool:
+## The opening cards play once a session after the title. They are skipped here the way a
+## player skips them, with ESC. With `watch_intro` the call returns as soon as the cards are
+## up: the caller steps through them and then waits with wait_for_counter().
+func open_counter(watch_intro: bool = false) -> bool:
 	if main.state == MainScript.State.REPORT:
 		await until(func() -> bool: return main.screens.age() >= 0.85, 3.0)
 	click(Vector2(320, 300))
-	return await until(func() -> bool: return main.state == MainScript.State.WAIT and main.clinic.cam_prompt, 12.0)
+	await tree.process_frame
+	if in_intro():
+		if watch_intro:
+			return true
+		key(KEY_ESCAPE)
+	return await wait_for_counter()
 
 
-func buzz_in() -> bool:
+func in_intro() -> bool:
+	return main.state == MainScript.State.INTRO
+
+
+func wait_for_counter(limit: float = 12.0) -> bool:
+	return await until(func() -> bool: return main.state == MainScript.State.WAIT and main.clinic.cam_prompt, limit)
+
+
+## Buzzes in whoever is on the hall camera. The counter guide opens by itself at a session's
+## first patient; it is closed here the way a player closes it, with ESC, unless `keep_guide`
+## is set (the caller then turns its pages).
+func buzz_in(keep_guide: bool = false) -> bool:
+	# the small monitor puts the hall on the big screen; a press on that buzzes them in
+	if not cam_on():
+		click(thumb_pos())
 	click(Gfx.MONITOR.get_center())
-	return await until(func() -> bool: return main.state == MainScript.State.EXAM, 12.0)
+	var ok: bool = await until(func() -> bool: return main.state == MainScript.State.EXAM, 12.0)
+	if ok and not keep_guide and main.guide.is_open():
+		key(KEY_ESCAPE)
+		await tree.process_frame
+	return ok
 
 
 ## Lets the lines on screen finish.
@@ -145,6 +240,7 @@ func settle(limit: float = 12.0) -> void:
 
 
 func look(zone: String) -> void:
+	uncover(zone_pos(zone))
 	click(zone_pos(zone))
 	await tree.process_frame
 
@@ -196,7 +292,7 @@ func ask(index: int) -> void:
 	if not main.dialogue.has_menu():
 		pad("ask")
 		await tree.process_frame
-	click(Vector2(120.0, 240.0 + 10.0 * float(index) + 5.0))
+	click(main.dialogue.menu_point(index))
 	await tree.process_frame
 	await until(func() -> bool: return not main._thinking and main.dialogue.speaker != "YOU", 12.0)
 
@@ -215,7 +311,8 @@ func press() -> void:
 	await tree.process_frame
 
 
-## Picks the TREAT stamp up from the desk and brings it down on the intake card.
+## Picks the TREAT stamp up from the wall plate and brings it down on the intake card, which
+## comes down from the wall by itself while the stamp is in hand.
 ## The other decision is not a stamp: stamp("refer") goes to the call box instead.
 func stamp(kind: String) -> void:
 	if kind == "refer":
@@ -223,7 +320,7 @@ func stamp(kind: String) -> void:
 		return
 	pad(kind)
 	await tree.process_frame
-	click(main.clipboard.DECISION.get_center())
+	click(main.clipboard.decision_rect().get_center())
 	await tree.process_frame
 
 
@@ -247,8 +344,22 @@ func wait_for_slip(limit: float = 30.0) -> bool:
 	return await until(func() -> bool: return main.state == MainScript.State.SLIP and main._slip_age > 0.6, limit)
 
 
+## Ends a run the way the game closes its window: every sound stops, and the audio thread gets
+## a moment of wall-clock time to let go of them (a run at a fixed frame rate turns frames far
+## faster than a sound plays). A sound still playing when the engine shuts down is reported as
+## leaked, although nothing is wrong with the game.
+func leave() -> void:
+	main.audio.set_muted(true)
+	main.audio.stop_all()
+	await tree.process_frame
+	OS.delay_msec(250)
+	main.event_log.stop()
+	main.queue_free()
+	await tree.process_frame
+
+
 ## Tears the slip off. Returns once the next patient is on the camera or the report is up.
 func take_slip() -> bool:
-	click(Vector2(280, 300))
+	click(MainScript.SLIP_CLIP.get_center())
 	return await until(func() -> bool:
 		return (main.state == MainScript.State.WAIT and main.clinic.cam_prompt) or main.state == MainScript.State.REPORT, 15.0)

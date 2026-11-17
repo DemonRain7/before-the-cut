@@ -76,7 +76,8 @@
   "exit": {
     "treat": "Thank you, dear. I knew you'd understand.",
     "refer": "They're coming for me? ...Yes. I think I knew.",
-    "taken": "Mind the hands, dear. They don't listen to me."
+    "taken": "Mind the hands, dear. They don't listen to me.",
+    "gave_up": "I've kept you long enough, dear."
   },
   "rows": {
     "eyes": {"ok": false, "text": "Her left pupil never tightened, and it is a natural eye.",
@@ -98,6 +99,8 @@
     "hit": {"title": "TOO SLOW",
       "text": "The torch arm reaches you before the shutter does. She is crying when Trauma Team pulls her away."},
     "locked_out": {"title": "LOCKED OUT",
-      "text": "The shutter comes down on a tired woman mid-sentence. \"That's all right, dear.\" Then the hands start on the metal. You were right. It did not feel like it."}
+      "text": "The shutter comes down on a tired woman mid-sentence. \"That's all right, dear.\" Then the hands start on the metal. You were right. It did not feel like it."},
+    "gave_up": {"title": "OUT OF PATIENCE",
+      "text": "\"Never mind, dear.\" Maren goes back to the yard with hands that do not listen to her. You made no call. Nobody is paid for that."}
   }
 }

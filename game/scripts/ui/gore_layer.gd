@@ -1,12 +1,17 @@
 extends Node2D
 ## Everything that leaves the counter window when a patient turns: flying glass, sparks, blood
-## in the air, and blood on the player's own eyes. Drawn in screen space over the interface.
+## in the air, and blood on the player's own eyes. Drawn over the whole interface.
 ##
-## Layers, back to front:
+## Layers, back to front. The first four belong to the world beyond the glass: they are laid
+## out in view space and shown at twice the size, like the window itself (see Gfx.VIEW_POS),
+## so a caller gives them the same positions it gives the clinic view.
 ##   jump   - an attacker who has come through the window is re-parented here
 ##   parts  - glass shards and drops of blood in flight
-##   glow   - sparks and the slash (additive)
-##   light  - the weapon's flare and the torch bloom (additive, dithered: see Gfx.dither)
+##   glow   - sparks and the hard streaks of a weapon's flare (additive)
+##   light  - the weapon's flare (additive, dithered: see Gfx.dither)
+## The rest happens to the player's own eyes and is laid out on the screen:
+##   streak - the slash across the view (additive)
+##   flash  - the torch bloom in the face (additive, dithered)
 ##   blot   - the holes a torch burns in the player's sight (dithered)
 ##   lens   - splats that land on the player's view and run
 ##   vig    - a red ring closing in from the edges
@@ -28,9 +33,12 @@ var less_blood: bool = false
 var vignette: float = 0.0          # 0..1: red closing in
 var jump := Node2D.new()
 
+var _world := Node2D.new()         # view space, at twice the size
 var _parts := Node2D.new()
 var _glow := Node2D.new()
 var _light := Node2D.new()
+var _streak := Node2D.new()
+var _flash := Node2D.new()
 var _blot := Node2D.new()
 var _lens := Node2D.new()
 var _vig: Sprite2D = null
@@ -54,15 +62,24 @@ var _dirty: bool = false
 
 func _ready() -> void:
 	_rng.randomize()
-	add_child(jump)
-	add_child(_parts)
+	_world.position = Gfx.VIEW_POS
+	_world.scale = Vector2(Gfx.VIEW_SCALE, Gfx.VIEW_SCALE)
+	add_child(_world)
+	_world.add_child(jump)
+	_world.add_child(_parts)
 	_parts.draw.connect(_draw_parts)
 	_glow.material = Gfx.additive()
-	add_child(_glow)
+	_world.add_child(_glow)
 	_glow.draw.connect(_draw_glow)
-	_light.material = Gfx.dither(true)
-	add_child(_light)
+	_light.material = Gfx.dither(true, 1.0, Gfx.VIEW_SCALE)
+	_world.add_child(_light)
 	_light.draw.connect(_draw_light)
+	_streak.material = Gfx.additive()
+	add_child(_streak)
+	_streak.draw.connect(_draw_streak)
+	_flash.material = Gfx.dither(true)
+	add_child(_flash)
+	_flash.draw.connect(_draw_flash)
 	_blot.material = Gfx.dither(false)
 	add_child(_blot)
 	_blot.draw.connect(_draw_blot)
@@ -105,6 +122,8 @@ func gash_count() -> int:
 
 ## A light that rides one point of the attacker's pose (the torch tip, the saw on the glass)
 ## until it is put out. `radius` is in the patient's own pixels: it grows as they come closer.
+## The points given to burst_shards, chips, droplets and sparks are in view space; those
+## given to splat, slash, bloom, gash and afterimage are on the screen.
 func flare_follow(rig: PatientRig, point: String, radius: float, color: Color) -> void:
 	_flare_rig = rig
 	_flare_point = point
@@ -360,6 +379,8 @@ func _process(delta: float) -> void:
 		_parts.queue_redraw()
 		_glow.queue_redraw()
 		_light.queue_redraw()
+		_streak.queue_redraw()
+		_flash.queue_redraw()
 	if lens_moving or moving:
 		_blot.queue_redraw()
 		_lens.queue_redraw()
@@ -403,7 +424,7 @@ func _draw_parts() -> void:
 	_parts.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
-## The flare's size this frame, in screen pixels: a cutting flame never holds still.
+## The flare's size this frame, in view-space pixels: a cutting flame never holds still.
 func _flare_size() -> float:
 	return _flare_r * _flare_rig.back.scale.x * (0.62 + 0.38 * absf(sin(_t * 43.0) * sin(_t * 12.7)))
 
@@ -427,6 +448,10 @@ func _draw_glow() -> void:
 		col.a = 1.0 - k * k
 		_glow.draw_line(pos.round(), (pos - vel * 0.022).round(), col, 1.0)
 		_glow.draw_rect(Rect2(pos.round(), Vector2(1, 1)), Color(1, 1, 1, col.a))
+
+
+## The blade across the player's own view.
+func _draw_streak() -> void:
 	for st in _streaks:
 		var streak: Dictionary = st
 		var a0: Vector2 = streak["a"]
@@ -437,9 +462,9 @@ func _draw_glow() -> void:
 		var from := a0.lerp(b0, tail * 0.85)
 		var to := a0.lerp(b0, head)
 		var fade := 1.0 - tail
-		_glow.draw_line(from, to, Color(RED2, 0.55 * fade), 13.0)
-		_glow.draw_line(from, to, Color(RED3, 0.8 * fade), 6.0)
-		_glow.draw_line(from, to, Color(1, 1, 1, fade), 2.0)
+		_streak.draw_line(from, to, Color(RED2, 0.55 * fade), 13.0)
+		_streak.draw_line(from, to, Color(RED3, 0.8 * fade), 6.0)
+		_streak.draw_line(from, to, Color(1, 1, 1, fade), 2.0)
 
 
 ## Soft light, drawn the way the rest of the game is drawn: it thins out, it never goes misty.
@@ -449,6 +474,10 @@ func _draw_light() -> void:
 		var r := _flare_size()
 		Gfx.soft_disc(_light, at, r * 2.4, _flare_col, 1.0, 0.24)
 		Gfx.soft_disc(_light, at, maxf(2.0, r * 0.8), Color.WHITE, 1.0, 0.45)
+
+
+## The torch in the player's face.
+func _draw_flash() -> void:
 	for b in _blooms:
 		var bloom_item: Dictionary = b
 		var k := float(bloom_item["age"]) / float(bloom_item["life"])
@@ -457,13 +486,13 @@ func _draw_light() -> void:
 		# full for the first instant, then it breaks up from the rim inwards
 		var a := minf(1.0, 1.3 * (1.0 - k) * (1.0 - k))
 		var pos: Vector2 = bloom_item["pos"]
-		Gfx.soft_disc(_light, pos, r, col, a, 0.34)
-		Gfx.soft_disc(_light, pos, r * 0.44, Color.WHITE, a, 0.5)
+		Gfx.soft_disc(_flash, pos, r, col, a, 0.34)
+		Gfx.soft_disc(_flash, pos, r * 0.44, Color.WHITE, a, 0.5)
 		# the flare spikes of a cutting torch
 		for i in 8:
 			var ang := float(i) * TAU / 8.0 + 0.3
 			var reach := r * (1.5 if i % 2 == 0 else 1.05)
-			_light.draw_line(pos, pos + Vector2(cos(ang), sin(ang)) * reach, Color(1, 1, 1, 0.75 * a), 2.0)
+			_flash.draw_line(pos, pos + Vector2(cos(ang), sin(ang)) * reach, Color(1, 1, 1, 0.75 * a), 2.0)
 
 
 func _draw_blot() -> void:

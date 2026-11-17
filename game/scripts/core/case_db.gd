@@ -42,7 +42,7 @@ static func load_all(dir: String = DATA_DIR) -> Dictionary:
 		if typeof(c) != TYPE_DICTIONARY:
 			errors.append("cases/%s.json is missing or is not valid JSON." % str(id))
 			continue
-		for e in validate_case(c, rules):
+		for e in validate_case(c, rules, out["sheet"]):
 			errors.append("%s: %s" % [str(id), str(e)])
 		out["cases"][str(id)] = c
 	return out
@@ -53,11 +53,45 @@ static func validate_rules(rules: Dictionary) -> Array:
 	var order: Variant = rules.get("shift_order")
 	if typeof(order) != TYPE_ARRAY or (order as Array).is_empty():
 		errors.append("rules.json: shift_order must list at least one case id.")
-	for group in ["costs", "reassure", "attack", "scoring", "grip"]:
+	for group in ["costs", "reassure", "attack", "scoring", "grip", "line", "patience"]:
 		if typeof(rules.get(group)) != TYPE_DICTIONARY:
 			errors.append("rules.json: '%s' must be an object." % group)
-	if typeof(rules.get("attack")) == TYPE_DICTIONARY and int(rules["attack"].get("window_ms", 0)) < 500:
+	if typeof(rules.get("attack")) == TYPE_DICTIONARY:
+		errors.append_array(_validate_attack(rules["attack"]))
+	if typeof(rules.get("line")) == TYPE_DICTIONARY and int(rules["line"].get("per_hour", -1)) < 0:
+		errors.append("rules.json: line.per_hour must be 0 or more.")
+	if typeof(rules.get("patience")) == TYPE_DICTIONARY and int(rules["patience"].get("leave_ms", -1)) < 0:
+		errors.append("rules.json: patience.leave_ms must be 0 or more.")
+	return errors
+
+
+## The shutter window and the glass. blow_at places each blow inside window_ms; the pane takes
+## `glass` of them in a shift; however little glass is left, the player gets min_window_ms.
+## repair_cost is what one layer costs to refit between patients (0 or absent: nobody mends it).
+static func _validate_attack(attack: Dictionary) -> Array:
+	var errors: Array = []
+	var window := int(attack.get("window_ms", 0))
+	if window < 500:
 		errors.append("rules.json: attack.window_ms must be at least 500.")
+	var marks: Variant = attack.get("blow_at")
+	if typeof(marks) != TYPE_ARRAY or (marks as Array).is_empty():
+		errors.append("rules.json: attack.blow_at must list at least one blow.")
+		return errors
+	var last := 0.0
+	for m in marks:
+		var at := float(m)
+		if at <= last or at >= 1.0:
+			errors.append("rules.json: attack.blow_at must rise, each value between 0 and 1.")
+			break
+		last = at
+	var glass := int(attack.get("glass", 0))
+	if glass < 1 or glass > (marks as Array).size():
+		errors.append("rules.json: attack.glass must be between 1 and the number of blows.")
+	var floor_ms := int(attack.get("min_window_ms", 0))
+	if floor_ms < 300 or floor_ms > window:
+		errors.append("rules.json: attack.min_window_ms must be between 300 and window_ms.")
+	if int(attack.get("repair_cost", 0)) < 0:
+		errors.append("rules.json: attack.repair_cost must be 0 or more (0: the glass cannot be mended).")
 	return errors
 
 
@@ -74,6 +108,9 @@ static func validate_sheet(sheet: Dictionary) -> Array:
 				errors.append("sheet.json: row '%s' needs '%s'." % [str(r.get("id", "?")), key])
 	if ids != ROWS:
 		errors.append("sheet.json: rows must be exactly %s, in that order." % str(ROWS))
+	var threshold := int(sheet.get("threshold", 0))
+	if threshold < 1 or threshold > ROWS.size():
+		errors.append("sheet.json: threshold must be between 1 and %d." % ROWS.size())
 	return errors
 
 
@@ -82,7 +119,8 @@ static func _need_text(c: Dictionary, key: String, errors: Array) -> void:
 		errors.append("'%s' must be a non-empty string." % key)
 
 
-static func validate_case(c: Dictionary, rules: Dictionary) -> Array:
+## `sheet` is only needed for its threshold: how many broken lines the house rule asks for.
+static func validate_case(c: Dictionary, rules: Dictionary, sheet: Dictionary = {}) -> Array:
 	var errors: Array = []
 	for key in ["id", "name", "role", "request", "sprite", "teaser"]:
 		_need_text(c, key, errors)
@@ -258,6 +296,9 @@ static func validate_case(c: Dictionary, rules: Dictionary) -> Array:
 				broken_reachable = true
 	if drifting and broken == 0:
 		errors.append("a drifting patient needs at least one broken sheet line.")
+	var threshold := int(sheet.get("threshold", 1))
+	if drifting and broken > 0 and broken < threshold:
+		errors.append("a drifting patient needs at least %d broken sheet lines (sheet.json threshold)." % threshold)
 	if not drifting and broken > 0:
 		errors.append("a stable patient must have no broken sheet line.")
 	if drifting and broken > 0 and not broken_reachable:
@@ -269,7 +310,7 @@ static func validate_case(c: Dictionary, rules: Dictionary) -> Array:
 
 	# outcome texts
 	var outcomes: Dictionary = c.get("outcomes", {}) if typeof(c.get("outcomes")) == TYPE_DICTIONARY else {}
-	var needed: Array = ["treat", "refer"]
+	var needed: Array = ["treat", "refer", "gave_up"]      # anyone can run out of patience
 	if drifting:
 		needed.append("locked_out")
 	else:
@@ -283,7 +324,7 @@ static func validate_case(c: Dictionary, rules: Dictionary) -> Array:
 		if typeof(o) != TYPE_DICTIONARY or str(o.get("title", "")) == "" or str(o.get("text", "")) == "":
 			errors.append("outcomes.%s needs 'title' and 'text'." % str(key))
 	var exit_lines: Dictionary = c.get("exit", {}) if typeof(c.get("exit")) == TYPE_DICTIONARY else {}
-	for key in ["treat", "refer"]:
+	for key in ["treat", "refer", "gave_up"]:
 		if str(exit_lines.get(key, "")) == "":
 			errors.append("exit.%s is missing." % key)
 	return errors

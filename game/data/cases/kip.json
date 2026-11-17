@@ -72,7 +72,8 @@
   "exit": {
     "treat": "Yes! Thank you. You're a lifesaver.",
     "refer": "Wait, what? Trauma Team? For a lens?",
-    "taken": "Hey! I'm fine! Ask my dispatcher, I'm fine!"
+    "taken": "Hey! I'm fine! Ask my dispatcher, I'm fine!",
+    "gave_up": "I can't wait any more. Sorry, doc."
   },
   "rows": {
     "eyes": {"ok": true, "text": "The cracked optic never tightens: it is an implant. Both eyes follow.",
@@ -91,6 +92,8 @@
     "walkout": {"title": "WALKED OUT",
       "text": "Kip leaves with the lens still cracked. Nobody gets paid."},
     "false_alarm": {"title": "FALSE ALARM",
-      "text": "The shutter slams in a courier's face. Couriers talk. That costs you."}
+      "text": "The shutter slams in a courier's face. Couriers talk. That costs you."},
+    "gave_up": {"title": "OUT OF PATIENCE",
+      "text": "Kip had a run to make and you were still deciding. He goes with the lens still cracked. No fee, no bill."}
   }
 }

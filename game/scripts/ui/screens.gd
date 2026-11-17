@@ -8,12 +8,26 @@ var report: Dictionary = {}
 var errors: Array = []            # data problems, shown on the title card
 var fade: float = 0.0             # black cover, 0..1 (used between shifts and after a hit)
 var voice: bool = false           # push-to-talk can work in this session: the title card says how
+var status_line: String = ""      # what answers the doctor in this session: the patient AI or the authored patient
 var help_line: String:
 	get:
 		return HELP_VOICE if voice else HELP
 
-const HELP := "mouse to play   •   T types a line   •   SPACE drops the shutter   •   M mutes   •   F11 fullscreen"
-const HELP_VOICE := "mouse   •   T types   •   hold TAB to speak   •   SPACE drops the shutter   •   M mutes   •   F11 fullscreen"
+const HELP := "mouse to play   •   T types a line   •   H guide   •   SPACE drops the shutter   •   M mutes   •   F11 fullscreen"
+const HELP_VOICE := "mouse   •   T types   •   hold TAB to speak   •   H guide   •   SPACE drops the shutter   •   M mutes   •   F11 fullscreen"
+const TITLE_LINES := [
+	"Compare each patient with the reference sheet on the wall.",
+	"Look, test and talk in any order, as much or as little as you like.",
+	"Then decide: TREAT the steady, call TRAUMA TEAM on the drifting.",
+	"If one turns on you, drop the shutter before the glass gives.",
+	"Keep the till over the lender's line, hour by hour.",
+]
+const TILL_ROW := "Till"
+const TILL_GLASS_ROW := "Till, after %d paid for glass"
+const OVER_ROW := "Over the line by"
+const UNDER_ROW := "Under the line by"
+const LINE_ROW := "The line (%d hours x %d)"
+const METER_ROW := "Meter, hour by hour"
 
 var _t: float = 0.0
 var _age: float = 0.0
@@ -64,17 +78,15 @@ func _draw_title() -> void:
 	var y := 176.0
 	Gfx.text_center(self, 320.0, y, "A back-street implant clinic. One counter, one night, five patients.", Gfx.TEAL7)
 	y += 18.0
-	for line in [
-		"Compare each patient with the reference sheet on your clipboard.",
-		"Look, test and talk in any order, as much or as little as you like.",
-		"Then decide: TREAT the steady, call TRAUMA TEAM on the drifting.",
-		"If one turns on you, drop the shutter.",
-	]:
-		Gfx.text_center(self, 320.0, y, line, Gfx.TEAL5)
+	for line in TITLE_LINES:
+		Gfx.text_center(self, 320.0, y, str(line), Gfx.TEAL5)
 		y += 12.0
+	y += 8.0
 	if not errors.is_empty():
-		y += 6.0
 		Gfx.text_center(self, 320.0, y, "DATA PROBLEM: " + str(errors[0]), Gfx.RED3)
+	elif status_line != "":
+		# who answers tonight, so nobody has to guess whether talking freely will work
+		Gfx.text_center(self, 320.0, y, status_line, Gfx.TEAL4)
 	if fmod(_t, 1.0) < 0.65:
 		Gfx.text_center(self, 320.0, 290.0, "CLICK TO OPEN THE COUNTER", Gfx.WARM6, true)
 	Gfx.text_center(self, 320.0, 338.0, help_line, Gfx.TEAL3)
@@ -99,7 +111,9 @@ func _draw_report() -> void:
 		if mark != null:
 			draw_texture(mark, Vector2(x0, y))
 		Gfx.text(self, Vector2(x0 + 16.0, y), str(visit.get("name", "")), Gfx.INKT, true)
-		Gfx.text(self, Vector2(x0 + 110.0, y), str(visit.get("title", "")), Gfx.GRN2 if ok else Gfx.RED1)
+		# a right call can still end badly: the tick is for the call, the colour for how it ended
+		var hurt := str(visit.get("outcome", "")) == "hit"
+		Gfx.text(self, Vector2(x0 + 110.0, y), str(visit.get("title", "")), Gfx.GRN2 if ok and not hurt else Gfx.RED1)
 		Gfx.text_right(self, x1, y, Gfx.money(int(visit.get("credits", 0))), Gfx.INKT)
 		var truth := "was steady" if str(visit.get("truth", "")) == "stable" else "was drifting"
 		Gfx.text(self, Vector2(x0 + 16.0, y + 10.0), truth, Gfx.INKS)
@@ -108,33 +122,52 @@ func _draw_report() -> void:
 	y += 2.0
 	draw_rect(Rect2(x0, y, x1 - x0, 1), Gfx.PAPER1)
 	y += 5.0
+	# the till against the lender's line: the figures, then every hourly reading of the meter
 	var total := int(report.get("total", 0))
-	var rent := int(report.get("rent", 0))
-	Gfx.text(self, Vector2(x0 + 16.0, y), "Till", Gfx.INKT)
+	var line := int(report.get("line", 0))
+	var held := bool(report.get("line_held", total >= line))
+	var readings: Array = report.get("readings", [])
+	var per_hour := 0
+	if not readings.is_empty():
+		per_hour = int((readings[0] as Dictionary).get("line", 0))
+	# glass that was paid for is already out of this figure: the row says so, in its own words
+	var glass_paid := int(report.get("repair_total", 0))
+	Gfx.text(self, Vector2(x0 + 16.0, y), TILL_GLASS_ROW % glass_paid if glass_paid > 0 else TILL_ROW, Gfx.INKT)
 	Gfx.text_right(self, x1, y, str(total), Gfx.INKT)
 	y += 11.0
-	Gfx.text(self, Vector2(x0 + 16.0, y), "Rent due", Gfx.INKT)
-	Gfx.text_right(self, x1, y, str(-rent), Gfx.INKT)
+	Gfx.text(self, Vector2(x0 + 16.0, y), LINE_ROW % [readings.size(), per_hour] if per_hour > 0 else "The line", Gfx.INKT)
+	Gfx.text_right(self, x1, y, str(line), Gfx.INKT)
 	y += 11.0
-	var left := total - rent
-	Gfx.text(self, Vector2(x0 + 16.0, y), "Left over" if left >= 0 else "Short", Gfx.INKT, true)
-	Gfx.text_right(self, x1, y, str(left), Gfx.GRN2 if left >= 0 else Gfx.RED1, true)
+	Gfx.text(self, Vector2(x0 + 16.0, y), OVER_ROW if held else UNDER_ROW, Gfx.INKT, true)
+	Gfx.text_right(self, x1, y, str(absi(total - line)), Gfx.GRN2 if held else Gfx.RED1, true)
+	y += 11.0
+	if not readings.is_empty():
+		Gfx.text(self, Vector2(x0 + 16.0, y), METER_ROW, Gfx.INKS)
+		var lamp := x1 - float(readings.size()) * 12.0 + 3.0
+		for r in readings:
+			var over := bool((r as Dictionary).get("held", true))
+			draw_rect(Rect2(lamp, y + 1.0, 9, 7), Gfx.INKT)
+			draw_rect(Rect2(lamp + 1.0, y + 2.0, 7, 5), Gfx.GRN3 if over else Gfx.RED2)
+			lamp += 12.0
 	y += 16.0
 	draw_rect(Rect2(x0, y, x1 - x0, 1), Gfx.PAPER1)
 	y += 8.0
 	Gfx.big_center(self, 320.0, y, str(report.get("title", "")), Gfx.INKT)
 	y += 26.0
-	for line in Gfx.wrap_text(str(report.get("text", "")), x1 - x0 - 16.0):
-		Gfx.text_center(self, 320.0, y, line, Gfx.INKT)
+	for said in Gfx.wrap_text(str(report.get("text", "")), x1 - x0 - 16.0):
+		Gfx.text_center(self, 320.0, y, said, Gfx.INKT)
 		y += 11.0
-	# what the till means for tomorrow, said in words as well as in the figures above
-	var rent_line := str(report.get("rent_text", ""))
-	if rent_line != "":
+	# what the meter's last reading means for tomorrow, in words as well as in the figures above
+	var verdict := str(report.get("line_text", ""))
+	if verdict != "":
 		y += 3.0
-		Gfx.text_center(self, 320.0, y, rent_line, Gfx.GRN2 if bool(report.get("rent_paid", false)) else Gfx.RED1)
+		Gfx.text_center(self, 320.0, y, verdict, Gfx.GRN2 if held else Gfx.RED1)
 		y += 11.0
 	y += 4.0
 	var tally := "Right calls: %d of %d" % [int(report.get("correct", 0)), int(report.get("count", 0))]
+	var under := int(report.get("hours_under", 0))
+	if under > 0:
+		tally += "   •   Hours under the line: %d" % under
 	var injuries := int(report.get("injuries", 0))
 	if injuries > 0:
 		tally += "   •   Times you were hurt: %d" % injuries
@@ -152,9 +185,11 @@ func _call_text(visit: Dictionary) -> String:
 		"caught":
 			return "you shut it in time"
 		"hit":
-			return "you were too slow"
+			return "right call, shutter too late" if bool(visit.get("correct", false)) else "you were too slow"
 		"locked_out", "false_alarm":
 			return "you dropped the shutter"
 		"walkout":
 			return "they walked out"
+		"gave_up":
+			return "they gave up waiting"
 	return ""

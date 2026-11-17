@@ -9,11 +9,16 @@ extends Node
 ##
 ## When a patient turns, the rig also plays the assault: the face overlay, the screaming
 ## mouth, the three blows on the glass and the lunge out through the window.
+##
+## While an answer is on its way (`thinking`) each patient waits in their own way, with a
+## small thought bubble by the head; while the doctor is speaking into the microphone
+## (`listening`) they look at the doctor and their hands stop. Both come from the patient's
+## idle habit, never from whether they are steady or drifting.
 
 const Gfx = preload("res://scripts/ui/gfx.gd")
 
 const PIVOT := Vector2(80, 160)   # where the patient meets the sill; lunges scale about it
-const POP_SCALE := 2.6            # how big they are when they come through the window
+const POP_SCALE := 1.6            # how big they are when they come through the window (on top of the window's own 2x)
 const SLIDE_PX := 250.0           # how far `slide` 1 carries them: out of the window, behind the wall
 
 signal impact(strength: float)
@@ -25,10 +30,12 @@ var case_data: Dictionary = {}
 var meta: Dictionary = {}
 var slide: float = 1.0            # 1 = out of the window to the right, 0 = at the counter
 var talking: bool = false
+var thinking: bool = false        # an answer is being worked out: the waiting pose and the thought bubble
+var listening: bool = false       # the doctor is speaking into the microphone: eyes on the doctor, hands still
 var frozen: bool = false          # the beat before an attack: nothing moves
 var less_blood: bool = false      # use the face overlay, the scream and the blow poses that were drawn without blood
 var pop: float = 0.0              # 0..1: out through the window, at the player
-var pop_target := Vector2(300, 178)   # where the face ends up on the screen
+var pop_target := Vector2(280, 138)   # where the face ends up, in view space (the middle of the screen)
 
 var _spr: Dictionary = {}
 var _rng := RandomNumberGenerator.new()
@@ -67,6 +74,9 @@ var _zoom_to: float = 1.0
 var _jerk: float = 0.0
 var _thrash := Vector2.ZERO
 var _thrash_t: float = 0.0
+var _bubble := Node2D.new()       # the thought bubble, beside the head
+var _minded: bool = false         # thinking or listening, as of the last frame
+var _thought_in: float = 0.0
 
 
 func setup(p_case: Dictionary, p_meta: Dictionary) -> void:
@@ -94,6 +104,15 @@ func setup(p_case: Dictionary, p_meta: Dictionary) -> void:
 	(_spr["lids"] as Sprite2D).visible = false
 	(_spr["turn"] as Sprite2D).visible = false
 	(_spr["attack"] as Sprite2D).visible = false
+	# the thought bubble sits up and to the right of the head, found from where the eyes are
+	var at := Vector2(116, 34)
+	var eyes: Variant = (meta.get("zones", {}) as Dictionary).get("eyes")
+	if typeof(eyes) == TYPE_ARRAY and (eyes as Array).size() >= 4:
+		at = Vector2(float(eyes[0]) + float(eyes[2]) + 10.0, float(eyes[1]) - 28.0)
+	_bubble.position = at
+	_bubble.visible = false
+	back.add_child(_bubble)
+	_bubble.draw.connect(_draw_bubble)
 	_blink_in = _next_blink()
 	_apply_face()
 	_apply_hands()
@@ -236,7 +255,7 @@ func attack_style() -> String:
 	return str(a.get("style", "saw"))
 
 
-## Where a named point of the attack pose ("hand", "tool", "head", "face") is on the screen.
+## Where a named point of the attack pose ("hand", "tool", "head", "face") is, in view space.
 func attack_point(point: String) -> Vector2:
 	return back.position + _attack_local(point) * back.scale
 
@@ -271,10 +290,23 @@ func lunge(amount: float) -> void:
 # ------------------------------------------------------------------ per-frame life
 func _process(delta: float) -> void:
 	_t += delta
+	var minded := (thinking or listening) and not frozen and not _attack and at_counter()
+	if minded != _minded:
+		_minded = minded
+		_thought_in = 0.0
+		if not minded:
+			_gaze_in = 0.2            # and back to their own habit
+	_bubble.visible = minded and thinking
+	if _bubble.visible:
+		_bubble.queue_redraw()
 	if not frozen and not _attack:
 		_update_blink(delta)
-		_update_gaze(delta)
-		_update_hands(delta)
+		if minded:
+			_update_thought(delta)
+		else:
+			_update_gaze(delta)
+		if not (minded and listening):
+			_update_hands(delta)
 	_update_mouth(delta)
 	if _attack:
 		_update_attack(delta)
@@ -340,6 +372,52 @@ func _update_gaze(delta: float) -> void:
 		_:
 			_gaze = Vector2.ZERO
 			_gaze_in = 10.0
+
+
+## Waiting for an answer, or being spoken to. The nervous one looks everywhere, the angry one
+## looks away, the one who wanders looks up, the meek one looks down, and the one who never
+## moves does not move now either. Spoken to, they all look at the doctor.
+func _update_thought(delta: float) -> void:
+	if _still_face or (listening and not thinking):
+		_gaze = Vector2.ZERO
+		return
+	_thought_in -= delta
+	if _thought_in > 0.0:
+		return
+	match _gaze_kind:
+		"dart":
+			var spots := [Vector2(2, 0), Vector2(-2, 0), Vector2(2, -1), Vector2(-2, -1), Vector2(1, 1), Vector2(-1, 1)]
+			_gaze = spots[_rng.randi_range(0, spots.size() - 1)]
+			_thought_in = _rng.randf_range(0.12, 0.3)
+		"glare":
+			_gaze = Vector2(-2, 1)
+			_thought_in = 10.0
+		"wander":
+			_gaze = Vector2(1, -1) if _gaze == Vector2(2, -1) else Vector2(2, -1)
+			_thought_in = _rng.randf_range(0.7, 1.3)
+		"soft":
+			_gaze = Vector2(0, 1)
+			_thought_in = 10.0
+		_:
+			_gaze = Vector2.ZERO
+			_thought_in = 10.0
+
+
+## The thought bubble: three dots that count up while the answer is on its way. For the
+## patient who never moves, the dots do not move either.
+func _draw_bubble() -> void:
+	var edge: Color = Gfx.TEAL7
+	var ink: Color = Gfx.INK0
+	_bubble.draw_rect(Rect2(1, 0, 21, 13), edge)
+	_bubble.draw_rect(Rect2(0, 1, 23, 11), edge)
+	_bubble.draw_rect(Rect2(2, 1, 19, 11), ink)
+	_bubble.draw_rect(Rect2(1, 2, 21, 9), ink)
+	_bubble.draw_rect(Rect2(-2, 13, 4, 4), edge)      # the tail, toward the head
+	_bubble.draw_rect(Rect2(-1, 14, 2, 2), ink)
+	_bubble.draw_rect(Rect2(-6, 18, 3, 3), edge)
+	var shown := 3 if _gaze_kind == "fixed" else int(_t * 3.4) % 4
+	for i in 3:
+		_bubble.draw_rect(Rect2(4 + 6 * i, 5, 3, 3), Gfx.TEAL7 if i < shown else Gfx.TEAL3)
 
 
 func _update_hands(delta: float) -> void:
@@ -475,7 +553,7 @@ func _apply_pose() -> void:
 		# through the window: the face swells to fill the screen, and keeps coming
 		var k := clampf(pop, 0.0, 1.0)
 		var big := lerpf(s, POP_SCALE, k) * (1.0 + 0.3 * maxf(0.0, pop - 1.0))
-		var target := pop_target + off * 2.0 - _attack_local("face") * big
+		var target := pop_target + off - _attack_local("face") * big
 		pos = pos.lerp(target, k)
 		s = big
 	pos = pos.round()

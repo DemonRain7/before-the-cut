@@ -40,18 +40,26 @@ const STAMP_G := Color("2f8f4a")
 const STAMP_A := Color("c9781e")
 const STAMP_R := Color("c8281c")
 
-# layout
+# layout: the screen. The counter window fills the middle of it; the booth around the window
+# (two strips of wall and the desk) is drawn at the screen's own pixel size.
 const SCREEN := Vector2(640, 360)
-const HOLE := Rect2(170, 14, 220, 186)        # the counter window
-const MONITOR := Rect2(18, 22, 132, 94)       # hall camera glass
-const NOTE_L := Rect2(15, 143, 70, 50)        # pinned note: till
-const NOTE_R := Rect2(90, 143, 62, 50)        # pinned note: queue
-const DIALOGUE := Rect2(0, 224, 400, 60)
-const DESK := Rect2(0, 284, 400, 76)
-const BOARD := Rect2(400, 0, 240, 360)
-const SHEET := Rect2(404, 3, 232, 164)
-const RECORD := Rect2(404, 171, 232, 186)
-const PATIENT_POS := Vector2(200, 26)         # patient canvas origin; its row 160 meets the sill
+const WINDOW := Rect2(100, 0, 440, 300)       # the counter window, as far as the screen shows it
+const DIALOGUE := Rect2(120, 300, 400, 60)    # the transcript unit set into the desk
+const SHEET := Rect2(0, 2, 232, 164)          # the reference sheet, once it is taken down
+const RECORD := Rect2(408, 2, 232, 186)       # the intake card, once it is taken down
+const CAM := Rect2(102, 190, 146, 108)        # the hall camera, switched to the big monitor
+const MONITOR := Rect2(109, 197, 132, 94)     # ... and that monitor's glass
+const THUMB := Rect2(17, 232, 66, 47)         # the small hall monitor on the wall
+const METER := Rect2(6, 172, 88, 48)          # the lit face of the lender's meter
+
+# layout: the view through the window. The hall, whoever stands in it, the glass and the
+# shutter are authored in a 640 x 360 space of their own ("view space"), in which the window
+# opening is HOLE. The screen shows that space at twice the size, moved by VIEW_POS, so the
+# upper 36 rows of the opening are above the top of the screen.
+const HOLE := Rect2(170, 14, 220, 186)        # the window opening, in view space
+const PATIENT_POS := Vector2(200, 26)         # patient canvas origin in view space; its row 160 meets the sill
+const VIEW_POS := Vector2(-240, -100)
+const VIEW_SCALE := 2.0
 
 const FS := 10
 const FS_BIG := 20
@@ -59,6 +67,20 @@ const LINE := 10
 
 static var _tex: Dictionary = {}
 static var _fonts: Dictionary = {}
+
+
+## A screen position, as a position in the view through the window (see VIEW_POS).
+static func to_view(p: Vector2) -> Vector2:
+	return (p - VIEW_POS) / VIEW_SCALE
+
+
+## A position in the view through the window, as a screen position.
+static func to_screen(p: Vector2) -> Vector2:
+	return p * VIEW_SCALE + VIEW_POS
+
+
+static func rect_to_screen(r: Rect2) -> Rect2:
+	return Rect2(to_screen(r.position), r.size * VIEW_SCALE)
 
 
 static func tex(path: String) -> Texture2D:
@@ -153,6 +175,25 @@ static func money(v: int) -> String:
 	return ("+%d" % v) if v > 0 else str(v)
 
 
+## Puts numbers into authored words: every "{key}" in s becomes values[key].
+static func fill(s: String, values: Dictionary) -> String:
+	var out := s
+	for key in values:
+		out = out.replace("{%s}" % str(key), str(values[key]))
+	return out
+
+
+## A one-pixel frame just inside rect, on whole pixels.
+static func outline(ci: CanvasItem, rect: Rect2, color: Color) -> void:
+	var r := Rect2(rect.position.floor(), rect.size.floor())
+	if r.size.x < 2.0 or r.size.y < 2.0:
+		return
+	ci.draw_rect(Rect2(r.position, Vector2(r.size.x, 1)), color)
+	ci.draw_rect(Rect2(r.position.x, r.end.y - 1.0, r.size.x, 1), color)
+	ci.draw_rect(Rect2(r.position.x, r.position.y + 1.0, 1, r.size.y - 2.0), color)
+	ci.draw_rect(Rect2(r.end.x - 1.0, r.position.y + 1.0, 1, r.size.y - 2.0), color)
+
+
 ## Text that comes from outside the game (the patient model, speech recognition) can use
 ## characters the bitmap font has no glyph for. For display only: typographic quotes and
 ## dashes become plain ones, accents are dropped, and anything else the font cannot draw is
@@ -205,18 +246,21 @@ static func additive() -> CanvasItemMaterial:
 # ---------------------------------------------------------------- dithered light
 # Soft light and shadow in the style of the art: a pixel is either lit or it is not, and a
 # glow falls off by thinning out in a 4 x 4 ordered pattern instead of going see-through.
-# The pattern is fixed to the screen's own pixels, so it lines up with everything else.
+# The pattern is fixed to the screen's own pixels, so it lines up with everything else; for
+# something in the view through the window, `cell` is 2 and it lines up with that art's pixels.
 const _DITHER_CODE := """shader_type canvas_item;
 render_mode BLEND_MODE;
 
 // how strongly a lit pixel is laid down
 uniform float gain = 1.0;
+// the size of one pattern step, in screen pixels
+uniform float cell = 1.0;
 
 const float BAYER[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
 
 void fragment() {
-	int cx = int(FRAGCOORD.x) % 4;
-	int cy = int(FRAGCOORD.y) % 4;
+	int cx = int(FRAGCOORD.x / cell) % 4;
+	int cy = int(FRAGCOORD.y / cell) % 4;
 	float need = (BAYER[cy * 4 + cx] + 0.5) / 16.0;
 	COLOR.a = step(need, COLOR.a) * gain;
 }
@@ -227,7 +271,8 @@ static var _dither_shaders: Dictionary = {}
 
 ## A material that turns the alpha of whatever is drawn with it into dither density.
 ## add: the lit pixels are added to what is behind them (light); otherwise they cover it (shadow).
-static func dither(add: bool, gain: float = 1.0) -> ShaderMaterial:
+## cell: the size of one pattern step in screen pixels (VIEW_SCALE for the view through the window).
+static func dither(add: bool, gain: float = 1.0, cell: float = 1.0) -> ShaderMaterial:
 	var mode := "blend_add" if add else "blend_mix"
 	if not _dither_shaders.has(mode):
 		var shader := Shader.new()
@@ -236,6 +281,7 @@ static func dither(add: bool, gain: float = 1.0) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = _dither_shaders[mode]
 	m.set_shader_parameter("gain", gain)
+	m.set_shader_parameter("cell", cell)
 	return m
 
 

@@ -141,13 +141,8 @@ func spoken_conversation(main: MainScript, driver: PlayDriver) -> void:
 	check(main.mic.simulated, "the run's microphone is simulated")
 	check(main._mic_why_not() == "", "with the patient AI service on, speaking is offered")
 	check(box.chips.size() == 2 and not box.chips_dim, "SPEAK joins TYPE on the strip")
-	var speak_rect := Rect2()
-	var type_rect := Rect2()
-	for chip in box._chip_rects():
-		if str(chip.id) == "speak":
-			speak_rect = chip.rect
-		elif str(chip.id) == "type":
-			type_rect = chip.rect
+	var speak_rect: Rect2 = box.chip_rect("speak")      # where the buttons are on the screen
+	var type_rect: Rect2 = box.chip_rect("type")
 	check(speak_rect.size.x > 0.0 and Gfx.DIALOGUE.encloses(speak_rect) and Gfx.DIALOGUE.encloses(type_rect)
 		and not speak_rect.intersects(type_rect) and speak_rect.end.x < type_rect.position.x, "the two buttons sit side by side inside the strip")
 	driver.move(speak_rect.get_center())
@@ -170,6 +165,8 @@ func spoken_conversation(main: MainScript, driver: PlayDriver) -> void:
 	await process_frame
 	await process_frame
 	check(box.input_level > 0.2, "the meter shows the voice")
+	check(main.rig != null and main.rig.listening and not main.rig.thinking and not main.rig._bubble.visible,
+		"the patient is seen listening while the microphone is open")
 	await driver.seconds(0.6)
 	check(box.input_seconds >= 0.5 and box.input_seconds < 3.0, "the clock counts while the key is held")
 	check(AudioServer.get_bus_volume_db(0) < -17.0, "the clinic goes quiet while the microphone is open")
@@ -182,6 +179,7 @@ func spoken_conversation(main: MainScript, driver: PlayDriver) -> void:
 		and main._base_hint == main.MIC_WAIT_HINT, "letting go closes the microphone and the words are written down")
 	settled = await driver.until(func() -> bool: return main._mic_state == "", 20.0)
 	check(settled, "the words come back")
+	check(not main.rig.listening, "the listening pose ends with the clip")
 	check(box.input_open and box.input_status == "" and box.input_text == MOCK_TRANSCRIPT, "they are put on the typing line for the doctor to check")
 	check(main._base_hint == main.MIC_MOCK_HINT, "the hint says the mock transport heard nobody")
 	check(main.agent.voice_clips_this_visit == clips + 1, "one clip was sent")
@@ -508,7 +506,9 @@ func meanwhile(main: MainScript, driver: PlayDriver) -> void:
 	var seq: int = main._seq
 	main.act_say("Take your time with this one.")
 	check(main._thinking and main._seq == seq + 1, "meanwhile: the slow patient is thinking")
-	await driver.seconds(0.3)
+	await driver.seconds(0.4)
+	check(main.rig != null and main.rig.thinking and main.rig._bubble.visible,
+		"meanwhile: the patient is seen thinking, with the thought bubble by the head")
 	var seen_before: bool = main.visit.seen.has("look:hands")
 	main.act_look("hands")
 	check(main._thinking and main._seq == seq + 1, "meanwhile: a look does not cancel the answer on its way")
@@ -570,6 +570,4 @@ func test_scene() -> void:
 	await typed_conversation(main, driver)
 	await spoken_conversation(main, driver)
 	await meanwhile(main, driver)
-	main.event_log.stop()
-	main.queue_free()
-	await process_frame
+	await driver.leave()

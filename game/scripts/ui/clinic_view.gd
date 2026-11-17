@@ -1,11 +1,16 @@
 extends Node2D
-## The left side of the screen above the desk: the hall behind the counter window, whoever
-## stands in it, the shutter, the wall with the hall camera and the pinboard, and the little
-## readouts that live on them (patience lamps, till, queue).
+## The counter, as the doctor sees it from the chair. The window fills the middle of the
+## screen: the hall behind it, whoever stands there, the glass and the shutter are drawn at
+## twice the size of everything else (they live in "view space", see Gfx.VIEW_POS). Around the
+## window is the doctor's own side at the screen's pixel size, painted in clinic/booth.png:
+## two strips of wall and the desk. What is fixed to them and lit is drawn here: the lender's
+## meter (the till, the line and the hour), the small hall monitor and the big one it switches
+## to, the patience lamps over the window (or the wait that is left once they are out), what
+## the glass can still take, and the attack bar on the sill.
 ##
 ## It also keeps the damage of the night: the glass cracks blow by blow and can be broken
 ## out, the shutter takes dents and cuts, blood dries where it ran. All of it stays until the
-## next shift starts.
+## next shift starts, except the glass, which the doctor can pay to have refitted.
 ##
 ## The Trauma Team crew lives here too. It is scenery with two controls (team_to, strobe):
 ## the director decides when they come; nothing about them is decided by the patient model.
@@ -22,7 +27,11 @@ const HIT_HEAD := Vector2(110, 50)
 # the slit a weapon opens in the shutter, inside its 96 x 40 picture
 const CUT_PATH := [Vector2(4, 30), Vector2(20, 25), Vector2(38, 22), Vector2(55, 17), Vector2(74, 13), Vector2(92, 9)]
 const CUT_SIZE := Vector2(96, 40)
-const SEEP_Y := 200.0             # the lower edge of the window, where blood runs out from
+# the foot of the window on the screen, where blood runs out from under the shutter and on
+# over the desk, and how far along it
+const SEEP_Y := 300.0
+const SEEP_X0 := 106
+const SEEP_X1 := 533
 # the crew's marks behind the patient, in window coordinates (the same as tools/art/gen_team.py),
 # and how far to the right they wait, out of sight behind the wall
 const TEAM_POS := Vector2(104, 26)
@@ -35,22 +44,38 @@ const BEACON_BLUE := Color(0.15, 0.35, 1.0)
 const DOOR_PANE := Rect2(167, 42, 38, 55)
 const DOOR_GAP := Rect2(161, 33, 44, 153)
 const DRIED := Color(0.7, 0.56, 0.58, 0.92)
+# the attack bar, on the sill at the foot of the window (screen)
+const SLOT := Rect2(216, 287, 207, 10)
+const PLATE := Color(0.027, 0.035, 0.047, 0.84)      # the dark backing of a readout over the window
 
 var scope: ScopeView = null
-var back_slot := Node2D.new()      # patient layers behind the sill
-var front_slot := Node2D.new()     # patient hands, in front of the sill
+var back_slot := Node2D.new()      # patient layers behind the sill (view space)
+var front_slot := Node2D.new()     # patient hands, in front of the sill (view space)
+var over_desk := Node2D.new()      # what runs out under the shutter; the director lays it over the desk, under the transcript's words
 var shutter_pos: float = 0.0       # 0 open, 1 closed
 var cam_id: String = ""            # who the hall camera shows ("" = empty hall)
-var cam_prompt: bool = false       # blink the "buzz in" prompt on the monitor
-var monitor_hot: bool = false
+var cam_prompt: bool = false       # somebody is waiting to be buzzed in: the monitors say so
+var cam_open: bool = false         # the hall camera is on the big monitor
+var thumb_hot: bool = false        # the pointer is on the small monitor
+var monitor_hot: bool = false      # ... or on the big one
 var till: int = 0
-var rent: int = 600
-var queue_index: int = 0
+var line: int = 0                  # what the lender's meter wants in the till when this hour ends
+var line_under: bool = false       # the last hourly reading was under the line
+var queue_index: int = 0           # one visit is one hour: the hour being worked, 0-based
 var queue_count: int = 5
 var results: Array = []            # one bool per finished visit: was the call right
 var patience: int = 0
 var patience_max: int = 0
 var show_patience: bool = false
+var leaving: float = -1.0          # 0..1 of the wait a patient with no patience still gives; < 0: nobody is leaving
+var glass_left: int = 3            # blows the pane can still take (ShiftState.glass)
+var glass_max: int = 3
+var bar_on: bool = false           # the attack bar: how long until they are through the window
+var bar_t: float = 0.0             # seconds since the warning
+var bar_through: float = 1.8       # seconds from the warning until the patient is through
+var bar_blows: Array = []          # seconds at which each blow lands on the glass
+var bar_text: String = ""          # once the shutter is down: how it went, in place of the bar
+var bar_color: Color = Gfx.GRN4
 var corner_text: String = ""
 var danger: float = 0.0            # 0..1: red light in the window
 var glass_state: int = 0           # 0 whole, 1..3 cracked further with each blow, 4 broken out
@@ -62,6 +87,7 @@ var less_blood: bool = false
 var strobe: float = 0.0            # 0..1: red and blue light from the street, through the hall
 var team_k: float = 1.0            # 1 = the crew is out of sight, 0 = on their marks
 
+var _view := Node2D.new()          # everything beyond the glass, and the glass and the shutter
 var _hall: Sprite2D
 var _door: Sprite2D
 var _rain: Sprite2D
@@ -84,7 +110,8 @@ var _decals := Node2D.new()
 var _zone := Node2D.new()
 var _shutter: Sprite2D
 var _dmg := Node2D.new()
-var _stains := Node2D.new()
+var _stains_l := Control.new()     # dried blood on the left wall, cut off at the window's edge
+var _stains_r := Control.new()     # and on the right one
 var _seep := Node2D.new()
 var _leak := Node2D.new()
 var _tint := ColorRect.new()
@@ -105,6 +132,10 @@ var _cam_age: float = 9.0
 var _till_shown: float = 0.0
 var _lost_from: int = 0
 var _lost_t: float = 0.0
+var _glass_from: int = 0
+var _glass_t: float = 0.0
+var _glass_back: int = 0           # the first lamp that has just come back (a repair)
+var _glass_back_t: float = 0.0
 var _dent_flash: float = 0.0
 var _rng := RandomNumberGenerator.new()
 var _dark_a: float = 0.0
@@ -130,84 +161,99 @@ var _team_moving: bool = false
 
 
 func _ready() -> void:
+	# the view through the window: laid out in view space, shown at twice the size
+	_view.position = Gfx.VIEW_POS
+	_view.scale = Vector2(Gfx.VIEW_SCALE, Gfx.VIEW_SCALE)
+	add_child(_view)
 	var origin := Gfx.HOLE.position
-	_hall = Gfx.sprite(self, "clinic/hall.png", origin)
-	_rain = Gfx.sprite(self, "clinic/rain_0.png", Vector2(337, 56))
-	_door = Gfx.sprite(self, "clinic/door_open.png", origin)
+	_hall = Gfx.sprite(_view, "clinic/hall.png", origin)
+	_rain = Gfx.sprite(_view, "clinic/rain_0.png", Vector2(337, 56))
+	_door = Gfx.sprite(_view, "clinic/door_open.png", origin)
 	_door.visible = false
 	_dark.position = origin
 	_dark.size = Gfx.HOLE.size
 	_dark.color = Color(0.016, 0.0, 0.024, 0.0)
 	_dark.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_dark)
+	_view.add_child(_dark)
 	_strobe.position = origin
 	_strobe.size = Gfx.HOLE.size
 	_strobe.color = Color(0, 0, 0, 0)
 	_strobe.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_strobe)
+	_view.add_child(_strobe)
 	_beam_clip.position = origin
 	_beam_clip.size = Gfx.HOLE.size
 	_beam_clip.clip_contents = true
 	_beam_clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_beam_clip)
-	_beam.material = Gfx.dither(true, 0.8)
+	_view.add_child(_beam_clip)
+	_beam.material = Gfx.dither(true, 0.8, Gfx.VIEW_SCALE)
 	_beam_clip.add_child(_beam)
 	_beam.draw.connect(_draw_beam)
 	# the crew stands behind whoever is at the counter
 	_team.visible = false
-	add_child(_team)
+	_view.add_child(_team)
 	Gfx.sprite(_team, "clinic/team.png")
 	Gfx.sprite(_team, "clinic/team_lights.png")
 	_team_red = Gfx.sprite(_team, "clinic/team_red.png")
 	_team_blue = Gfx.sprite(_team, "clinic/team_blue.png")
-	add_child(back_slot)
-	_sill = Gfx.sprite(self, "clinic/sill.png", Vector2(origin.x, 185))
-	_sill_blood = Gfx.sprite(self, "fx/sill_blood.png", Vector2(origin.x, 185))
+	_view.add_child(back_slot)
+	_sill = Gfx.sprite(_view, "clinic/sill.png", Vector2(origin.x, 185))
+	_sill_blood = Gfx.sprite(_view, "fx/sill_blood.png", Vector2(origin.x, 185))
 	_sill_blood.visible = false
-	_sill_glass = Gfx.sprite(self, "fx/sill_glass.png", Vector2(origin.x, 185))
+	_sill_glass = Gfx.sprite(_view, "fx/sill_glass.png", Vector2(origin.x, 185))
 	_sill_glass.visible = false
-	add_child(front_slot)
-	_glow = Gfx.sprite(self, "clinic/lamp_glow.png", Vector2(170, 18))
+	_view.add_child(front_slot)
+	_glow = Gfx.sprite(_view, "clinic/lamp_glow.png", Vector2(170, 18))
 	_glow.material = Gfx.additive()
 	_glow.modulate = Color(1, 1, 1, 0.5)
-	_glass = Gfx.sprite(self, "clinic/glass.png", origin)
+	_glass = Gfx.sprite(_view, "clinic/glass.png", origin)
 	_glass.modulate = Color(1, 1, 1, 0.42)
-	_broken = Gfx.sprite(self, "fx/glass_broken.png", origin)
+	_broken = Gfx.sprite(_view, "fx/glass_broken.png", origin)
 	_broken.visible = false
 	_decals.position = origin
-	add_child(_decals)
-	_crack = Gfx.sprite(self, "fx/crack_1.png", origin)
+	_view.add_child(_decals)
+	_crack = Gfx.sprite(_view, "fx/crack_1.png", origin)
 	_crack.visible = false
-	add_child(_zone)
-	_zone.draw.connect(_draw_zone)
-	_shutter = Gfx.sprite(self, "clinic/shutter.png", Vector2(origin.x, origin.y - 190.0))
+	_shutter = Gfx.sprite(_view, "clinic/shutter.png", Vector2(origin.x, origin.y - 190.0))
 	_shutter.add_child(_dmg)
 	_tint.position = origin
 	_tint.size = Gfx.HOLE.size
 	_tint.color = Color(0.9, 0.08, 0.08, 0.0)
 	_tint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_tint)
-	_wall = Gfx.sprite(self, "clinic/wall.png")
-	add_child(_stains)
-	add_child(_seep)
-	_seep.draw.connect(_draw_seep)
-	_leak.material = Gfx.additive()
-	add_child(_leak)
-	_leak.draw.connect(_draw_leak)
-	add_child(_cam)
-	_cam.draw.connect(_draw_cam)
+	_view.add_child(_tint)
+	# from here on: the doctor's side of the glass, in screen pixels
+	add_child(_zone)
+	_zone.draw.connect(_draw_zone)
+	_wall = Gfx.sprite(self, "clinic/booth.png")
+	# what dries on a wall stays on that wall: it ends at the window's edge and at the desk
+	var left_wall := Rect2(0, 0, Gfx.WINDOW.position.x, Gfx.WINDOW.end.y)
+	var right_wall := Rect2(Gfx.WINDOW.end.x, 0, Gfx.SCREEN.x - Gfx.WINDOW.end.x, Gfx.WINDOW.end.y)
+	for pair in [[_stains_l, left_wall], [_stains_r, right_wall]]:
+		var clip: Control = pair[0]
+		var area: Rect2 = pair[1]
+		clip.position = area.position
+		clip.size = area.size
+		clip.clip_contents = true
+		clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(clip)
+	scope = ScopeView.new()
+	add_child(scope)
 	add_child(_hud)
 	_hud.draw.connect(_draw_hud)
-	scope = ScopeView.new()
-	scope.position = origin
-	add_child(scope)
+	add_child(_cam)
+	_cam.draw.connect(_draw_cam)
+	over_desk.add_child(_seep)
+	_seep.draw.connect(_draw_seep)
+	_leak.material = Gfx.additive()
+	over_desk.add_child(_leak)
+	_leak.draw.connect(_draw_leak)
 	_rng.randomize()
 	_apply_shutter()
 
 
 # ------------------------------------------------------------------ controls
+## Brackets round a part of the patient. `rect` is in view space (PatientRig.zone_rect).
 func set_zone(rect: Rect2, label: String) -> void:
-	_zone_rect = rect
+	_zone_rect = Gfx.rect_to_screen(rect)
 	_zone_label = label
 
 
@@ -228,6 +274,42 @@ func set_patience(value: int, maximum: int) -> void:
 		_lost_t = 0.6
 	patience = value
 	patience_max = maximum
+
+
+## What the pane can still take (ShiftState.glass). A lamp that goes out flashes first, and
+## so does one that comes back after a repair.
+func set_glass_left(left: int, maximum: int) -> void:
+	if maximum == glass_max:
+		if left < glass_left:
+			_glass_from = glass_left
+			_glass_t = 0.6
+		elif left > glass_left:
+			_glass_back = glass_left
+			_glass_back_t = 0.9
+	glass_left = left
+	glass_max = maximum
+
+
+## The attack bar: `through` seconds until the patient is through the window, with a notch
+## for every blow that lands on the way (seconds after the warning).
+func bar_start(through: float, blows: Array) -> void:
+	bar_on = true
+	bar_t = 0.0
+	bar_through = maxf(through, 0.05)
+	bar_blows = blows.duplicate()
+	bar_text = ""
+
+
+## The shutter is down: the bar gives way to a line that says how it went.
+func bar_stop(text: String, color: Color) -> void:
+	bar_on = true
+	bar_text = text
+	bar_color = color
+
+
+func bar_clear() -> void:
+	bar_on = false
+	bar_text = ""
 
 
 func door(open: bool) -> void:
@@ -410,7 +492,8 @@ func has_cut() -> bool:
 	return _cut != null
 
 
-## Where the weapon is biting through right now, on the screen.
+## Where the weapon is biting through right now, in view space (what the gore layer's
+## sparks and droplets take).
 func cut_point() -> Vector2:
 	if _cut == null:
 		return Vector2.ZERO
@@ -437,16 +520,16 @@ func clear_shutter_damage() -> void:
 	_gore_count = 0
 
 
-## Blood finds its way under the shutter and runs down the front of the counter.
-## heavy: a lot of it, in wide runs that reach the bottom of the counter front.
+## Blood finds its way under the shutter and runs out over the edge of the desk.
+## heavy: a lot of it, in wide runs that reach well into the desk.
 func seep(count: int, heavy: bool = false) -> void:
 	if less_blood:
 		return
 	for i in count:
 		_drips.append({
-			"x": float(_rng.randi_range(177, 381)),
+			"x": float(_rng.randi_range(SEEP_X0, SEEP_X1)),
 			"len": 0.0,
-			"max": float(_rng.randi_range(9, 23) if heavy else _rng.randi_range(4, 21)),
+			"max": float(_rng.randi_range(8, 20) if heavy else _rng.randi_range(3, 15)),
 			"speed": _rng.randf_range(5.0, 15.0) * (1.6 if heavy else 1.0),
 			"wait": _rng.randf_range(0.0, 1.8),
 			"w": 2.0 if _rng.randf() < (0.6 if heavy else 0.3) else 1.0,
@@ -458,23 +541,25 @@ func drip_count() -> int:
 	return _drips.size()
 
 
-## Dried blood on the wall, centred at a screen position.
+## Dried blood on a booth wall, centred at a screen position. It goes on the wall its centre
+## is nearest to and is cut off where that wall ends.
 func add_stain(path: String, center: Vector2, tone: Color = DRIED) -> void:
 	if less_blood:
 		return
 	var t := Gfx.tex(path)
 	if t == null:
 		return
+	var wall := _stains_l if center.x < Gfx.WINDOW.get_center().x else _stains_r
 	var sp := Sprite2D.new()
 	sp.texture = t
 	sp.centered = false
-	sp.position = (center - t.get_size() / 2.0).round()
+	sp.position = (center - t.get_size() / 2.0).round() - wall.position
 	sp.modulate = tone
-	_stains.add_child(sp)
+	wall.add_child(sp)
 
 
 func stain_count() -> int:
-	return _stains.get_child_count()
+	return _stains_l.get_child_count() + _stains_r.get_child_count()
 
 
 ## A new shift: the glazier and the cleaners have been.
@@ -485,12 +570,17 @@ func reset_damage() -> void:
 	_fading.clear()
 	_drips.clear()
 	_seep.queue_redraw()
-	for c in _stains.get_children():
-		c.queue_free()
+	for wall in [_stains_l, _stains_r]:
+		for c in (wall as Control).get_children():
+			c.queue_free()
 	sill_blood(false)
 	under_glow = 0.0
 	hall_dark = 0.0
 	flicker = 0.0
+	leaving = -1.0
+	_glass_t = 0.0
+	_glass_back_t = 0.0
+	bar_clear()
 	team_clear()
 
 
@@ -545,6 +635,10 @@ func _process(delta: float) -> void:
 	_till_shown = move_toward(_till_shown, float(till), maxf(60.0, absf(float(till) - _till_shown) * 4.0) * delta)
 	if _lost_t > 0.0:
 		_lost_t -= delta
+	if _glass_t > 0.0:
+		_glass_t -= delta
+	if _glass_back_t > 0.0:
+		_glass_back_t -= delta
 	_zone.queue_redraw()
 	_cam.queue_redraw()
 	_hud.queue_redraw()
@@ -634,7 +728,7 @@ func _update_damage(delta: float) -> void:
 		if _cut_hold <= 0.0:
 			_tooth.queue_free()      # the blade is pulled back out
 			_tooth = null
-	# blood runs down the counter front, then dries where it stopped
+	# blood runs out over the desk, then dries where it stopped
 	var moving := false
 	for d in _drips:
 		var drip: Dictionary = d
@@ -670,6 +764,8 @@ func _draw_seep() -> void:
 
 
 func _draw_leak() -> void:
+	var x := Gfx.WINDOW.position.x + 4.0
+	var w := Gfx.WINDOW.size.x - 8.0
 	if strobe > 0.01 and shutter_pos > 0.9:
 		# the crew's lights in the hall, seen under the closed shutter
 		var red := fmod(_t, BEACON_BEAT * 2.0) < BEACON_BEAT
@@ -677,21 +773,25 @@ func _draw_leak() -> void:
 		var c := BEACON_RED if red else BEACON_BLUE
 		for i in 5:
 			var sa := strobe * (0.25 + 0.5 * fall) * (1.0 - 0.18 * float(i))
-			_leak.draw_rect(Rect2(Gfx.HOLE.position.x + 2.0, SEEP_Y - 1.0 + float(i), Gfx.HOLE.size.x - 4.0, 1), Color(c, sa))
+			_leak.draw_rect(Rect2(x, SEEP_Y - 2.0 + float(i), w, 1), Color(c, sa))
 	if under_glow <= 0.01:
 		return
 	var f := under_glow * (0.45 + 0.55 * absf(sin(_t * 23.0) * sin(_t * 7.3)))
 	for i in 6:
 		var a := f * (0.55 - 0.09 * float(i))
-		_leak.draw_rect(Rect2(Gfx.HOLE.position.x + 2.0, SEEP_Y - 1.0 + float(i), Gfx.HOLE.size.x - 4.0, 1), Color(under_color, a))
+		_leak.draw_rect(Rect2(x, SEEP_Y - 2.0 + float(i), w, 1), Color(under_color, a))
 
 
 func _draw_zone() -> void:
-	if _zone_rect.size.x <= 0.0:
+	if _zone_rect.size.x <= 0.0 or shutter_pos > 0.3:
+		return      # nothing to point at, or the shutter is in the way
+	var win := Gfx.WINDOW.grow(-2.0)
+	var r := _zone_rect.grow(4.0).intersection(win)
+	if r.size.x <= 0.0 or r.size.y <= 0.0:
 		return
-	var r := _zone_rect.grow(2.0)
 	var col: Color = Gfx.WARM7
-	var a := 4.0
+	var a := 9.0      # arm length
+	var th := 2.0     # and thickness: the picture behind it is drawn in double pixels
 	var x0 := r.position.x
 	var y0 := r.position.y
 	var x1 := r.end.x
@@ -701,31 +801,69 @@ func _draw_zone() -> void:
 		var cy: float = corner[1]
 		var sx: float = corner[2]
 		var sy: float = corner[3]
-		_zone.draw_rect(Rect2(minf(cx, cx + sx * a), cy if sy > 0.0 else cy - 1.0, a, 1), col)
-		_zone.draw_rect(Rect2(cx if sx > 0.0 else cx - 1.0, minf(cy, cy + sy * a), 1, a), col)
+		_zone.draw_rect(Rect2(minf(cx, cx + sx * a), cy if sy > 0.0 else cy - th, a, th), col)
+		_zone.draw_rect(Rect2(cx if sx > 0.0 else cx - th, minf(cy, cy + sy * a), th, a), col)
 	if _zone_label != "":
 		var w := Gfx.text_w(_zone_label) + 6.0
-		var lx := clampf(x0, Gfx.HOLE.position.x + 2.0, Gfx.HOLE.end.x - w - 2.0)
-		var ly := maxf(Gfx.HOLE.position.y + 2.0, y0 - 12.0)
+		var lx := clampf(x0, win.position.x, win.end.x - w)
+		var ly := maxf(win.position.y + 14.0, y0 - 13.0)
 		_zone.draw_rect(Rect2(lx, ly, w, 11), Color(Gfx.INK0, 0.85))
 		Gfx.text(_zone, Vector2(lx + 3.0, ly + 1.0), _zone_label, col)
 
 
+# ------------------------------------------------------------------ the hall camera
+## The small monitor on the wall always runs. Clicked, it puts the same picture on the big
+## monitor beside the window, where there is room to read it.
 func _draw_cam() -> void:
+	var t := Gfx.THUMB
+	_draw_feed(t, false)
+	if cam_id != "" and fmod(_t, 1.0) < 0.6:
+		_cam.draw_rect(Rect2(t.position + Vector2(2, 2), Vector2(3, 3)), Gfx.GRN5)
+	if cam_prompt and not cam_open and fmod(_t, 0.9) < 0.6:
+		_ring(t.grow(2.0), Gfx.GRN4)
+	if thumb_hot:
+		_ring(t.grow(2.0), Gfx.CYAN2)
+	if not cam_open:
+		return
+	var panel := Gfx.tex("clinic/cam_panel.png")
+	if panel != null:
+		_cam.draw_texture(panel, Gfx.CAM.position)
 	var m := Gfx.MONITOR
+	_draw_feed(m, true)
+	if monitor_hot:
+		_ring(m.grow(1.0), Gfx.CYAN2)
+
+
+func _ring(rect: Rect2, color: Color) -> void:
+	_cam.draw_rect(Rect2(rect.position.x, rect.position.y, rect.size.x, 1), color)
+	_cam.draw_rect(Rect2(rect.position.x, rect.end.y - 1.0, rect.size.x, 1), color)
+	_cam.draw_rect(Rect2(rect.position.x, rect.position.y, 1, rect.size.y), color)
+	_cam.draw_rect(Rect2(rect.end.x - 1.0, rect.position.y, 1, rect.size.y), color)
+
+
+## The hall camera's picture, fitted into `m`. full: with its lettering, as on the big monitor.
+func _draw_feed(m: Rect2, full: bool) -> void:
+	var k := m.size.x / 132.0
 	var bg := Gfx.tex("clinic/hall_cam.png")
 	if bg != null:
-		_cam.draw_texture(bg, m.position)
+		_cam.draw_texture_rect(bg, m, false)
 	if cam_id != "":
 		var sil := Gfx.tex("patients/%s/hallcam.png" % cam_id)
 		if sil != null:
 			var a := clampf(_cam_age / 0.5, 0.0, 1.0)
 			if _cam_age < 0.5 and int(_cam_age * 30.0) % 3 == 0:
 				a *= 0.4
-			var sway := roundf(sin(_t * 0.9) * 1.0)
-			var pos := Vector2(m.position.x + floorf((m.size.x - sil.get_width()) / 2.0) + 12.0 + sway,
-				m.end.y - sil.get_height())
-			_cam.draw_texture(sil, pos, Color(1, 1, 1, a))
+			var size := (sil.get_size() * k).floor()
+			var sway := roundf(sin(_t * 0.9) * 1.0) if full else 0.0
+			var pos := Vector2(m.position.x + floorf((m.size.x - size.x) / 2.0) + roundf(12.0 * k) + sway, m.end.y - size.y)
+			_cam.draw_texture_rect(sil, Rect2(pos, size), false, Color(1, 1, 1, a))
+	if not full:
+		var row := 1.0
+		while row < m.size.y:      # the lines of a small tube
+			_cam.draw_rect(Rect2(m.position.x, m.position.y + row, m.size.x, 1), Color(0, 0, 0, 0.2))
+			row += 2.0
+		return
+	if cam_id != "":
 		Gfx.text(_cam, m.position + Vector2(10, 4), "1 WAITING", Gfx.GRN4)
 	else:
 		Gfx.text(_cam, m.position + Vector2(10, 4), "HALL EMPTY", Gfx.GRN3)
@@ -740,38 +878,137 @@ func _draw_cam() -> void:
 	var overlay := Gfx.tex("clinic/crt_overlay.png")
 	if overlay != null:
 		_cam.draw_texture(overlay, m.position)
-	if monitor_hot:
-		_cam.draw_rect(m.grow(1.0), Gfx.CYAN2, false, 1.0)
 
 
+# ------------------------------------------------------------------ readouts
 func _draw_hud() -> void:
-	# pinned note: the till
-	var l := Gfx.NOTE_L
-	Gfx.text(_hud, l.position + Vector2(5, 5), "TILL", Gfx.PRINT)
-	var shown := int(roundf(_till_shown))
-	var col: Color = Gfx.INKT if shown >= 0 else Gfx.RED1
-	Gfx.big(_hud, l.position + Vector2(5, 14), str(shown), col)
-	Gfx.text(_hud, l.position + Vector2(5, 37), "rent %d" % rent, Gfx.INKS)
-	# pinned note: the queue
-	var r := Gfx.NOTE_R
-	Gfx.text(_hud, r.position + Vector2(5, 5), "PATIENT", Gfx.PRINT)
-	Gfx.big(_hud, r.position + Vector2(5, 14), "%d/%d" % [mini(queue_index + 1, queue_count), queue_count], Gfx.INKT)
-	for i in results.size():
-		var ok := bool(results[i])
-		Gfx.text(_hud, r.position + Vector2(5 + 10 * i, 37), "✓" if ok else "✗", Gfx.GRN2 if ok else Gfx.RED1)
-	# patience lamps on the counter edge
-	if show_patience and patience_max > 0:
-		Gfx.text(_hud, Vector2(8, 210), "PATIENCE", Gfx.WARM7)
-		var on := Gfx.tex("ui/pip_on.png")
-		var off := Gfx.tex("ui/pip_off.png")
-		for i in patience_max:
-			var pos := Vector2(62 + 9 * i, 211)
-			var lit := i < patience
-			if not lit and _lost_t > 0.0 and i < _lost_from and fmod(_lost_t, 0.2) < 0.1:
-				_hud.draw_rect(Rect2(pos.x + 1.0, pos.y + 1.0, 5, 5), Gfx.RED2)
-			elif lit and on != null:
-				_hud.draw_texture(on, pos)
-			elif off != null:
-				_hud.draw_texture(off, pos)
+	_draw_meter()
+	_draw_patience()
+	_draw_glass()
+	_draw_bar()
 	if corner_text != "":
-		Gfx.text(_hud, Vector2(4, 1), corner_text, Gfx.TEAL3)
+		Gfx.text(_hud, Gfx.WINDOW.position + Vector2(4, 1), corner_text, Gfx.TEAL4)
+
+
+## The lender's meter on the wall: the till, the line it has to reach when this hour ends,
+## the hour (one patient is one hour), and how each call went.
+func _draw_meter() -> void:
+	var m := Gfx.METER
+	var x := m.position.x + 4.0
+	var y := m.position.y
+	Gfx.text(_hud, Vector2(x, y + 2.0), "TILL", Gfx.GRN3)
+	Gfx.text_right(_hud, m.end.x - 4.0, y + 2.0, "HOUR %d/%d" % [mini(queue_index + 1, queue_count), queue_count], Gfx.GRN3)
+	var shown := int(roundf(_till_shown))
+	Gfx.big(_hud, Vector2(x, y + 12.0), str(shown), Gfx.GRN5 if shown >= 0 else Gfx.RED3)
+	Gfx.text(_hud, Vector2(x, y + 36.0), "LINE %d" % line, Gfx.RED3 if line_under else Gfx.GRN3)
+	var n := results.size()
+	for i in n:
+		var ok := bool(results[i])
+		Gfx.text(_hud, Vector2(m.end.x - 4.0 - 7.0 * float(n - i), y + 36.0), "✓" if ok else "✗", Gfx.GRN4 if ok else Gfx.RED3)
+
+
+func _frame(rect: Rect2, color: Color) -> void:
+	_hud.draw_rect(Rect2(rect.position.x, rect.position.y, rect.size.x, 1), color)
+	_hud.draw_rect(Rect2(rect.position.x, rect.end.y - 1.0, rect.size.x, 1), color)
+	_hud.draw_rect(Rect2(rect.position.x, rect.position.y, 1, rect.size.y), color)
+	_hud.draw_rect(Rect2(rect.end.x - 1.0, rect.position.y, 1, rect.size.y), color)
+
+
+## Where the plate of the patience lamps is on the screen: over the head of whoever is at
+## the window, as wide as this patient's lamps need.
+func patience_plate() -> Rect2:
+	var w := maxf(116.0, 61.0 + 9.0 * float(patience_max))
+	return Rect2(roundf(Gfx.WINDOW.get_center().x - w / 2.0), 1, w, 12)
+
+
+## Where the plate of the glass lamps is: on the sill, in the corner of the window.
+func glass_plate() -> Rect2:
+	var w := 34.0 + 8.0 * float(glass_max)
+	return Rect2(Gfx.WINDOW.end.x - w - 2.0, Gfx.WINDOW.end.y - 14.0, w, 12)
+
+
+## The patience lamps, on a plate over the head of whoever is at the window. Once they are
+## all out the patient is on the way out, and the plate shows how much of that last wait is left.
+func _draw_patience() -> void:
+	if not show_patience or patience_max <= 0:
+		return
+	var plate := patience_plate()
+	_hud.draw_rect(plate, PLATE)
+	var x := plate.position.x + 4.0
+	var y := plate.position.y + 1.0
+	if leaving >= 0.0:
+		var hot := fmod(_t, 0.4) < 0.26
+		var red: Color = Gfx.RED3 if hot else Gfx.RED2
+		Gfx.text(_hud, Vector2(x, y), "LEAVING", red, true)
+		var track := Rect2(x + 54.0, y + 2.0, plate.end.x - x - 58.0, 5)
+		_hud.draw_rect(track, Gfx.INK0)
+		_hud.draw_rect(Rect2(track.position, Vector2(roundf(track.size.x * clampf(leaving, 0.0, 1.0)), track.size.y)), red)
+		_frame(track.grow(1.0), Gfx.RED1)
+		return
+	Gfx.text(_hud, Vector2(x, y), "PATIENCE", Gfx.WARM7)
+	var on := Gfx.tex("ui/pip_on.png")
+	var off := Gfx.tex("ui/pip_off.png")
+	for i in patience_max:
+		var pos := Vector2(x + 54.0 + 9.0 * float(i), y + 1.0)
+		var lit := i < patience
+		if not lit and _lost_t > 0.0 and i < _lost_from and fmod(_lost_t, 0.2) < 0.1:
+			_hud.draw_rect(Rect2(pos.x + 1.0, pos.y + 1.0, 5, 5), Gfx.RED2)
+		elif lit and on != null:
+			_hud.draw_texture(on, pos)
+		elif off != null:
+			_hud.draw_texture(off, pos)
+
+
+## What the counter glass can still take: one lamp for every blow, on the sill in the corner
+## of the window. A lamp comes back only when the doctor pays to have a layer refitted.
+func _draw_glass() -> void:
+	if glass_max <= 0:
+		return
+	var plate := glass_plate()
+	_hud.draw_rect(plate, PLATE)
+	var x := plate.position.x + 3.0
+	var y := plate.position.y + 1.0
+	Gfx.text(_hud, Vector2(x, y), "GLASS", Gfx.RED2 if glass_left <= 0 else Gfx.CYAN2)
+	for i in glass_max:
+		var pos := Vector2(x + 28.0 + 8.0 * float(i), y + 1.0)
+		var box := Rect2(pos, Vector2(7, 7))
+		if i < glass_left:
+			var fresh := _glass_back_t > 0.0 and i >= _glass_back and fmod(_glass_back_t, 0.2) < 0.1
+			_hud.draw_rect(box, Gfx.CYAN3 if fresh else Gfx.CYAN1)
+			if not fresh:
+				_hud.draw_rect(Rect2(pos + Vector2(1, 1), Vector2(5, 5)), Gfx.CYAN2)
+				_hud.draw_rect(Rect2(pos + Vector2(1, 1), Vector2(2, 1)), Gfx.CYAN3)
+		elif _glass_t > 0.0 and i < _glass_from and fmod(_glass_t, 0.2) < 0.1:
+			_hud.draw_rect(box, Gfx.CYAN3)
+		else:
+			_hud.draw_rect(box, Gfx.INK0)
+			_frame(box, Gfx.RED1)
+			for k in 3:      # the crack that put it out
+				_hud.draw_rect(Rect2(pos.x + 2.0 + float(k), pos.y + 4.0 - float(k), 1, 1), Gfx.RED2)
+
+
+## The attack bar on the sill. It fills from the warning until the patient is through the
+## window; each notch is a blow on the glass, and a blow that lands before the shutter is
+## down costs the pane one of its lamps.
+func _draw_bar() -> void:
+	if not bar_on:
+		return
+	var r := SLOT
+	_hud.draw_rect(r, Gfx.INK0)
+	if bar_text != "":
+		_frame(r, bar_color)
+		Gfx.text_center(_hud, r.position.x + r.size.x / 2.0, r.position.y, bar_text, bar_color, true)
+		return
+	var inner := Rect2(r.position + Vector2(1, 1), r.size - Vector2(2, 2))
+	var k := clampf(bar_t / bar_through, 0.0, 1.0)
+	var hot := fmod(_t, 0.16) < 0.08
+	var reach := roundf(inner.size.x * k)
+	_hud.draw_rect(Rect2(inner.position, Vector2(reach, inner.size.y)), Gfx.RED1)
+	for at in bar_blows:
+		var bx := inner.position.x + roundf(inner.size.x * clampf(float(at) / bar_through, 0.0, 1.0))
+		var landed := bar_t >= float(at)
+		_hud.draw_rect(Rect2(bx - 1.0, inner.position.y, 2, inner.size.y), Gfx.WARM7 if landed else Gfx.AMBER)
+	# the far end: through the window
+	_hud.draw_rect(Rect2(inner.end.x - 3.0, inner.position.y, 3, inner.size.y), Gfx.RED3 if hot else Gfx.RED2)
+	_hud.draw_rect(Rect2(minf(inner.position.x + reach, inner.end.x - 1.0), inner.position.y, 1, inner.size.y), Color.WHITE)
+	_frame(r, Gfx.RED3 if hot else Gfx.RED2)

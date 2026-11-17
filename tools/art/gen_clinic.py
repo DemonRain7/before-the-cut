@@ -12,7 +12,7 @@ import os
 import numpy as np
 
 from font_data import draw_text, text_width
-from px import ASSETS, OUT, Canvas, bayer, contact_sheet
+from px import ASSETS, OUT, Canvas, bayer, col, contact_sheet
 
 HOLE = (170, 14, 220, 186)
 SCREEN = (18, 22, 132, 94)       # monitor glass inside the wall image
@@ -322,16 +322,27 @@ def wall():
     return c
 
 
+GLOW_STEPS = 24                  # shades the lamp's cone of light falls off in
+
+
 def lamp_glow():
-    """Additive cone of lamplight, centred on the lamp mouth at (30, 150)."""
+    """Additive cone of lamplight, centred on the lamp mouth at (30, 150).
+
+    It falls off in the picture's alpha, in GLOW_STEPS even steps, and not by thinning out in
+    an ordered pattern like the other lights: the view through the window is shown at twice
+    its size, and a pattern that coarse lay over the visitor's face like a print screen. The
+    colour and the strength are the averages of the patterned version it replaces."""
     c = Canvas(250, 210)
     yy, xx = c.grid()
     dx, dy = xx - 30.0, yy - 150.0
     d = np.sqrt(dx * dx + dy * dy)
     ang = (dx * 0.95 - dy * 0.3) / np.maximum(d, 1e-3)       # cosine to the aim direction
     t = np.clip(1.0 - d / 235.0, 0, 1) ** 1.5 * np.clip((ang - 0.15) / 0.7, 0, 1)
-    c.fill(t > bayer(c.h, c.w), "warm6")
-    c.fill((t * 0.6) > bayer(c.h, c.w), "warm7")
+    tone = 0.4 * np.array(col("warm6"), dtype=np.float32) + 0.6 * np.array(col("warm7"), dtype=np.float32)
+    level = np.round(t * GLOW_STEPS) / GLOW_STEPS
+    lit = level > 0
+    c.a[lit, :3] = np.round(tone).astype(np.uint8)
+    c.a[:, :, 3] = np.round(level * 255.0).astype(np.uint8)
     return c
 
 

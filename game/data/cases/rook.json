@@ -79,7 +79,8 @@
   "exit": {
     "treat": "About time.",
     "refer": "You called a crew on me? For an arm?",
-    "taken": "Hands off. I can walk."
+    "taken": "Hands off. I can walk.",
+    "gave_up": "I'm done waiting."
   },
   "rows": {
     "eyes": {"ok": true, "text": "Red and tired, but both pupils tighten and follow.",
@@ -100,6 +101,8 @@
     "walkout": {"title": "WALKED OUT",
       "text": "Rook takes his bad arm back to the docks. You pushed a steady man out the door."},
     "false_alarm": {"title": "FALSE ALARM",
-      "text": "The shutter drops on an angry man with a sore arm. He was only angry. That costs you."}
+      "text": "The shutter drops on an angry man with a sore arm. He was only angry. That costs you."},
+    "gave_up": {"title": "OUT OF PATIENCE",
+      "text": "Rook waited as long as an angry man can. He takes the arm somewhere faster. No fee, no bill."}
   }
 }

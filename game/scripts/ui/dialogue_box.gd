@@ -1,11 +1,20 @@
 extends Node2D
-## The strip under the window: one spoken line with a typewriter, or the list of questions,
-## or the line the doctor is typing (or dictating), and a dim hint line at the bottom.
+## The transcript unit set into the desk under the window: one spoken line with a
+## typewriter, or the list of questions, or the line the doctor is typing (or dictating), and
+## a dim hint line at the bottom.
+##
+## Everything in here is laid out in the strip's own coordinates (BOX); the node is moved so
+## that BOX lands on Gfx.DIALOGUE. The functions that take a pointer take a screen position.
+##
+## The unit's face (`back`) is a node of its own, so that the director can lay what runs down
+## from the sill between the face and the words: blood crosses the glass of the unit, never a
+## name or a line on it.
 
 const Gfx = preload("res://scripts/ui/gfx.gd")
 
 signal blip
 
+const BOX := Rect2(0, 224, 400, 60)
 const TEXT_X := 12.0
 const TEXT_W := 376.0
 const NAME_Y := 229.0
@@ -50,6 +59,8 @@ var input_seconds: float = 0.0
 var chips: Array = []          # [{"id", "key", "label"}] small buttons on the name line
 var chips_dim: bool = false
 var chip_hover: String = ""
+
+var back := Node2D.new()       # the unit's face; this node draws only what is written on it
 
 var _acc: float = 0.0
 var _t: float = 0.0
@@ -137,9 +148,29 @@ func has_menu() -> bool:
 	return not menu.is_empty()
 
 
-func menu_index_at(pos: Vector2) -> int:
+func _ready() -> void:
+	position = Gfx.DIALOGUE.position - BOX.position
+	if back.get_parent() == null:
+		# nobody placed the face: it goes straight behind the words
+		back.show_behind_parent = true
+		add_child(back)
+	else:
+		back.position = position
+	back.draw.connect(_draw_back)
+	back.queue_redraw()
+
+
+func _draw_back() -> void:
+	var bg := Gfx.tex("clinic/dialogue.png")
+	if bg != null:
+		back.draw_texture(bg, BOX.position)
+
+
+## The question under a screen position, or -1.
+func menu_index_at(screen: Vector2) -> int:
 	if menu.is_empty():
 		return -1
+	var pos := screen - position
 	if pos.x < 4.0 or pos.x > 396.0:
 		return -1
 	var i := int(floor((pos.y - MENU_Y) / MENU_PITCH))
@@ -285,15 +316,30 @@ func _chip_rects() -> Array:
 	return out
 
 
-## The button under the pointer, or "". They are put away while the doctor is typing.
-func chip_at(pos: Vector2) -> String:
+## The button under a screen position, or "". They are put away while the doctor is typing.
+func chip_at(screen: Vector2) -> String:
 	if input_open:
 		return ""
+	var pos := screen - position
 	for c in _chip_rects():
 		var r: Rect2 = c["rect"]
 		if r.has_point(pos):
 			return str(c["id"])
 	return ""
+
+
+## Where a small button is on the screen (an empty rectangle if there is no such button).
+func chip_rect(id: String) -> Rect2:
+	for c in _chip_rects():
+		if str(c["id"]) == id:
+			var r: Rect2 = c["rect"]
+			return Rect2(r.position + position, r.size)
+	return Rect2()
+
+
+## Where question `index` of the list is on the screen: the middle of its row.
+func menu_point(index: int) -> Vector2:
+	return position + Vector2(120.0, MENU_Y + MENU_PITCH * float(index) + MENU_PITCH / 2.0)
 
 
 func _process(delta: float) -> void:
@@ -338,9 +384,6 @@ func _char_at(index: int) -> String:
 
 
 func _draw() -> void:
-	var bg := Gfx.tex("clinic/dialogue.png")
-	if bg != null:
-		draw_texture(bg, Gfx.DIALOGUE.position)
 	if input_open:
 		_draw_input()
 	elif not menu.is_empty():

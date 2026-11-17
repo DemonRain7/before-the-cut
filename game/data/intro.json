@@ -1,0 +1,103 @@
+{
+  "version": 2,
+  "note": "Words for the opening cards (scripts/ui/intro.gd) and the counter guide (scripts/ui/guide.gd). First written by the assistant on 2026-11-15 after the student's eleven notes. Version 2 (2026-11-16) is the guide for the counter-first screen: four pages, one each for the window, the left wall, the right wall and the desk. Nobody has playtested them. {per_hour}, {hours}, {total}, {threshold} and {repair_cost} are filled in from rules.json and sheet.json; a rule set with no repair_cost leaves the \"mend\" item out. The pictures and the positions of the guide's numbers are drawn in code; only the words live here, so tools/art/measure_text.py can check that they fit.",
+  "cards": [
+    {
+      "id": "towers",
+      "art": "towers",
+      "title": "THE TOWERS",
+      "text": "Up in the towers, an implant is something you buy. Down here, under the rain, it is something you owe on.",
+      "labels": {}
+    },
+    {
+      "id": "lease",
+      "art": "lease",
+      "title": "THE LEASE",
+      "text": "You fit implants at a back-street counter. The chair, the tools and your own two hands are on lease from Harrow Credit.",
+      "labels": {
+        "head": "HARROW CREDIT",
+        "sub": "EQUIPMENT LEASE",
+        "items": ["1 surgical chair", "1 instrument tray", "2 hands, left and right"],
+        "stamp": "ON LEASE",
+        "foot": "Metered hourly. Shortfall recovered in kind."
+      }
+    },
+    {
+      "id": "line",
+      "art": "line",
+      "title": "THE LINE",
+      "text": "Their meter reads your till every hour, and every hour it wants {per_hour} more. End the night under the line and they make the cut: the lease is called in, hands first.",
+      "labels": {
+        "hour": "HOUR",
+        "line": "LINE",
+        "over": "OPEN",
+        "under": "THE CUT"
+      }
+    },
+    {
+      "id": "drift",
+      "art": "drift",
+      "title": "THE DRIFT",
+      "text": "Cheap chrome and no sleep, and some patients start to drift. Most are only tired, scared or angry. Put one who is drifting under the knife and it does not end in your chair.",
+      "labels": {
+        "list": "TONIGHT'S LIST",
+        "ask": "STEADY OR DRIFTING?"
+      }
+    },
+    {
+      "id": "counter",
+      "art": "counter",
+      "title": "BEFORE THE CUT",
+      "text": "So you check them first. TREAT the steady and the fee is yours. Call TRAUMA TEAM on the drifting. If one turns on you, drop the SHUTTER before the glass gives.",
+      "labels": {
+        "treat": "TREAT",
+        "treat_sub": "the steady",
+        "team": "TRAUMA TEAM",
+        "team_sub": "the drifting",
+        "shutter": "SHUTTER",
+        "shutter_sub": "if one turns"
+      }
+    }
+  ],
+  "guide": [
+    {
+      "id": "window",
+      "title": "THE WINDOW",
+      "items": [
+        {"key": "patient", "text": "THE PATIENT. Click eyes, hands or port for a closer look. Looking is free."},
+        {"key": "patience", "text": "PATIENCE. Tools and questions cost lamps. When the last one goes out they leave: no fee, no fine."},
+        {"key": "glass", "text": "GLASS. What the pane can still take tonight. Every blow that lands leaves less time at the next attack."}
+      ]
+    },
+    {
+      "id": "left",
+      "title": "THE LEFT WALL",
+      "items": [
+        {"key": "sheet", "text": "REFERENCE SHEET [R]. What a steady patient looks like, and what is merely odd. Click it to take it down. It never decides for you."},
+        {"key": "till", "text": "TILL and HOUR. One patient is one hour. The meter reads the till each hour: stay over the line."},
+        {"key": "camera", "text": "HALL CAMERA [C]. Who is next. Click it, then the big screen, to buzz them in. ENTER does it at once."}
+      ]
+    },
+    {
+      "id": "right",
+      "title": "THE RIGHT WALL",
+      "items": [
+        {"key": "record", "text": "INTAKE CARD [N]. Your notes on the patient. Findings are written on it by themselves; tick or cross a row yourself. {threshold} crosses: drifting, by the house rule. The call stays yours."},
+        {"key": "treat", "text": "TREAT. Pick up the stamp and stamp the card. For the steady."},
+        {"key": "team", "text": "TRAUMA TEAM. Press twice and they take the patient away. For the drifting."},
+        {"key": "shutter", "text": "SHUTTER [SPACE]. If a patient turns on you, drop it before the red bar runs out."},
+        {"key": "mend", "text": "GLASS [G]. Between patients, {repair_cost} credits put one layer back in the pane."}
+      ]
+    },
+    {
+      "id": "desk",
+      "title": "THE DESK",
+      "items": [
+        {"key": "tools", "text": "TOOLS. Penlight, grip bar, port check. Each costs patience and gives one reading."},
+        {"key": "say", "text": "YOUR OWN WORDS. T types a line. With the patient AI running, hold TAB to speak it."},
+        {"key": "talk", "text": "TALK. ASK a question, CALM to give patience back, PRESS to push them hard."}
+      ],
+      "closing": "Nothing is required. Decide whenever you like. H opens this guide again."
+    }
+  ]
+}

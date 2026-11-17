@@ -14,7 +14,8 @@ from px import ASSETS
 
 SR = 22050
 OUTDIR = os.path.join(ASSETS, "audio")
-rng = np.random.default_rng(1977)
+SEED = 1977
+rng = np.random.default_rng(SEED)
 
 
 def t(sec):
@@ -505,6 +506,20 @@ def drip():
     return at(0.12, (0.0, a), (0.035, b))
 
 
+def glass_fit():
+    """The fitter's arm bonding a fresh layer into the counter frame: servo, slide, seat, latches."""
+    sec = 0.34
+    x = t(sec)
+    swell = np.sin(np.pi * x / sec)
+    servo = lp(square(118, sec, 0.35), 900) * swell ** 0.6 * 0.35 + sweep(520, 760, sec) * swell * 0.12
+    slide = bp(noise(0.3), 2800, 7000) * np.sin(np.pi * t(0.3) / 0.3) ** 1.5 * 0.3
+    seat = sweep(210, 85, 0.12) * env(int(SR * 0.12), 0.001, 0.03)
+    seal = lp(noise(0.05), 1500) * env(int(SR * 0.05), 0.001, 0.012) * 0.6
+    ring = sum(sine(f, 0.4) * a for f, a in ((2480, 1.0), (3910, 0.45), (6150, 0.2))) * env(int(SR * 0.4), 0.002, 0.1) * 0.3
+    latch = at(0.14, *[(i * 0.045, bp(noise(0.012), 1800, 6000) * env(int(SR * 0.012), 0.0005, 0.004)) for i in range(3)])
+    return at(1.15, (0.0, servo), (0.26, slide), (0.54, seat), (0.54, seal), (0.55, ring), (0.78, latch * 0.6))
+
+
 # ------------------------------------------------------------------ results
 def cash():
     ching = at(0.7, (0.0, bell(2093, 0.4, 0.14)), (0.09, bell(2637, 0.6, 0.22)))
@@ -571,16 +586,24 @@ SOUNDS = {
     "radio": (radio, 0.5), "siren": (siren, 0.4),
     "jingle_good": (lambda: jingle([523.3, 659.3, 784.0, 1046.5]), 0.5),
     "jingle_bad": (lambda: jingle([392.0, 349.2, 311.1, 233.1], 0.2, 0.35), 0.5),
+    "glass_fit": (glass_fit, 0.6),
 }
+# The sounds of the first build share one random stream, in the order above. Every sound added
+# since starts from a fresh stream instead: adding one changes no other file, and writing it
+# alone gives the same file as a full build. Add new sounds here as well as above.
+FRESH = {"radio", "siren", "glass_fit"}
 
 
 def main(only=None):
     """With names on the command line, write only those sounds and print their level."""
+    global rng
     total = 0.0
     count = 0
     for name, (fn, gain) in SOUNDS.items():
         if only and name not in only:
             continue
+        if name in FRESH:
+            rng = np.random.default_rng(SEED)
         x = np.asarray(fn(), dtype=np.float64)
         if not np.all(np.isfinite(x)):
             raise ValueError("%s: the waveform is not finite" % name)

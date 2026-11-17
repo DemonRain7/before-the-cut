@@ -75,7 +75,8 @@
   "exit": {
     "treat": "Yes! Doc, you're a s-star.",
     "refer": "Trauma Team? For st-static?",
-    "taken": "Easy! The chrome's p-paid for!"
+    "taken": "Easy! The chrome's p-paid for!",
+    "gave_up": "T-time's up, doc. I've got a set."
   },
   "rows": {
     "eyes": {"ok": true, "text": "Display eyes never tighten: they are implants. Both followed the light.",
@@ -95,6 +96,8 @@
     "walkout": {"title": "WALKED OUT",
       "text": "Juno takes her static back to the street. The hat stays empty tonight."},
     "false_alarm": {"title": "FALSE ALARM",
-      "text": "The shutter drops on a singer with a broken voice box. She looked strange. She was fine. That costs you."}
+      "text": "The shutter drops on a singer with a broken voice box. She looked strange. She was fine. That costs you."},
+    "gave_up": {"title": "OUT OF PATIENCE",
+      "text": "Midnight was not going to wait, and neither was Juno. She sings the set through the static. No fee, no bill."}
   }
 }

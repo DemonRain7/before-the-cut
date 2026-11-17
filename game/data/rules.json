@@ -1,23 +1,26 @@
 {
-  "version": 3,
-  "note": "First-pass numbers chosen by the assistant on 2026-11-14. None has been tuned with players. Version 3: the second decision is a call to Trauma Team (ids still say 'refer'); a call on a steady patient now costs the call-out (false_call). Agent limits were raised for typed and spoken conversation: 16 patient-model calls per visit, a 4 s wait, replies asked to stay within 110 characters and shown up to 220 (two pages of the strip); the proxy must hold the same numbers. Push-to-talk (agent.voice): a clip is at most 10 s, 24 clips per visit, 7 s to wait for its words; quieter than silence_peak is not sent.",
+  "version": 5,
+  "note": "First-pass numbers chosen by the assistant on 2026-11-14. None has been tuned with players. Version 3: the second decision is a call to Trauma Team (ids still say 'refer'); a call on a steady patient now costs the call-out (false_call). Agent limits were raised for typed and spoken conversation: 16 patient-model calls per visit, a 4 s wait, replies asked to stay within 110 characters and shown up to 220 (two pages of the strip); the proxy must hold the same numbers. Push-to-talk (agent.voice): a clip is at most 10 s, 24 clips per visit, 7 s to wait for its words; quieter than silence_peak is not sent. Version 4 (2026-11-15, after the student's eleven notes): the flat rent became an hourly line (line.per_hour: one visit is one hour, the meter is read after each, and the last reading decides the night); a patient whose patience reaches 0 waits patience.leave_ms and then leaves unpaid and unbilled (outcome gave_up); the counter glass takes attack.glass blows per shift, attack.blow_at places them inside window_ms, and with less glass left the patient comes through sooner, never sooner than attack.min_window_ms. Version 5 (2026-11-16, after the student's notes on the screen and the glass): between patients the doctor can pay attack.repair_cost credits for one layer of the counter glass. It takes one more blow, and an empty frame has a pane again. The money leaves the till at once and the meter counts it at every later reading. No other number changed.",
   "shift_order": ["kip", "rook", "vale", "juno", "maren"],
   "arrivals": {"shuffle": true, "first_shift_opens_steady": true, "note": "Added 2026-11-15: shift_order is who comes in; each shift draws the order from its seed. The first shift of a session opens with a steady patient. --authored-order keeps the listed order (tests and captures)."},
-  "rent": 600,
+  "line": {"per_hour": 120, "note": "What the lender's meter wants in the till at each hourly reading: hour n needs n x per_hour. Five hours make 600, the old rent. 120 is also the hand-over fee, so a right call on a drifting patient exactly holds the line for that hour."},
+  "patience": {"leave_ms": 8000, "note": "At 0 the patient gives an ultimatum and leaves after this long unless the player decides or reassures. 0 makes them leave at once."},
   "costs": {"check": 1, "insist": 1, "ask": 1, "press": 2},
   "reassure": {"gain": 1, "uses": 2},
   "grip": {"limit_ms": 1000},
-  "attack": {"window_ms": 1800, "beat_min_ms": 600, "beat_max_ms": 1200},
+  "attack": {"window_ms": 1800, "beat_min_ms": 600, "beat_max_ms": 1200, "blow_at": [0.3, 0.55, 0.8], "glass": 3, "min_window_ms": 650, "repair_cost": 40,
+    "note": "blow_at: when each blow lands on the glass, as a share of window_ms. A blow that lands before the shutter is down costs one of the glass points. With g points left only g blows land and the patient comes through at the time of the next one (1800, 1440, 990 ms, then min_window_ms). repair_cost: what one point costs to put back, between patients; 0 switches repairs off. At 40 a whole pane (three layers) costs one hour of the line."},
   "scoring": {"treat_drifting": -400, "refer_drifting": 120, "false_call": -150, "hit": -300, "false_alarm": -100},
   "agent": {"max_model_calls_per_visit": 16, "max_line_chars": 110, "max_reply_chars": 220, "timeout_ms": 4000,
     "voice": {"enabled": true, "max_seconds": 10, "min_seconds": 0.35, "timeout_ms": 7000, "max_clips_per_visit": 24, "silence_peak": 0.012}},
-  "titles_note": "The first entry that fits is used. min_correct counts right calls (out of five). max_injuries and rent_paid are optional: a night that hurt you, or that did not cover the rent, is not given a title that says it went well.",
+  "titles_note": "The first entry that fits is used. min_correct counts right calls (out of five). max_injuries is optional. line_held, where an entry has it, must equal the night's last meter reading: a night that ended under the line is THE CUT whatever else went right, and a night that hurt you is not given a title that says it went well.",
   "titles": [
-    {"min_correct": 5, "max_injuries": 0, "rent_paid": true, "title": "STEADY HANDS", "text": "Five patients, five right calls. The sheet goes back on its nail. You open again tomorrow."},
-    {"min_correct": 5, "rent_paid": true, "title": "RIGHT THE HARD WAY", "text": "Every call was right, and one of them still reached you. Reading people is half the job. The shutter is the other half."},
-    {"min_correct": 4, "max_injuries": 0, "rent_paid": true, "title": "A GOOD NIGHT'S WORK", "text": "One visit went wrong. Most nights are like that. The rest went the way they should."},
-    {"min_correct": 3, "title": "OPEN, BARELY", "text": "You were right more often than not. In this trade that is not the same as safe."},
-    {"min_correct": 0, "title": "LICENCE UNDER REVIEW", "text": "The sheet was on the clipboard the whole time. Read it again before the next shift."}
+    {"min_correct": 0, "line_held": false, "title": "THE CUT", "text": "Under the line at closing. Harrow Credit sends two quiet people for what is theirs: the chair, the tools, and the hands that used them."},
+    {"min_correct": 5, "max_injuries": 0, "line_held": true, "title": "STEADY HANDS", "text": "Five patients, five right calls. The sheet goes back on its nail. You open again tomorrow."},
+    {"min_correct": 5, "line_held": true, "title": "RIGHT THE HARD WAY", "text": "Every call was right, and one of them still reached you. Reading people is half the job. The shutter is the other half."},
+    {"min_correct": 4, "max_injuries": 0, "line_held": true, "title": "A GOOD NIGHT'S WORK", "text": "One visit went wrong. Most nights are like that. The rest went the way they should."},
+    {"min_correct": 3, "line_held": true, "title": "OPEN, BARELY", "text": "You were right more often than not. In this trade that is not the same as safe."},
+    {"min_correct": 0, "line_held": true, "title": "LICENCE UNDER REVIEW", "text": "The line held, and that is the kindest thing to say. The sheet was on the wall the whole time. Read it again."}
   ],
-  "rent_text": {"paid": "Rent is paid. The lights stay on another night.", "short": "Rent is short. The landlord will be back for the rest."}
+  "line_text": {"held": "Meter: OVER THE LINE. The lease runs another night.", "short": "Meter: UNDER THE LINE. The lease is called in."}
 }
