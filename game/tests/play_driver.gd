@@ -137,10 +137,58 @@ func cam_on() -> bool:
 	return main.clinic.cam_open
 
 
+func list_down() -> bool:
+	return main.clipboard.list_open
+
+
 ## Takes the reference sheet down from the left wall, the way a player does: a click on it.
+## The sheet and tonight's contact list hang on one hook, so with the list down it is the
+## swap tab under the list's own tab that brings the sheet.
 func take_sheet() -> void:
-	if not sheet_down():
+	if sheet_down():
+		return
+	if list_down():
+		swap()
+	else:
 		click(main.desk.object_rect("sheet").get_center())
+
+
+## Takes tonight's contact list down (with the sheet down, through the swap tab).
+func take_list() -> void:
+	if list_down():
+		return
+	if sheet_down():
+		swap()
+	else:
+		click(main.desk.object_rect("list").get_center())
+
+
+func hang_list() -> void:
+	if list_down():
+		click(main.clipboard.list_tab().get_center())
+
+
+## The tab under the sheet's or the list's: trades the one that is down for the other.
+func swap() -> void:
+	click(main.clipboard.swap_tab().get_center())
+
+
+## Where the SAY button of one of tonight's entries is, or (-1, -1) if it is not on the list.
+func say_pos(entry_id: String) -> Vector2:
+	for i in main.clipboard.contacts.size():
+		if str((main.clipboard.contacts[i] as Dictionary).get("id", "")) == entry_id:
+			return main.clipboard.say_rect(i).get_center()
+	return Vector2(-1, -1)
+
+
+## Says an entry's code: the list comes down, and once it is all the way out the SAY button
+## beside the entry is pressed. Returns once the exchange is over.
+func say_code(entry_id: String) -> void:
+	take_list()
+	await until(func() -> bool: return main.clipboard._list_k >= 1.0, 3.0)
+	click(say_pos(entry_id))
+	await tree.process_frame
+	await until(func() -> bool: return not main._lock, 10.0)
 
 
 ## Takes the intake card down from the right wall.
@@ -171,6 +219,8 @@ func uncover(pos: Vector2) -> void:
 	match main._panel_at(pos):
 		"sheet":
 			hang_sheet()
+		"list":
+			hang_list()
 		"card":
 			hang_card()
 		"cam":
@@ -220,8 +270,8 @@ func wait_for_counter(limit: float = 12.0) -> bool:
 
 
 ## Buzzes in whoever is on the hall camera. The counter guide opens by itself at a session's
-## first patient; it is closed here the way a player closes it, with ESC, unless `keep_guide`
-## is set (the caller then turns its pages).
+## first patient when the first-night training is off; it is closed here the way a player
+## closes it, with ESC, unless `keep_guide` is set (the caller then turns its pages).
 func buzz_in(keep_guide: bool = false) -> bool:
 	# the small monitor puts the hall on the big screen; a press on that buzzes them in
 	if not cam_on():

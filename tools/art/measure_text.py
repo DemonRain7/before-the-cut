@@ -19,6 +19,7 @@ SCREENS_GD = os.path.join(UI, "screens.gd")
 CLIPBOARD_GD = os.path.join(UI, "clipboard.gd")
 INTRO_GD = os.path.join(UI, "intro.gd")
 GUIDE_GD = os.path.join(UI, "guide.gd")
+COACH_GD = os.path.join(UI, "coach.gd")
 # "sheet" is the text column of a sheet row; "footer" is centred across the whole sheet.
 # "slip_title" is an outcome title in the big font across the result slip; wider than this and
 # the slip falls back to the small font. "report_title" is the big title on the end-of-shift
@@ -35,7 +36,8 @@ LIMITS = {"note": 186, "look": 186, "sheet": 182, "footer": 220, "row": 176, "qu
           "plate": 203, "tally": 74, "screen": 624}
 SLIP_WIDTH = 180        # the text column of the result slip (main.gd: _draw_slip)
 SLIP_GAP = 8            # least space between the call and the money on its last line (main.gd: SLIP_GAP)
-SLIP_LINES = 6          # lines of outcome text the slip has room for
+REPORT_VISIT_ROOM = 258 # a visit's second line on the report, from the call (x0 + 110) to the figure column (x1)
+SLIP_LINES = 5          # lines of outcome text the slip has room for (main.gd: _draw_slip)
 REPORT_LINES = 3        # lines of title text the report has room for above the meter line and the tally
 STRIP_WIDTH = 376       # the dialogue strip (dialogue_box.gd: TEXT_W)
 STRIP_LINES = 2         # rows of speech on one page of it (dialogue_box.gd: PAGE_LINES)
@@ -200,6 +202,25 @@ def intro_rows(intro, numbers):
                 rows.append(check("card_label", cid + ".items%d" % i, item, limit=212 - 24 - 15))
             rows.append(check("card_label", cid + ".foot", labels.get("foot", ""), limit=212 - 24))
             rows.append(check("card_label", cid + ".stamp", labels.get("stamp", ""), bold=True, limit=74 - 8))
+        elif art == "lanterns":
+            # the list is 196 px wide with 12 px margins; SAY is a button at least 30 px wide at the
+            # right of each alias, and the PICKED UP stamp takes its place on the first entry
+            col = 196 - 24
+            say = labels.get("say", "")
+            say_w = max(30, text_width(say, True) + 10)
+            rows.append(check("card_label", cid + ".head", labels.get("head", ""), bold=True, limit=col))
+            rows.append(check("card_label", cid + ".say", say, bold=True, limit=30 - 4))
+            for i, e in enumerate(labels.get("entries", [])[:2]):
+                alias = e.get("alias", "")
+                rows.append(check("card_label", cid + ".alias%d" % i, alias, bold=True, limit=col - say_w - 6))
+                for k, clue in enumerate(e.get("clues", [])):
+                    rows.append(check("card_label", cid + ".clue%d.%d" % (i, k), "• " + clue, limit=col))
+                rows.append(check("card_label", cid + ".code%d" % i, '"%s"' % e.get("code", ""), limit=col))
+                if i == 0:
+                    rows.append(check("card_label", cid + ".picked", labels.get("picked", ""), bold=True,
+                                      limit=col - text_width(alias, True) - 6 - 6))
+            # the figure rises over the package, between the list and the courier
+            rows.append(check("card_label", cid + ".drop", fill(labels.get("drop", ""), numbers), bold=True, limit=56))
         elif art == "line":
             hours = int(numbers.get("hours", 5))
             per_hour = int(numbers.get("per_hour", 0))
@@ -286,6 +307,58 @@ def guide_rows(intro, numbers):
     return rows
 
 
+TRAINING_LINES = 4      # lines a training tip may take (the box grows with them; four keeps it off the face)
+TRAINING_UNTIL = {"next", "list_open", "sheet_open", "card_open", "visit_start", "code_said", "mark", "verdict",
+                  "continue", "talk", "look", "check:penlight", "check:grip", "check:port"}
+TRAINING_AREAS = {"list", "sheet", "card", "marks", "guide", "cam", "code", "tools", "talk", "decide", "slip",
+                  "patience", "meter", "shutter"}
+
+
+def training_rows(intro, numbers):
+    """The first-night training (coach.gd): each tip wrapped to the box, and the box's own words."""
+    rows = []
+    width = number(COACH_GD, "WIDTH")
+    pad = number(COACH_GD, "PAD")
+    text_w = number(COACH_GD, "TEXT_W")
+    if text_w != width - pad * 2:
+        rows.append(("training", "coach.gd:TEXT_W", int(text_w), "", " NOT WIDTH - 2 * PAD (%d)" % (width - pad * 2)))
+    steps = intro.get("training", [])
+    if not steps:
+        rows.append(("training", "intro.training", 0, "", " NO TRAINING STEPS FOUND"))
+    phases = set(re.findall(r'"(\w+)"', source(COACH_GD)[source(COACH_GD).index("const PHASES"):].split("\n")[0]))
+    counter = "%d/%d" % (len(steps), len(steps))
+    named = dict(consts(COACH_GD, r"^(TITLE|NEXT|DONE|SKIP)$"))
+    title_w = text_width(named.get("TITLE", ""), True) + 6 + text_width(counter)
+    rows.append(("training_label", "coach.gd:TITLE+counter", title_w, named.get("TITLE", ""),
+                 " TOO WIDE (room %d px)" % text_w if title_w > text_w else ""))
+    # SKIP ALL on the left and NEXT (or DONE) on the right of the bottom row, with room between
+    for last in ("NEXT", "DONE"):
+        both = text_width(named.get("SKIP", ""), True) + 10 + 12 + text_width(named.get(last, ""), True) + 8
+        rows.append(("training_label", "coach.gd:SKIP+" + last, both, named.get(last, ""),
+                     " THE BUTTONS MEET (room %d px)" % text_w if both > text_w else ""))
+    seen = set()
+    for i, st in enumerate(steps):
+        sid = str(st.get("id", "?"))
+        where = "intro.training.%d.%s" % (i + 1, sid)
+        row = check_lines("training", where, fill(st.get("text", ""), numbers), int(text_w), TRAINING_LINES)
+        flag = row[4]
+        if sid in seen:
+            flag += " DUPLICATE ID"
+        seen.add(sid)
+        if "{" in fill(st.get("text", ""), numbers):
+            flag += " AN UNFILLED {NUMBER}"
+        own = [x.strip() for x in str(st.get("phase", "")).split(",") if x.strip()]
+        if not own or any(x not in phases for x in own):
+            flag += " UNKNOWN PHASE (%s)" % st.get("phase", "")
+        if str(st.get("until", "")) not in TRAINING_UNTIL:
+            flag += " UNKNOWN EVENT (%s)" % st.get("until", "")
+        area = str(st.get("area", ""))
+        if area not in TRAINING_AREAS and not area.startswith("pad:"):
+            flag += " UNKNOWN AREA (%s)" % area
+        rows.append(row[:4] + (flag,))
+    return rows
+
+
 def main():
     rows = []
     sheet = json.load(open(os.path.join(DATA, "sheet.json"), encoding="utf-8"))
@@ -351,8 +424,20 @@ def main():
     repair_cost = int(rules.get("attack", {}).get("repair_cost", 0))
     # the most glass a night can buy: a whole pane before every patient
     repair_most = repair_cost * glass * hours
+    contacts = rules.get("contacts", {})
+    reassure = rules.get("reassure", {})
+    costs = rules.get("costs", {})
     numbers = {"per_hour": per_hour, "hours": hours, "total": per_hour * hours, "threshold": threshold,
-               "repair_cost": repair_cost}
+               "repair_cost": repair_cost, "pay": int(contacts.get("pay", 0)), "code_cost": int(contacts.get("wrong_cost", 0)),
+               "per_night": int(contacts.get("per_night", 0)), "calm_cost": int(reassure.get("cost", 0)),
+               "calm_gain": int(reassure.get("gain", 0)), "ask_cost": int(costs.get("ask", 0)),
+               "press_cost": int(costs.get("press", 0)),
+               "limit": "%.1f" % (float(rules.get("grip", {}).get("limit_ms", 1000)) / 1000.0)}
+    contact_data = json.load(open(os.path.join(DATA, "contacts.json"), encoding="utf-8"))
+    packages = [str(e.get("package", "")) for e in contact_data.get("pool", [])]
+    longest_package = max(packages, key=lambda t: text_width(t)) if packages else ""
+    aliases = [str(e.get("alias", "")) for e in contact_data.get("pool", [])]
+    longest_alias = max(aliases, key=lambda t: text_width(t, True)) if aliases else ""
     best = sum(sorted(fees | {int(rules["scoring"].get("refer_drifting", 0))}, reverse=True)[:1]) * hours
     worst = min(int(v) for v in rules["scoring"].values()) * hours
     line_total = per_hour * hours
@@ -370,6 +455,25 @@ def main():
         rows.append(check("report_row", "screens.gd:" + name, worst_numbers(text, values), bold=name in ("OVER_ROW", "UNDER_ROW")))
     tally = "Right calls: %d of %d   •   Hours under the line: %d   •   Times you were hurt: %d" % (hours, hours, hours, hours)
     rows.append(check("report_tally", "screens.gd:_draw_report tally", tally))
+    for name, text in consts(SCREENS_GD, r"^DROPS_TALLY$"):
+        per_night = int(contacts.get("per_night", 0))
+        rows.append(check("report_tally", "screens.gd:" + name,
+                          worst_numbers(text, [per_night, per_night, per_night * int(contacts.get("pay", 0))])))
+    # a visit's second line: what the doctor did at x0 + 110, and what was not the call's own at x1
+    src = source(SCREENS_GD)
+    body = src[src.index("func _call_text"):]
+    said_calls = re.findall(r'return "([^"]+)"', body)
+    small = dict(consts(SCREENS_GD, r"^VISIT_"))
+    if not said_calls or len(small) < 3:
+        rows.append(("report_row", "screens.gd:_draw_report", 0, "", " NO VISIT LINE WORDS FOUND"))
+    else:
+        calm_most = int(reassure.get("cost", 0)) * int(reassure.get("uses", 0))
+        extra = "   ".join([max(worst_numbers(small["VISIT_DROP"], [int(contacts.get("pay", 0))]), small["VISIT_NO_DROP"],
+                                key=text_width), worst_numbers(small["VISIT_CALM"], [calm_most])])
+        call = max(said_calls, key=text_width)
+        room = REPORT_VISIT_ROOM - text_width(call) - SLIP_GAP
+        rows.append(("report_row", "screens.gd:_visit_extra", text_width(extra), extra,
+                     " RUNS INTO '%s' (room %d px)" % (call, room) if text_width(extra) > room else ""))
     # the title card
     for name, text in consts(SCREENS_GD, r"^HELP"):
         rows.append(check("screen", "screens.gd:" + name, text))
@@ -378,6 +482,8 @@ def main():
     block = block[:block.index("]")]
     for i, text in enumerate(re.findall(r'"([^"]*)"', block)):
         rows.append(check("screen", "screens.gd:TITLE_LINES%d" % i, text))
+    for name, text in consts(SCREENS_GD, r"^SUBTITLE$"):
+        rows.append(check("screen", "screens.gd:" + name, text))
     status = consts(MAIN_GD, r"^STATUS_")
     if not status:
         rows.append(("screen", "main.gd", 0, "", " NO STATUS LINES FOUND"))
@@ -387,7 +493,13 @@ def main():
     found = hints()
     if not found:
         rows.append(("hint", "main.gd", 0, "", " NO HINTS FOUND"))
-    hint_values = {"GLASS_HINT": [repair_cost]}
+    calm_uses = int(reassure.get("uses", 0))
+    hint_values = {"GLASS_HINT": [repair_cost],
+                   "CALM_HINT": [numbers["calm_cost"], numbers["calm_gain"], calm_uses],
+                   "CALM_HOLD_HINT": [numbers["calm_cost"], numbers["calm_gain"], calm_uses],
+                   "CALM_FREE_HINT": [numbers["calm_gain"], calm_uses],
+                   "CALM_FREE_HOLD_HINT": [numbers["calm_gain"], calm_uses],
+                   "SAY_CODE_HINT": [numbers["code_cost"]], "CODE_BLANK_HINT": [numbers["code_cost"]]}
     for name, h in found:
         rows.append(check("hint", "main.gd:" + name, worst_numbers(h, hint_values.get(name, [len(sheet["rows"])] * 2))))
     said = consts(MAIN_GD, r"_LINE$")
@@ -400,6 +512,10 @@ def main():
             text = worst_numbers(text, [hours, hours, worst, line_total, line_total - worst])
         elif name == "SHIFT_LINE":
             text = worst_numbers(text, [hours, per_hour])
+        elif name == "SHIFT_LIST_LINE":
+            text = worst_numbers(text, [hours, numbers["per_night"], per_hour])
+        elif name == "DROP_LINE":
+            text = worst_numbers(text.replace("%s", longest_package, 1), [numbers["pay"]])
         elif name == "GLASS_LINE":
             text = worst_numbers(text, [repair_cost, glass, glass])
         rows.append(check_lines("strip_text", "main.gd:" + name, text, STRIP_WIDTH, STRIP_LINES))
@@ -417,12 +533,23 @@ def main():
     intro = json.load(open(os.path.join(DATA, "intro.json"), encoding="utf-8"))
     rows += intro_rows(intro, numbers)
     rows += guide_rows(intro, numbers)
+    rows += training_rows(intro, numbers)
+    # the slip's breakdown line under the call (main.gd: _slip_breakdown): the longest it can be
+    named = dict(consts(MAIN_GD, r"^SLIP_(DROP|NO_DROP|CALM)$"))
+    if len(named) < 3:
+        rows.append(("slip_call", "main.gd:SLIP_*", 0, "", " NO BREAKDOWN WORDS FOUND"))
+    else:
+        worst = "  •  ".join([max(worst_numbers(named["SLIP_DROP"], [numbers["pay"]]),
+                                  named["SLIP_NO_DROP"].replace("%s", longest_alias), key=text_width),
+                             worst_numbers(named["SLIP_CALM"], [numbers["calm_cost"] * calm_uses])])
+        rows.append(("slip_call", "main.gd:_slip_breakdown", text_width(worst), worst,
+                     " WIDER THAN THE SLIP (%d px)" % SLIP_WIDTH if text_width(worst) > SLIP_WIDTH else ""))
     bad = [r for r in rows if r[4]]
     by_kind = {}
     for kind, where, w, text, flag in rows:
         by_kind.setdefault(kind, []).append(w)
     for kind, ws in sorted(by_kind.items()):
-        unit = "lines" if kind in ("slip_text", "report_text", "strip_text", "card_text", "guide_item") else "px"
+        unit = "lines" if kind in ("slip_text", "report_text", "strip_text", "card_text", "guide_item", "training") else "px"
         print("%-12s n=%-3d max=%d %s" % (kind, len(ws), max(ws), unit))
     for kind, where, w, text, flag in bad:
         print("!! %s %s (%d)%s: %s" % (kind, where, w, flag, text))

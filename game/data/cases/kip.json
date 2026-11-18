@@ -2,7 +2,7 @@
   "id": "kip",
   "version": 2,
   "name": "Kip Marlow",
-  "role": "Courier",
+  "role": "Bike courier",
   "age": 22,
   "truth": "stable",
   "request": "Swap cracked left optic",
@@ -61,13 +61,16 @@
     "deflect": ["Uh. Can we skip that one?"],
     "reassure": ["Okay. Okay. Thanks. Long night."],
     "spent": "I really have to go. Are you doing it or not?",
-    "after:grip": "Sorry. Too much coffee."
+    "after:grip": "Sorry. Too much coffee.",
+    "code": "Sorry, what? I just need the lens."
   },
   "press": [
     {"line": "What? No! I'm not... I just need a lens! Why would you say that?",
       "face": "upset", "hands": "raise", "note": "Flinched, voice cracked. All at once."},
     {"line": "Forget it. I'll find a doc who doesn't treat me like a bomb.", "end": "walkout"}
   ],
+  "flare": {"line": "Come ON, I've got runs waiting! ...Sorry. Sorry. Long night.", "face": "upset", "hands": "slam",
+    "note": "Snapped and slapped the glass, all of him at once."},
   "attack": {"on_refer": false, "telegraph": "", "line": ""},
   "exit": {
     "treat": "Yes! Thank you. You're a lifesaver.",

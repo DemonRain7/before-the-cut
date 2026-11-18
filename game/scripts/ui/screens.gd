@@ -15,12 +15,13 @@ var help_line: String:
 
 const HELP := "mouse to play   •   T types a line   •   H guide   •   SPACE drops the shutter   •   M mutes   •   F11 fullscreen"
 const HELP_VOICE := "mouse   •   T types   •   hold TAB to speak   •   H guide   •   SPACE drops the shutter   •   M mutes   •   F11 fullscreen"
+const SUBTITLE := "The Lanterns' back-street clinic. One counter, one night, five visitors."
 const TITLE_LINES := [
-	"Compare each patient with the reference sheet on the wall.",
+	"Compare each visitor with the reference sheet on the wall.",
 	"Look, test and talk in any order, as much or as little as you like.",
 	"Then decide: TREAT the steady, call TRAUMA TEAM on the drifting.",
 	"If one turns on you, drop the shutter before the glass gives.",
-	"Keep the till over the lender's line, hour by hour.",
+	"Say the code to tonight's contacts. Keep the till over the lender's line.",
 ]
 const TILL_ROW := "Till"
 const TILL_GLASS_ROW := "Till, after %d paid for glass"
@@ -28,6 +29,11 @@ const OVER_ROW := "Over the line by"
 const UNDER_ROW := "Under the line by"
 const LINE_ROW := "The line (%d hours x %d)"
 const METER_ROW := "Meter, hour by hour"
+const DROPS_TALLY := "Drops picked up: %d of %d (+%d)"
+# under a visit's figure, what in it was not the call's own (the slip's words, in small)
+const VISIT_DROP := "drop +%d"
+const VISIT_NO_DROP := "drop missed"
+const VISIT_CALM := "calm -%d"
 
 var _t: float = 0.0
 var _age: float = 0.0
@@ -76,7 +82,7 @@ func _draw_title() -> void:
 			flicker = 0.6
 		draw_texture(logo, Vector2(floorf((Gfx.SCREEN.x - logo.get_width()) / 2.0), 48), Color(1, 1, 1, flicker))
 	var y := 176.0
-	Gfx.text_center(self, 320.0, y, "A back-street implant clinic. One counter, one night, five patients.", Gfx.TEAL7)
+	Gfx.text_center(self, 320.0, y, SUBTITLE, Gfx.TEAL7)
 	y += 18.0
 	for line in TITLE_LINES:
 		Gfx.text_center(self, 320.0, y, str(line), Gfx.TEAL5)
@@ -118,6 +124,9 @@ func _draw_report() -> void:
 		var truth := "was steady" if str(visit.get("truth", "")) == "stable" else "was drifting"
 		Gfx.text(self, Vector2(x0 + 16.0, y + 10.0), truth, Gfx.INKS)
 		Gfx.text(self, Vector2(x0 + 110.0, y + 10.0), _call_text(visit), Gfx.INKS)
+		var extra := _visit_extra(visit)
+		if extra != "":
+			Gfx.text_right(self, x1, y + 10.0, extra, Gfx.PRINT)
 		y += 23.0
 	y += 2.0
 	draw_rect(Rect2(x0, y, x1 - x0, 1), Gfx.PAPER1)
@@ -172,8 +181,28 @@ func _draw_report() -> void:
 	if injuries > 0:
 		tally += "   •   Times you were hurt: %d" % injuries
 	Gfx.text_center(self, 320.0, y, tally, Gfx.INKS)
+	# the couriers: what the night's packages did for the till, on a line of their own
+	var listed := int(report.get("contacts", 0))
+	if listed > 0:
+		var drops := int(report.get("drops", 0))
+		Gfx.text_center(self, 320.0, y + 11.0, DROPS_TALLY % [drops, listed, int(report.get("drop_total", 0))],
+			Gfx.GRN2 if drops > 0 else Gfx.INKS)
 	if _age > 0.8 and fmod(_t, 1.0) < 0.65:
 		Gfx.text_center(self, 320.0, p.end.y - 16.0, "CLICK FOR A NEW SHIFT", Gfx.RED1, true)
+
+
+## Under a visit's figure: a courier's package, or the one that never came over the counter,
+## and what the calm-patches cost. Empty for a visit that was only the call.
+func _visit_extra(visit: Dictionary) -> String:
+	var parts := PackedStringArray()
+	if bool(visit.get("dropped", false)):
+		parts.append(VISIT_DROP % int(visit.get("drop", 0)))
+	elif bool(visit.get("contact", false)):
+		parts.append(VISIT_NO_DROP)
+	var calm := int(visit.get("calm_spent", 0))
+	if calm > 0:
+		parts.append(VISIT_CALM % calm)
+	return "   ".join(parts)
 
 
 func _call_text(visit: Dictionary) -> String:

@@ -5,6 +5,12 @@ extends Node2D
 ##   port:     a close look at the socket
 ## It shows what the case data says and nothing else. It never judges what it shows: when
 ## the interaction has run its course it emits `completed` and the director writes the note.
+## What it can do is hold the sheet up beside the picture: the sheet's normal line for this
+## tool runs along the bottom (`standard`), the grip timer marks the sheet's limit, and each
+## eye, once it has had the light long enough, gets a plain readout of what it did.
+##
+## If the patient lunges or slams the glass while it is up, the director tears it away
+## (`tear`): the picture jolts, drops and is gone, and takes no more input.
 ##
 ## The picture is 220 x 186 and is shown at twice its size, like everything else beyond the
 ## glass, cut off at the edges of the window. What the instrument says (the caption, the grip
@@ -28,6 +34,7 @@ const LIT_NEEDED := 0.55
 const PUPIL_WIDE := 9.0
 const PUPIL_TIGHT := 4.0
 const FORCE_TIME := 0.55
+const TEAR_TIME := 0.24
 
 enum Grip { IDLE, SQUEEZE, HOLDING_ON, OPEN }
 
@@ -36,6 +43,8 @@ var audio: Node = null
 var caption: String = ""
 var result: String = ""
 var done: bool = false
+var standard: String = ""         # the sheet's normal line for this tool (set before open)
+var limit_s: float = 1.0          # rules.json grip.limit_ms: the release the sheet allows
 
 var _case: Dictionary = {}
 var _pid: String = ""
@@ -57,6 +66,7 @@ var _tremor: int = 0
 var _shown_time: float = -1.0
 var _port_t: float = 0.0
 var _rng := RandomNumberGenerator.new()
+var _tear_t: float = 0.0
 
 
 func _ready() -> void:
@@ -73,8 +83,9 @@ func _ready() -> void:
 	visible = false
 
 
+## Up and taking input. A close-up being torn away is no longer open.
 func is_open() -> bool:
-	return tool != ""
+	return tool != "" and _tear_t <= 0.0
 
 
 func open(p_tool: String, p_case: Dictionary, already_done: bool, p_result: String) -> void:
@@ -104,6 +115,9 @@ func open(p_tool: String, p_case: Dictionary, already_done: bool, p_result: Stri
 func close() -> void:
 	tool = ""
 	visible = false
+	_tear_t = 0.0
+	modulate = Color.WHITE
+	_layers.position = ORIGIN - Gfx.WINDOW.position
 	for c in _layers.get_children():
 		_layers.remove_child(c)
 		c.queue_free()
@@ -116,6 +130,17 @@ func close() -> void:
 func set_result(text: String) -> void:
 	result = text
 	done = true
+
+
+## The patient came at the glass: the close-up is knocked out of the doctor's hands. It jolts,
+## slips down and fades, then closes itself. Nothing it was doing completes.
+func tear() -> void:
+	if not is_open():
+		return
+	_tear_t = TEAR_TIME
+	_down = false
+	_play("tool_put", 0.7)
+	_hud.queue_redraw()
 
 
 ## The pointer, in the picture's own pixels.
@@ -303,6 +328,15 @@ func _process(delta: float) -> void:
 	if tool == "":
 		return
 	_t += delta
+	if _tear_t > 0.0:
+		_tear_t -= delta
+		var k := 1.0 - clampf(_tear_t / TEAR_TIME, 0.0, 1.0)
+		var jolt := Vector2(roundf(_rng.randf_range(-5.0, 5.0) * (1.0 - k)), roundf(70.0 * k * k))
+		_layers.position = ORIGIN - Gfx.WINDOW.position + jolt
+		modulate = Color(1, 1, 1, 1.0 - k)
+		if _tear_t <= 0.0:
+			close()
+		return
 	match tool:
 		"penlight":
 			_update_eyes(delta)
@@ -314,7 +348,7 @@ func _process(delta: float) -> void:
 
 
 func _draw_hud() -> void:
-	if tool == "":
+	if tool == "" or _tear_t > 0.0:
 		return
 	var text := result if (done and result != "") else caption
 	var col: Color = Gfx.WARM7 if (done and result != "") else Gfx.TEAL6
@@ -331,6 +365,35 @@ func _draw_hud() -> void:
 				Gfx.text(_hud, Vector2(plate.end.x - 22.0 + 9.0 * float(i), plate.position.y + 1.0), "●" if ok else "○", Gfx.WARM6 if ok else Gfx.TEAL4)
 	if tool == "grip":
 		_draw_grip_readout()
+	if tool == "penlight":
+		_draw_eye_readouts()
+	if standard != "":
+		# the sheet held up beside the picture: what a steady patient does here
+		var sp := Rect2(Gfx.WINDOW.position.x + 4.0, Gfx.WINDOW.end.y - 32.0, Gfx.WINDOW.size.x - 8.0, 12)
+		_hud.draw_rect(sp, PLATE)
+		Gfx.text(_hud, sp.position + Vector2(4, 1), "SHEET", Gfx.AMBER, true)
+		Gfx.text(_hud, sp.position + Vector2(10.0 + Gfx.text_w("SHEET", true), 1), standard, Gfx.TEAL7)
+
+
+## Under each eye, once it has had the light long enough: did the pupil tighten (an implant
+## has none), and did the eye follow. The patient's right eye is on the left of the screen.
+func _draw_eye_readouts() -> void:
+	for e in _eyes:
+		var eye: Dictionary = e
+		if float(eye["lit"]) < LIT_NEEDED:
+			continue
+		var pos: Vector2 = eye["pos"]
+		var at := ORIGIN + pos * SCALE + Vector2(0, 54)
+		var head := "RIGHT EYE" if pos == EYE_R else "LEFT EYE"
+		var what := "IMPLANT"
+		if str(eye["kind"]) == "natural":
+			what = "TIGHTENS" if bool(eye["tightens"]) else "STAYS WIDE"
+		what += ", FOLLOWS" if bool(eye["follows"]) else ", DOESN'T FOLLOW"
+		var w := maxf(Gfx.text_w(head, true), Gfx.text_w(what)) + 10.0
+		var r := Rect2(roundf(at.x - w / 2.0), at.y, w, 23)
+		_hud.draw_rect(r, PLATE)
+		Gfx.text_center(_hud, at.x, r.position.y + 1.0, head, Gfx.TEAL5, true)
+		Gfx.text_center(_hud, at.x, r.position.y + 11.0, what, Gfx.WARM7)
 
 
 func _draw_grip_readout() -> void:
@@ -358,13 +421,21 @@ func _draw_grip_readout() -> void:
 		_hud.draw_rect(Rect2(r.position.x + 4.0, r.position.y + 16.0, roundf(56.0 * _force), 6), Gfx.GRN3)
 		Gfx.text_center(_hud, r.position.x + 32.0, r.position.y + 28.0, "grip force", Gfx.TEAL4)
 		return
-	Gfx.big_center(_hud, r.position.x + 32.0, r.position.y + 2.0, "%.1fs" % shown, col)
-	# a two-second scale with a mark at one second
+	var late := shown > limit_s
+	Gfx.big_center(_hud, r.position.x + 32.0, r.position.y + 2.0, "%.1fs" % shown, Gfx.RED3 if late else col)
+	# a two-second scale with the sheet's limit marked on it; past the limit it runs red
 	var x0 := r.position.x + 4.0
 	var w := 56.0
+	var at := roundf(w * clampf(limit_s / 2.0, 0.0, 1.0))
+	var reach := roundf(w * clampf(shown / 2.0, 0.0, 1.0))
 	_hud.draw_rect(Rect2(x0, r.position.y + 25.0, w, 5), Gfx.TEAL2)
-	_hud.draw_rect(Rect2(x0, r.position.y + 25.0, roundf(w * clampf(shown / 2.0, 0.0, 1.0)), 5), Gfx.GRN3)
-	_hud.draw_rect(Rect2(x0 + w / 2.0, r.position.y + 23.0, 1, 9), Gfx.TEAL7)
+	_hud.draw_rect(Rect2(x0, r.position.y + 25.0, minf(reach, at), 5), Gfx.GRN3)
+	if reach > at:
+		_hud.draw_rect(Rect2(x0 + at, r.position.y + 25.0, reach - at, 5), Gfx.RED2)
+	_hud.draw_rect(Rect2(x0 + at, r.position.y + 23.0, 1, 9), Gfx.AMBER)
+	# the mark carries its own value and the far end of the scale has none, so the one number
+	# printed on the scale is the limit ("LIMIT 2s" at the end once read as a two-second limit)
 	Gfx.text(_hud, Vector2(x0, r.position.y + 33.0), "0", Gfx.TEAL5)
-	Gfx.text_center(_hud, x0 + w / 2.0, r.position.y + 33.0, "1", Gfx.TEAL7)
-	Gfx.text_right(_hud, x0 + w, r.position.y + 33.0, "2", Gfx.TEAL5)
+	var tag := "LIMIT %ss" % ("%.1f" % limit_s).trim_suffix(".0")
+	var half := Gfx.text_w(tag) * 0.5
+	Gfx.text_center(_hud, clampf(x0 + at, x0 + 6.0 + half, x0 + w - half), r.position.y + 33.0, tag, Gfx.AMBER)

@@ -69,13 +69,16 @@
     "deflect": ["That is not relevant."],
     "reassure": ["Thank you. I do appreciate a professional."],
     "spent": "I believe we're done with questions. Your decision, doctor.",
-    "after:grip": "Satisfied?"
+    "after:grip": "Satisfied?",
+    "code": "I'm afraid I don't follow, doctor."
   },
   "press": [
     {"line": "I understand your concern, doctor.",
       "face": "flat", "hands": "fist", "note": "Calm face, level voice. His fist creaked shut."},
     {"line": "Unfortunate.", "end": "attack"}
   ],
+  "flare": {"line": "Faster, doctor.", "face": "flat", "hands": "slam",
+    "note": "His palm hit the glass. His face never moved."},
   "attack": {"on_refer": true,
     "telegraph": "His optics snap to pinpoints. The rig under his sleeve whines.",
     "line": "The rig disagrees."},

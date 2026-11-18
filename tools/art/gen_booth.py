@@ -8,8 +8,8 @@ and open when they are clicked.
 
 Screen layout (640 x 360):
   window      100,0    440 x 300   transparent here; view pixels are 2 x 2 screen pixels
-  left wall     0,0    100 x 300   pinboard (reference sheet, guide), lender's meter, hall monitor
-  right wall  540,0    100 x 300   pinboard (intake card, notice), control plate with four pads
+  left wall     0,0    100 x 300   pinboard (reference sheet, contact list), lender's meter, hall monitor
+  right wall  540,0    100 x 300   pinboard (intake card, counter guide), control plate with four pads
   desk          0,300  640 x 60    tool mat, transcript (drawn by the game), talk mat
 """
 import os
@@ -72,28 +72,6 @@ def pinboard(c, x0, y0, x1, y1, glow_x):
     c.glow(cork, "warm4", glow_x, y1 + 60, 120, amt=0.5)
     c.fill(c.rect(x0 + 3, y0 + 3, x1 - 3, y0 + 3), "warm0")
     c.fill(c.rect(x0 + 3, y0 + 3, x0 + 3, y1 - 3), "warm0")
-
-
-def notice(c, x0, y0):
-    """A house notice under the intake card. It is the one piece of advice the wall gives."""
-    w, h = 76, 60
-    c.fill(c.rect(x0 + 2, y0 + 2, x0 + w, y0 + h), "ink0", 120)
-    p = c.rect(x0, y0, x0 + w - 1, y0 + h - 1)
-    yy, xx = c.grid()
-    c.fill(p, "paper3")
-    c.dither(p, "paper2", np.clip((yy - y0) / float(h) * 0.5, 0, 0.5))
-    c.fill(c.rect(x0, y0 + h - 1, x0 + w - 1, y0 + h - 1), "paper1")
-    c.fill(c.rect(x0, y0, x0 + w - 1, y0 + 11), "red1")
-    c.fill(c.rect(x0, y0 + 11, x0 + w - 1, y0 + 11), "red0")
-    lines = (("HOUSE RULE", "paper4", True, 1), ("THEY TURN?", "inkt", True, 15), ("DROP THE", "inks", False, 27),
-             ("SHUTTER.", "inks", False, 37), ("[SPACE]", "red1", True, 48))
-    for s, colr, bold, dy in lines:
-        tw = text_width(s, bold)
-        assert tw <= w - 4, "notice line too wide: %s (%d)" % (s, tw)
-        draw_text(c, x0 + (w - tw) // 2, y0 + dy, s, colr, bold=bold)
-    mx = x0 + w // 2
-    c.fill(c.rect(mx - 1, y0 - 2, mx, y0), "cyan2")
-    c.px(mx - 1, y0 - 2, "white")
 
 
 def meter(c):
@@ -199,7 +177,6 @@ def booth():
     walls(c)
     pinboard(c, 4, 4, 91, 164, 120)
     pinboard(c, 548, 4, 623, 184, 520)
-    notice(c, 548, 122)
     meter(c)
     thumb(c)
     controls(c)
@@ -309,6 +286,48 @@ def obj_guide():
     return c
 
 
+def obj_list():
+    """Tonight's contacts: a strip of tractor-feed printout under a red tack, the Lanterns'
+    paper lantern stamped in the corner. The handler pins a fresh one up every night."""
+    c = Canvas(80, 46)
+    yy, xx = c.grid()
+    c.fill(c.rect(6, 6, 77, 45), "ink0", 120)
+    p = c.rect(4, 3, 75, 43)
+    c.fill(p, "paper3")
+    c.dither(p, "paper2", np.clip(xx / 80.0 * 0.3 + yy / 46.0 * 0.3 - 0.1, 0, 0.5))
+    # the feed margins, their holes and the perforation beside them
+    for x in (4, 69):
+        c.fill(c.rect(x, 3, x + 6, 43), "paper2")
+        for y in range(6, 42, 6):
+            c.fill(c.rect(x + 2, y, x + 3, y + 1), "warm1")
+    for x in (11, 68):
+        c.fill(c.rect(x, 3, x, 43) & ((yy % 2) == 0), "paper1")
+    # the header in lantern red
+    c.fill(c.rect(12, 5, 67, 16), "red1")
+    c.fill(c.rect(12, 17, 67, 17), "red0")
+    tw = text_width("CONTACTS", True)
+    assert tw <= 54, "list header too wide (%d)" % tw
+    draw_text(c, 40 - tw // 2, 6, "CONTACTS", "paper4", bold=True)
+    # two printed entries: an alias, then its lines
+    for i, y in enumerate((21, 32)):
+        c.fill(c.rect(14, y, 14 + (24, 30)[i], y + 1), "inkt")
+        c.fill(c.rect(14, y + 4, 14 + (40, 34)[i], y + 4), "inks")
+        c.fill(c.rect(14, y + 7, 14 + (32, 38)[i], y + 7), "inks")
+    # the paper lantern
+    lan = c.ell(61, 31, 4, 5)
+    c.fill(lan, "red2")
+    c.fill(c.rect(60, 29, 62, 33) & lan, "amber")
+    c.fill(c.rect(59, 25, 63, 25), "ink1")
+    c.fill(c.rect(59, 37, 63, 37), "ink1")
+    c.fill(c.rect(61, 23, 61, 24), "ink1")
+    c.fill(c.rect(4, 43, 75, 43), "paper1")
+    c.outline("ink0", p)
+    # the tack
+    c.fill(c.ell(40, 2, 2.5, 2.2), "red2")
+    c.px(39, 1, "white")
+    return c
+
+
 def tool_glass():
     """The glazier's key on the control plate: a pane with a fresh pane sliding over it."""
     c = Canvas(36, 38)
@@ -353,7 +372,8 @@ def main():
     b.save("clinic/booth.png")
     cp = cam_panel()
     cp.save("clinic/cam_panel.png")
-    things = {"obj_sheet": obj_sheet(), "obj_card": obj_card(), "obj_guide": obj_guide(), "tool_glass": tool_glass(),
+    things = {"obj_sheet": obj_sheet(), "obj_card": obj_card(), "obj_guide": obj_guide(), "obj_list": obj_list(),
+              "tool_glass": tool_glass(),
               "pad_w": pad(40, 54), "pad_w_hot": pad(40, 54, hot=True)}
     for name, canvas in things.items():
         canvas.save("ui/%s.png" % name)
@@ -379,8 +399,9 @@ def main():
     except Exception as err:
         print("booth composite without the icons:", err)
     comp.blit(things["obj_sheet"], 8, 8)
-    comp.blit(things["obj_guide"], 8, 112)
+    comp.blit(things["obj_list"], 8, 112)
     comp.blit(things["obj_card"], 546, 8)
+    comp.blit(things["obj_guide"], 546, 128)
     comp.blit(things["tool_glass"], 596, 248)
     os.makedirs(OUT, exist_ok=True)
     comp.scaled(2).image().convert("RGB").save(os.path.join(OUT, "booth_empty.png"))

@@ -6,8 +6,9 @@ extends Node2D
 ##   on the desk, right of it:            the three ways of talking
 ##   on the plate by the right wall:      the TREAT stamp, the Trauma Team call box, the
 ##                                        shutter lever and the key that orders new glass
-##   pinned to the walls:                 the reference sheet and the counter guide (left),
-##                                        the intake card on its clipboard (right)
+##   pinned to the walls:                 the reference sheet and tonight's contact list
+##                                        (left), the intake card on its clipboard and the
+##                                        counter guide (right)
 ## It only draws and reports what is under the pointer; the director decides what a click means.
 
 const Gfx = preload("res://scripts/ui/gfx.gd")
@@ -26,11 +27,12 @@ const PADS := [
 	# pays the glazier for one layer of the counter glass (between patients)
 	{"id": "glass", "rect": Rect2(594, 245, 40, 54), "icon": "ui/tool_glass.png", "label": "GLASS"},
 ]
-# the papers on the walls. Taken down, the sheet and the card are drawn by the clipboard.
+# the papers on the walls. Taken down, the sheet, the list and the card are drawn by the clipboard.
 const OBJECTS := [
 	{"id": "sheet", "rect": Rect2(8, 8, 80, 92), "art": "ui/obj_sheet.png"},
-	{"id": "guide", "rect": Rect2(8, 112, 80, 46), "art": "ui/obj_guide.png"},
+	{"id": "list", "rect": Rect2(8, 112, 80, 46), "art": "ui/obj_list.png"},
 	{"id": "card", "rect": Rect2(546, 8, 80, 104), "art": "ui/obj_card.png"},
+	{"id": "guide", "rect": Rect2(546, 128, 80, 46), "art": "ui/obj_guide.png"},
 ]
 
 var hover: String = ""           # the pad or the wall object under the pointer
@@ -65,7 +67,7 @@ func pad_rect(id: String) -> Rect2:
 	return Rect2()
 
 
-## The paper on the wall under the pointer: "sheet", "guide", "card" or "".
+## The paper on the wall under the pointer: "sheet", "list", "card", "guide" or "".
 func object_at(pos: Vector2) -> String:
 	for o in OBJECTS:
 		var obj: Dictionary = o

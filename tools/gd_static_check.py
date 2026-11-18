@@ -70,6 +70,12 @@ OBJECTS_PER_FILE = {
     "tests/run_ui_smoke.gd": {
         "main": UI + "main.gd",
     },
+    "scripts/ui/main.gd": {
+        "coach": UI + "coach.gd",
+        "clipboard": UI + "clipboard.gd",
+        "guide": UI + "guide.gd",
+        "desk": UI + "desk.gd",
+    },
 }
 
 # Members every object has (from RefCounted / Node / Control), so they are never reported.

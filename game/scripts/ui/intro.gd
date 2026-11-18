@@ -28,6 +28,7 @@ const SETTLED := 6.0         # by now every picture has finished moving
 const RUSH := 5.0            # how much faster a picture runs once its text was hurried
 const FOOT := "ENTER or click: next   •   ESC: skip"
 const SKY_H := 330.0         # the towers picture is taller than its frame: the view pans down it
+const ARTS := ["towers", "lease", "lanterns", "line", "drift", "counter"]   # what _draw_art() can draw
 
 var skipped: bool = false    # the player skipped the rest
 var index: int = 0           # the card on screen
@@ -251,6 +252,8 @@ func _draw_art() -> void:
 			_art_towers(_card_t)
 		"lease":
 			_art_lease(_card_t, labels)
+		"lanterns":
+			_art_lanterns(_card_t, labels)
 		"line":
 			_art_line(_card_t, labels)
 		"drift":
@@ -258,6 +261,7 @@ func _draw_art() -> void:
 		"counter":
 			_art_counter(_card_t, labels)
 		_:
+			# a name missing from ARTS: an empty frame (the UI smoke test fails on it)
 			_r(0, 0, ART.size.x, ART.size.y, Gfx.INK1)
 
 
@@ -465,6 +469,145 @@ func _art_lease(t: float, labels: Dictionary) -> void:
 		Gfx.outline(_art, box, ink)
 		Gfx.outline(_art, box.grow(-1.0), ink)
 		Gfx.text_center(_art, box.position.x + box.size.x / 2.0, box.position.y + box.size.y / 2.0 - 5.0, word, ink, true)
+
+
+## Tonight's list on the clinic wall, under the Lanterns' red lamp: the code is said to the right
+## visitor, and a package comes over the counter. Both entries are made up; their clues fit none
+## of the game's visitors (data/intro.json says so in its note).
+func _art_lanterns(t: float, labels: Dictionary) -> void:
+	var w := ART.size.x
+	var h := ART.size.y
+	var counter_y := 150.0
+	var said_at := 2.0                 # SAY is pressed on the first entry
+	var slide_at := said_at + 0.9      # the package starts over the counter
+	var picked_at := slide_at + 0.8    # and the entry is stamped
+	# the back wall: bricks in the dark
+	_r(0, 0, w, h, Gfx.INK1)
+	for row in int(counter_y / 10.0):
+		var yy := 4.0 + 10.0 * float(row)
+		_r(0, yy, w, 1, Gfx.TEAL1)
+		var xx := 12.0 if row % 2 == 1 else 0.0
+		while xx < w:
+			_r(xx, yy + 1.0, 1, 9, Gfx.TEAL1)
+			xx += 24.0
+	# the lamp: a red paper lantern swaying a little on its cord. Now and then it gutters.
+	var lit := int(t * 8.0) % 29 != 0
+	var lx := 318.0 + floorf(sin(t * 1.3) * 2.0 + 0.5)
+	var glow := 0.06 if lit else 0.03      # its light on the bricks, in rings that fade out
+	_ellipse(Vector2(lx, 64), 96.0, 84.0, Color(Gfx.RED1, glow))
+	_ellipse(Vector2(lx, 58), 70.0, 62.0, Color(Gfx.RED1, glow))
+	_ellipse(Vector2(lx, 52), 48.0, 44.0, Color(Gfx.RED1, glow))
+	_ellipse(Vector2(lx, 44), 32.0, 28.0, Color(Gfx.RED2, glow * 1.6))
+	_art.draw_line(Vector2(318.5, 0), Vector2(lx + 0.5, 18), Gfx.TEAL3)
+	_r(lx - 7.0, 18, 14, 4, Gfx.INK0)
+	_ellipse(Vector2(lx, 43), 17.0, 21.0, Gfx.RED1)
+	_ellipse(Vector2(lx, 43), 13.0, 19.0, Gfx.RED2 if lit else Gfx.RED1)
+	for rib in 4:
+		var ry := 31.0 + 8.0 * float(rib)
+		var half := floorf(17.0 * sqrt(maxf(0.0, 1.0 - pow((ry - 43.0) / 21.0, 2.0))))
+		_r(lx - half, ry, half * 2.0, 1, Gfx.RED1)
+	if lit:
+		_r(lx - 6.0, 36, 2, 14, Color(Gfx.RED3, 0.6))      # the flame inside, through the paper
+	_r(lx - 7.0, 64, 14, 3, Gfx.INK0)
+	_r(lx - 1.0, 67, 2, 3, Gfx.RED1)
+	_r(lx - 2.0, 70, 4, 9, Gfx.RED2 if lit else Gfx.RED1)
+	# the courier across the counter: a hood and shoulders, the lamp's red down one side
+	var rim := Color(Gfx.RED1, 0.9 if lit else 0.5)
+	var cx := 282.0
+	_ellipse(Vector2(cx, 102), 11.0, 13.0, Gfx.INK0)
+	for i in 13:
+		var dy := -13.0 + 2.0 * float(i)
+		var edge := floorf(11.0 * sqrt(maxf(0.0, 1.0 - dy * dy / 169.0)))
+		_r(cx + edge - 1.0, 102.0 + dy, 1, 2, rim)
+	_r(cx - 5.0, 103, 2, 1, Gfx.TEAL4)
+	_r(cx + 2.0, 103, 2, 1, Gfx.TEAL4)
+	var sy := 112.0
+	while sy < counter_y:
+		var half := 12.0 + minf(10.0, (sy - 112.0) * 0.9)
+		_r(cx - half, sy, half * 2.0, 2, Gfx.INK0)
+		_r(cx + half - 1.0, sy, 1, 2, rim)
+		sy += 2.0
+	if t >= said_at + 0.3 and t < slide_at + 0.6:
+		# they know the code: a word back
+		for d in mini(3, 1 + int((t - said_at - 0.3) / 0.15)):
+			_r(cx + 16.0 + 4.0 * float(d), 92, 2, 2, Gfx.TEAL6)
+	_r(0, counter_y, w, h - counter_y, Gfx.TEAL1)
+	_r(0, counter_y, w, 1, Gfx.TEAL3)
+	_r(0, counter_y + 4.0, w, 1, Gfx.TEAL2)
+	# the list, pinned up beside the window: a printout like the one on the wall in the game
+	var px := 18.0
+	var py := 6.0
+	var pw := 196.0
+	var ph := 140.0
+	_r(px + 3.0, py + 3.0, pw, ph, Color(0, 0, 0, 0.5))
+	_r(px, py, pw, ph, Gfx.PAPER3)
+	Gfx.outline(_art, Rect2(px, py, pw, ph), Gfx.PAPER1)
+	for i in int(ph / 10.0):
+		_r(px + 3.0, py + 5.0 + 10.0 * float(i), 2, 2, Gfx.INKS)          # the feed holes
+		_r(px + pw - 5.0, py + 5.0 + 10.0 * float(i), 2, 2, Gfx.INKS)
+	var tx := px + 12.0
+	var right := px + pw - 12.0
+	Gfx.text_center(_art, px + pw / 2.0, py + 4.0, str(labels.get("head", "")), Gfx.RED1, true)
+	_r(tx, py + 15.0, right - tx, 1, Gfx.RED1)
+	var entries: Array = labels.get("entries", [])
+	var say := str(labels.get("say", ""))
+	var say_w := maxf(30.0, Gfx.text_w(say, true) + 10.0)
+	for i in mini(entries.size(), 2):
+		var at := 0.4 + 0.5 * float(i)
+		if t < at:
+			break
+		var e: Dictionary = entries[i]
+		var ey := py + 22.0 + 52.0 * float(i)
+		if i > 0:
+			_r(tx, ey - 6.0, right - tx, 1, Color(Gfx.PAPER1, 0.8))
+		Gfx.text(_art, Vector2(tx, ey), str(e.get("alias", "")).substr(0, int((t - at) * 40.0)), Gfx.INKT, true)
+		var clues: Array = e.get("clues", [])
+		for k in clues.size():
+			if t >= at + 0.2 + 0.12 * float(k):
+				Gfx.text(_art, Vector2(tx, ey + 11.0 + 10.0 * float(k)), "• " + str(clues[k]), Gfx.INKT)
+		if t >= at + 0.45:
+			Gfx.text(_art, Vector2(tx, ey + 32.0), "\"%s\"" % str(e.get("code", "")), Gfx.INKS)
+		if t < at + 0.5:
+			continue
+		if i == 0 and t >= picked_at:
+			# settled: stamped the way the list in the game stamps it
+			_cue_once("picked", "stamp")
+			var word := str(labels.get("picked", ""))
+			var land := clampf((t - picked_at) / 0.12, 0.0, 1.0)
+			var sw := Gfx.text_w(word, true) + 6.0
+			var box := Rect2(right - sw, ey - 2.0, sw, 13).grow(floorf((1.0 - land) * 3.0))
+			var ink := Gfx.STAMP_G if land >= 1.0 else Gfx.GRN4
+			Gfx.outline(_art, box, ink)
+			Gfx.text_center(_art, box.position.x + box.size.x / 2.0, box.position.y + box.size.y / 2.0 - 5.0, word, ink, true)
+			continue
+		if i == 0 and t >= said_at:
+			_cue_once("say", "click")
+		var hot := i == 0 and t >= said_at - 0.5
+		var button := Rect2(right - say_w, ey - 1.0, say_w, 11)
+		_r(button.position.x + 1.0, button.position.y + 1.0, button.size.x, button.size.y, Color(0, 0, 0, 0.3))
+		if i == 0 and t >= said_at and t < said_at + 0.16:
+			button.position += Vector2(1, 1)     # pressed
+		_r(button.position.x, button.position.y, button.size.x, button.size.y, Gfx.RED2 if hot else Gfx.RED1)
+		Gfx.text_center(_art, button.position.x + button.size.x / 2.0, button.position.y + 1.0, say, Gfx.PAPER3, true)
+	_r(tx, py + 122.0, right - tx, 1, Gfx.PAPER1)
+	for i in 2:
+		_r(tx + 10.0, py + 127.0 + 6.0 * float(i), 110.0 + floorf(_rnd(i + 60) * 40.0), 1, Gfx.PAPER2)
+	# the package slides over the counter, and the till is the better for it
+	if t >= slide_at:
+		var slide := clampf((t - slide_at) / 0.45, 0.0, 1.0)
+		slide = 1.0 - (1.0 - slide) * (1.0 - slide)
+		var bx := floorf(lerpf(268.0, 228.0, slide))
+		var by := counter_y - 14.0
+		_r(bx + 2.0, by + 2.0, 32, 13, Color(0, 0, 0, 0.45))
+		_r(bx, by, 32, 14, Gfx.TEAL3)
+		_r(bx, by, 32, 1, Gfx.TEAL5)
+		_r(bx, by + 13.0, 32, 1, Gfx.INK0)
+		_r(bx + 13.0, by, 6, 14, Gfx.WARM5)       # tape
+		_r(bx + 3.0, by + 4.0, 5, 5, Gfx.RED2)     # the Lanterns' seal
+		if slide >= 1.0:
+			_cue_once("drop", "cash")
+			var rise := clampf((t - slide_at - 0.45) / 0.5, 0.0, 1.0)
+			Gfx.text_center(_art, bx + 16.0, by - 14.0 - floorf(rise * 8.0), Gfx.fill(str(labels.get("drop", "")), _numbers), Gfx.GRN4, true)
 
 
 ## The lender's meter: the line climbs one step an hour. Over it the counter stays open; under

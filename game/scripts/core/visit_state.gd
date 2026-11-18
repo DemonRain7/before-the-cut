@@ -7,6 +7,15 @@ extends RefCounted
 ## Tests, questions and pressure cost patience. At 0 the patient gives an ultimatum; if nobody
 ## decides or reassures them in time they leave by themselves (outcome "gave_up": no fee, no
 ## bill, no call). The wait is the director's clock; the rule and its length are here.
+## CALM (reassure) is a calm-patch from the drawer: it costs credits as well as a use.
+##
+## Contacts (rules version 6): a visitor may be one of tonight's couriers. The player says the
+## code line of an entry on the list; the right courier answers and hands over the package, and
+## anyone else answers with their own puzzled line for a little patience, so a wrong code says
+## nothing about who is a courier. Codes are game-owned: no model call, no history tag.
+## Surprises (rules version 6): each action is rolled once. A drifting patient may snap and
+## attack mid-exam; anyone may flare once a visit (a shout and a hand on the glass, never an
+## attack, TEMPER evidence only). The training visit has neither.
 ## This class owns the truth, the evidence, patience, attacks and the result. The patient
 ## AI supplies original dialogue and decides exam cooperation. The offline script alone
 ## uses authored move choices. Physical test readings, scoring and attack timing stay here.
@@ -41,11 +50,21 @@ var last_recorded_speech: String = ""  # memory only; never written to the event
 var press_count: int = 0
 var reassure_left: int = 0
 var reassure_used: int = 0
-var attack_cause: String = ""    # "refer" or "press"
+var attack_cause: String = ""    # "refer", "press" or "snap"
 var blows_taken: int = 0         # blows that reached the glass before the shutter was down
 var verdict_kind: String = ""    # "treat", "refer" or ""
 var outcome: String = ""
 var history: Array = []          # short tags, newest last (sent to the patient brain)
+var contact: Dictionary = {}     # tonight's contact entry when this visitor is a courier, else {}
+var dropped: bool = false        # the courier answered the code and handed the package over
+var drop_pay: int = 0            # what the drop put in the till
+var codes_tried: Dictionary = {} # entry id -> true: wrong codes already said to this visitor
+var codes_wrong: int = 0
+var calm_spent: int = 0          # credits CALM took off the till
+var actions: int = 0             # actions rolled for a snap or a flare
+var surprises: bool = true       # false on the training visit: nobody snaps or flares
+var snapped: bool = false
+var flared: bool = false
 
 
 func _init(p_case: Dictionary = {}, p_rules: Dictionary = {}) -> void:
@@ -59,6 +78,11 @@ func _init(p_case: Dictionary = {}, p_rules: Dictionary = {}) -> void:
 		marks[row] = 0
 	if not port_covered():
 		granted["port"] = true
+
+
+## Tonight's list says this visitor is a courier (an entry of data/contacts.json "pool").
+func set_contact(entry: Dictionary) -> void:
+	contact = entry.duplicate(true)
 
 
 # ------------------------------------------------------------------ helpers
@@ -374,9 +398,15 @@ func apply_ask(topic_id: String, move: String) -> Dictionary:
 	return res
 
 
-## Reassurance: a little patience back, and refused tools will be allowed next time.
+## What one CALM costs in credits: a calm-patch from the drawer.
+func reassure_cost() -> int:
+	return maxi(0, int(_rule("reassure", "cost", 0)))
+
+
+## Reassurance: a little patience back, and refused tools will be allowed next time. It costs
+## reassure_cost() credits; the till may go below zero for it.
 func reassure() -> Dictionary:
-	var res := {"result": "closed", "line": ""}
+	var res := {"result": "closed", "line": "", "cost": 0}
 	if phase != Phase.EXAM:
 		return res
 	if reassure_left <= 0:
@@ -384,6 +414,8 @@ func reassure() -> Dictionary:
 		return res
 	reassure_left -= 1
 	reassure_used += 1
+	calm_spent += reassure_cost()
+	res["cost"] = reassure_cost()
 	patience = mini(patience_max, patience + int(_rule("reassure", "gain", 1)))
 	for tool in refusals.keys():
 		if not granted.has(tool):
@@ -423,6 +455,129 @@ func press() -> Dictionary:
 		res["result"] = "react"
 		seen["press"] = true
 		res["new"] = add_note("temper", "press", str(entry.get("note", "")))
+	return res
+
+
+# ------------------------------------------------------------------ contacts
+func is_contact() -> bool:
+	return not contact.is_empty()
+
+
+## The patience a wrong code costs. A code of any kind needs at least this much patience left
+## (and some patience at all), so a patient on the way out cannot be sounded for free.
+func code_cost() -> int:
+	return maxi(0, int(_rule("contacts", "wrong_cost", 1)))
+
+
+## The player says the code line of one entry of tonight's list.
+## result: "drop" (the right courier: the answer, the package and the pay; free) |
+##   "blank" (anyone else, or another courier's code: their own puzzled line, code_cost()) |
+##   "tried" (that code was already said to them: nothing happens, free) |
+##   "done" (the drop is made already) | "short" (no patience left to listen) | "closed"
+func say_code(entry: Dictionary) -> Dictionary:
+	var id := str(entry.get("id", ""))
+	var res := {"result": "closed", "id": id, "cost": 0, "line": "", "pay": 0, "package": ""}
+	if phase != Phase.EXAM or id == "":
+		return res
+	if dropped:
+		res["result"] = "done"
+		return res
+	if codes_tried.has(id):
+		res["result"] = "tried"
+		return res
+	var cost := code_cost()
+	if patience <= 0 or patience < cost:
+		res["result"] = "short"
+		return res
+	if is_contact() and str(contact.get("id", "")) == id:
+		dropped = true
+		drop_pay = maxi(0, int(_rule("contacts", "pay", 0)))
+		res["result"] = "drop"
+		res["line"] = str(contact.get("answer", ""))
+		res["pay"] = drop_pay
+		res["package"] = str(contact.get("package", ""))
+		return res
+	patience -= cost
+	codes_tried[id] = true
+	codes_wrong += 1
+	res["result"] = "blank"
+	res["cost"] = cost
+	res["line"] = _first_line("code")
+	return res
+
+
+## What this visit has done to the till so far, before its outcome is known: the drop in,
+## CALM out.
+func till_change() -> int:
+	return drop_pay - calm_spent
+
+
+# ------------------------------------------------------------------ surprises
+## The chance that the action just counted is the one a drifting patient snaps on.
+func snap_chance() -> float:
+	if not surprises or not is_drifting():
+		return 0.0
+	var grace := int(_rule("snap", "grace", 3))
+	var step := float(_rule("snap", "step", 0.0))
+	var top := float(_rule("snap", "max", 0.0))
+	return clampf(float(actions - grace) * step, 0.0, top)
+
+
+## The chance that the action just counted brings the visit's one flare.
+func flare_chance() -> float:
+	if not surprises or flared or case_data.get("flare", {}).is_empty():
+		return 0.0
+	if actions <= int(_rule("flare", "grace", 1)):
+		return 0.0
+	return clampf(float(_rule("flare", "chance", 0.0)), 0.0, 1.0)
+
+
+## One action of the player's: a tool, a question, pressure, CALM, a code or their own words.
+## Looking is free and is not one. Counts it and rolls, with the director's generator, whether
+## the patient snaps (drifting only) or flares (anyone, once a visit). Returns "snap", "flare"
+## or "". Nothing happens yet: snap() and flare() do it when the director is ready.
+func roll_action(rng: RandomNumberGenerator) -> String:
+	if phase != Phase.EXAM:
+		return ""
+	actions += 1
+	var s := snap_chance()
+	if s > 0.0 and rng.randf() < s:
+		return "snap"
+	var f := flare_chance()
+	if f > 0.0 and rng.randf() < f:
+		return "flare"
+	return ""
+
+
+## A drifting patient turns mid-exam. What follows is the ordinary attack.
+func snap() -> bool:
+	if phase != Phase.EXAM or not is_drifting():
+		return false
+	phase = Phase.ATTACK
+	attack_cause = "snap"
+	snapped = true
+	_note("snap")
+	return true
+
+
+## A shout and a hand slammed on the glass. Never an attack. The note is TEMPER evidence and
+## agrees with the case: face and voice together for the steady, not for the drifting.
+func flare() -> Dictionary:
+	var res := {"ok": false, "line": "", "face": "", "hands": "", "note": "", "new": false}
+	if phase != Phase.EXAM or flared:
+		return res
+	var spec: Dictionary = case_data.get("flare", {})
+	if spec.is_empty():
+		return res
+	flared = true
+	seen["flare"] = true
+	res["ok"] = true
+	res["line"] = str(spec.get("line", ""))
+	res["face"] = str(spec.get("face", ""))
+	res["hands"] = str(spec.get("hands", ""))
+	res["note"] = str(spec.get("note", ""))
+	res["new"] = add_note("temper", "flare", str(res["note"]))
+	_note("flare")
 	return res
 
 
@@ -510,6 +665,8 @@ func cycle_mark(row: String) -> int:
 
 
 func row_seen(row: String) -> bool:
+	if row == "temper" and seen.has("flare"):
+		return true      # a flare shows the temper as plainly as pressure does
 	var spec: Dictionary = case_data.get("rows", {}).get(row, {})
 	for key in spec.get("evidence", []):
 		if seen.has(str(key)):
@@ -544,7 +701,8 @@ func is_correct(p_outcome: String) -> bool:
 	return false
 
 
-## Everything the result slip needs. Only meaningful once the visit is DONE.
+## Everything the result slip needs. Only meaningful once the visit is DONE. "credits" is what
+## the visit put in the till in all: the outcome's credits, the drop, less CALM.
 func settlement() -> Dictionary:
 	var key := outcome
 	if outcome.begins_with("treated"):
@@ -577,7 +735,8 @@ func settlement() -> Dictionary:
 		"outcome": outcome,
 		"verdict": verdict_kind,
 		"truth": str(case_data.get("truth", "stable")),
-		"credits": credits_for(outcome),
+		"credits": credits_for(outcome) + till_change(),
+		"outcome_credits": credits_for(outcome),
 		"correct": is_correct(outcome),
 		"injured": outcome == "hit",
 		"title": str(text.get("title", outcome.to_upper())),
@@ -588,4 +747,16 @@ func settlement() -> Dictionary:
 		"crossed": crossed(),
 		"blows": blows_taken,
 		"grade": shutter_grade(),
+		"cause": attack_cause,
+		"contact": is_contact(),
+		"contact_id": str(contact.get("id", "")),
+		"alias": str(contact.get("alias", "")),
+		"dropped": dropped,
+		"drop": drop_pay,
+		"package": str(contact.get("package", "")) if dropped else "",
+		"missed_drop": is_contact() and not dropped,
+		"calm_spent": calm_spent,
+		"codes_wrong": codes_wrong,
+		"snapped": snapped,
+		"flared": flared,
 	}

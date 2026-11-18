@@ -68,13 +68,16 @@
     "deflect": ["Not your business."],
     "reassure": ["...Yeah. All right. Long week."],
     "spent": "Enough tests. Cut or don't.",
-    "after:grip": "See? It shakes. It still lets go."
+    "after:grip": "See? It shakes. It still lets go.",
+    "code": "What are you on about?"
   },
   "press": [
     {"line": "You calling me a psycho? Say it again. SAY IT AGAIN.",
       "face": "angry", "hands": "slam", "note": "Roared and hit the counter, all at once."},
     {"line": "Keep your chair. I'll get it done at the docks.", "end": "walkout"}
   ],
+  "flare": {"line": "Are we DONE yet? ...Get on with it.", "face": "angry", "hands": "slam",
+    "note": "Barked and banged the glass. Face and voice together."},
   "attack": {"on_refer": false, "telegraph": "", "line": ""},
   "exit": {
     "treat": "About time.",

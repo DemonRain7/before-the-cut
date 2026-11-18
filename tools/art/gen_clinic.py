@@ -544,6 +544,21 @@ def paper(w, h, base="paper3", shade="paper2", edge="paper1", seed=1, stain=Fals
     return c
 
 
+def printout(w, h, seed=4):
+    """Tonight's contact list as it lies on the desk: tractor-feed printout with a hole every
+    ten pixels down both margins and a perforation beside each."""
+    c = paper(w, h, seed=seed)
+    yy, xx = c.grid()
+    p = c.rect(0, 0, w - 1, h - 1)
+    for x in (0, w - 11):
+        c.dither(c.rect(x, 0, x + 10, h - 1) & p, "paper2", 0.5)
+        for y in range(6, h - 3, 10):
+            c.fill(c.ell(x + 5, y, 2.2, 2.2), "warm0")
+    for x in (11, w - 12):
+        c.fill(c.rect(x, 0, x, h - 2) & ((yy % 3) == 0), "paper1")
+    return c
+
+
 def clip():
     c = Canvas(64, 16)
     body = c.rrect(4, 4, 59, 14, 3)
@@ -588,6 +603,8 @@ def main():
     bd.save(d + "/board.png")
     sheet = paper(232, 164, seed=2, stain=True)
     sheet.save(d + "/sheet.png")
+    lst = printout(232, 164)
+    lst.save(d + "/list.png")
     rec = paper(232, 186, base="manila3", shade="manila2", edge="manila1", seed=3, holes=True)
     rec.save(d + "/record.png")
     cl = clip()

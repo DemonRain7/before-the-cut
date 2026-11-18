@@ -63,13 +63,16 @@
     "deflect": ["It isn't worth your time."],
     "reassure": ["Thank you, dear. You're kind."],
     "spent": "I shouldn't keep you. Just tell me, doctor.",
-    "after:grip": "Sorry. It holds on sometimes."
+    "after:grip": "Sorry. It holds on sometimes.",
+    "code": "I'm sorry, dear. I don't follow."
   },
   "press": [
     {"line": "I'd rather you didn't say that.",
       "face": "blank", "hands": "freeze", "note": "Went still. Empty face, flat voice."},
     {"line": "Oh. Oh no. Doctor, the hands...", "end": "attack"}
   ],
+  "flare": {"line": "Oh! I'm sorry, dear. It does that.", "face": "blank", "hands": "slam",
+    "note": "Her hand hit the glass on its own. Her face stayed empty."},
   "attack": {"on_refer": false,
     "telegraph": "Her hands rise before she does. The torch arm lights.",
     "line": "I'm sorry. I'm so sorry."},

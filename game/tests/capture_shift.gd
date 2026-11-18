@@ -12,19 +12,26 @@ extends SceneTree
 ## moment it waits for never came. Use it to check this script without opening a window:
 ##   godot --headless --audio-driver Dummy --fixed-fps 60 --path game --script res://tests/capture_shift.gd
 ##
-## Four shifts are played, so that the opening, the guide, the booth walls, the hourly meter,
-## the doctor's own marks, a patient who runs out of patience, every way an attack can end and
-## the glass fitter are all seen:
-##   shift 1: the opening cards, the hall camera's two monitors and the counter guide; Kip is
-##            examined with the reference sheet and the intake card taken down from the walls,
-##            ticked on the card, spoken to on the typing line and through push-to-talk (staged);
-##            Rook's temper gets one cross; Vale gets two, is called in, turns, and is stopped
-##            after the second blow (saw); Juno is seen thinking (staged); Maren gets through
-##            what is left of the glass (torch)
-##   shift 2: a false alarm puts the first hour under the line; Trauma Team takes Rook away; Vale
-##            gets through whole glass (saw); Maren is stopped in time with no glass left (torch)
-##   shift 3: Kip runs out of patience, is held once and then leaves by himself; Vale is stopped
-##            before the first blow (saw); Maren is stopped after the third, with the glass gone (torch)
+## Four shifts are played, so that the opening, the first night's training, tonight's contact
+## list and its codes, the guide, the booth walls, the hourly meter, the doctor's own marks, a
+## flare, a snap, a patient who runs out of patience, every way an attack can end and the glass
+## fitter are all seen:
+##   shift 1: the opening cards, then the first night's training, one frame a tip: tonight's list
+##            and how to read it, the hall camera's two monitors, Kip's intake card, his code and
+##            his package, the reference sheet, the three tools with what the sheet expects drawn
+##            into each close-up, the talk pads with CALM's price, the doctor's tick, the decision
+##            and, on the slip, the last tip. Kip is also looked at, asked, pressed, calmed (paid),
+##            spoken to on the typing line and through push-to-talk (staged). Rook's temper gets
+##            one cross, and the counter guide is opened with H at his arrival; Vale gets two
+##            crosses, is called in, turns, and is stopped after the second blow (saw); Juno is
+##            given the other courier's code on purpose and is seen thinking (staged); Maren hands
+##            her package over and then gets through what is left of the glass (torch)
+##   shift 2: Kip flares over the light and the doctor drops the shutter anyway: a false alarm,
+##            and the first hour under the line; Trauma Team takes Rook away; Vale gets through
+##            whole glass (saw); Maren is stopped in time with no glass left (torch)
+##   shift 3: Kip runs out of patience, is held once and then leaves by himself; Vale snaps in the
+##            middle of a test and is stopped before the first blow (saw); Maren is stopped after
+##            the third, with the glass gone (torch)
 ##   shift 4: Vale takes all three blows out of the pane before the shutter stops him, and the
 ##            pane drops out of its frame; between patients the till buys it back, one layer at a
 ##            time; Maren turns behind the mended glass and has the whole bar again; the report
@@ -32,18 +39,28 @@ extends SceneTree
 ## The glass belongs to the shift: a blow that lands in one attack leaves less time in the next.
 ## That is why the same two patients are seen with three blows, one blow and none.
 ##
+## The night is played under the game's own rules: the line of 240 an hour, two couriers on
+## each night's list, CALM at 30 credits. Each night's seed is fixed (seed_for()), so that the
+## list is the same in every run: Kip and Maren on the first night, Rook and Juno afterwards.
+## Snaps and flares are switched off for the run, since a random one would cut into a staged
+## scene. The flare of shift 2 and the snap of shift 3 are cued instead: their rules are pinned
+## for one action, as tests/run_ui_smoke.gd does.
+##
 ## The push-to-talk frames and the thinking frames are staged: a stand-in answers in place of the
 ## patient AI service and the microphone is simulated. No device is opened, nobody is recorded and
 ## no service is called. On the push-to-talk frames the words on the line are the mock sentence,
 ## and the strip says so. On the thinking frames the stand-in keeps the answer back for three
 ## seconds and then has none, so the authored patient answers after all.
 ## Options after the "--":
-##   --attacks-only   skip the opening, the guide and the examination shots, keep the attack scenes
-##                    and the glass fitter
+##   --attacks-only   skip the opening, the training, the guide and the examination shots, keep
+##                    the attack scenes (the snap among them) and the glass fitter. The training is
+##                    switched off for it, so the guide opens by itself at the first patient, as
+##                    with --no-training, and is closed with ESC
 ##   --less-blood     passed on to the game: the same scenes without the blood
 
 const MainScript = preload("res://scripts/ui/main.gd")
 const VisitState = preload("res://scripts/core/visit_state.gd")
+const ShiftState = preload("res://scripts/core/shift_state.gd")
 const PlayDriver = preload("res://tests/play_driver.gd")
 const Gfx = preload("res://scripts/ui/gfx.gd")
 
@@ -116,6 +133,14 @@ func _run() -> void:
 	main.mic.simulated = true          # a capture run never opens a microphone
 	d = PlayDriver.new(self, main)
 	main.event_log.write("automated_run", {"runner": "tests/capture_shift.gd"})
+	main.surprises_enabled = false     # a random snap or flare would cut into a staged scene; two are cued below
+	if attacks_only:
+		main.training_enabled = false  # its box would sit over the first night's frames
+	var first_night := seed_for(["kip", "maren"], main.training_enabled)
+	var later_nights := seed_for(["rook", "juno"], false)
+	reached(first_night > 0 and later_nights > 0, "a seed is found for each night's contact list")
+	main.fixed_seed = first_night
+	main.has_fixed_seed = true
 	d.move(Vector2(330, 250))
 	await d.seconds(0.6)
 	# ---------------------------------------------------------------- shift 1
@@ -131,7 +156,7 @@ func _run() -> void:
 		await shot("title")
 		await opening_cards()
 		await d.settle()
-		await shot("hall-camera")
+		await training_wait()
 		await kip()
 		await rook()
 		await vale_stopped(false)
@@ -139,6 +164,7 @@ func _run() -> void:
 		await maren_gets_through(false)
 	await report_shot("report")
 	# ---------------------------------------------------------------- shift 2
+	main.fixed_seed = later_nights
 	await d.open_counter()
 	if attacks_only:
 		await quick("treat")
@@ -157,7 +183,7 @@ func _run() -> void:
 	else:
 		await kip_runs_out()
 	await quick("treat")
-	await vale_stopped_clean()
+	await vale_snaps()
 	await quick("treat", "juno-behind-whole-glass")
 	await maren_stopped_late()
 	await report_shot("report-3")
@@ -190,6 +216,76 @@ func reached(ok: bool, what: String) -> void:
 	if not ok:
 		missed += 1
 		print("MISSED %s" % what)
+
+
+## Sets some rules for a moment (as tests/run_ui_smoke.gd does) and returns what they were,
+## for restore_rules().
+func pin_rules(values: Dictionary) -> Dictionary:
+	var was := {}
+	for group in values.keys():
+		var g: Dictionary = main.rules[group]
+		var old := {}
+		for k in (values[group] as Dictionary).keys():
+			old[k] = g.get(k)
+			g[k] = values[group][k]
+		was[group] = old
+	return was
+
+
+func restore_rules(was: Dictionary) -> void:
+	for group in was.keys():
+		var g: Dictionary = main.rules[group]
+		for k in (was[group] as Dictionary).keys():
+			g[k] = was[group][k]
+
+
+## A shift seed whose contact list holds exactly these cases, drawn the way the game draws it
+## (with `training`, the first visitor is always on the list). -1 if none of the first 5000 does.
+func seed_for(cases: Array, training: bool) -> int:
+	var want: Array = cases.duplicate()
+	want.sort()
+	var order: Array = ShiftState.new(main.rules, []).order
+	for s in range(1, 5001):
+		var got: Array = []
+		for e in ShiftState.draw_contacts(main.rules, main.contact_data.get("pool", []), order, s, training):
+			got.append(str((e as Dictionary).get("case", "")))
+		got.sort()
+		if got == want:
+			return s
+	return -1
+
+
+## The id of tonight's list entry for a case, or "" if that case is not on the list.
+func entry_of(case_id: String) -> String:
+	for e in main.shift.contacts:
+		if str((e as Dictionary).get("case", "")) == case_id:
+			return str((e as Dictionary).get("id", ""))
+	return ""
+
+
+## Puts the pointer where it rests on nothing: the hall beside the visitor, on whichever side the
+## training box and the big screen leave clear (failing both, the top of the window).
+func rest() -> void:
+	for p in [REST, REST_RIGHT, Vector2(320, 8)]:
+		if main.coach.is_showing() and main.coach.box().grow(6.0).has_point(p):
+			continue
+		if d.cam_on() and Gfx.CAM.has_point(p):
+			continue
+		d.move(p)
+		return
+	d.move(Vector2(320, 8))
+
+
+## A click on something behind the training box would land on the box instead: the run says so.
+func clear_of_box(pos: Vector2, what: String) -> void:
+	reached(main.coach.button_at(pos) == "", what + ": the training box is not in front of it")
+
+
+## Closes the close-up that is open, if one is (a right-click with nothing open would hang the
+## papers back instead).
+func close_scope() -> void:
+	if main.clinic.scope.is_open():
+		await d.put_away()
 
 
 ## Where the run stands, for the dry run's list: the state, and what is left of the patience,
@@ -284,10 +380,47 @@ func opening_cards() -> void:
 	reached(await d.wait_for_counter(), "the hall camera asks for the first patient")
 
 
-## The counter guide, which opens by itself at the first patient of a session: one frame a page
-## (the window, the left wall, the right wall, the desk).
+## The first night's training while the first visitor waits: tonight's list on the left wall and
+## how to read it, then the hall camera. One frame a tip, and the hall on the big screen.
+func training_wait() -> void:
+	await process_frame
+	await process_frame
+	reached(main.coach.is_showing() and main.coach.current() == "list" and not main.guide.is_open(),
+		"training: the first tip is up, tonight's list, and the guide stays shut")
+	rest()
+	await d.seconds(0.5)
+	await shot("training-1-list")
+	d.move(main.desk.object_rect("list").get_center())
+	await d.seconds(0.3)
+	await shot("wall-list-hover")
+	d.take_list()
+	rest()
+	await d.until(func() -> bool: return main.clipboard._list_k >= 1.0, 3.0)
+	await d.seconds(0.4)
+	reached(d.list_down() and main.coach.current() == "clues", "training: the list is down, and the next tip says how to read it")
+	await shot("training-2-clues")
+	d.click(main.coach.next_rect().get_center())
+	reached(main.coach.current() == "buzz", "training: NEXT moves on to the hall camera")
+	# the small monitor on the left wall puts the hall on the big screen; a press on that lets them in
+	d.move(d.thumb_pos())
+	await d.seconds(0.4)
+	await shot("training-3-camera")
+	d.click(d.thumb_pos())
+	d.move(Gfx.MONITOR.get_center() + Vector2(34, 22))
+	await d.seconds(0.5)
+	reached(d.cam_on() and main.state == MainScript.State.WAIT, "training: the hall is on the big screen, and nobody is let in yet")
+	await shot("hall-camera-big-screen")
+	clear_of_box(Gfx.MONITOR.get_center(), "training: the big screen")
+	await d.buzz_in()
+	reached(main.coach.current() == "card" and not main.guide.is_open(),
+		"training: buzzing the visitor in moves on to the intake card, and the guide does not open by itself")
+
+
+## The counter guide, opened with H: one frame a page (the window, the left wall, the right
+## wall, the desk). It opens by itself only on a first night without the training.
 func guide_pages(who: String) -> void:
-	reached(main.guide.is_open(), who + ": the counter guide opens by itself at the first patient")
+	d.key(KEY_H)
+	reached(main.guide.is_open(), who + ": H opens the counter guide")
 	d.move(Vector2(176, 250))      # in the hall, left of the visitor: no page of the guide has words or a frame there
 	for i in main.guide.count():
 		if not main.guide.is_open():
@@ -513,57 +646,117 @@ func team_takes(who: String, stem: String = "") -> void:
 
 # ================================================================ shift 1
 
-## The first patient of the session: the hall camera's two monitors, the guide, the papers
-## taken down from the walls, every way of examining, the doctor's own tick, the one-time tips
-## on the hint row, the typing line and the staged push-to-talk, then TREAT and the meter's
-## first reading.
+## The first patient of the session, the training visit, one frame a tip: his intake card, his
+## code and his package, the reference sheet, the three tools with what the sheet expects drawn
+## into each close-up, the talk pads with CALM's price, the doctor's own tick and the decision.
+## Then the rest of what a visit offers: the hall seen during a visit, the looks, a question, a
+## press, a paid CALM, the typing line and the staged push-to-talk, TREAT, the last tip on the
+## slip, and the meter's first reading.
 func kip() -> void:
-	# the small monitor on the left wall puts the hall on the big screen; a press on that lets him in
-	d.move(d.thumb_pos())
-	await d.seconds(0.3)
-	await shot("hall-camera-hover")
-	d.click(d.thumb_pos())
-	d.move(Gfx.MONITOR.get_center() + Vector2(34, 22))
-	await d.seconds(0.5)
-	reached(d.cam_on() and main.state == MainScript.State.WAIT, "kip: the hall is on the big screen, and nobody is let in yet")
-	await shot("hall-camera-big-screen")
-	await d.buzz_in(true)
-	await guide_pages("kip")
-	d.move(REST)
-	await d.seconds(0.5)
-	reached(not d.sheet_down() and not d.card_down() and not d.cam_on(), "kip: nothing hangs in front of the window")
-	await shot("kip-arrives")
+	var kip_id := entry_of("kip")
+	reached(main.visit != null and main.visit.is_contact() and kip_id != "", "kip: he is on tonight's list")
+	await d.settle()
+	rest()
+	await d.seconds(0.4)
+	reached(not d.cam_on() and main.coach.is_showing() and main.coach.current() == "card", "kip: he is in, and the tip points at his intake card")
+	await shot("training-4-card")
 	d.move(d.zone_pos("eyes"))
 	await d.seconds(0.25)
 	await shot("kip-hover-eyes")
+	clear_of_box(d.zone_pos("eyes"), "kip: his eyes")
 	await d.look("eyes")
 	await d.settle()
 	await d.seconds(0.3)
 	reached(str(main.desk.badges.get("card", "")) == "1", "kip: the card on the wall counts the note it has not shown")
 	await shot("kip-look-eyes")
-	# the reference sheet comes down from the left wall; its row for what the pointer is on lights up
-	d.move(main.desk.object_rect("sheet").get_center())
-	await d.seconds(0.3)
-	await shot("kip-wall-sheet-hover")
-	d.take_sheet()
-	d.move(d.zone_pos("eyes"))
-	await d.seconds(0.4)
-	reached(d.sheet_down(), "kip: a click takes the reference sheet down")
-	await shot("kip-sheet-down")
-	# and the intake card from the right wall, with the note already on it
+	# the intake card comes down from the right wall, with the note already on it; the list is down on the left
 	d.move(main.desk.object_rect("card").get_center())
 	await d.seconds(0.3)
 	await shot("kip-wall-card-hover")
 	d.take_card()
-	d.move(d.mark_pos("eyes"))
+	d.take_list()
+	rest()
+	await d.until(func() -> bool: return main.clipboard._list_k >= 1.0, 3.0)
+	await d.seconds(0.4)
+	reached(d.card_down() and d.list_down() and main.coach.current() == "code", "kip: card and list are down, and the tip says to hold one against the other")
+	await shot("training-5-code")
+	d.move(d.say_pos(kip_id))
 	await d.seconds(0.3)
-	reached(d.sheet_down() and d.card_down(), "kip: both papers are down at once")
-	await shot("kip-hover-mark-box")
+	reached(main.clipboard.say_hover == kip_id, "kip: the pointer is on the SAY beside his entry")
+	await shot("kip-say-hover")
+	clear_of_box(d.say_pos(kip_id), "kip: his entry's SAY")
+	d.click(d.say_pos(kip_id))
+	rest()
+	reached(await d.until(func() -> bool: return main.dialogue.speaker == "YOU" and not main.dialogue.typing, 5.0), "kip: the doctor says the code")
+	await shot("kip-says-the-code")
+	reached(await d.until(func() -> bool: return main.dialogue.speaker == "PACKAGE" and not main.dialogue.typing, 8.0),
+		"kip: he answers it, and the package comes over the counter")
+	reached(main.visit.dropped and main.clipboard.entry_mark(kip_id) == "picked" and main.coach.current() == "drop",
+		"kip: the drop is in the till, his entry is ticked off, and the tip says what it means")
+	rest()
+	await d.seconds(0.3)
+	await shot("training-6-drop")
+	d.click(main.coach.next_rect().get_center())
+	reached(main.coach.current() == "sheet", "kip: NEXT moves on to the reference sheet")
+	# the reference sheet comes down where the list is, through the tab under the list
+	d.move(main.clipboard.swap_tab().get_center())
+	await d.seconds(0.35)
+	await shot("training-7-sheet")
+	clear_of_box(main.clipboard.swap_tab().get_center(), "kip: the swap tab")
+	d.swap()
+	d.move(d.pad_pos("penlight"))
+	await d.seconds(0.45)
+	reached(d.sheet_down() and not d.list_down() and main.coach.current() == "light",
+		"kip: the sheet is down where the list was, and the next tip is the penlight")
+	await shot("training-8-light")
+	reached(await d.request_tool("penlight") == "open", "kip: the penlight close-up opens")
+	d.move(d.in_window(Vector2(60, 86)))
+	await d.seconds(0.45)
+	reached(not main.coach.is_showing(), "kip: the tips step aside while a close-up is open")
+	await shot("kip-penlight-right-eye")
+	await d.sweep_eyes()
+	await d.seconds(0.4)
+	await shot("kip-penlight-readouts")
+	await close_scope()
+	rest()
+	await d.seconds(0.4)
+	reached(main.coach.is_showing() and main.coach.current() == "grip", "kip: with the light away, the grip tip")
+	await shot("training-9-grip")
+	reached(await d.request_tool("grip") == "open", "kip: the grip close-up opens")
+	await d.seconds(0.25)
+	await shot("kip-grip-ready")
+	await hold_grip("kip-grip-squeeze")
+	await shot("kip-grip-result")
+	await d.settle()
+	await close_scope()
+	rest()
+	await d.seconds(0.4)
+	reached(main.coach.is_showing() and main.coach.current() == "port", "kip: the port tip")
+	await shot("training-10-port")
+	reached(await d.request_tool("port") == "open", "kip: the port close-up opens")
+	await d.watch_port()
+	await d.seconds(0.4)
+	await shot("kip-port")
+	await close_scope()
+	d.move(d.pad_pos("calm"))
+	await d.seconds(0.45)
+	reached(main.coach.is_showing() and main.coach.current() == "talk" and str(main.desk.badges.get("calm", "")) == "30cr",
+		"kip: the tip about talking, and CALM's price on its pad")
+	await shot("training-11-talk")
+	d.click(main.coach.next_rect().get_center())
+	reached(main.coach.current() == "marks", "kip: NEXT moves on to the doctor's own marks")
+	d.take_card()
+	d.move(d.mark_pos("eyes"))
+	await d.seconds(0.35)
+	reached(d.card_down(), "kip: the card is down for the marks")
+	await shot("training-12-marks")
+	clear_of_box(d.mark_pos("eyes"), "kip: the mark box")
 	d.mark("eyes")
 	d.move(d.mark_pos("eyes") + Vector2(46, 18))      # off the box, so the tick is not under the hand
-	await d.seconds(0.3)
-	reached(main.visit != null and main.visit.ticked() == 1, "kip: one click on the box ticks the row")
-	await shot("kip-mark-tick")
+	await d.seconds(0.35)
+	reached(main.visit != null and main.visit.ticked() == 1 and main.coach.current() == "decide",
+		"kip: one click on the box ticks the row, and the last tip of the exam is the decision")
+	await shot("training-13-decide")
 	# the tab on a paper's edge hangs it back
 	d.move(main.clipboard.sheet_tab().get_center())
 	await d.seconds(0.3)
@@ -577,31 +770,13 @@ func kip() -> void:
 	reached(d.cam_on() and main.state == MainScript.State.EXAM, "kip: C puts the hall on the big screen during a visit")
 	await shot("kip-hall-peek")
 	d.key(KEY_C)
+	await d.seconds(0.2)
+	clear_of_box(d.zone_pos("hands"), "kip: his hands")
 	await d.look("hands")
 	await d.settle()
+	clear_of_box(d.zone_pos("port"), "kip: his port")
 	await d.look("port")
 	await d.settle()
-	d.move(d.pad_pos("penlight"))
-	await d.seconds(0.25)
-	await shot("kip-hover-penlight")
-	await d.request_tool("penlight")
-	d.move(d.in_window(Vector2(60, 86)))
-	await d.seconds(0.45)
-	await shot("kip-penlight-right-eye")
-	await d.sweep_eyes()
-	await d.seconds(0.4)
-	await shot("kip-penlight-left-eye")
-	await d.request_tool("grip")
-	await d.seconds(0.25)
-	await shot("kip-grip-ready")
-	await hold_grip("kip-grip-squeeze")
-	await shot("kip-grip-result")
-	await d.settle()
-	await d.request_tool("port")
-	await d.watch_port()
-	await d.seconds(0.4)
-	await shot("kip-port")
-	await d.put_away()
 	d.pad("ask")
 	await d.seconds(0.15)
 	d.move(main.dialogue.menu_point(1))
@@ -620,6 +795,7 @@ func kip() -> void:
 	await shot("kip-last-lamp-tip")
 	await d.reassure()
 	await d.settle()
+	reached(main.visit != null and main.visit.calm_spent == 30, "kip: the calm-patch is paid for out of the till")
 	await shot("kip-reassured")
 	await typed_line("kip", "Is the night shift hard on you?")
 	await staged_voice("kip")
@@ -630,22 +806,29 @@ func kip() -> void:
 	await d.seconds(0.25)
 	reached(main._held == "treat" and d.card_down(), "kip: with the stamp in hand the card is down")
 	await shot("kip-stamp-in-hand")
+	clear_of_box(main.clipboard.decision_rect().get_center(), "kip: the card's decision box")
 	d.click(main.clipboard.decision_rect().get_center())
 	d.move(REST_RIGHT)      # off the card, so that nothing on it is under the hand
 	await d.seconds(0.3)
 	await shot("kip-stamped")
 	await d.wait_for_slip()
-	await shot("kip-slip")
+	await d.seconds(0.3)
+	reached(main.coach.is_showing() and main.coach.current() == "after", "kip: with the slip, the training's last tip")
+	await shot("kip-slip-last-tip")
 	await slip_then_meter("meter-over-the-line")
 
 
 ## Rook refuses, loses his temper and gets one cross for it: one broken line alone can be ordinary.
+## The training ends as he is buzzed in, and the counter guide is opened with H.
 func rook() -> void:
 	await d.settle()
 	await shot("rook-camera")
 	await d.buzz_in()
 	await d.settle()
+	reached(not main.coach.is_running() and not main.guide.is_open(), "rook: buzzing the second visitor in ends the training")
 	await shot("rook-arrives")
+	await guide_pages("rook")
+	await d.settle()
 	await d.request_tool("grip")
 	d.move(d.pad_pos("grip"))
 	await d.seconds(0.3)
@@ -722,13 +905,23 @@ func vale_stopped(brief: bool) -> void:
 	await stopped_shots("vale")
 
 
-## Juno's chrome looks worse than it is. She is seen thinking an answer over (staged).
+## Juno's chrome looks worse than it is. She is given the other courier's code on purpose: a
+## blank look, one patience. She is seen thinking an answer over (staged).
 func juno() -> void:
 	await d.settle()
 	await d.buzz_in()
 	await d.settle()
 	reached(d.card_down(), "juno: the card is still down from the last visit, with her name on it now")
 	await shot("juno-arrives")
+	var before: int = main.visit.patience if main.visit != null else 0
+	await d.say_code(entry_of("maren"))
+	await d.settle()
+	rest()
+	await d.seconds(0.3)
+	reached(main.visit != null and main.visit.codes_wrong == 1 and main.visit.patience == before - 1 and not main.visit.dropped
+		and main._base_hint == MainScript.CODE_BLANK_HINT % 1, "juno: Maren's code gets a blank look and costs a lamp")
+	await shot("juno-wrong-code")
+	d.hang_list()
 	d.hang_card()
 	await d.look("eyes")
 	await d.settle()
@@ -741,9 +934,7 @@ func juno() -> void:
 	await staged_thinking("juno", 1)
 	await d.settle()
 	await shot("juno-deflects")
-	await d.ask(1)
-	await d.settle()
-	await d.press()
+	await d.press()      # her last lamps but one: the wrong code cost one of them
 	await d.seconds(0.4)
 	await shot("juno-press")
 	await d.settle()
@@ -754,14 +945,26 @@ func juno() -> void:
 	await d.take_slip()
 
 
-## Maren is pressed twice, turns, and nobody touches the shutter. The glass Vale left has one
-## blow in it, so she is through after one.
+## Maren, the night's other courier, answers her code and hands her package over; then she is
+## pressed twice, turns, and nobody touches the shutter. The glass Vale left has one blow in it,
+## so she is through after one.
 func maren_gets_through(brief: bool) -> void:
 	await d.settle()
 	await d.buzz_in()
 	await d.settle()
 	await shot("maren-arrives")
 	if not brief:
+		var maren_id := entry_of("maren")
+		await d.say_code(maren_id)
+		reached(await d.until(func() -> bool: return main.dialogue.speaker == "PACKAGE" and not main.dialogue.typing, 8.0),
+			"maren: her package comes over the counter")
+		reached(main.visit != null and main.visit.dropped and main.clipboard.entry_mark(maren_id) == "picked",
+			"maren: the drop is in the till, and her entry is ticked off")
+		rest()
+		await d.seconds(0.3)
+		await shot("maren-drop")
+		d.hang_list()
+		await d.settle()
 		await d.request_tool("grip")
 		await hold_grip("")
 		await shot("maren-grip-late")
@@ -789,12 +992,35 @@ func maren_gets_through(brief: bool) -> void:
 
 # ================================================================ shift 2
 
-## The armed shutter and a false alarm on a steady patient. The fine puts the first hour under
-## the line, and the meter says so.
+## A flare: Kip loses his temper over the light, knocks the close-up out of the doctor's hand and
+## slams the counter. No red bar comes up, and the first flare of a session brings the tip that
+## says so. The doctor drops the shutter anyway: the armed shutter, and a false alarm on a steady
+## patient. The fine puts the first hour under the line, and the meter says so.
 func kip_false_alarm() -> void:
 	await d.settle()
 	await d.buzz_in()
 	await d.settle()
+	# cued: a flare is due on the first action (see the header)
+	var was: Dictionary = pin_rules({"flare": {"grace": 0, "chance": 1.0}})
+	main.visit.surprises = true
+	reached(await d.request_tool("penlight") == "open", "kip-2: the penlight close-up opens")
+	d.move(d.in_window(Vector2(60, 86)))
+	reached(await d.until(func() -> bool: return main.visit != null and main.visit.flared, 5.0), "kip-2: he flares over the light")
+	restore_rules(was)
+	if main.visit != null:
+		main.visit.surprises = false
+	await d.seconds(0.06)
+	await shot("kip-2-flare-torn")
+	await d.seconds(0.25)
+	await shot("kip-2-flare-slam")
+	reached(await d.until(func() -> bool: return main._base_hint == MainScript.FLARE_COACH_HINT, 6.0),
+		"kip-2: the tip says a flare is only temper")
+	await d.settle()
+	reached(main.state == MainScript.State.EXAM and not main._telegraphed and not main.clinic.scope.is_open(),
+		"kip-2: the close-up is gone, no red bar is up, and the exam goes on")
+	rest()
+	await d.seconds(0.3)
+	await shot("kip-2-flare-tip")
 	d.shutter_key()
 	await d.seconds(0.3)
 	await shot("kip-shutter-armed")
@@ -876,14 +1102,38 @@ func kip_runs_out() -> void:
 	await slip_then_meter("meter-nothing-this-hour")
 
 
-## Trauma Team is called on Vale and the shutter comes down the moment he turns: no blow lands
-## and the glass stays whole.
-func vale_stopped_clean() -> void:
+## A snap: nobody calls for Trauma Team. Vale gives a reason not to follow the light, the doctor
+## insists, and in the middle of the test he comes at the glass: the close-up is knocked away, a
+## short warning, then the red bar. The shutter comes down the moment it is up: no blow lands and
+## the glass stays whole.
+func vale_snaps() -> void:
 	await d.settle()
 	await d.buzz_in()
 	await d.settle()
-	await d.call_team()
-	await turn_shots("vale-3", 0)
+	# cued: no flare at all, and then a snap due on the next action (see the header)
+	main.visit.surprises = true
+	var calm: Dictionary = pin_rules({"flare": {"chance": 0.0}})
+	reached(await d.request_tool("penlight") == "refused", "vale-3: he gives a reason instead of following the light")
+	await d.settle()
+	var sure: Dictionary = pin_rules({"snap": {"grace": 0, "step": 1.0, "max": 1.0}})
+	reached(await d.request_tool("penlight") == "open", "vale-3: insisting opens the penlight close-up")
+	d.move(d.in_window(Vector2(60, 86)))
+	await d.seconds(0.2)
+	await shot("vale-3-insists")
+	reached(await d.until(func() -> bool: return main.visit != null and main.visit.snapped, 6.0), "vale-3: he snaps in the middle of the test")
+	restore_rules(sure)
+	restore_rules(calm)
+	if main.visit != null:
+		main.visit.surprises = false
+	await d.seconds(0.05)
+	await shot("vale-3-snaps")
+	await d.seconds(0.15)
+	reached(main.state == MainScript.State.ATTACK and not main._telegraphed, "vale-3: the warning before the red bar")
+	await shot("vale-3-snap-surge")
+	reached(await d.wait_for_telegraph(), "vale-3: the red bar comes up")
+	reached(blows_due() == 3, "vale-3: the glass is whole tonight")
+	await d.seconds(0.04)
+	await shot("vale-3-turns")
 	await stopped_shots("vale-3")
 
 

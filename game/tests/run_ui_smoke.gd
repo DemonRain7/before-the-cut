@@ -1,6 +1,9 @@
 extends SceneTree
-## Headless smoke test of the real screen. It loads scenes/main.tscn and plays six shifts
+## Headless smoke test of the real screen. It loads scenes/main.tscn and plays nine shifts
 ## through the same pointer and key entry points a player uses (see tests/play_driver.gd).
+## The first six check the counter itself under a few rules held still (no couriers, a free
+## CALM, the old line, no snaps or flares, no training); the last three play the night as it
+## is: the contact list and the paid CALM, the snaps and flares, and the first-night training.
 ## Run from the repository root:
 ##   godot --headless --path game --script res://tests/run_ui_smoke.gd
 ## Exit code 0 = all passed, 1 = at least one check failed, 2 = the run did not finish.
@@ -8,6 +11,7 @@ extends SceneTree
 
 const MainScript = preload("res://scripts/ui/main.gd")
 const VisitState = preload("res://scripts/core/visit_state.gd")
+const ShiftState = preload("res://scripts/core/shift_state.gd")
 const PlayDriver = preload("res://tests/play_driver.gd")
 const Gfx = preload("res://scripts/ui/gfx.gd")
 
@@ -35,7 +39,7 @@ class SlowClient:
 
 func _initialize() -> void:
 	# If a script error stops the run, nothing would ever call quit(). This makes sure something does.
-	create_timer(480.0, true, false, true).timeout.connect(_on_watchdog)
+	create_timer(900.0, true, false, true).timeout.connect(_on_watchdog)
 	_run()
 
 
@@ -64,15 +68,29 @@ func _run() -> void:
 	main.mic.simulated = true      # an automated run never opens a microphone
 	d = PlayDriver.new(self, main)
 	main.event_log.write("automated_run", {"runner": "tests/run_ui_smoke.gd"})
+	# The first six shifts were written for the counter before tonight's contacts, the paid CALM,
+	# the snaps and the training, and they count every credit and every patience lamp. They run
+	# with those held still: nobody on the list, CALM for free, the old line of 120 an hour, no
+	# surprises and no training box. Everything they check about the counter is the same either way.
+	main.surprises_enabled = false
+	main.training_enabled = false
+	var real: Dictionary = pin_rules({"line": {"per_hour": 120}, "reassure": {"cost": 0}, "contacts": {"per_night": 0}})
 	await shift_careful()
 	await shift_reckless()
 	await shift_odds_and_ends()
 	await shift_line_and_glass()
 	await shift_last_glass()
 	await shift_walls_and_glass()
+	var six: int = main.event_log.memory.size()
+	restore_rules(real)
+	await shift_couriers()
+	main.surprises_enabled = true
+	await shift_surprises()
+	main.training_enabled = true
+	await shift_training()
 	voice_words()
 	counter_words()
-	check_log()
+	check_log(six)
 	print("")
 	print("RESULT: %d passed, %d failed" % [passed, failed])
 	await d.leave()
@@ -147,6 +165,48 @@ func logged(type: String) -> Array:
 	return main.event_log.memory.filter(func(r: Dictionary) -> bool: return str(r.get("type", "")) == type)
 
 
+## Sets some of main.rules for a while ({"group": {"key": value}}) and returns what they were,
+## for restore_rules(). The rules are one dictionary that the shift and every visit read as
+## they go, so a change counts from the next thing that reads it.
+func pin_rules(values: Dictionary) -> Dictionary:
+	var was := {}
+	for group in values.keys():
+		var g: Dictionary = main.rules[group]
+		var old := {}
+		for k in (values[group] as Dictionary).keys():
+			old[k] = g.get(k)
+			g[k] = values[group][k]
+		was[group] = old
+	return was
+
+
+func restore_rules(was: Dictionary) -> void:
+	for group in was.keys():
+		var g: Dictionary = main.rules[group]
+		for k in (was[group] as Dictionary).keys():
+			g[k] = was[group][k]
+
+
+## A shift seed whose contact list is drawn for exactly these visitors (case ids), or -1.
+func seed_for(cases: Array) -> int:
+	var want: Array = cases.duplicate()
+	want.sort()
+	var order: Array = ShiftState.new(main.rules, []).order
+	for s in range(1, 5001):
+		var got: Array = []
+		for e in ShiftState.draw_contacts(main.rules, main.contact_data.get("pool", []), order, s, false):
+			got.append(str((e as Dictionary).get("case", "")))
+		got.sort()
+		if got == want:
+			return s
+	return -1
+
+
+## The records of one type written since the log held `from` records.
+func logged_since(type: String, from: int) -> Array:
+	return main.event_log.memory.slice(from).filter(func(r: Dictionary) -> bool: return str(r.get("type", "")) == type)
+
+
 ## True when the next patient to turn tonight would land blows at `blows_ms` after the warning
 ## and be through the window at `through_ms` (ShiftState.attack_plan(), from the glass left).
 func plan_is(blows_ms: Array, through_ms: int) -> bool:
@@ -190,15 +250,22 @@ func the_opening() -> void:
 	var up: bool = await d.open_counter(true)
 	check(up and d.in_intro() and main.intro.is_running(), "the first click on the title brings up the opening cards")
 	check(main.shift == null and main.visit == null, "no shift has started behind them")
-	check(main.intro.count() == 5, "there are five cards")
+	check(main.intro.count() == 6, "there are six cards")
 	var fits := 0
+	var drawn := 0
 	for i in main.intro.count():
 		var rows: int = main.intro.lines_of(i).size()
 		if rows >= 1 and rows <= main.intro.TEXT_LINES:
 			fits += 1
 		else:
 			print("  card %d takes %d lines" % [i + 1, rows])
+		var art := str((main.intro._cards[i] as Dictionary).get("art", ""))
+		if main.intro.ARTS.has(art):
+			drawn += 1
+		else:
+			print("  card %d asks for a picture nobody draws: '%s'" % [i + 1, art])
 	check(fits == main.intro.count(), "every card's text fits under its picture")
+	check(drawn == main.intro.count(), "every card names one of the pictures the opening draws")
 	var shown: bool = await d.until(func() -> bool: return main.intro._phase == "show" and main.intro.index == 0, 3.0)
 	check(shown and main.intro._typed < float(main.intro._total), "the first card opens and starts typing its text")
 	d.key(KEY_ENTER)
@@ -250,10 +317,10 @@ func the_guide() -> VisitState:
 	check(main.guide.page == 1 and not main._sheet_wanted and not d.sheet_down(), "a click on the wall sheet turns the page too: the sheet stays where it hangs")
 	d.key(KEY_SPACE)
 	check(main.guide.page == 2 and main._armed <= 0.0, "SPACE turns the page and does not arm the shutter")
-	for code in [KEY_R, KEY_N, KEY_C, KEY_G, KEY_T]:
+	for code in [KEY_R, KEY_L, KEY_N, KEY_C, KEY_G, KEY_T]:
 		d.key(int(code))
-	check(main.guide.page == 2 and not main._sheet_wanted and not main._card_wanted and not main._cam_wanted and not main.dialogue.input_open,
-		"the keys of the papers, the camera, the glass and the typing line do nothing under it")
+	check(main.guide.page == 2 and not main._sheet_wanted and not main._list_wanted and not main._card_wanted and not main._cam_wanted
+		and not main.dialogue.input_open, "the keys of the papers, the camera, the glass and the typing line do nothing under it")
 	d.key(KEY_ENTER)
 	check(main.guide.page == 3 and main.guide.is_open(), "ENTER turns to the last page")
 	d.key(KEY_ENTER)
@@ -297,7 +364,7 @@ func guide_layout() -> void:
 			else:
 				print("  guide item '%s' is outside the lit part of its page, or under the list: %s" % [key, str(area)])
 	check(fits == main.guide.count(), "every page's list fits on the screen")
-	check(keys == 14 and placed == keys, "the fourteen things it explains are framed in the lit part of their page, clear of the list")
+	check(keys == 16 and placed == keys, "the sixteen things it explains are framed in the lit part of their page, clear of the list")
 	var buttons: Rect2 = main.dialogue.chip_rect("type")
 	var speak: Rect2 = main.dialogue.chip_rect("speak")
 	if speak.size.x > 0.0:
@@ -306,6 +373,8 @@ func guide_layout() -> void:
 		"patience": main.clinic.patience_plate(),
 		"glass": main.clinic.glass_plate(),
 		"sheet": main.desk.object_rect("sheet"),
+		"list": main.desk.object_rect("list"),
+		"booklet": main.desk.object_rect("guide"),
 		"till": Gfx.METER,
 		"camera": Gfx.THUMB,
 		"record": main.desk.object_rect("card"),
@@ -842,11 +911,11 @@ func shift_line_and_glass() -> void:
 	await process_frame
 	await process_frame
 	check(main.clinic.leaving > 0.0 and main.clinic.leaving <= 1.0, "the lamps turn into the time that is left")
-	check(main.dialogue.hint == main.LEAVING_HINT, "the hint says what can still be done")
+	check(main.dialogue.hint == (main.LEAVING_HINT if v.reassure_cost() > 0 else main.LEAVING_FREE_HINT), "the hint says what can still be done")
 	var calm_hint: String = main._pad_hint("calm")
 	check(calm_hint.begins_with("CALM:") and calm_hint.contains("keeps them at the counter") and Gfx.text_w(calm_hint) <= main.dialogue.TEXT_W,
 		"CALM says that it would hold him, under the name printed on the pad, in words that fit the hint row")
-	check(main.LEAVING_HINT.contains("CALM") and main.SHORT_HINT.contains("CALM"),
+	check(main.LEAVING_HINT.contains("CALM") and main.LEAVING_FREE_HINT.contains("CALM") and main.SHORT_HINT.contains("CALM"),
 		"the hints that send the player to that pad call it by the name printed on it")
 	var left: float = main._leave_t
 	d.key(KEY_H)
@@ -1098,7 +1167,7 @@ func shift_walls_and_glass() -> void:
 	section("Kip: what hangs on the walls, and what it covers")
 	await d.settle()
 	var lit := 0
-	for item in ["sheet", "guide", "card"]:
+	for item in ["sheet", "list", "guide", "card"]:
 		var id := str(item)
 		d.move(main.desk.object_rect(id).get_center())
 		await process_frame
@@ -1107,15 +1176,19 @@ func shift_walls_and_glass() -> void:
 			lit += 1
 		else:
 			print("  '%s' on the wall: hover '%s', cursor '%s', hint '%s'" % [id, main.desk.hover, main._cursor_kind, main._hover_hint])
-	check(lit == 3, "the sheet, the booklet and the card each light up under the pointer and say what they are")
+	check(lit == 4, "the sheet, the contact list, the booklet and the card each light up under the pointer and say what they are")
 	var before: int = logged("panel").size()
 	d.take_sheet()
 	check(d.sheet_down() and bool(main.desk.taken.get("sheet", false)), "a click takes the sheet down")
 	var panels: Array = logged("panel")
 	var last: Dictionary = panels[panels.size() - 1]
 	check(panels.size() == before + 1 and str(last.get("panel", "")) == "sheet" and bool(last.get("open", false)), "the log has it: the sheet, down")
+	d.click(main.desk.object_rect("list").get_center())
+	check(d.sheet_down() and not d.list_down(), "the sheet covers the contact list's place on the wall: a click on the paper is not passed on")
+	d.take_card()
 	d.click(main.desk.object_rect("guide").get_center())
-	check(not main.guide.is_open(), "the sheet covers the booklet behind it: a click on the paper is not passed on")
+	check(d.card_down() and not main.guide.is_open(), "the card covers the booklet behind it on the right wall")
+	d.hang_card()
 	d.key(KEY_C)
 	check(d.cam_on() and main.state == MainScript.State.EXAM, "C looks into the hall while he stands there")
 	var over: Rect2 = Gfx.CAM.intersection(Gfx.rect_to_screen(main.rig.zone_rect("hands")))
@@ -1164,9 +1237,9 @@ func shift_walls_and_glass() -> void:
 		"the guide points at the walls, so the papers hang there while it is open")
 	d.key(KEY_ESCAPE)
 	check(not main.guide.is_open() and d.sheet_down() and d.card_down(), "and they are down again when it closes")
-	d.hang_sheet()
+	d.hang_card()
 	d.click(main.desk.object_rect("guide").get_center())
-	check(main.guide.is_open() and main.guide.page == 0, "with the sheet back on the wall, a click on the booklet opens the guide")
+	check(main.guide.is_open() and main.guide.page == 0, "with the card back on the wall, a click on the booklet opens the guide")
 	d.right_click()
 	check(not main.guide.is_open(), "and the right button closes it")
 	d.move(d.thumb_pos())
@@ -1321,6 +1394,376 @@ func shift_walls_and_glass() -> void:
 	var end: Dictionary = ends[ends.size() - 1]
 	check(int(end.get("glass_paid", 0)) == 120 and int(end.get("glass_left", 0)) == 3 and int(end.get("total", 0)) == 1020,
 		"the log's last line of the night says what was paid for glass")
+
+
+# ================================================================ shift 7
+
+## The night as it is played: two couriers on tonight's list, a CALM that costs credits, and the
+## line of 240 an hour. The seed is picked so that Kip and Maren are the two on the list.
+func shift_couriers() -> void:
+	section("Seventh shift: tonight's contact list")
+	var picked := seed_for(["kip", "maren"])
+	check(picked > 0, "a night can be drawn with Kip and Maren on the list")
+	main.fixed_seed = picked
+	main.has_fixed_seed = true
+	var opened: bool = await d.open_counter()
+	main.has_fixed_seed = false
+	check(opened and main.shift_number == 7, "a seventh shift starts")
+	var kip_id := ""
+	var maren_id := ""
+	var maren_alias := ""
+	for e in main.shift.contacts:
+		var entry: Dictionary = e
+		match str(entry.get("case", "")):
+			"kip":
+				kip_id = str(entry.get("id", ""))
+			"maren":
+				maren_id = str(entry.get("id", ""))
+				maren_alias = str(entry.get("alias", ""))
+	check(main.shift.contacts.size() == 2 and main.clipboard.contacts.size() == 2 and kip_id != "" and maren_id != "",
+		"two couriers are on tonight's list, Kip's entry and Maren's, and the list on the wall has both")
+	check(main.clinic.line == 240 and main.shift.line_per_hour() == 240, "the meter wants 240 an hour")
+	check(main._shift_line() == main.SHIFT_LIST_LINE % [5, 2, 240], "the night opens by saying how many visitors are on the list")
+	var lists: Array = logged("contacts")
+	var listed: Dictionary = lists[lists.size() - 1]
+	check(int(listed.get("entries", 0)) == 2 and (listed.get("ids", []) as Array).has(kip_id) and not bool(listed.get("training", true)),
+		"the log has tonight's list by its entry ids, on a night with no training")
+	await process_frame
+	check(main.desk.nudge.has("list") and not main._list_seen, "the list asks to be looked at")
+
+	section("Kip: the list, a wrong code, the right one, and a CALM that costs")
+	var v: VisitState = await enter("kip")
+	check(v.is_contact() and str(v.contact.get("id", "")) == kip_id, "Kip is tonight's courier SPARROW or PAPER CRANE")
+	check(not v.surprises, "the surprises are still held for this night")
+	await d.settle()
+	var before: int = logged("panel").size()
+	d.key(KEY_L)
+	check(d.list_down() and bool(main.desk.taken.get("list", false)) and main._list_seen and not main.desk.nudge.has("list"),
+		"L takes the list down: its place on the wall is empty, and it stops asking")
+	var panels: Array = logged("panel")
+	var last: Dictionary = panels[panels.size() - 1]
+	check(panels.size() == before + 1 and str(last.get("panel", "")) == "list" and bool(last.get("open", false)), "the log has it: the list, down")
+	d.move(main.clipboard.swap_tab().get_center())
+	await process_frame
+	await process_frame
+	check(main.clipboard.tab_hover == "swap" and main._hover_hint == main.SWAP_SHEET_HINT, "the tab under the list's own offers the sheet")
+	d.swap()
+	check(d.sheet_down() and not d.list_down(), "a click on it brings the sheet down and puts the list back on the hook")
+	await process_frame
+	await process_frame
+	check(main.clipboard.tab_hover == "swap" and main._hover_hint == main.SWAP_LIST_HINT, "under the sheet the same tab offers the list")
+	d.swap()
+	check(d.list_down() and not d.sheet_down(), "and a click trades them back")
+	await d.until(func() -> bool: return main.clipboard._list_k >= 1.0, 3.0)
+	d.move(d.say_pos(maren_id))
+	await process_frame
+	await process_frame
+	check(main.clipboard.say_hover == maren_id and main._hover_hint == main.SAY_CODE_HINT % 1, "the SAY button beside an entry says what a code does")
+	var codes_before: int = logged("code").size()
+	await d.say_code(maren_id)
+	var codes: Array = logged("code")
+	check(codes.size() == codes_before + 1 and str(codes[codes.size() - 1].get("result", "")) == "blank", "the log has the code: a blank")
+	check(v.patience == v.patience_max - 1 and v.codes_wrong == 1 and not v.dropped and v.in_exam(), "Maren's code to Kip: a blank look, one patience")
+	check(main._base_hint == main.CODE_BLANK_HINT % 1, "the hint says a wrong code says nothing about the patient")
+	await d.settle()
+	d.click(d.say_pos(maren_id))
+	await process_frame
+	check(logged("code").size() == codes_before + 1 and v.patience == v.patience_max - 1, "the same code again does nothing: it was tried")
+	await d.say_code(kip_id)
+	codes = logged("code")
+	check(str(codes[codes.size() - 1].get("result", "")) == "drop" and v.dropped and v.drop_pay == 300 and main.clinic.till == 300,
+		"his own code: he answers it, and the drop puts 300 in the till before anything is decided")
+	check(v.patience == v.patience_max - 1, "the right code is free")
+	var shown: bool = await d.until(func() -> bool: return main.dialogue.speaker == "PACKAGE" and main._coached.has("drop"), 8.0)
+	check(shown and main._base_hint == main.DROP_COACH_HINT, "the strip says what came over the counter, and a tip says it changes nothing about the exam")
+	check(main.clipboard.entry_mark(kip_id) == "picked" and not main.clipboard.can_say(maren_id), "his entry is ticked off, and no more codes are said this visit")
+	await d.settle()
+	check(str(main.desk.badges.get("calm", "")) == "30cr" and main._pad_hint("calm") == main.CALM_HINT % [30, 1, 2],
+		"the CALM pad shows its price: a calm-patch is 30 credits")
+	await d.reassure()
+	var calms: Array = logged("reassure")
+	check(v.patience == v.patience_max and v.calm_spent == 30 and main.clinic.till == 270, "CALM gives the lamp back, and takes 30 off the till")
+	check(int(calms[calms.size() - 1].get("cost", 0)) == 30 and int(calms[calms.size() - 1].get("calm_spent", 0)) == 30, "the log has what it cost")
+	await d.settle()
+	await d.stamp("treat")
+	check(v.outcome == "treated_ok", "TREAT is right for Kip")
+	var printed: bool = await d.wait_for_slip(40.0)
+	check(printed, "Kip: the result slip prints")
+	var s: Dictionary = main._slip_data
+	check(int(s.get("outcome_credits", 0)) == 250 and int(s.get("credits", 0)) == 520, "the call earns the fee; with the drop and less the patch, 520")
+	check(main._slip_breakdown(s) == main.SLIP_DROP % 300 + "  •  " + main.SLIP_CALM % 30, "under the call the slip says what the drop brought and what CALM cost")
+	check(main.clinic.till == main.shift.total() and main.shift.total() == 520, "the till matches: 520")
+	var moved: bool = await d.take_slip()
+	check(moved and main.clipboard.entry_mark(kip_id) == "picked", "Kip: taking the slip moves on, and his entry stays ticked off")
+
+	section("Rook, Vale and Juno: nobody else on the list")
+	v = await enter("rook")
+	check(not v.is_contact(), "Rook is not on the list")
+	await d.stamp("treat")
+	await finish_visit("Rook")
+	check(main.shift.total() == 820, "820 in the till")
+	v = await enter("vale")
+	await d.call_team()
+	var warned: bool = await d.wait_for_telegraph()
+	d.shutter_key()
+	check(warned and v.outcome == "caught", "the call turns Vale, and the shutter stops him")
+	await finish_visit("Vale")
+	v = await enter("juno")
+	await d.stamp("treat")
+	check(v.outcome == "treated_ok", "TREAT is right for Juno")
+	await finish_visit("Juno")
+	check(main.shift.total() == 1290, "1290 in the till")
+
+	section("Maren: a courier who goes without her package")
+	v = await enter("maren")
+	check(v.is_contact() and str(v.contact.get("id", "")) == maren_id, "Maren is the other courier")
+	await d.call_team()
+	check(v.outcome == "referred_drifting", "the call hands her over without a fight")
+	printed = await d.wait_for_slip(40.0)
+	check(printed and main._slip_breakdown(main._slip_data) == main.SLIP_NO_DROP % maren_alias, "the slip says her package never came over the counter")
+	moved = await d.take_slip()
+	check(moved and main.clipboard.entry_mark(maren_id) == "missed", "her entry is marked missed")
+
+	section("Report: the drops are on the bill")
+	check(main.state == MainScript.State.REPORT, "the report is up")
+	var r: Dictionary = main.screens.report
+	check(int(r.get("total", 0)) == 1410 and int(r.get("correct", 0)) == 5 and bool(r.get("line_held", false)) and str(r.get("title", "")) == "STEADY HANDS",
+		"five right calls and one drop: 1410, over 240 an hour, STEADY HANDS")
+	check(int(r.get("contacts", 0)) == 2 and int(r.get("drops", 0)) == 1 and int(r.get("drop_total", 0)) == 300 and int(r.get("calm_total", 0)) == 30,
+		"one drop of the two on the list, and one calm-patch")
+	var ends: Array = logged("shift_end")
+	var end: Dictionary = ends[ends.size() - 1]
+	check(int(end.get("drops", 0)) == 1 and int(end.get("drop_total", 0)) == 300 and int(end.get("calm_total", 0)) == 30, "the log's last line of the night has them too")
+
+
+# ================================================================ shift 8
+
+## The surprises: a flare (anybody, once a visit) and a snap (the drifting only). The rules are
+## pinned for a moment so that each comes on cue; the rest of the night is as it is played.
+func shift_surprises() -> void:
+	section("Eighth shift: a flare and a snap")
+	var from: int = main.event_log.memory.size()
+	var opened: bool = await d.open_counter()
+	check(opened and main.shift_number == 8, "an eighth shift starts")
+
+	section("Kip: a flare knocks the light out of the doctor's hand, and the exam goes on")
+	var v: VisitState = await enter("kip")
+	check(v.surprises, "surprises are on tonight")
+	await d.settle()
+	var was: Dictionary = pin_rules({"flare": {"grace": 0, "chance": 1.0}})
+	var temper: int = note_count(v, "temper")
+	var status: String = await d.request_tool("penlight")
+	check(status == "open", "the penlight close-up opens")
+	var flared: bool = await d.until(func() -> bool: return v.flared, 5.0)
+	restore_rules(was)
+	var dues: Array = logged_since("surprise_due", from)
+	check(flared and dues.size() == 1 and str(dues[0].get("kind", "")) == "flare" and logged_since("flare", from).size() == 1,
+		"a flare comes up after the test, and comes a moment later; the log has both")
+	await process_frame
+	check(not main.clinic.scope.is_open() and main.desk.active == "", "the close-up is knocked out of the doctor's hand")
+	check(main.state == MainScript.State.EXAM and v.in_exam() and not main._telegraphed and not main.clinic.bar_on, "it is not an attack: no red bar, and the exam goes on")
+	check(note_count(v, "temper") == temper + 1, "it goes on the TEMPER line")
+	var tip: bool = await d.until(func() -> bool: return main._coached.has("flare") and main._base_hint == main.FLARE_COACH_HINT, 6.0)
+	check(tip, "the first flare of a session brings the tip: only the red bar needs the shutter")
+	await d.settle()
+	await d.stamp("treat")
+	check(v.outcome == "treated_ok", "TREAT is still right for Kip")
+	await finish_visit("Kip")
+
+	section("Rook: TREAT")
+	v = await enter("rook")
+	await d.stamp("treat")
+	check(v.outcome == "treated_ok", "TREAT is right for Rook")
+	await finish_visit("Rook")
+
+	section("Vale: he snaps in the middle of a test")
+	v = await enter("vale")
+	await d.settle()
+	was = pin_rules({"flare": {"chance": 0.0}})
+	status = await d.request_tool("penlight")
+	check(status == "refused" and v.in_exam() and main.state == MainScript.State.EXAM, "he gives a reason instead of following the light, and does not snap yet")
+	var snap_was: Dictionary = pin_rules({"snap": {"grace": 0, "step": 1.0, "max": 1.0}})
+	status = await d.request_tool("penlight")
+	check(status == "open", "insisting opens the test")
+	var turned: bool = await d.until(func() -> bool: return main.state == MainScript.State.ATTACK, 5.0)
+	restore_rules(snap_was)
+	restore_rules(was)
+	check(turned and v.attack_cause == "snap" and v.snapped, "a moment later he turns on the doctor: a snap")
+	check(not main.clinic.scope.is_open() and main._panels_hold, "the close-up is knocked away, and nothing hangs in front of him")
+	check(logged_since("snap", from).size() == 1, "the log has the snap")
+	var warned: bool = await d.wait_for_telegraph()
+	check(warned and main.clinic.bar_on, "the red bar comes up, as for any attack")
+	d.shutter_key()
+	check(v.outcome == "caught", "the shutter stops him")
+	await finish_visit("Vale")
+	check(bool(last_record().get("correct", false)) and int(last_record().get("credits", 0)) == 120 and bool(last_record().get("snapped", false)),
+		"stopped after a snap: a right call, with the handover fee")
+
+	section("Juno and Maren, and a night under the line")
+	v = await enter("juno")
+	await d.stamp("treat")
+	check(v.outcome == "treated_ok", "TREAT is right for Juno")
+	await finish_visit("Juno")
+	v = await enter("maren")
+	await d.call_team()
+	check(v.outcome == "referred_drifting", "the call hands Maren over")
+	await finish_visit("Maren")
+	check(main.state == MainScript.State.REPORT, "the report is up")
+	var r: Dictionary = main.screens.report
+	check(int(r.get("total", 0)) == 1140 and int(r.get("correct", 0)) == 5 and not bool(r.get("line_held", true))
+		and int(r.get("hours_under", 0)) == 2 and str(r.get("title", "")) == "THE CUT",
+		"five right calls with no drop are 1140, under the line of 1200: THE CUT")
+	var missed := 0
+	for e in main.shift.contacts:
+		if main.clipboard.entry_mark(str((e as Dictionary).get("id", ""))) == "missed":
+			missed += 1
+	check(int(r.get("drops", -1)) == 0 and int(r.get("contacts", 0)) == 2 and missed == 2, "neither courier's package came over the counter")
+
+
+# ================================================================ shift 9
+
+## The first night of a session as a new player has it: the training box. The session's first
+## night ran with it switched off, so it runs here, on the ninth.
+func shift_training() -> void:
+	section("Ninth shift: the first-night training")
+	var from: int = main.event_log.memory.size()
+	var opened: bool = await d.open_counter()
+	check(opened and main.shift_number == 9, "a ninth shift starts")
+	var trainings: Array = logged_since("training", from)
+	check(trainings.size() == 1 and int(trainings[0].get("tips", 0)) == 14 and main.coach.count() == 14, "the training starts with the night: fourteen tips")
+	var lists: Array = logged_since("contacts", from)
+	var kip_id := ""
+	for e in main.shift.contacts:
+		if str((e as Dictionary).get("case", "")) == "kip":
+			kip_id = str((e as Dictionary).get("id", ""))
+	check(lists.size() == 1 and bool(lists[0].get("training", false)) and kip_id != "",
+		"on a training night the first visitor is on the list, so the code comes up on the first exam")
+	await process_frame
+	await process_frame
+	check(main.coach.is_running() and main.coach.is_showing() and main.coach.current() == "list", "the first tip is up: tonight's list")
+	d.key(KEY_L)
+	check(d.list_down() and main.coach.current() == "clues", "L takes it down, and the next tip says how to read it")
+	await process_frame
+	await process_frame
+	d.move(main.coach.next_rect().get_center())
+	await process_frame
+	await process_frame
+	check(main.coach.hover == "next" and main._hover_hint == main.TRAINING_NEXT_HINT, "the NEXT button says what it does")
+	d.click(main.coach.next_rect().get_center())
+	check(main.coach.current() == "buzz", "NEXT moves on: the hall camera")
+	var v: VisitState = await enter("kip")
+	check(main.coach.current() == "card", "buzzing Kip in ends that tip; the next is about his intake card")
+	check(not v.surprises and main._training_visit, "on the training visit nobody snaps or flares")
+	check(logged_since("guide", from).is_empty(), "and the guide does not open by itself: the tips stand in for it")
+	var starts: Array = logged_since("visit_start", from)
+	check(starts.size() == 1 and bool(starts[0].get("training", false)) and bool(starts[0].get("contact", false)), "the log says this is the training visit, and a courier's")
+	await d.settle()
+	d.key(KEY_N)
+	check(d.card_down() and main.coach.current() == "code", "N takes the card down: next, the code")
+	var dues: int = logged_since("surprise_due", from).size()
+	var was: Dictionary = pin_rules({"flare": {"grace": 0, "chance": 1.0}})
+	# the drop's own one-time tip was seen on the seventh night; it is put back for a moment to
+	# see that the training, which has a tip of its own for it, keeps it off the hint row
+	main._coached.erase("drop")
+	await d.say_code(kip_id)
+	check(v.dropped and main.coach.current() == "drop", "the right code: the package, and a tip about what it means")
+	await d.settle()
+	await d.seconds(1.0)
+	check(logged_since("surprise_due", from).size() == dues and not v.flared, "with a flare due on every action, still nobody flares on the training visit")
+	check(not main._coached.has("drop") and main._base_hint != main.DROP_COACH_HINT, "the drop's one-time tip stays off the hint row while the training explains it")
+	main._coached["drop"] = true
+	restore_rules(was)
+	d.click(main.coach.next_rect().get_center())
+	check(main.coach.current() == "sheet", "NEXT: on to the exam, and the reference sheet")
+	d.take_sheet()
+	check(d.sheet_down() and not d.list_down() and main.coach.current() == "light", "the swap tab brings the sheet down where the list was; next, the penlight")
+	var status: String = await d.request_tool("penlight")
+	await process_frame
+	await process_frame
+	check(status == "open", "the penlight opens")
+	check(not main.coach.is_showing() and main.coach.is_running() and main.coach.current() == "light", "the tips step aside while a close-up is open")
+	var done: bool = await d.sweep_eyes()
+	check(done and main.coach.current() == "grip", "using the light ends its tip: next, the grip")
+	await d.put_away()
+	status = await d.request_tool("grip")
+	check(status == "open", "the grip bar opens")
+	done = await d.squeeze_and_release()
+	check(done and main.coach.current() == "port", "next, the port")
+	status = await d.request_tool("port")
+	done = await d.watch_port()
+	check(status == "open" and done and main.coach.current() == "talk", "next, talking")
+	await d.put_away()
+	await process_frame
+	await process_frame
+	check(main.coach.is_showing() and main.coach.area() == "talk", "with the tool away, the tip about talking is up")
+	d.click(main.coach.next_rect().get_center())
+	check(main.coach.current() == "marks", "NEXT: the marks")
+	d.mark("eyes")
+	check(int(v.marks.get("eyes", 0)) == 1 and main.coach.current() == "decide", "a tick: next, the decision")
+	await d.settle()
+	await d.stamp("treat")
+	check(v.outcome == "treated_ok" and main.coach.current() == "after", "TREAT: the last tip waits for the slip")
+	var printed: bool = await d.wait_for_slip(40.0)
+	check(printed and main.coach.is_showing() and main.coach.current() == "after", "with the slip, the last tip: what can happen from now on")
+	var moved: bool = await d.take_slip()
+	check(moved and main.coach.is_running() and main.coach.current() == "after", "taking the slip at once leaves it up while the next one waits")
+	var waiting: bool = await d.until(func() -> bool: return main.state == MainScript.State.WAIT, 12.0)
+	await process_frame
+	await process_frame
+	if not (d.sheet_down() and d.card_down()):
+		print("    (note: sheet down %s, card down %s between patients)" % [d.sheet_down(), d.card_down()])
+	check(waiting and main.coach.is_showing() and not main.coach.box().intersects(Gfx.CAM),
+		"between patients the box keeps clear of where the hall camera opens, whatever is down from the walls")
+
+	section("Rook: after the training")
+	v = await enter("rook")
+	var ends: Array = logged_since("training_end", from)
+	check(not main.coach.is_running() and ends.size() == 1 and not bool(ends[0].get("skipped", true)) and int(ends[0].get("reached", 0)) == 13,
+		"buzzing the second visitor in ends the training, at its last tip, not skipped")
+	check(v.surprises and not main._training_visit, "from the second visitor on the counter is the real one: surprises are back")
+	# started again by hand, only to try its two ways out
+	main.coach.start()
+	await process_frame
+	await process_frame
+	check(main.coach.is_showing(), "(started again by hand) the box is up")
+	d.key(KEY_K)
+	ends = logged_since("training_end", from)
+	check(not main.coach.is_running() and ends.size() == 2 and bool(ends[1].get("skipped", false)), "K ends it, as skipped")
+	main.coach.start()
+	await process_frame
+	await process_frame
+	d.move(main.coach.skip_rect().get_center())
+	await process_frame
+	await process_frame
+	check(main.coach.hover == "skip" and main._hover_hint == main.TRAINING_SKIP_HINT, "the SKIP ALL button says what it does")
+	d.click(main.coach.skip_rect().get_center())
+	ends = logged_since("training_end", from)
+	check(not main.coach.is_running() and ends.size() == 3 and bool(ends[2].get("skipped", false)), "and a click on it ends the training too")
+	d.key(KEY_K)
+	check(logged_since("training_end", from).size() == 3 and v.in_exam(), "K with no training running does nothing")
+	await d.settle()
+	await d.stamp("treat")
+	check(v.outcome == "treated_ok", "TREAT is right for Rook")
+	await finish_visit("Rook")
+
+	section("Vale, Juno and Maren")
+	v = await enter("vale")
+	await d.call_team()
+	var warned: bool = await d.wait_for_telegraph()
+	d.shutter_key()
+	check(warned and v.outcome == "caught", "the call turns Vale, and the shutter stops him")
+	await finish_visit("Vale")
+	v = await enter("juno")
+	await d.stamp("treat")
+	await finish_visit("Juno")
+	v = await enter("maren")
+	await d.call_team()
+	check(v.outcome == "referred_drifting", "the call hands Maren over")
+	await finish_visit("Maren")
+	check(main.state == MainScript.State.REPORT, "the report is up")
+	var r: Dictionary = main.screens.report
+	check(int(r.get("total", 0)) == 1440 and bool(r.get("line_held", false)) and str(r.get("title", "")) == "STEADY HANDS" and int(r.get("drops", 0)) == 1,
+		"the training night: five right calls and Kip's drop, 1440, STEADY HANDS")
 
 
 # ================================================================ the doctor's own words
@@ -1503,6 +1946,11 @@ func counter_words() -> void:
 		main.GLASS_OFF_HINT, main.CROSS_SOME_HINT % [1, 2], main.CROSS_SOME_HINT % [4, 5], main.CROSS_RULE_HINT % 2, main.CROSS_RULE_HINT % 5]
 	hints.append_array(main.OBJECT_HINT.values())
 	hints.append_array(main.TAB_HINT.values())
+	# tonight's list, the paid CALM, the surprises and the training
+	hints.append_array([main.LEAVING_FREE_HINT, main.CALM_HINT % [30, 1, 2], main.CALM_HOLD_HINT % [30, 1, 2], main.CALM_GONE_HINT,
+		main.CALM_FREE_HINT % [1, 2], main.CALM_FREE_HOLD_HINT % [1, 2], main.SAY_CODE_HINT % 1, main.CODE_BLANK_HINT % 1,
+		main.DROP_COACH_HINT, main.FLARE_COACH_HINT, main.TRAINING_SKIP_HINT, main.TRAINING_NEXT_HINT, main.SWAP_LIST_HINT,
+		main.SWAP_SHEET_HINT])
 	var fits := 0
 	for h in hints:
 		var text := str(h)
@@ -1510,7 +1958,7 @@ func counter_words() -> void:
 			fits += 1
 		else:
 			print("  too wide or unprintable: ", text)
-	check(fits == hints.size() and fits >= 27, "all %d hints about patience, marks, the walls and the glass fit the hint row" % hints.size())
+	check(fits == hints.size() and fits >= 43, "all %d hints about patience, marks, the walls, the list, CALM and the training fit the hint row" % hints.size())
 	var plates: Array = [main.STOP_CLEAN_LINE, main.STOP_BARE_LINE, main.STOP_LAST_LINE, main.STOP_BLOW_LINE % 1, main.STOP_BLOWS_LINE % 2,
 		main.STOP_BLOWS_LINE % 3]
 	fits = 0
@@ -1543,6 +1991,17 @@ func counter_words() -> void:
 		and Gfx.wrap_text(worst_under, main.dialogue.TEXT_W).size() <= main.dialogue.PAGE_LINES
 		and Gfx.wrap_text(main.SHIFT_LINE % [5, 120], main.dialogue.TEXT_W).size() <= main.dialogue.PAGE_LINES,
 		"the meter's readings and the shift's first line each fit one page of the strip")
+	check(Gfx.wrap_text(main.SHIFT_LIST_LINE % [5, 2, 240], main.dialogue.TEXT_W).size() <= main.dialogue.PAGE_LINES,
+		"the first line of a night with a contact list fits one page of the strip")
+	var packages := 0
+	var pool: Array = main.contact_data.get("pool", [])
+	for e in pool:
+		var line: String = main.DROP_LINE % [str((e as Dictionary).get("package", "")), 300]
+		if Gfx.printable(line) == line and Gfx.wrap_text(line, main.dialogue.TEXT_W).size() <= main.dialogue.PAGE_LINES:
+			packages += 1
+		else:
+			print("  a package that does not fit one page: ", line)
+	check(pool.size() == 10 and packages == pool.size(), "what each of the ten couriers hands over fits one page of the strip")
 	check(Gfx.wrap_text(main.GLASS_LINE % [40, 3, 3], main.dialogue.TEXT_W).size() <= main.dialogue.PAGE_LINES
 		and Gfx.wrap_text(main.GLASS_LINE % [999, 3, 3], main.dialogue.TEXT_W).size() <= main.dialogue.PAGE_LINES,
 		"what the glass fitter did fits one page of the strip")
@@ -1553,30 +2012,63 @@ func counter_words() -> void:
 
 # ================================================================ log
 
-func check_log() -> void:
-	section("Event log")
+func _count_types(records: Array) -> Dictionary:
 	var types := {}
-	for rec in main.event_log.memory:
+	for rec in records:
 		var record: Dictionary = rec
 		var t := str(record.get("type", ""))
 		types[t] = int(types.get(t, 0)) + 1
+	return types
+
+
+## `six`: how many records the log held when the sixth shift was over. The first six shifts and
+## the last three are counted apart, since they were played under different rules.
+func check_log(six: int) -> void:
+	section("Event log")
+	var all: Dictionary = _count_types(main.event_log.memory)
+	var types: Dictionary = _count_types(main.event_log.memory.slice(0, six))
 	for t in ["session_start", "automated_run", "intro", "intro_end", "guide", "shift_start", "meter", "visit_start", "look", "check",
 			"check_done", "ask", "reassure", "press", "say", "mark", "call_line_open", "verdict", "attack", "attack_hit", "shutter",
 			"spent", "leaving", "gave_up", "agent_move", "visit_end", "shift_end", "panel", "glass_repair"]:
 		check(types.has(t), "the log has '%s' records" % t)
-	check(int(types.get("visit_start", 0)) == 30 and int(types.get("visit_end", 0)) == 30, "thirty visits were logged from start to end")
+	check(int(types.get("visit_start", 0)) == 30 and int(types.get("visit_end", 0)) == 30, "thirty visits were logged from start to end in the first six shifts")
 	check(int(types.get("shift_end", 0)) == 6, "six shifts were logged")
 	check(int(types.get("meter", 0)) == 24, "the meter was read after every patient but the last of each shift")
 	check(int(types.get("glass_repair", 0)) == 3, "three layers of glass were bought, all in the sixth shift")
 	var named := 0
-	for rec in logged("panel"):
+	for rec in logged("panel").slice(0, int(types.get("panel", 0))):
 		var record: Dictionary = rec
 		if ["sheet", "card", "cam"].has(str(record.get("panel", ""))) and record.has("open"):
 			named += 1
 	check(named == int(types.get("panel", 0)) and named >= 20, "every paper taken down or hung back and every switch of the big screen is logged by its name")
-	check(int(types.get("intro", 0)) == 1 and int(types.get("intro_end", 0)) == 1, "the opening played once in the session")
 	check(int(types.get("leaving", 0)) == 2 and int(types.get("gave_up", 0)) == 1, "one patient said twice that he was leaving, and left once")
-	check(int(types.get("voice", 0)) == 2, "the two refused presses of the speak key were logged, and nothing else of that kind")
+	check(int(all.get("intro", 0)) == 1 and int(all.get("intro_end", 0)) == 1, "the opening played once in the session")
+	check(int(all.get("voice", 0)) == 2, "the two refused presses of the speak key were logged, and nothing else of that kind")
+	var later: Dictionary = _count_types(main.event_log.memory.slice(six))
+	for t in ["contacts", "code", "snap", "flare", "surprise_due", "training", "training_end"]:
+		check(later.has(t), "the last three shifts' log has '%s' records" % t)
+	check(int(later.get("visit_start", 0)) == 15 and int(later.get("visit_end", 0)) == 15 and int(later.get("shift_end", 0)) == 3
+		and int(later.get("meter", 0)) == 12, "the last three shifts: fifteen visits, three nights, twelve readings of the meter")
+	check(int(later.get("contacts", 0)) == 3 and int(later.get("training", 0)) == 1 and int(later.get("training_end", 0)) == 3,
+		"a list every night, one training, ended three times (once at its last tip, twice by hand)")
+	check(int(later.get("code", 0)) == 3 and int(later.get("snap", 0)) == 1 and int(later.get("flare", 0)) == 1 and int(later.get("surprise_due", 0)) == 2,
+		"three codes said (one blank, two drops), one snap and one flare, each logged when it came up")
+	var listed := 0
+	var lists := 0
+	for rec in main.event_log.memory.slice(six):
+		var record: Dictionary = rec
+		if str(record.get("type", "")) != "panel":
+			continue
+		if ["sheet", "list", "card", "cam"].has(str(record.get("panel", ""))) and record.has("open"):
+			listed += 1
+		if str(record.get("panel", "")) == "list":
+			lists += 1
+	check(listed == int(later.get("panel", 0)) and lists >= 2, "the list taken down and hung back is logged by its name too")
+	for rec in main.event_log.memory.slice(six):
+		var record: Dictionary = rec
+		if str(record.get("type", "")) == "code" and (record.has("say") or record.has("line") or record.has("answer")):
+			check(false, "a code is logged by its entry id and result, never its words")
+			break
 	var worded := 0
 	for rec in main.event_log.memory:
 		var record: Dictionary = rec

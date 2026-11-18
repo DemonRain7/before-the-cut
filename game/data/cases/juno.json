@@ -64,13 +64,16 @@
     "deflect": ["Pass."],
     "reassure": ["Okay. We're c-cool."],
     "spent": "Doc, I've got a set at midnight. Yes or no?",
-    "after:grip": "Chrome's g-good for something."
+    "after:grip": "Chrome's g-good for something.",
+    "code": "Is that a l-lyric? Don't know it."
   },
   "press": [
     {"line": "Excuse me? I'm a s-singer, not a headline. Check your own wiring!",
       "face": "angry", "hands": "point", "note": "Eyes flashed, voice jumped: all at once."},
     {"line": "I'll sing through the static. Bye.", "end": "walkout"}
   ],
+  "flare": {"line": "Hey! Eyes up here, doc! ...Sorry. I hate being st-stared at.", "face": "angry", "hands": "slam",
+    "note": "Flared and slapped the glass: face and voice at once."},
   "attack": {"on_refer": false, "telegraph": "", "line": ""},
   "exit": {
     "treat": "Yes! Doc, you're a s-star.",

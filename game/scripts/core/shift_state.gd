@@ -1,9 +1,14 @@
 extends RefCounted
-## One shift: the queue of patients, the running totals, the lender's line and the counter glass.
+## One shift: the queue of patients, tonight's contacts, the running totals, the lender's line
+## and the counter glass.
 ##
-## The line (rules.json "line"): the clinic's chair and tools are on lease, and the lender's
+## The line (rules.json "line"): Kessler sold the doctor's debt to Harrow Credit, and Harrow's
 ## meter reads the till once an hour. One finished visit is one hour; hour n wants n x per_hour
 ## in the till. Readings on the way are warnings. The last one decides the night (see report()).
+##
+## Contacts (rules.json "contacts", data/contacts.json): each night some visitors are couriers.
+## The list is drawn from the shift seed (draw_contacts()); a drop is paid into the visit's
+## settlement, so the till and every reading count it like a fee.
 ##
 ## The glass (rules.json "attack"): the pane in the counter window takes "glass" blows in a
 ## shift. Each blow that lands before the shutter is down uses one up, and the damage stays,
@@ -19,6 +24,7 @@ var records: Array = []   # one settlement per finished visit
 var glass: int = 0        # blows the pane can still take tonight
 var glass_out: bool = false   # somebody came through it: no pane is left
 var repairs: Array = []   # one per layer paid for: {"after": visits finished by then, "cost": credits}
+var contacts: Array = []  # tonight's list: entries of data/contacts.json "pool", one per courier
 
 
 func _init(p_rules: Dictionary = {}, p_order: Array = []) -> void:
@@ -54,6 +60,58 @@ static func arrival_order(p_rules: Dictionary, p_cases: Dictionary, p_seed: int,
 					ids.insert(0, steady)
 				break
 	return ids
+
+
+## Tonight's contacts: rules.json contacts.per_night entries of the pool, each for a different
+## visitor who comes in tonight, drawn from the shift seed with a generator of their own.
+## `first_on_list` (the training night) puts the first visitor on the list, so the first visit
+## can show how a code works. The list is not in arrival order, so it says nothing about who
+## comes when.
+static func draw_contacts(p_rules: Dictionary, pool: Array, p_order: Array, p_seed: int, first_on_list: bool = false) -> Array:
+	var per := 0
+	if typeof(p_rules.get("contacts")) == TYPE_DICTIONARY:
+		per = maxi(0, int(p_rules["contacts"].get("per_night", 0)))
+	if per == 0 or pool.is_empty() or p_order.is_empty():
+		return []
+	var coming: Array = []
+	for id in p_order:
+		coming.append(str(id))
+	var entries: Array = []
+	for e in pool:
+		if typeof(e) == TYPE_DICTIONARY and coming.has(str((e as Dictionary).get("case", ""))):
+			entries.append(e)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("contacts:%d" % p_seed)
+	for i in range(entries.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var swap: Variant = entries[i]
+		entries[i] = entries[j]
+		entries[j] = swap
+	var out: Array = []
+	var taken: Dictionary = {}
+	if first_on_list:
+		for e in entries:
+			if str(e.get("case", "")) == str(coming[0]):
+				out.append((e as Dictionary).duplicate(true))
+				taken[str(coming[0])] = true
+				break
+	for e in entries:
+		if out.size() >= per:
+			break
+		var cid := str(e.get("case", ""))
+		if taken.has(cid):
+			continue
+		out.append((e as Dictionary).duplicate(true))
+		taken[cid] = true
+	return out
+
+
+## The list entry for a visitor, or {} when they are not a courier tonight.
+func contact_for(case_id: String) -> Dictionary:
+	for e in contacts:
+		if str((e as Dictionary).get("case", "")) == case_id:
+			return e
+	return {}
 
 
 func current_id() -> String:
@@ -245,6 +303,14 @@ func report() -> Dictionary:
 		text = str(entry.get("text", ""))
 		break
 	var line_text: Dictionary = rules.get("line_text", {})
+	var drops := 0
+	var drop_total := 0
+	var calm_total := 0
+	for r in records:
+		if bool(r.get("dropped", false)):
+			drops += 1
+			drop_total += int(r.get("drop", 0))
+		calm_total += int(r.get("calm_spent", 0))
 	return {
 		"visits": records.duplicate(true),
 		"count": order.size(),
@@ -259,6 +325,10 @@ func report() -> Dictionary:
 		"glass_max": glass_max(),
 		"repairs": repairs.size(),
 		"repair_total": repair_total(),
+		"contacts": contacts.size(),
+		"drops": drops,
+		"drop_total": drop_total,
+		"calm_total": calm_total,
 		"title": title,
 		"text": text,
 		"line_text": str(line_text.get("held" if line_held else "short", "")),

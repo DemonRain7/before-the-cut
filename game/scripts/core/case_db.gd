@@ -1,5 +1,6 @@
 extends RefCounted
-## Loads rules.json, sheet.json and the case files, and checks them before the game uses them.
+## Loads rules.json, sheet.json, the case files and contacts.json, and checks them before the
+## game uses them.
 ## A data mistake is reported as a readable list instead of a broken visit.
 ## Used as: const CaseDB = preload("res://scripts/core/case_db.gd")
 
@@ -8,6 +9,9 @@ const ROWS := ["eyes", "hands", "port", "speech", "temper"]
 const ZONES := ["eyes", "hands", "port"]
 const TOOLS := ["penlight", "grip", "port"]
 const EYE_KINDS := ["natural", "optic", "combat", "display"]
+# what a contact clue may test: data/contacts.json "clues"
+const CLUE_TESTS := ["age_min", "age_max", "fee_min", "fee_max", "eyes", "request_starts"]
+const EYE_CLUES := ["chrome_both", "natural_any"]
 
 
 static func load_json(path: String) -> Variant:
@@ -20,9 +24,9 @@ static func load_json(path: String) -> Variant:
 	return json.data
 
 
-## Returns {"rules", "sheet", "cases": {id: case}, "errors": [String]}.
+## Returns {"rules", "sheet", "cases": {id: case}, "contacts", "errors": [String]}.
 static func load_all(dir: String = DATA_DIR) -> Dictionary:
-	var out := {"rules": {}, "sheet": {}, "cases": {}, "errors": []}
+	var out := {"rules": {}, "sheet": {}, "cases": {}, "contacts": {}, "errors": []}
 	var errors: Array = out["errors"]
 	var rules: Variant = load_json(dir + "/rules.json")
 	if typeof(rules) != TYPE_DICTIONARY:
@@ -45,6 +49,12 @@ static func load_all(dir: String = DATA_DIR) -> Dictionary:
 		for e in validate_case(c, rules, out["sheet"]):
 			errors.append("%s: %s" % [str(id), str(e)])
 		out["cases"][str(id)] = c
+	var contacts: Variant = load_json(dir + "/contacts.json")
+	if typeof(contacts) != TYPE_DICTIONARY:
+		errors.append("contacts.json is missing or is not valid JSON.")
+	else:
+		out["contacts"] = contacts
+		errors.append_array(validate_contacts(contacts, out["cases"], rules))
 	return out
 
 
@@ -62,7 +72,53 @@ static func validate_rules(rules: Dictionary) -> Array:
 		errors.append("rules.json: line.per_hour must be 0 or more.")
 	if typeof(rules.get("patience")) == TYPE_DICTIONARY and int(rules["patience"].get("leave_ms", -1)) < 0:
 		errors.append("rules.json: patience.leave_ms must be 0 or more.")
+	if typeof(rules.get("reassure")) == TYPE_DICTIONARY and int(rules["reassure"].get("cost", 0)) < 0:
+		errors.append("rules.json: reassure.cost must be 0 or more (CALM never pays the doctor).")
+	errors.append_array(_validate_surprises(rules))
+	if rules.has("contacts"):
+		var contacts: Variant = rules["contacts"]
+		if typeof(contacts) != TYPE_DICTIONARY:
+			errors.append("rules.json: 'contacts' must be an object.")
+		else:
+			for key in ["per_night", "pay", "wrong_cost"]:
+				if int(contacts.get(key, -1)) < 0:
+					errors.append("rules.json: contacts.%s must be 0 or more." % key)
+			if int(contacts.get("per_night", 0)) > 2:
+				errors.append("rules.json: contacts.per_night is at most 2 (the list paper has room for two).")
 	return errors
+
+
+## The patient who snaps (drifting only) and the one who flares (anyone). Both groups are
+## optional: a rule set without them has nobody snap or flare.
+static func _validate_surprises(rules: Dictionary) -> Array:
+	var errors: Array = []
+	for group in ["snap", "flare"]:
+		if not rules.has(group):
+			continue
+		var g: Variant = rules[group]
+		if typeof(g) != TYPE_DICTIONARY:
+			errors.append("rules.json: '%s' must be an object." % group)
+			continue
+		if int(g.get("grace", -1)) < 0:
+			errors.append("rules.json: %s.grace must be 0 or more." % group)
+		var lo := int(g.get("delay_min_ms", -1))
+		var hi := int(g.get("delay_max_ms", -1))
+		if lo < 0 or hi < lo:
+			errors.append("rules.json: %s.delay_min_ms must be 0 or more and no more than delay_max_ms." % group)
+		var odds: Array = ["step", "max"] if group == "snap" else ["chance"]
+		for key in odds:
+			var v := float(g.get(key, -1.0))
+			if v < 0.0 or v > 1.0:
+				errors.append("rules.json: %s.%s must be between 0 and 1." % [group, key])
+		if group == "snap" and int(g.get("lead_ms", -1)) < 0:
+			errors.append("rules.json: snap.lead_ms must be 0 or more.")
+	return errors
+
+
+## Whether this rule set lets a drifting patient snap mid-exam.
+static func snaps_on(rules: Dictionary) -> bool:
+	var g: Variant = rules.get("snap")
+	return typeof(g) == TYPE_DICTIONARY and float(g.get("max", 0.0)) > 0.0 and float(g.get("step", 0.0)) > 0.0
 
 
 ## The shutter window and the glass. blow_at places each blow inside window_ms; the pane takes
@@ -209,9 +265,17 @@ static func validate_case(c: Dictionary, rules: Dictionary, sheet: Dictionary = 
 					errors.append("topic '%s' has unknown move '%s'." % [tid, str(m)])
 				if str(m) == "deflect" and str(t.get("deflect", "")) == "" and not lines.has("deflect"):
 					errors.append("topic '%s' can deflect but has no deflect line." % tid)
-	for key in ["comply", "stall", "refuse", "reassure", "spent"]:
+	for key in ["comply", "stall", "refuse", "reassure", "spent", "code"]:
 		if not lines.has(key):
 			errors.append("lines.%s is missing." % key)
+	# the shout at the glass anyone may give once a visit (rules.json "flare")
+	var flare: Variant = c.get("flare")
+	if typeof(flare) != TYPE_DICTIONARY:
+		errors.append("flare must be an object with 'line', 'note', 'face' and 'hands'.")
+	else:
+		for key in ["line", "note", "face", "hands"]:
+			if str(flare.get(key, "")) == "":
+				errors.append("flare.%s is missing." % key)
 
 	# scripted rules
 	for r in c.get("script", []):
@@ -254,6 +318,11 @@ static func validate_case(c: Dictionary, rules: Dictionary, sheet: Dictionary = 
 	var can_attack := on_refer or press_attacks
 	if not drifting and can_attack:
 		errors.append("a stable patient must never attack.")
+	# with snaps on, any drifting patient can turn mid-exam
+	if drifting and snaps_on(rules):
+		can_attack = true
+		if str(attack.get("line", "")) == "":
+			errors.append("a drifting patient can snap, so attack.line is needed.")
 	if can_attack and str(attack.get("telegraph", "")) == "":
 		errors.append("an attack needs a visible telegraph text.")
 
@@ -327,4 +396,135 @@ static func validate_case(c: Dictionary, rules: Dictionary, sheet: Dictionary = 
 	for key in ["treat", "refer", "gave_up"]:
 		if str(exit_lines.get(key, "")) == "":
 			errors.append("exit.%s is missing." % key)
+	return errors
+
+
+# ------------------------------------------------------------------ contacts
+## Whether one clue of data/contacts.json fits one case. Every test a clue names must hold.
+static func clue_fits(clue: Dictionary, c: Dictionary) -> bool:
+	var age := int(c.get("age", 0))
+	var fee := int(c.get("fee", 0))
+	if clue.has("age_min") and age < int(clue["age_min"]):
+		return false
+	if clue.has("age_max") and age > int(clue["age_max"]):
+		return false
+	if clue.has("fee_min") and fee < int(clue["fee_min"]):
+		return false
+	if clue.has("fee_max") and fee > int(clue["fee_max"]):
+		return false
+	if clue.has("request_starts") and not str(c.get("request", "")).begins_with(str(clue["request_starts"])):
+		return false
+	if clue.has("eyes"):
+		var natural := 0
+		var eyes: Dictionary = c.get("eyes", {}) if typeof(c.get("eyes")) == TYPE_DICTIONARY else {}
+		for side in ["left", "right"]:
+			var eye: Variant = eyes.get(side)
+			if typeof(eye) == TYPE_DICTIONARY and str(eye.get("kind", "")) == "natural":
+				natural += 1
+		match str(clue["eyes"]):
+			"chrome_both":
+				if natural > 0:
+					return false
+			"natural_any":
+				if natural == 0:
+					return false
+			_:
+				return false
+	return true
+
+
+## The case ids (of `cases`) that a clue fits, sorted.
+static func clue_matches(clue: Dictionary, cases: Dictionary) -> Array:
+	var out: Array = []
+	for id in cases.keys():
+		if clue_fits(clue, cases[id]):
+			out.append(str(id))
+	out.sort()
+	return out
+
+
+## The contact list must be fair: a clue alone never points at one visitor, the two clues of an
+## entry together point at exactly its own, and no two entries share an alias or a code line.
+static func validate_contacts(contacts: Dictionary, cases: Dictionary, rules: Dictionary) -> Array:
+	var errors: Array = []
+	var clues: Variant = contacts.get("clues")
+	var pool: Variant = contacts.get("pool")
+	if typeof(clues) != TYPE_DICTIONARY:
+		errors.append("contacts.json: clues must be an object.")
+		return errors
+	if typeof(pool) != TYPE_ARRAY:
+		errors.append("contacts.json: pool must be a list.")
+		return errors
+	for cid in (clues as Dictionary).keys():
+		var clue: Variant = clues[cid]
+		if typeof(clue) != TYPE_DICTIONARY or str(clue.get("text", "")) == "":
+			errors.append("contacts.json: clue '%s' needs 'text'." % str(cid))
+			continue
+		var tests := 0
+		for key in (clue as Dictionary).keys():
+			if str(key) == "text":
+				continue
+			if not CLUE_TESTS.has(str(key)):
+				errors.append("contacts.json: clue '%s' has unknown test '%s'." % [str(cid), str(key)])
+			tests += 1
+		if tests == 0:
+			errors.append("contacts.json: clue '%s' tests nothing." % str(cid))
+		if clue.has("eyes") and not EYE_CLUES.has(str(clue["eyes"])):
+			errors.append("contacts.json: clue '%s' eyes must be one of %s." % [str(cid), str(EYE_CLUES)])
+		if not cases.is_empty() and clue_matches(clue, cases).size() < 2:
+			errors.append("contacts.json: clue '%s' fits fewer than two visitors, so alone it gives one away." % str(cid))
+	var ids: Array = []
+	var aliases: Array = []
+	var says: Array = []
+	var couriers: Dictionary = {}
+	for e in pool:
+		if typeof(e) != TYPE_DICTIONARY:
+			errors.append("contacts.json: every pool entry must be an object.")
+			continue
+		var id := str(e.get("id", ""))
+		for key in ["id", "case", "alias", "say", "answer", "package"]:
+			if str(e.get(key, "")) == "":
+				errors.append("contacts.json: entry '%s' needs '%s'." % [id, key])
+		if ids.has(id):
+			errors.append("contacts.json: entry id '%s' is used twice." % id)
+		ids.append(id)
+		var alias := str(e.get("alias", ""))
+		if aliases.has(alias):
+			errors.append("contacts.json: alias '%s' is used twice." % alias)
+		aliases.append(alias)
+		var say := str(e.get("say", ""))
+		if says.has(say):
+			errors.append("contacts.json: entry '%s' shares its code line with another." % id)
+		says.append(say)
+		var case_id := str(e.get("case", ""))
+		if not cases.is_empty() and not cases.has(case_id):
+			errors.append("contacts.json: entry '%s' names unknown visitor '%s'." % [id, case_id])
+			continue
+		couriers[case_id] = true
+		var used: Variant = e.get("clues")
+		if typeof(used) != TYPE_ARRAY or (used as Array).size() != 2:
+			errors.append("contacts.json: entry '%s' must give exactly two clues." % id)
+			continue
+		var fits: Array = []
+		for k in cases.keys():
+			fits.append(str(k))
+		var known := true
+		for cl in used:
+			if not (clues as Dictionary).has(str(cl)):
+				errors.append("contacts.json: entry '%s' uses unknown clue '%s'." % [id, str(cl)])
+				known = false
+				continue
+			var matched := clue_matches(clues[str(cl)], cases)
+			var kept: Array = []
+			for f in fits:
+				if matched.has(str(f)):
+					kept.append(str(f))
+			fits = kept
+		if known and not cases.is_empty() and (fits.size() != 1 or str(fits[0]) != case_id):
+			errors.append("contacts.json: entry '%s' clues fit %s, not just '%s'." % [id, str(fits), case_id])
+	var per_night := 0
+	if typeof(rules.get("contacts")) == TYPE_DICTIONARY:
+		per_night = int(rules["contacts"].get("per_night", 0))
+	if per_night > couriers.size():
+		errors.append("contacts.json: the rules ask for %d contacts a night but only %d visitors can be one." % [per_night, couriers.size()])
 	return errors

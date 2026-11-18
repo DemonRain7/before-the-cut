@@ -3,7 +3,8 @@ extends Node2D
 ## is for: the window, the left wall, the right wall, the desk. A page darkens everything but
 ## the part it is about, frames each thing it explains, numbers it, and lists the numbers
 ## beside it. It opens by itself once, when the first patient of a session reaches the
-## counter, and again on H or F1 or a click on the booklet on the left wall. While it is open
+## counter (not while the first-night training, coach.gd, is running: that points at one thing
+## at a time instead), and again on H or F1 or a click on the booklet on the right wall. While it is open
 ## the papers and the big camera screen are back on the wall, where it points at them. The
 ## words come from data/intro.json ("guide"); where each thing sits on the screen is known
 ## here. Nothing in it is a step the player has to take.
@@ -39,9 +40,11 @@ const AREAS := {
 	"patience": Rect2(261, 0, 118, 14),
 	"glass": Rect2(479, 285, 60, 14),
 	"sheet": Rect2(7, 7, 82, 94),
+	"list": Rect2(7, 111, 82, 48),
 	"till": Rect2(2, 168, 96, 56),
 	"camera": Rect2(2, 226, 96, 73),
 	"record": Rect2(545, 7, 82, 106),
+	"booklet": Rect2(545, 127, 82, 48),
 	"treat": Rect2(546, 190, 40, 54),
 	"team": Rect2(594, 190, 40, 54),
 	"shutter": Rect2(546, 245, 40, 54),

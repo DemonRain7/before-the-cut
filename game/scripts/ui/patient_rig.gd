@@ -8,7 +8,9 @@ extends Node
 ## Every layer is a 160 x 176 image with the same origin (see tools/art/gen_patients.py).
 ##
 ## When a patient turns, the rig also plays the assault: the face overlay, the screaming
-## mouth, the three blows on the glass and the lunge out through the window.
+## mouth, the three blows on the glass and the lunge out through the window. A patient who
+## snaps or flares mid-exam first surges at the glass (`surge`): up against it in a blink, then
+## back, or straight on into the attack.
 ##
 ## While an answer is on its way (`thinking`) each patient waits in their own way, with a
 ## small thought bubble by the head; while the doctor is speaking into the microphone
@@ -20,6 +22,9 @@ const Gfx = preload("res://scripts/ui/gfx.gd")
 const PIVOT := Vector2(80, 160)   # where the patient meets the sill; lunges scale about it
 const POP_SCALE := 1.6            # how big they are when they come through the window (on top of the window's own 2x)
 const SLIDE_PX := 250.0           # how far `slide` 1 carries them: out of the window, behind the wall
+const SURGE_IN := 0.09            # seconds to come up against the glass
+const SURGE_OUT := 0.3            # seconds to sink back from it
+const SURGE_SCALE := 0.22         # how much bigger they are against the glass
 
 signal impact(strength: float)
 
@@ -77,6 +82,8 @@ var _thrash_t: float = 0.0
 var _bubble := Node2D.new()       # the thought bubble, beside the head
 var _minded: bool = false         # thinking or listening, as of the last frame
 var _thought_in: float = 0.0
+var _surge_t: float = -1.0        # seconds into a surge at the glass, or -1
+var _surge_hold: float = 0.0
 
 
 func setup(p_case: Dictionary, p_meta: Dictionary) -> void:
@@ -278,6 +285,25 @@ func _apply_attack_pose() -> void:
 	_set_tex("attack", layer)
 
 
+## They come at the glass all at once: up against it in a blink, held there `hold` seconds,
+## then back. A snap holds until the attack pose has taken over; a flare comes straight back.
+func surge(hold: float) -> void:
+	_surge_t = 0.0
+	_surge_hold = maxf(0.0, hold)
+	shake(3.5, 0.3)
+
+
+## 0 at rest, 1 against the glass.
+func _surge_amount() -> float:
+	if _surge_t < 0.0:
+		return 0.0
+	if _surge_t < SURGE_IN:
+		return _surge_t / SURGE_IN
+	if _surge_t < SURGE_IN + _surge_hold:
+		return 1.0
+	return clampf(1.0 - (_surge_t - SURGE_IN - _surge_hold) / SURGE_OUT, 0.0, 1.0)
+
+
 func shake(amp: float, time: float) -> void:
 	_shake_amp = amp
 	_shake_t = time
@@ -316,6 +342,10 @@ func _process(delta: float) -> void:
 			_end_reaction()
 	if _shake_t > 0.0:
 		_shake_t -= delta
+	if _surge_t >= 0.0:
+		_surge_t += delta
+		if _surge_t > SURGE_IN + _surge_hold + SURGE_OUT:
+			_surge_t = -1.0
 	_apply_pose()
 
 
@@ -548,6 +578,12 @@ func _apply_pose() -> void:
 	if _attack:
 		off += _thrash
 		s = _zoom + _jerk * 0.035
+	var surge := _surge_amount()
+	if surge > 0.0:
+		# up against the glass: bigger about the sill, and a little lower, as if nearer
+		var k := 1.0 - (1.0 - surge) * (1.0 - surge)
+		s *= 1.0 + SURGE_SCALE * k
+		off.y += roundf(4.0 * k)
 	var pos := Gfx.PATIENT_POS + off + PIVOT * (1.0 - s)
 	if pop > 0.0:
 		# through the window: the face swells to fill the screen, and keeps coming

@@ -1,14 +1,22 @@
 extends Node2D
-## The doctor's two papers. Both hang on the booth walls until they are wanted (the wall
-## objects are drawn by the desk); taken down, each slides in over its own side of the window:
+## The doctor's papers. They hang on the booth walls until they are wanted (the wall objects
+## are drawn by the desk); taken down, each slides in over its own side of the window:
 ##   the normal reference sheet, from the left
+##   tonight's contact list, from the left, into the same place (the director never has both
+##   of the left-hand papers down at once)
 ##   the patient's intake card, from the right
 ## The card mirrors the five sheet lines. Notes land on it as the player looks, tests and
 ## talks; nothing on it says "normal" or "abnormal" until the visit is over. The box beside
 ## each row is the player's own tick or cross, and the decision box counts their crosses
 ## against the house rule on the sheet (sheet.json "threshold").
 ##
-## A paper that is out has a small tab on its window-side edge that puts it back.
+## A paper that is out has a small tab on its window-side edge that puts it back. The sheet and
+## the list hang on one hook: under the tab of whichever is down, a second tab (L or R) swaps it
+## for the other.
+##
+## The contact list prints tonight's entries (data/contacts.json, drawn by ShiftState): an
+## alias, two clues and a code line each. During the exam each entry still open has a SAY
+## button; what a code does is decided by VisitState.say_code(), never here.
 ##
 ## The papers were laid out for a screen on which they sat one above the other, the sheet at
 ## SHEET_HOME and the card at CARD_HOME, and their rows are still written in those
@@ -36,6 +44,13 @@ const TAB := Vector2(12, 24)      # the tab that puts a paper back
 const TAB_DROP := 8.0             # how far below the paper's top edge it sits
 const SLIDE := 252.0              # how far a paper travels to be out of sight
 const SLIDE_TIME := 0.16
+const LIST_X := 16.0              # the text column of the contact list, inside its feed margins
+const LIST_RIGHT := 216.0
+const LIST_ENTRY_Y := 22.0
+const LIST_ENTRY_H := 50.0
+const LIST_FOOT_Y := 124.0
+const LIST_MAX := 2               # entries the paper has room for (case_db holds contacts.per_night to it)
+const SAY_SIZE := Vector2(30, 11)
 
 var sheet: Dictionary = {}
 var visit: VisitState = null      # the patient at the counter, or null
@@ -48,12 +63,22 @@ var hover_mark: String = ""
 var counter_text: String = ""     # "2 / 5"
 var sheet_open: bool = false      # the reference sheet is down from its board
 var card_open: bool = false       # the intake card is down from its board
-var tab_hover: String = ""        # "sheet" | "card": the tab under the pointer
+var list_open: bool = false       # tonight's contact list is down from its board
+var tab_hover: String = ""        # "sheet" | "list" | "card" | "swap": the tab under the pointer
+var contacts: Array = []          # tonight's entries, as ShiftState drew them
+var clues: Dictionary = {}        # data/contacts.json "clues": id -> {"text": ...}
+var list_title: String = "TONIGHT'S CONTACTS"
+var contact_pay: int = 0          # rules.json contacts.pay
+var code_cost: int = 1            # rules.json contacts.wrong_cost
+var contact_marks: Dictionary = {}    # entry id -> "picked" | "missed", for the rest of the night
+var say_hover: String = ""        # the entry whose SAY button is under the pointer
 
 var _sheet_n := Node2D.new()
 var _card_n := Node2D.new()
+var _list_n := Node2D.new()
 var _sheet_k: float = 0.0         # 0 away, 1 out
 var _card_k: float = 0.0
+var _list_k: float = 0.0
 var _fresh: Dictionary = {}       # note key -> seconds since it was written
 var _imprint_t: float = 9.0
 var _t: float = 0.0
@@ -62,6 +87,8 @@ var _t: float = 0.0
 func _ready() -> void:
 	add_child(_sheet_n)
 	_sheet_n.draw.connect(_draw_sheet_paper)
+	add_child(_list_n)
+	_list_n.draw.connect(_draw_list_paper)
 	add_child(_card_n)
 	_card_n.draw.connect(_draw_card_paper)
 	_place()
@@ -92,10 +119,22 @@ func mark_fresh(key: String) -> void:
 	_fresh[key] = 0.0
 
 
-## Both papers where they are meant to be, at once (no slide).
+## Tonight's list, as the shift drew it. The marks of the last night go with it.
+func set_contacts(p_entries: Array, p_clues: Dictionary, p_title: String, p_pay: int, p_cost: int) -> void:
+	contacts = p_entries.duplicate(true)
+	clues = p_clues
+	list_title = p_title if p_title != "" else "TONIGHT'S CONTACTS"
+	contact_pay = p_pay
+	code_cost = p_cost
+	contact_marks.clear()
+	say_hover = ""
+
+
+## All the papers where they are meant to be, at once (no slide).
 func snap() -> void:
 	_sheet_k = 1.0 if sheet_open else 0.0
 	_card_k = 1.0 if card_open else 0.0
+	_list_k = 1.0 if list_open else 0.0
 	_place()
 
 
@@ -116,19 +155,38 @@ func in_sheet(pos: Vector2) -> bool:
 	return sheet_open and Gfx.SHEET.has_point(pos)
 
 
+func in_list(pos: Vector2) -> bool:
+	return list_open and Gfx.SHEET.has_point(pos)
+
+
 ## The tab that puts the sheet back, on the screen.
 func sheet_tab() -> Rect2:
 	return Rect2(Gfx.SHEET.end.x, Gfx.SHEET.position.y + TAB_DROP, TAB.x, TAB.y)
+
+
+## The list comes down into the sheet's place, so its tab is where the sheet's is.
+func list_tab() -> Rect2:
+	return sheet_tab()
+
+
+## Under the tab of the sheet or the list: the tab that trades the one that is down for the other.
+func swap_tab() -> Rect2:
+	return Rect2(Gfx.SHEET.end.x, Gfx.SHEET.position.y + TAB_DROP + TAB.y + 4.0, TAB.x, TAB.y)
 
 
 func card_tab() -> Rect2:
 	return Rect2(Gfx.RECORD.position.x - TAB.x, Gfx.RECORD.position.y + TAB_DROP, TAB.x, TAB.y)
 
 
-## "sheet" or "card" if the pointer is on the tab of a paper that is out, else "".
+## "sheet", "list" or "card" if the pointer is on the tab of a paper that is out, "swap" on the
+## tab that trades the sheet and the list, else "".
 func tab_at(pos: Vector2) -> String:
+	if list_open and list_tab().has_point(pos):
+		return "list"
 	if sheet_open and sheet_tab().has_point(pos):
 		return "sheet"
+	if (list_open or sheet_open) and swap_tab().has_point(pos):
+		return "swap"
 	if card_open and card_tab().has_point(pos):
 		return "card"
 	return ""
@@ -172,6 +230,40 @@ func decision_rect() -> Rect2:
 	return Rect2(DECISION.position + _card_shift(), DECISION.size)
 
 
+## How an entry of tonight's list stands: "picked" (its package came over the counter
+## tonight), "missed" (its courier came and went without it) or "".
+func entry_mark(id: String) -> String:
+	var mark := str(contact_marks.get(id, ""))
+	if mark == "" and visit != null and visit.dropped and str(visit.contact.get("id", "")) == id:
+		mark = "picked"
+	return mark
+
+
+## Whether the SAY button of an entry is there to press: during the exam, for an entry still
+## open, a code this visitor has not heard yet, and no package over the counter this visit.
+func can_say(id: String) -> bool:
+	if mode != "exam" or visit == null or not visit.in_exam() or visit.dropped:
+		return false
+	return entry_mark(id) == "" and not visit.codes_tried.has(id)
+
+
+## The SAY button of entry i, on the screen, with the list all the way out.
+func say_rect(i: int) -> Rect2:
+	var at := Vector2(LIST_RIGHT - SAY_SIZE.x, LIST_ENTRY_Y + LIST_ENTRY_H * float(i) - 1.0)
+	return Rect2(Gfx.SHEET.position + at, SAY_SIZE)
+
+
+## The entry id whose SAY button is under the pointer and can be pressed, or "".
+func say_at(pos: Vector2) -> String:
+	if not in_list(pos) or _list_k < 1.0:
+		return ""
+	for i in mini(contacts.size(), LIST_MAX):
+		var id := str((contacts[i] as Dictionary).get("id", ""))
+		if say_rect(i).grow(1.0).has_point(pos) and can_say(id):
+			return id
+	return ""
+
+
 # ------------------------------------------------------------------ frame
 func _process(delta: float) -> void:
 	_t += delta
@@ -181,9 +273,12 @@ func _process(delta: float) -> void:
 	var step := delta / SLIDE_TIME
 	_sheet_k = move_toward(_sheet_k, 1.0 if sheet_open else 0.0, step)
 	_card_k = move_toward(_card_k, 1.0 if card_open else 0.0, step)
+	_list_k = move_toward(_list_k, 1.0 if list_open else 0.0, step)
 	_place()
 	if _sheet_n.visible:
 		_sheet_n.queue_redraw()
+	if _list_n.visible:
+		_list_n.queue_redraw()
 	if _card_n.visible:
 		_card_n.queue_redraw()
 
@@ -196,6 +291,9 @@ func _place() -> void:
 	_sheet_n.position = _sheet_shift() + Vector2(-roundf(SLIDE * (1.0 - sk)), 0.0)
 	_card_n.visible = _card_k > 0.0
 	_card_n.position = _card_shift() + Vector2(roundf(SLIDE * (1.0 - ck)), 0.0)
+	var lk := 1.0 - (1.0 - _list_k) * (1.0 - _list_k)
+	_list_n.visible = _list_k > 0.0
+	_list_n.position = Gfx.SHEET.position + Vector2(-roundf(SLIDE * (1.0 - lk)), 0.0)
 
 
 # ------------------------------------------------------------------ drawing
@@ -215,12 +313,24 @@ func _draw_tab(node: Node2D, at: Vector2, to_left: bool, hot: bool) -> void:
 		node.draw_rect(Rect2(x, cy - float(i), 1, 1.0 + 2.0 * float(i)), col)
 
 
+## The swap tab under the left-hand paper's own: the key letter of the paper it brings down.
+func _draw_swap(node: Node2D, at: Vector2, key: String, hot: bool) -> void:
+	var r := Rect2(at, TAB)
+	node.draw_rect(Rect2(r.position + Vector2(1, 2), r.size), Color(0, 0, 0, 0.35))
+	node.draw_rect(r, Gfx.PAPER3 if hot else Gfx.PAPER2)
+	node.draw_rect(Rect2(r.position.x, r.position.y, r.size.x, 1), Gfx.PAPER1)
+	node.draw_rect(Rect2(r.position.x, r.end.y - 1.0, r.size.x, 1), Gfx.PAPER1)
+	node.draw_rect(Rect2(r.end.x - 1.0, r.position.y, 1, r.size.y), Gfx.PAPER1)
+	Gfx.text_center(node, r.position.x + r.size.x / 2.0, r.position.y + 7.0, key, Gfx.INKT if hot else Gfx.INKS, true)
+
+
 func _draw_sheet_paper() -> void:
 	var n := _sheet_n
 	var sheet_tex := Gfx.tex("clinic/sheet.png")
 	if sheet_tex != null:
 		n.draw_texture(sheet_tex, SHEET_HOME)
 	_draw_tab(n, SHEET_HOME + Vector2(Gfx.SHEET.size.x, TAB_DROP), true, tab_hover == "sheet")
+	_draw_swap(n, SHEET_HOME + Vector2(Gfx.SHEET.size.x, TAB_DROP + TAB.y + 4.0), "L", tab_hover == "swap")
 	Gfx.text_center(n, 520.0, 18.0, str(sheet.get("title", "NORMAL REFERENCE SHEET")), Gfx.INKT, true)
 	n.draw_rect(Rect2(410, 29, 220, 1), Gfx.PAPER1)
 	var rows: Array = sheet.get("rows", [])
@@ -241,6 +351,62 @@ func _draw_sheet_paper() -> void:
 	var footer: Array = sheet.get("footer", [])
 	for i in footer.size():
 		Gfx.text_center(n, 520.0, fy + 2.0 + 10.0 * float(i), str(footer[i]), Gfx.INKT if i == 0 else Gfx.INKS)
+
+
+## Tonight's contact list, drawn in its own pixels (0, 0 is its top-left corner).
+func _draw_list_paper() -> void:
+	var n := _list_n
+	var tex := Gfx.tex("clinic/list.png")
+	if tex != null:
+		n.draw_texture(tex, Vector2.ZERO)
+	_draw_tab(n, Vector2(Gfx.SHEET.size.x, TAB_DROP), true, tab_hover == "list")
+	_draw_swap(n, Vector2(Gfx.SHEET.size.x, TAB_DROP + TAB.y + 4.0), "R", tab_hover == "swap")
+	var mid := Gfx.SHEET.size.x / 2.0
+	Gfx.text_center(n, mid, 4.0, list_title, Gfx.RED1, true)
+	n.draw_rect(Rect2(LIST_X, 15, LIST_RIGHT - LIST_X, 1), Gfx.RED1)
+	if contacts.is_empty():
+		Gfx.text_center(n, mid, 60.0, "Nobody on the list tonight.", Gfx.PRINT)
+	for i in mini(contacts.size(), LIST_MAX):
+		var e: Dictionary = contacts[i]
+		var y := LIST_ENTRY_Y + LIST_ENTRY_H * float(i)
+		if i > 0:
+			n.draw_rect(Rect2(LIST_X, y - 5.0, LIST_RIGHT - LIST_X, 1), Color(Gfx.PAPER1, 0.8))
+		Gfx.text(n, Vector2(LIST_X, y), str(e.get("alias", "")), Gfx.INKT, true)
+		var used: Array = e.get("clues", [])
+		for k in used.size():
+			var clue: Dictionary = clues.get(str(used[k]), {})
+			Gfx.text(n, Vector2(LIST_X, y + 11.0 + 10.0 * float(k)), "• " + str(clue.get("text", "")), Gfx.INKT)
+		Gfx.text(n, Vector2(LIST_X, y + 32.0), "\"%s\"" % str(e.get("say", "")), Gfx.INKS)
+		_draw_entry_state(i, str(e.get("id", "")), y)
+	n.draw_rect(Rect2(LIST_X, LIST_FOOT_Y - 3.0, LIST_RIGHT - LIST_X, 1), Gfx.PAPER1)
+	Gfx.text_center(n, mid, LIST_FOOT_Y, "Both clues fit one visitor. Say their code.", Gfx.INKT)
+	Gfx.text_center(n, mid, LIST_FOOT_Y + 10.0, "Right one: a package, +%d, either way." % contact_pay, Gfx.INKS)
+	Gfx.text_center(n, mid, LIST_FOOT_Y + 20.0, "Anyone else: a blank look, -%d patience." % code_cost, Gfx.INKS)
+
+
+## Right of an alias: the stamp of an entry that is settled, the pencilled "blank look" of a
+## code this visitor did not know, or the SAY button.
+func _draw_entry_state(i: int, id: String, y: float) -> void:
+	var n := _list_n
+	var mark := entry_mark(id)
+	if mark != "":
+		var text := "PICKED UP" if mark == "picked" else "MISSED"
+		var col: Color = Gfx.STAMP_G if mark == "picked" else Gfx.STAMP_R
+		var w := Gfx.text_w(text, true) + 6.0
+		var r := Rect2(LIST_RIGHT - w, y - 2.0, w, 13)
+		n.draw_rect(r, col, false, 1.0)
+		Gfx.text(n, r.position + Vector2(3, 1), text, col, true)
+		return
+	if mode != "exam" or visit == null or not visit.in_exam() or visit.dropped:
+		return
+	if visit.codes_tried.has(id):
+		Gfx.text_right(n, LIST_RIGHT, y, "blank look", Gfx.PENCIL)
+		return
+	var r := Rect2(say_rect(i).position - Gfx.SHEET.position, SAY_SIZE)
+	var hot := say_hover == id
+	n.draw_rect(Rect2(r.position + Vector2(1, 1), r.size), Color(0, 0, 0, 0.3))
+	n.draw_rect(r, Gfx.RED2 if hot else Gfx.RED1)
+	Gfx.text_center(n, r.position.x + r.size.x / 2.0, r.position.y + 1.0, "SAY", Gfx.PAPER3, true)
 
 
 func _draw_card_paper() -> void:

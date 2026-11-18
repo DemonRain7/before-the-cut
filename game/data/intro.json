@@ -1,19 +1,19 @@
 {
-  "version": 2,
-  "note": "Words for the opening cards (scripts/ui/intro.gd) and the counter guide (scripts/ui/guide.gd). First written by the assistant on 2026-11-15 after the student's eleven notes. Version 2 (2026-11-16) is the guide for the counter-first screen: four pages, one each for the window, the left wall, the right wall and the desk. Nobody has playtested them. {per_hour}, {hours}, {total}, {threshold} and {repair_cost} are filled in from rules.json and sheet.json; a rule set with no repair_cost leaves the \"mend\" item out. The pictures and the positions of the guide's numbers are drawn in code; only the words live here, so tools/art/measure_text.py can check that they fit.",
+  "version": 4,
+  "note": "Words for the opening cards (scripts/ui/intro.gd), the counter guide (scripts/ui/guide.gd) and the first-night training (scripts/ui/coach.gd). First written by the assistant on 2026-11-15 after the student's eleven notes. Version 2 (2026-11-16) is the guide for the counter-first screen: four pages, one each for the window, the left wall, the right wall and the desk. Version 3 (2026-11-17) adds the contact list and the paid calm-patch to the guide and the training: one tip at a time on the first night, each pointing at one thing. A tip has an id, the phases of a visit it belongs to (wait, exam, slip; a comma-separated list), the event that completes it (until; \"next\" for a tip that is only read), the area it points at (main.gd: _coach_focus) and its text, which must fit four lines of the box. Every tip also has NEXT, and SKIP ALL [K] ends the training; nothing in it is a step the player has to take. Version 4 (2026-11-17) tells the student's story in six cards: fired from Kessler, the debt Kessler sold to Harrow Credit, the Lanterns' back-street clinic and its contacts, Harrow's line, the drift (illegal street chrome) and the counter. The Lanterns card's picture is a list with two made-up entries: their aliases and codes are not in data/contacts.json, and each pair of clues fits none of the five visitors, so the picture cannot be taken for a real night's list. Nobody has playtested any of it. {per_hour}, {hours}, {total}, {threshold}, {repair_cost}, {pay}, {code_cost}, {calm_cost}, {calm_gain}, {ask_cost}, {press_cost}, {per_night} and {limit} are filled in from rules.json and sheet.json; a rule set with no repair_cost leaves the \"mend\" item out. The pictures and the positions of the guide's numbers are drawn in code; only the words live here, so tools/art/measure_text.py can check that they fit.",
   "cards": [
     {
-      "id": "towers",
+      "id": "fired",
       "art": "towers",
-      "title": "THE TOWERS",
-      "text": "Up in the towers, an implant is something you buy. Down here, under the rain, it is something you owe on.",
+      "title": "FIRED",
+      "text": "Twelve years at Kessler, up in the towers, fitting chrome to people who could pay for it. Then one night your badge stopped opening doors, and security walked you all the way down.",
       "labels": {}
     },
     {
-      "id": "lease",
+      "id": "debt",
       "art": "lease",
-      "title": "THE LEASE",
-      "text": "You fit implants at a back-street counter. The chair, the tools and your own two hands are on lease from Harrow Credit.",
+      "title": "THE DEBT",
+      "text": "Kessler sold everything you owed to Harrow Credit: the flat, the licence, the loan on your own two hands. Now the chair, the tools and the hands are on lease.",
       "labels": {
         "head": "HARROW CREDIT",
         "sub": "EQUIPMENT LEASE",
@@ -23,40 +23,41 @@
       }
     },
     {
+      "id": "lanterns",
+      "art": "lanterns",
+      "title": "THE LANTERNS",
+      "text": "One counter would still take you: a back-street clinic the Lanterns run. Their contacts come in as patients, carrying smuggled military chrome. Tonight's list says who to look for. The right code, and the crew pays {pay}.",
+      "labels": {
+        "head": "TONIGHT'S CONTACTS",
+        "entries": [
+          {"alias": "KESTREL", "clues": ["Under thirty.", "Fee 400 or more."], "code": "Is the ferry late again?"},
+          {"alias": "COPPER", "clues": ["Over forty.", "Chrome in both eyes."], "code": "Is the market open Sunday?"}
+        ],
+        "say": "SAY",
+        "picked": "PICKED UP",
+        "drop": "+{pay}"
+      }
+    },
+    {
       "id": "line",
       "art": "line",
       "title": "THE LINE",
-      "text": "Their meter reads your till every hour, and every hour it wants {per_hour} more. End the night under the line and they make the cut: the lease is called in, hands first.",
-      "labels": {
-        "hour": "HOUR",
-        "line": "LINE",
-        "over": "OPEN",
-        "under": "THE CUT"
-      }
+      "text": "Harrow's meter reads your till every hour, and every hour it wants {per_hour} more. Fees and packages both count. End the night under the line and Harrow makes the cut: the lease is called in, hands first.",
+      "labels": {"hour": "HOUR", "line": "LINE", "over": "OPEN", "under": "THE CUT"}
     },
     {
       "id": "drift",
       "art": "drift",
       "title": "THE DRIFT",
-      "text": "Cheap chrome and no sleep, and some patients start to drift. Most are only tired, scared or angry. Put one who is drifting under the knife and it does not end in your chair.",
-      "labels": {
-        "list": "TONIGHT'S LIST",
-        "ask": "STEADY OR DRIFTING?"
-      }
+      "text": "Street chrome is illegal chrome: cheap, unlicensed, sometimes torn out of a soldier. Some who wear it start to drift, and a drifting one can turn on you without warning. Most are only tired, scared or angry.",
+      "labels": {"list": "TONIGHT'S VISITORS", "ask": "STEADY OR DRIFTING?"}
     },
     {
       "id": "counter",
       "art": "counter",
       "title": "BEFORE THE CUT",
       "text": "So you check them first. TREAT the steady and the fee is yours. Call TRAUMA TEAM on the drifting. If one turns on you, drop the SHUTTER before the glass gives.",
-      "labels": {
-        "treat": "TREAT",
-        "treat_sub": "the steady",
-        "team": "TRAUMA TEAM",
-        "team_sub": "the drifting",
-        "shutter": "SHUTTER",
-        "shutter_sub": "if one turns"
-      }
+      "labels": {"treat": "TREAT", "treat_sub": "the steady", "team": "TRAUMA TEAM", "team_sub": "the drifting", "shutter": "SHUTTER", "shutter_sub": "if one turns"}
     }
   ],
   "guide": [
@@ -65,7 +66,7 @@
       "title": "THE WINDOW",
       "items": [
         {"key": "patient", "text": "THE PATIENT. Click eyes, hands or port for a closer look. Looking is free."},
-        {"key": "patience", "text": "PATIENCE. Tools and questions cost lamps. When the last one goes out they leave: no fee, no fine."},
+        {"key": "patience", "text": "PATIENCE. Tools, questions and wrong codes cost lamps. When the last one goes out they leave: no fee, no fine."},
         {"key": "glass", "text": "GLASS. What the pane can still take tonight. Every blow that lands leaves less time at the next attack."}
       ]
     },
@@ -74,6 +75,7 @@
       "title": "THE LEFT WALL",
       "items": [
         {"key": "sheet", "text": "REFERENCE SHEET [R]. What a steady patient looks like, and what is merely odd. Click it to take it down. It never decides for you."},
+        {"key": "list", "text": "CONTACT LIST [L]. Tonight's contacts: an alias, two clues and a code each. SAY the code to the one visitor who fits both clues: a package, +{pay}. Anyone else: -{code_cost} patience."},
         {"key": "till", "text": "TILL and HOUR. One patient is one hour. The meter reads the till each hour: stay over the line."},
         {"key": "camera", "text": "HALL CAMERA [C]. Who is next. Click it, then the big screen, to buzz them in. ENTER does it at once."}
       ]
@@ -83,6 +85,7 @@
       "title": "THE RIGHT WALL",
       "items": [
         {"key": "record", "text": "INTAKE CARD [N]. Your notes on the patient. Findings are written on it by themselves; tick or cross a row yourself. {threshold} crosses: drifting, by the house rule. The call stays yours."},
+        {"key": "booklet", "text": "COUNTER GUIDE [H]. These pages. On your first night a TRAINING box points at one thing at a time; SKIP ALL [K] ends it."},
         {"key": "treat", "text": "TREAT. Pick up the stamp and stamp the card. For the steady."},
         {"key": "team", "text": "TRAUMA TEAM. Press twice and they take the patient away. For the drifting."},
         {"key": "shutter", "text": "SHUTTER [SPACE]. If a patient turns on you, drop it before the red bar runs out."},
@@ -95,9 +98,109 @@
       "items": [
         {"key": "tools", "text": "TOOLS. Penlight, grip bar, port check. Each costs patience and gives one reading."},
         {"key": "say", "text": "YOUR OWN WORDS. T types a line. With the patient AI running, hold TAB to speak it."},
-        {"key": "talk", "text": "TALK. ASK a question, CALM to give patience back, PRESS to push them hard."}
+        {"key": "talk", "text": "TALK. ASK a question. CALM gives patience back, but each calm-patch costs {calm_cost} credits. PRESS pushes them hard."}
       ],
       "closing": "Nothing is required. Decide whenever you like. H opens this guide again."
+    }
+  ],
+  "training": [
+    {
+      "id": "list",
+      "phase": "wait,exam",
+      "until": "list_open",
+      "area": "list",
+      "text": "TONIGHT'S CONTACTS hang on the left wall: the people the crew is waiting on. Click the list, or press L."
+    },
+    {
+      "id": "clues",
+      "phase": "wait,exam",
+      "until": "next",
+      "area": "list",
+      "text": "Each contact: an alias, two clues, a code. The one visitor who fits BOTH is theirs. The card has age, fee and request; a look shows the eyes."
+    },
+    {
+      "id": "buzz",
+      "phase": "wait",
+      "until": "visit_start",
+      "area": "cam",
+      "text": "The HALL CAMERA shows who is waiting. Click it, then the big screen, or press ENTER to buzz them in."
+    },
+    {
+      "id": "card",
+      "phase": "exam",
+      "until": "card_open",
+      "area": "card",
+      "text": "Their INTAKE CARD [N] hangs on the right wall: name, age, fee, request, and your notes as you work."
+    },
+    {
+      "id": "code",
+      "phase": "exam",
+      "until": "code_said",
+      "area": "code",
+      "text": "Card out, list out [L]: do both clues of one entry fit? Press SAY beside it. A wrong code costs {code_cost} patience."
+    },
+    {
+      "id": "drop",
+      "phase": "exam",
+      "until": "next",
+      "area": "meter",
+      "text": "Right code: a package, +{pay} in the till. Wrong: a blank look. Neither tells you anything about the patient."
+    },
+    {
+      "id": "sheet",
+      "phase": "exam",
+      "until": "sheet_open",
+      "area": "sheet",
+      "text": "Now the exam. The REFERENCE SHEET [R] says what a steady patient does. It comes down where the list does."
+    },
+    {
+      "id": "light",
+      "phase": "exam",
+      "until": "check:penlight",
+      "area": "pad:penlight",
+      "text": "PENLIGHT: move the light onto each eye. A natural pupil tightens, chrome does not. Both eyes should follow it."
+    },
+    {
+      "id": "grip",
+      "phase": "exam",
+      "until": "check:grip",
+      "area": "pad:grip",
+      "text": "GRIP: hold the mouse till the force gauge fills, then let go to say RELEASE. Steady lets go before the LIMIT mark, {limit} s."
+    },
+    {
+      "id": "port",
+      "phase": "exam",
+      "until": "check:port",
+      "area": "pad:port",
+      "text": "PORT: a close look at the socket. Calm skin is fine. Dark threads spreading from it are not."
+    },
+    {
+      "id": "talk",
+      "phase": "exam",
+      "until": "next",
+      "area": "talk",
+      "text": "TALK: ASK costs {ask_cost}, PRESS costs {press_cost} and tests temper. CALM gives {calm_gain} back for {calm_cost} credits. No patience: they leave."
+    },
+    {
+      "id": "marks",
+      "phase": "exam",
+      "until": "mark",
+      "area": "marks",
+      "text": "Tick or cross each row of the card against the sheet. Your marks help you count: nothing scores them."
+    },
+    {
+      "id": "decide",
+      "phase": "exam",
+      "until": "verdict",
+      "area": "decide",
+      "text": "Steady? Pick up TREAT and stamp the card. {threshold} broken lines mean drifting: call TRAUMA TEAM, press twice."
+    },
+    {
+      "id": "after",
+      "phase": "slip,wait",
+      "until": "next",
+      "area": "slip",
+      "text": "From now on a drifting patient may turn on you mid-exam. A red bar: SHUTTER [SPACE], now. A shout with no red bar is only temper."
     }
   ]
 }

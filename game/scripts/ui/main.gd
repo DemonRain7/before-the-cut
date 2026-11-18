@@ -13,7 +13,9 @@ extends Control
 ##   --model                             autonomous patient dialogue through the proxy
 ##   --mute                              start with sound off
 ##   --less-blood                        the attack scenes without the blood
-##   --no-intro                          skip the opening cards and the first showing of the counter guide
+##   --no-intro                          skip the opening cards, the first-night training and the first showing of the counter guide
+##   --no-training                       no training box on the first night (the guide opens by itself instead)
+##   --no-surprises                      no patient snaps or flares mid-exam (tests, captures)
 
 const Gfx = preload("res://scripts/ui/gfx.gd")
 const CaseDB = preload("res://scripts/core/case_db.gd")
@@ -34,12 +36,17 @@ const AudioBank = preload("res://scripts/ui/audio_bank.gd")
 const GoreLayer = preload("res://scripts/ui/gore_layer.gd")
 const Intro = preload("res://scripts/ui/intro.gd")
 const Guide = preload("res://scripts/ui/guide.gd")
+const Coach = preload("res://scripts/ui/coach.gd")
 
 enum State { TITLE, WAIT, ENTER, EXAM, ATTACK, RESOLVE, SLIP, REPORT, INTRO }
 
 const SLIP_CLIP := Rect2(217, 148, 202, 152)   # over the counter: the slip feeds up out of the printer in the desk
 const SLIP_REST := 4.0                          # its last few pixels stay in the printer
 const SLIP_GAP := 8.0                           # least space between the call and the money on the slip's last line
+const SLIP_LINES := 5                           # lines of outcome text above the rule (measure_text.py SLIP_LINES)
+const SLIP_DROP := "DROP +%d"                   # under the call: what a courier's package put in the till
+const SLIP_NO_DROP := "%s: NO DROP"             # a courier who came and went without one
+const SLIP_CALM := "CALM -%d"                   # what the calm-patches cost
 const CARD_LINGER := 1.3                        # seconds a card that was just stamped stays out by itself
 const ARM_TIME := 2.2
 const CALL_ARM_TIME := 3.5                      # how long the Trauma Team line waits for the second press
@@ -93,26 +100,42 @@ const PRESS_LINES := [
 	"I think the implant is running you. Prove me wrong.",
 ]
 const REASSURE_LINES := [
-	"Take your time. Nobody is in trouble here.",
-	"You're doing fine. We are nearly done.",
+	"Here, a calm-patch. On the wrist. Take your time, nobody is in trouble.",
+	"Another patch. Breathe. You're doing fine, we are nearly done.",
 ]
 const FIRST_HINT := "Nothing is required. Look, test, talk, or decide whenever you like."
 # a patient with no patience left gives one last wait and then leaves by themselves
 const SHORT_HINT := "Not enough patience for that. CALM them, or decide."
-const LEAVING_HINT := "They are leaving. Decide now, or press CALM to hold them."
+const LEAVING_HINT := "They are leaving. Decide now, or pay for a CALM to hold them."
+const LEAVING_FREE_HINT := "They are leaving. Decide now, or press CALM to hold them."
 const LEAVING_LAST_HINT := "They are leaving. Decide now, or let them go."
 # coaching: each of these is offered once in a session, when the thing it explains first happens
 const NOTE_COACH_HINT := "Noted on your intake card. It hangs on the right wall: click it, or press N."
 const NOTE_OPEN_COACH_HINT := "Noted for you. Click the box beside a row to tick or cross it yourself."
 const LAMP_COACH_HINT := "One patience lamp left. When it goes out, they leave: no fee, no fine."
 const GLASS_COACH_HINT := "Each blow before the shutter costs the glass. Less glass, less time."
+const DROP_COACH_HINT := "The drop changes nothing about the exam. Steady or drifting, the call is still yours."
+const FLARE_COACH_HINT := "Only temper: no red bar, nothing to stop. The SHUTTER is for the red bar."
+const CALM_HINT := "CALM: a calm-patch, %d credits. +%d patience, and a refusal softens. %d left."
+const CALM_HOLD_HINT := "CALM: a calm-patch, %d credits. +%d patience, and it keeps them here. %d left."
+const CALM_GONE_HINT := "CALM: no calm-patches left for this visit."
+const CALM_FREE_HINT := "CALM: +%d patience, and a refusal softens. %d left."
+const CALM_FREE_HOLD_HINT := "CALM: +%d patience. It keeps them at the counter. %d left."
+const SAY_CODE_HINT := "SAY the code. The right contact hands over a package. Anyone else: -%d patience."
+const CODE_BLANK_HINT := "Wrong code: a blank look, -%d patience. It says nothing about the patient."
+const TRAINING_SKIP_HINT := "SKIP ALL [K]: end the training. H opens the counter guide any time."
+const TRAINING_NEXT_HINT := "NEXT: on to the next tip."
+const SWAP_LIST_HINT := "Swap for tonight's contact list. [L]"
+const SWAP_SHEET_HINT := "Swap for the reference sheet. [R]"
 # the player's own crosses against the house rule on the reference sheet: advice, never a score
 const CROSS_SOME_HINT := "%d of %d broken lines by your marks. One alone can be ordinary."
 const CROSS_RULE_HINT := "%d broken lines by your own marks. The house rule says TRAUMA TEAM."
 # the lender's meter reads the till after every patient (one patient is one hour)
 const METER_OVER_LINE := "Hour %d of %d. Till %d, line %d. Over the line."
 const METER_UNDER_LINE := "Hour %d of %d. Till %d, line %d. UNDER THE LINE by %d."
-const SHIFT_LINE := "Night shift. %d on the list, one an hour. The meter wants %d more in the till every hour."
+const SHIFT_LINE := "Night shift: %d visitors, one an hour. The meter wants %d more every hour."
+const SHIFT_LIST_LINE := "Night shift: %d visitors, one an hour, %d of them on the contact list. The meter wants %d more every hour."
+const DROP_LINE := "%s +%d credits, whatever you decide."
 # how the shutter was timed against a patient who turned (VisitState.shutter_grade)
 const STOP_CLEAN_LINE := "STOPPED CLEAN: THE GLASS HOLDS"
 const STOP_BARE_LINE := "STOPPED IN TIME: NO GLASS LEFT"
@@ -133,10 +156,24 @@ const CAM_HINT := "Click the screen, or press ENTER, to buzz them in."
 # the things on the booth walls, and the papers once they are down
 const OBJECT_HINT := {
 	"sheet": "NORMAL REFERENCE SHEET [R]: what a steady patient looks like. Click to take it down.",
+	"list": "CONTACT LIST [L]: tonight's contacts, two clues and a code each. Click to take it down.",
 	"card": "INTAKE CARD [N]: your notes on this patient. Click to take it down.",
 	"guide": "COUNTER GUIDE [H]: how this counter works.",
 }
-const TAB_HINT := {"sheet": "Hang the sheet back on the wall. [R]", "card": "Hang the card back on the wall. [N]"}
+const TAB_HINT := {
+	"sheet": "Hang the sheet back on the wall. [R]",
+	"list": "Hang the list back on the wall. [L]",
+	"card": "Hang the card back on the wall. [N]",
+}
+# where the first-night training points (screen space): the parts of the booth its tips are about
+const COACH_SAY := Rect2(184, 21, 34, 65)          # the SAY buttons of the contact list
+const COACH_MARKS := Rect2(410, 45, 40, 140)       # the tick boxes of the intake card
+const COACH_TOOLS := Rect2(0, 301, 120, 58)        # the three tools on the desk
+const COACH_TALK := Rect2(520, 301, 120, 58)       # ASK, CALM, PRESS and the words of your own
+const COACH_DECIDE := Rect2(546, 190, 88, 54)      # the stamp and the call box
+const COACH_PATIENCE := Rect2(261, 0, 118, 14)     # the patience lamps over the window
+const COACH_LEFT_PAPER := Rect2(0, 2, 246, 164)    # the sheet or the list, down from the wall, with its tabs
+const COACH_RIGHT_PAPER := Rect2(394, 2, 246, 186) # the card, down from the wall, with its tab
 const CAM_PEEK_HINT := "HALL CAMERA [C]: who is waiting in the hall."
 const CAM_OFF_HINT := "HALL CAMERA [C]: click to switch the big screen off."
 # the counter glass can be mended between patients (rules.json attack.repair_cost)
@@ -203,6 +240,9 @@ var start_muted: bool = false
 var less_blood: bool = false      # launch option --less-blood: the same scene without the blood
 var intro_enabled: bool = true    # false (--no-intro): no opening cards, and the guide waits to be asked for
 var intro_data: Dictionary = {}   # data/intro.json: the opening cards and the pages of the counter guide
+var training_enabled: bool = true # false (--no-training): the first night has no training box
+var surprises_enabled: bool = true    # false (--no-surprises): nobody snaps or flares mid-exam
+var contact_data: Dictionary = {} # data/contacts.json: the couriers' pool and the clue words
 
 var clinic: ClinicView = null
 var dialogue: DialogueBox = null
@@ -214,6 +254,7 @@ var mic: VoiceInput = null        # push-to-talk: a microphone that is open only
 var gore: GoreLayer = null
 var intro: Intro = null           # the opening cards, once a session
 var guide: Guide = null           # the counter guide: H or F1
+var coach: Coach = null           # the first-night training: one tip at a time, pointing at the booth
 var rig: PatientRig = null
 
 var _world := Node2D.new()
@@ -243,6 +284,8 @@ var _leave_said: bool = false     # they have said so
 var _leave_idle: float = 0.0      # quiet seconds since the last lamp went out
 var _intro_seen: bool = false     # the opening plays once a session
 var _guide_seen: bool = false     # and the guide opens by itself once
+var _trained: bool = false        # the training has run this session (once, on the first night)
+var _training_visit: bool = false # this visit began while the training was running: no surprises
 var _coached: Dictionary = {}     # coaching hints already shown this session
 var _coach_next: String = ""      # one that is waiting for the hint row to be free
 var _coach_id: String = ""        # which one that is
@@ -286,6 +329,9 @@ var _card_back: bool = false
 var _card_linger: float = 0.0     # seconds a card that was just stamped stays out by itself
 var _card_unseen: int = 0         # notes written on the card while it hung on the wall
 var _sheet_seen: bool = false     # the wall sheet stops asking to be looked at once it has been down
+var _list_wanted: bool = false    # tonight's contact list is down (it hangs on the sheet's hook)
+var _list_back: bool = false      # and a close-up pushed it aside
+var _list_seen: bool = false      # it stops asking to be looked at once it has been down
 var _panels_hold: bool = false    # a patient has turned: nothing hangs in front of the window
 var _shake_t: float = 0.0
 var _shake_amp: float = 0.0
@@ -293,6 +339,9 @@ var _flash_a: float = 0.0
 var _flash_fall: float = 1.0
 var _flash_color := Color.WHITE
 var _rng := RandomNumberGenerator.new()      # shift-seeded: beats and arrivals
+var _snap_rng := RandomNumberGenerator.new()   # visit-seeded: snaps and flares
+var _surprise: String = ""        # "snap" or "flare": rolled, and due once _surprise_t has run out
+var _surprise_t: float = 0.0
 var _fx_rng := RandomNumberGenerator.new()   # cosmetic only
 var _boot_rng := RandomNumberGenerator.new()
 
@@ -306,6 +355,7 @@ func _ready() -> void:
 	sheet = db["sheet"]
 	cases = db["cases"]
 	data_errors = db["errors"]
+	contact_data = db.get("contacts", {})
 	var m: Variant = CaseDB.load_json("res://assets/patients/meta.json")
 	if typeof(m) == TYPE_DICTIONARY:
 		meta = m
@@ -342,6 +392,10 @@ func _read_launch_options() -> void:
 			authored_order = true
 		elif a == "--no-intro":
 			intro_enabled = false
+		elif a == "--no-training":
+			training_enabled = false
+		elif a == "--no-surprises":
+			surprises_enabled = false
 	if agent_url == "":
 		use_model = false
 
@@ -386,14 +440,24 @@ func _build() -> void:
 	var per_hour := int(line_rules.get("per_hour", 0))
 	var hours := (rules.get("shift_order", []) as Array).size()
 	var repair_cost := int((rules.get("attack", {}) as Dictionary).get("repair_cost", 0))
+	var contact_rules: Dictionary = rules.get("contacts", {})
+	var calm_rules: Dictionary = rules.get("reassure", {})
+	var costs: Dictionary = rules.get("costs", {})
 	var numbers := {"per_hour": per_hour, "hours": hours, "total": per_hour * hours, "threshold": int(sheet.get("threshold", 0)),
-		"repair_cost": repair_cost}
+		"repair_cost": repair_cost, "pay": int(contact_rules.get("pay", 0)), "code_cost": int(contact_rules.get("wrong_cost", 1)),
+		"per_night": int(contact_rules.get("per_night", 0)), "calm_cost": int(calm_rules.get("cost", 0)),
+		"calm_gain": int(calm_rules.get("gain", 1)), "ask_cost": int(costs.get("ask", 1)), "press_cost": int(costs.get("press", 2)),
+		"limit": "%.1f" % _grip_limit_s()}
 	intro = Intro.new()
 	intro.setup(intro_data.get("cards", []), numbers, cases)
 	add_child(intro)
 	intro.blip.connect(_on_intro_blip)
 	intro.turned.connect(_on_intro_turned)
 	intro.cue.connect(_on_intro_cue)
+	coach = Coach.new()
+	coach.setup(intro_data.get("training", []), numbers)
+	add_child(coach)
+	coach.finished.connect(_on_training_finished)
 	guide = Guide.new()
 	# a rule set with no price for glass has no fitter for the guide to explain
 	guide.setup(intro_data.get("guide", []), numbers, [] if repair_cost > 0 else ["mend"])
@@ -411,6 +475,7 @@ func _build() -> void:
 	mic.filled.connect(act_speak_stop)
 	mic.failed.connect(_on_mic_failed)
 	clinic.scope.audio = audio
+	clinic.scope.limit_s = _grip_limit_s()
 	clinic.scope.completed.connect(_on_scope_completed)
 	dialogue.blip.connect(_on_blip)
 	Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
@@ -682,9 +747,16 @@ func _sync_visit() -> void:
 			open_topics = true
 	if open_topics:
 		desk.badges["ask"] = "-%d" % int(costs.get("ask", 1))
-	desk.badges["calm"] = "x%d" % visit.reassure_left
+	# a calm-patch costs credits: the pad shows the price while there are patches left
+	if visit.reassure_left <= 0:
+		desk.badges["calm"] = "x0"
+	elif visit.reassure_cost() > 0:
+		desk.badges["calm"] = "%dcr" % visit.reassure_cost()
+	else:
+		desk.badges["calm"] = "x%d" % visit.reassure_left
 	desk.badges["press"] = "-%d" % int(costs.get("press", 2))
 	desk.enabled["calm"] = visit.reassure_left > 0
+	clinic.till = _till_now()
 
 
 func _desk_for_exam() -> void:
@@ -745,18 +817,25 @@ func _card_out() -> bool:
 
 
 func _sheet_out() -> bool:
-	return _panels_live() and _sheet_wanted
+	return _panels_live() and _sheet_wanted and not _list_wanted
+
+
+## Tonight's contact list hangs on the sheet's hook: one of the two is down at a time.
+func _list_out() -> bool:
+	return _panels_live() and _list_wanted
 
 
 func _cam_out() -> bool:
 	return _panels_live() and _cam_wanted and (state == State.WAIT or state == State.EXAM)
 
 
-## Which open paper or screen is under a point: "sheet", "card", "cam" or "". An open one is in
+## Which open paper or screen is under a point: "sheet", "list", "card", "cam" or "". An open one is in
 ## front of the window, so it takes the pointer before the patient does.
 func _panel_at(pos: Vector2) -> String:
 	if clipboard.in_record(pos):
 		return "card"
+	if clipboard.in_list(pos):
+		return "list"
 	if clipboard.in_sheet(pos):
 		return "sheet"
 	if clinic.cam_open and Gfx.CAM.has_point(pos):
@@ -779,6 +858,10 @@ func act_sheet(on: int = -1) -> void:
 	_sheet_back = false
 	if want:
 		_sheet_seen = true
+		_list_wanted = false      # one hook: the list goes back up as the sheet comes down
+		_list_back = false
+		if coach != null:
+			coach.event("sheet_open")
 	audio.play("paper", 1.1 if want else 0.9, -5.0)
 	_log("panel", {"panel": "sheet", "open": want})
 
@@ -796,6 +879,8 @@ func act_card(on: int = -1) -> void:
 	_card_back = false
 	audio.play("paper", 1.0 if want else 0.85, -5.0)
 	_log("panel", {"panel": "card", "open": want})
+	if want and coach != null:
+		coach.event("card_open")
 
 
 ## The big screen of the hall camera. `on`: 1 on, 0 off, -1 the other way; and while somebody
@@ -822,8 +907,10 @@ func act_cam(on: int = -1) -> void:
 func _papers_aside() -> void:
 	_sheet_back = _sheet_wanted
 	_card_back = _card_wanted
+	_list_back = _list_wanted
 	_sheet_wanted = false
 	_card_wanted = false
+	_list_wanted = false
 	_cam_wanted = false
 	_sync_panels(0.0)
 
@@ -833,8 +920,11 @@ func _papers_return() -> void:
 		_sheet_wanted = true
 	if _card_back:
 		_card_wanted = true
+	if _list_back:
+		_list_wanted = true
 	_sheet_back = false
 	_card_back = false
+	_list_back = false
 	_sync_panels(0.0)
 
 
@@ -842,20 +932,28 @@ func _papers_return() -> void:
 func _sync_panels(delta: float) -> void:
 	if _card_linger > 0.0:
 		_card_linger = maxf(0.0, _card_linger - delta)
-	var sheet_on := _sheet_out()
+	var list_on := _list_out()
+	var sheet_on := _sheet_out() and not list_on
 	var card_on := _card_out()
 	if card_on:
 		_card_unseen = 0
 	clipboard.sheet_open = sheet_on
+	clipboard.list_open = list_on
 	clipboard.card_open = card_on
 	clinic.cam_open = _cam_out()
 	desk.taken["sheet"] = sheet_on
+	desk.taken["list"] = list_on
 	desk.taken["card"] = card_on
 	# the sheet asks to be looked at until it has been down once
 	if _sheet_seen or not (state == State.EXAM or state == State.WAIT):
 		desk.nudge.erase("sheet")
 	else:
 		desk.nudge["sheet"] = true
+	# and so does tonight's contact list, on a night with couriers on it
+	if _list_seen or shift == null or shift.contacts.is_empty() or not (state == State.EXAM or state == State.WAIT):
+		desk.nudge.erase("list")
+	else:
+		desk.nudge["list"] = true
 	if _card_unseen > 0 and not card_on and visit != null:
 		desk.badges["card"] = str(_card_unseen)
 	else:
@@ -931,11 +1029,13 @@ func _pad_hint(pad: String) -> String:
 		"ask":
 			return "ASK: pick a question. A new answer costs %d patience." % int(costs.get("ask", 1))
 		"calm":
+			var gain := int((rules.get("reassure", {}) as Dictionary).get("gain", 1))
+			var price := visit.reassure_cost()
 			if visit.reassure_left <= 0:
-				return "CALM: you have said the kind things already."
-			if _leave_said:
-				return "CALM: +1 patience. It keeps them at the counter. %d left." % visit.reassure_left
-			return "CALM: +1 patience, and a refusal softens. %d left." % visit.reassure_left
+				return CALM_GONE_HINT
+			if price <= 0:
+				return (CALM_FREE_HOLD_HINT if _leave_said else CALM_FREE_HINT) % [gain, visit.reassure_left]
+			return (CALM_HOLD_HINT if _leave_said else CALM_HINT) % [price, gain, visit.reassure_left]
 		"press":
 			return "PRESS: say something that stings. Costs %d patience." % int(costs.get("press", 2))
 		"treat":
@@ -998,7 +1098,8 @@ func _on_intro_cue(sound: String) -> void:
 
 
 ## The counter guide: what everything on the screen is for. It opens by itself once, before
-## the first patient of a session, and again whenever the player asks (H or F1).
+## the first patient of a session that has no first-night training (on a training night the
+## coach points at one thing at a time instead), and again whenever the player asks (H or F1).
 func act_guide(asked: bool = true) -> void:
 	if guide.is_open() or not guide.has_pages():
 		return
@@ -1044,6 +1145,12 @@ func _start_shift() -> void:
 	_rng.seed = shift_seed
 	var order: Array = [] if authored_order else ShiftState.arrival_order(rules, cases, shift_seed, shift_number == 1)
 	shift = ShiftState.new(rules, order)
+	# the training night puts its first visitor on the list, so the code is shown on the first exam
+	var training := training_enabled and intro_enabled and not _trained and coach != null and coach.has_steps()
+	var contact_rules: Dictionary = rules.get("contacts", {})
+	shift.contacts = ShiftState.draw_contacts(rules, contact_data.get("pool", []), shift.order, shift_seed, training)
+	clipboard.set_contacts(shift.contacts, contact_data.get("clues", {}), str(contact_data.get("title", "")),
+		int(contact_rules.get("pay", 0)), int(contact_rules.get("wrong_cost", 1)))
 	var client: Variant = null
 	if agent_url != "":
 		client = model_client
@@ -1073,6 +1180,10 @@ func _start_shift() -> void:
 	_card_linger = 0.0
 	_card_unseen = 0
 	_panels_hold = false
+	_list_wanted = false
+	_list_back = false
+	_list_seen = false
+	_surprise = ""
 	gore.clear()
 	for c in _mess.get_children():
 		c.queue_free()
@@ -1081,13 +1192,23 @@ func _start_shift() -> void:
 	clinic.set_cam("")
 	clinic.corner_text = ""
 	_log("shift_start", {"shift": shift_number, "seed": shift_seed, "order": shift.order, "agent_mode": agent.mode})
+	var ids: Array = []
+	for e in shift.contacts:
+		ids.append(str((e as Dictionary).get("id", "")))
+	_log("contacts", {"entries": shift.contacts.size(), "ids": ids, "training": training})
+	if training:
+		_trained = true
+		coach.start()
+		_log("training", {"tips": coach.count()})
+	elif coach != null and coach.is_running():
+		coach.stop(false)
 	state = State.WAIT
 	clinic.cam_prompt = false
 	var token := _bump()
 	clinic.shutter_to(0.0, 1.0)
 	desk.lever_down = false
 	audio.play("shutter_roll")
-	var ok: bool = await _narrate("", SHIFT_LINE % [shift.count(), shift.line_per_hour()], token, 0.7)
+	var ok: bool = await _narrate("", _shift_line(), token, 0.7)
 	if not ok:
 		return
 	_begin_wait()
@@ -1159,11 +1280,22 @@ func act_call_next() -> void:
 	var c: Dictionary = cases[id]
 	_visit_serial += 1
 	visit = VisitState.new(c, rules)
+	visit.set_contact(shift.contact_for(id))
+	# the training belongs to the night's first visitor: a tip still up when the second one is
+	# buzzed in has had its moment, and from here on the counter is the real one
+	if coach != null and coach.is_running() and shift.index > 0:
+		coach.stop(false)
+	_training_visit = coach != null and coach.is_running()
+	visit.surprises = surprises_enabled and not _training_visit      # nobody snaps on the training visit
+	_surprise = ""
+	_snap_rng.seed = hash("surprise:%d:%d" % [shift_seed, _visit_serial])
 	agent.begin_visit(c, "%s-%d-%s" % [session_id, _visit_serial, id], shift_seed + _visit_serial * 7919)
 	_telegraphed = false
 	_attack_t = 0.0
 	_blows = 0
-	_log("visit_start", {"index": shift.index, "agent_mode": agent.mode})
+	_log("visit_start", {"index": shift.index, "agent_mode": agent.mode, "contact": visit.is_contact(), "training": _training_visit})
+	if coach != null:
+		coach.event("visit_start")
 	rig = PatientRig.new()
 	add_child(rig)
 	rig.less_blood = less_blood
@@ -1212,7 +1344,7 @@ func act_call_next() -> void:
 		_base_hint = FIRST_HINT
 	# the first patient of a session: the guide to the counter opens by itself, now that
 	# everything it points at (the patient, the lamps, the pads, the record) is in view
-	if intro_enabled and not _guide_seen and guide.has_pages():
+	if intro_enabled and not _guide_seen and not _trained and guide.has_pages():
 		act_guide(false)
 		while guide.is_open():
 			await get_tree().process_frame
@@ -1255,6 +1387,8 @@ func act_look(zone: String) -> void:
 	if not _mark_new_notes(before):
 		audio.play("click", 1.2, -6.0)
 	_log("look", {"zone": zone, "covered": bool(res.get("covered", false))})
+	if coach != null:
+		coach.event("look")
 	_narrate(str(ZONE_TITLE[zone]), str(res.get("text", "")), token, 0.0)
 
 
@@ -1268,6 +1402,7 @@ func act_tool(tool: String) -> void:
 	audio.play("tool_pick")
 	if visit.granted.has(tool):
 		_open_scope(tool)
+		_roll_surprise()
 		return
 	if visit.patience < visit.check_cost(tool):
 		_spent(token)
@@ -1291,11 +1426,15 @@ func act_tool(tool: String) -> void:
 			# not over a stamp or an open call line picked up while they answered: the tool waits
 			if ok and _held == "" and _call_armed <= 0.0:
 				_open_scope(tool)
+			if ok:
+				_roll_surprise()      # the close-up is no shelter: they can come at the glass during it
 		"explained":
 			_base_hint = "They gave a reason instead. Insist (costs %d) or CALM them." % visit.check_cost(tool)
+			_roll_surprise()
 			_patient_line(line, token, 1.0)
 		"refused":
 			_base_hint = "They said no. Insist (costs %d) or CALM them first." % visit.check_cost(tool)
+			_roll_surprise()
 			_patient_line(line, token, 1.0)
 		"spent":
 			_spent(token)
@@ -1424,6 +1563,7 @@ func _open_scope(tool: String) -> void:
 	if visit == null:
 		return
 	var already := visit.seen.has("check:" + tool)
+	clinic.scope.standard = _sheet_normal(str(VisitState.TOOL_ROW.get(tool, "")))      # what the sheet calls steady
 	clinic.scope.open(tool, visit.case_data, already, "Noted on the card." if already else "")
 	clinic.scope.pointer_screen(_mouse)
 	_papers_aside()      # the close-up fills the window
@@ -1459,6 +1599,8 @@ func _on_scope_completed(tool: String) -> void:
 	clinic.scope.set_result("Noted on the card.")
 	_mark_new_notes(before)
 	_log("check_done", {"tool": tool})
+	if coach != null:
+		coach.event("check:" + tool)
 	_after_check(tool, str(res.get("text", "")), _seq)
 
 
@@ -1516,14 +1658,18 @@ func act_ask(id: String, said: String = "") -> void:
 	var result := str(res.get("result", ""))
 	_log("ask", {"topic": id, "move": str(res.get("move", "")), "result": result, "cost": int(res.get("cost", 0)),
 		"patience": visit.patience, "source": str(d.get("source", ""))})
+	if coach != null:
+		coach.event("talk")
 	if not await _show_reaction(d, token):
 		return
 	match result:
 		"answered":
 			_mark_new_notes(before)
+			_roll_surprise()
 			_patient_line(str(res.get("line", "")), token, 0.0)
 		"deflected":
 			_base_hint = "They dodged it. Ask the same thing again and they answer."
+			_roll_surprise()
 			_patient_line(str(d.get("line", "")), token, 0.0)
 		"spent":
 			_spent(token)
@@ -1546,12 +1692,17 @@ func act_reassure() -> void:
 		audio.play("beep_low")
 		return
 	_sync_visit()
-	_log("reassure", {"patience": visit.patience, "held": held})
+	_log("reassure", {"patience": visit.patience, "held": held, "cost": int(res.get("cost", 0)), "calm_spent": visit.calm_spent})
 	audio.play("calm")
+	if int(res.get("cost", 0)) > 0:
+		audio.play("cash", 0.7, -10.0)      # the patch comes out of the till
+	if coach != null:
+		coach.event("talk")
 	if not await _show_reaction(d, token):
 		return
 	if rig != null:
 		rig.soften()
+	_roll_surprise()
 	_patient_line(str(d.get("reply", "")), token, 0.0)
 
 
@@ -1569,6 +1720,8 @@ func act_press() -> void:
 	var result := str(res.get("result", ""))
 	_sync_visit()
 	_log("press", {"count": visit.press_count, "result": result, "patience": visit.patience})
+	if coach != null:
+		coach.event("talk")
 	if not await _show_reaction(d, token):
 		return
 	match result:
@@ -1577,6 +1730,7 @@ func act_press() -> void:
 				rig.react(str(res.get("face", "")), str(res.get("hands", "")))
 			audio.play("sting")
 			_mark_new_notes(before)
+			_roll_surprise()
 			_patient_line(str(res.get("line", "")), token, 0.0)
 		"walkout":
 			_walkout(str(res.get("line", "")), token)
@@ -1618,7 +1772,10 @@ func act_say(text: String) -> void:
 	visit.apply_dialogue("free", str(d.reply), str(d.reaction))
 	_sync_visit()
 	_mark_new_notes(before)
+	if coach != null:
+		coach.event("talk")
 	if await _show_reaction(d, token):
+		_roll_surprise()
 		_patient_line(str(d.reply), token, 0.0)
 
 
@@ -1889,6 +2046,8 @@ func act_mark(row: String) -> void:
 	var crossed := visit.crossed()
 	var need := int(sheet.get("threshold", 0))
 	_log("mark", {"row": row, "value": value, "crossed": crossed})
+	if coach != null:
+		coach.event("mark")
 	if crossed == before or need <= 0:
 		return
 	if crossed >= need:
@@ -1975,6 +2134,8 @@ func act_verdict(kind: String) -> void:
 	if next == "":
 		return
 	_first_visit_done = true
+	if coach != null:
+		coach.event("verdict")
 	state = State.ATTACK if next == "attack" else State.RESOLVE
 	_desk_off()
 	clipboard.stamp(kind)
@@ -2150,7 +2311,9 @@ func _remove_rig() -> void:
 ## up one of the blows it can take tonight (ShiftState.attack_plan()), so a slow shutter leaves
 ## less time for the next attack. The shutter stops it; if it is still up when the bar runs
 ## out, they come through.
-func _attack_sequence(lead_line: String, token: int) -> void:
+## lead_s >= 0: a snap. There is no last word and no long beat: they are at the glass already,
+## and the red bar starts after lead_s.
+func _attack_sequence(lead_line: String, token: int, lead_s: float = -1.0) -> void:
 	_first_visit_done = true
 	state = State.ATTACK
 	_telegraphed = false
@@ -2159,18 +2322,23 @@ func _attack_sequence(lead_line: String, token: int) -> void:
 	_desk_off()
 	desk.enabled["shutter"] = true
 	_base_hint = ""
-	var ok: bool = await _patient_line(lead_line, token, 0.15)
-	if not ok:
-		return
+	var ok := true
 	var attack_rules: Dictionary = rules.get("attack", {})
 	var attack: Dictionary = visit.case_data.get("attack", {})
+	var beat := lead_s
+	if lead_s < 0.0:
+		ok = await _patient_line(lead_line, token, 0.15)
+		if not ok:
+			return
+		beat = _rng.randf_range(float(attack_rules.get("beat_min_ms", 600)), float(attack_rules.get("beat_max_ms", 1200))) / 1000.0
+	else:
+		dialogue.clear()
 	if rig != null:
 		rig.frozen = true
 	_patient_talking = false
 	audio.set_loop_volume("amb_drone", -50.0)
-	clinic.flicker = 0.55
-	clinic.hall_dark = 0.4
-	var beat := _rng.randf_range(float(attack_rules.get("beat_min_ms", 600)), float(attack_rules.get("beat_max_ms", 1200))) / 1000.0
+	clinic.flicker = 0.55 if lead_s < 0.0 else 0.8
+	clinic.hall_dark = 0.4 if lead_s < 0.0 else 0.6
 	ok = await _wait(beat, token)
 	if not ok:
 		return
@@ -2723,6 +2891,11 @@ func _resolve() -> void:
 	_cam_wanted = false
 	_sheet_back = false
 	_card_back = false
+	_list_back = false
+	_surprise = ""
+	if visit.is_contact():
+		# the list keeps tonight's answer: the package came over the counter, or it did not
+		clipboard.contact_marks[str(visit.contact.get("id", ""))] = "picked" if visit.dropped else "missed"
 	clinic.show_patience = false
 	clinic.leaving = -1.0
 	clinic.bar_clear()                 # the slip prints out of the slot the bar sat on
@@ -2743,7 +2916,9 @@ func _resolve() -> void:
 		"truth": str(s.get("truth", "")), "correct": bool(s.get("correct", false)), "credits": int(s.get("credits", 0)),
 		"patience_left": int(s.get("patience_left", 0)), "press_count": int(s.get("press_count", 0)),
 		"crossed": int(s.get("crossed", 0)), "blows": int(s.get("blows", 0)), "grade": str(s.get("grade", "")),
-		"seen": visit.seen.keys(), "model_calls": agent.calls_this_visit, "fallbacks": agent.fallbacks_this_visit})
+		"seen": visit.seen.keys(), "model_calls": agent.calls_this_visit, "fallbacks": agent.fallbacks_this_visit,
+		"contact": visit.is_contact(), "dropped": visit.dropped, "calm_spent": visit.calm_spent,
+		"codes_wrong": visit.codes_wrong, "snapped": visit.snapped, "flared": visit.flared})
 	await _wait(0.8, token)
 	clinic.till = shift.total()
 	var credits := int(s.get("credits", 0))
@@ -2761,6 +2936,8 @@ func act_continue() -> void:
 		return
 	audio.play("tear")
 	_slip_mode = "drop"
+	if coach != null:
+		coach.event("continue")
 	clinic.under_glow = 0.0
 	clinic.team_clear()
 	shift.advance()
@@ -2797,7 +2974,9 @@ func _show_report() -> void:
 		"total": int(report.get("total", 0)), "line": int(report.get("line", 0)),
 		"line_held": bool(report.get("line_held", false)), "hours_under": int(report.get("hours_under", 0)),
 		"injuries": int(report.get("injuries", 0)), "glass_left": int(report.get("glass", 0)),
-		"glass_paid": int(report.get("repair_total", 0)), "title": str(report.get("title", ""))})
+		"glass_paid": int(report.get("repair_total", 0)), "title": str(report.get("title", "")),
+		"drops": int(report.get("drops", 0)), "drop_total": int(report.get("drop_total", 0)),
+		"calm_total": int(report.get("calm_total", 0))})
 
 
 func _on_impact(strength: float) -> void:
@@ -2873,6 +3052,17 @@ func _pointer_press(pos: Vector2, button: int) -> void:
 		elif button == MOUSE_BUTTON_LEFT:
 			act_intro_next()
 		return
+	# the training box is in front of the booth: its buttons first, and the rest of it is opaque
+	if button == MOUSE_BUTTON_LEFT and coach != null and coach.is_showing():
+		match coach.button_at(pos):
+			"skip":
+				act_training_skip()
+				return
+			"next":
+				act_training_next()
+				return
+			"box":
+				return
 	if button == MOUSE_BUTTON_RIGHT:
 		# the right button puts things back: what is in hand first, and with empty hands the
 		# paper or the screen it was pressed on
@@ -2880,6 +3070,9 @@ func _pointer_press(pos: Vector2, button: int) -> void:
 			match _panel_at(pos):
 				"sheet":
 					act_sheet(0)
+					return
+				"list":
+					act_list(0)
 					return
 				"card":
 					act_card(0)
@@ -2929,6 +3122,15 @@ func _wall_click(pos: Vector2) -> bool:
 		"sheet":
 			act_sheet(0)
 			return true
+		"list":
+			act_list(0)
+			return true
+		"swap":
+			if clipboard.list_open:
+				act_sheet(1)
+			else:
+				act_list(1)
+			return true
 		"card":
 			act_card(0)
 			return true
@@ -2936,7 +3138,7 @@ func _wall_click(pos: Vector2) -> bool:
 		"cam":
 			act_cam()
 			return true
-		"sheet", "card":
+		"sheet", "list", "card":
 			return false
 	var exam_or_wait := state == State.WAIT or state == State.EXAM
 	if exam_or_wait and _over_thumb(pos):
@@ -2945,6 +3147,9 @@ func _wall_click(pos: Vector2) -> bool:
 	match desk.object_at(pos):
 		"sheet":
 			act_sheet(1)
+			return true
+		"list":
+			act_list(1)
 			return true
 		"card":
 			act_card(1)
@@ -3026,8 +3231,12 @@ func _key_press(keycode: int, unicode: int) -> void:
 			act_guide()
 		KEY_R:
 			act_sheet()
+		KEY_L:
+			act_list()
 		KEY_N:
 			act_card()
+		KEY_K:
+			act_training_skip()
 		KEY_C:
 			act_cam()
 		KEY_G:
@@ -3061,7 +3270,7 @@ func _key_press(keycode: int, unicode: int) -> void:
 
 
 ## Right-click or ESC: put away whatever is in hand. With empty hands, what is out in front of
-## the window goes back to its wall: the big screen first, then the card, then the sheet.
+## the window goes back to its wall: the big screen first, then the card, then the list or the sheet.
 func act_cancel() -> void:
 	if state == State.EXAM and _cancel_exam():
 		return
@@ -3071,6 +3280,8 @@ func act_cancel() -> void:
 		act_cam(0)
 	elif clipboard.card_open and not _card_forced():
 		act_card(0)
+	elif clipboard.list_open:
+		act_list(0)
 	elif clipboard.sheet_open:
 		act_sheet(0)
 
@@ -3112,6 +3323,11 @@ func _exam_click(pos: Vector2) -> void:
 				if box != "":
 					act_mark(box)
 			return      # the rest of the card is paper
+		"list":
+			var said := clipboard.say_at(pos)
+			if said != "":
+				act_say_code(said)
+			return      # the rest of the list is paper
 		"sheet":
 			return
 	# the open close-up owns the window
@@ -3187,6 +3403,7 @@ func _process(delta: float) -> void:
 	if guide.is_open() and not (state == State.WAIT or state == State.EXAM):
 		guide.close()
 	_update_leaving(delta)
+	_update_surprise(delta)
 	if _coach_next != "" and _base_hint == "" and not _leave_said:
 		# a one-time tip, once nothing more urgent is on the hint row. The one about the glass is
 		# for the moments after an attack, while the stop is still being read off the bar; the
@@ -3247,6 +3464,7 @@ func _process(delta: float) -> void:
 			label = "MOCK TRANSPORT"
 		clinic.corner_text = "%s  %d/%d calls" % [label, agent.calls_this_visit, agent.max_calls]
 	_sync_panels(delta)
+	_sync_coach()
 	_update_hover()
 	_update_hint()
 	_update_fx(delta)
@@ -3266,6 +3484,9 @@ func _update_hover() -> void:
 	clipboard.tab_hover = ""
 	dialogue.menu_hover = -1
 	dialogue.chip_hover = ""
+	clipboard.say_hover = ""
+	if _coach_hover(pos):
+		return
 	if _wall_hover(pos):
 		return
 	match state:
@@ -3292,7 +3513,10 @@ func _wall_hover(pos: Vector2) -> bool:
 	if tab != "":
 		clipboard.tab_hover = tab
 		_cursor_kind = "hand"
-		_hover_hint = str(TAB_HINT[tab])
+		if tab == "swap":
+			_hover_hint = SWAP_SHEET_HINT if clipboard.list_open else SWAP_LIST_HINT
+		else:
+			_hover_hint = str(TAB_HINT[tab])
 		return true
 	var buzz := state == State.WAIT and clinic.cam_prompt
 	match _panel_at(pos):
@@ -3301,7 +3525,7 @@ func _wall_hover(pos: Vector2) -> bool:
 			_cursor_kind = "hand"
 			_hover_hint = CAM_HINT if buzz else CAM_OFF_HINT
 			return true
-		"sheet", "card":
+		"sheet", "list", "card":
 			return false
 	var exam_or_wait := state == State.WAIT or state == State.EXAM
 	if exam_or_wait and _over_thumb(pos):
@@ -3357,6 +3581,14 @@ func _hover_exam(pos: Vector2) -> void:
 		if PAD_ROW.has(pad):
 			clipboard.highlight_row = str(PAD_ROW[pad])
 		return
+	if paper == "list":
+		var entry := clipboard.say_at(pos)
+		if entry != "":
+			clipboard.say_hover = entry
+			if _can_act():
+				_cursor_kind = "hand"
+			_hover_hint = SAY_CODE_HINT % visit.code_cost()
+			return
 	if _held != "":
 		_cursor_kind = "none"
 		return
@@ -3409,7 +3641,8 @@ func _update_hint() -> void:
 	elif _leave_said and state == State.EXAM and visit != null and not mid_action:
 		# a patient who is on the way out outranks what the pointer is resting on
 		var last := visit.reassure_left <= 0
-		dialogue.set_hint(LEAVING_LAST_HINT if last else LEAVING_HINT, Gfx.RED3 if fmod(_t, 0.8) < 0.56 else Gfx.RED2)
+		var hold := LEAVING_HINT if visit.reassure_cost() > 0 else LEAVING_FREE_HINT
+		dialogue.set_hint(LEAVING_LAST_HINT if last else hold, Gfx.RED3 if fmod(_t, 0.8) < 0.56 else Gfx.RED2)
 	elif _hover_hint != "" and not news:
 		dialogue.set_hint(_hover_hint, Gfx.TEAL5)
 	elif _base_hint == "" and _thinking and _think_t > 0.8 and state == State.EXAM:
@@ -3486,19 +3719,380 @@ func _draw_slip() -> void:
 		Gfx.big_center(_slip, mid, 27, title, Gfx.INKT)
 	else:
 		Gfx.text_center(_slip, mid, 33, title, Gfx.INKT, true)
-	Gfx.paragraph(_slip, Vector2(x0, 50), str(s.get("text", "")), w, Gfx.INKT, false, 6)
-	_slip.draw_rect(Rect2(x0, 112, w, 1), Gfx.PAPER1)
+	Gfx.paragraph(_slip, Vector2(x0, 50), str(s.get("text", "")), w, Gfx.INKT, false, SLIP_LINES)
+	_slip.draw_rect(Rect2(x0, 102, w, 1), Gfx.PAPER1)
 	var steady := str(s.get("truth", "")) == "stable"
-	_fit(_slip, x0, 115, "%s was %s." % [str(s.get("name", "")), "STEADY" if steady else "DRIFTING"], w, Gfx.INKT)
+	_fit(_slip, x0, 105, "%s was %s." % [str(s.get("name", "")), "STEADY" if steady else "DRIFTING"], w, Gfx.INKT)
 	var call := "RIGHT CALL" if ok else "WRONG CALL"
 	if outcome == "walkout" or outcome == "gave_up" or (outcome == "hit" and not ok):
 		call = "NO CALL"
 	elif outcome == "hit" and ok:
 		call = "RIGHT CALL, HURT"      # the crew was the right answer; the shutter came too late
-	var credits := int(s.get("credits", 0))
+	# what the call itself earned; a courier's package and the calm-patches go on the line below
+	var credits := int(s.get("outcome_credits", s.get("credits", 0)))
 	var paid := "%s credits" % Gfx.money(credits)
 	# the call and the money share one line: the call gives way before it touches the figure
-	_fit(_slip, x0, 126, call, w - Gfx.text_w(paid, true) - SLIP_GAP, Gfx.GRN2 if ok else Gfx.RED1)
-	Gfx.text_right(_slip, x1, 126, paid, Gfx.INKT if credits >= 0 else Gfx.RED1, true)
+	_fit(_slip, x0, 116, call, w - Gfx.text_w(paid, true) - SLIP_GAP, Gfx.GRN2 if ok else Gfx.RED1)
+	Gfx.text_right(_slip, x1, 116, paid, Gfx.INKT if credits >= 0 else Gfx.RED1, true)
+	var extra := _slip_breakdown(s)
+	if extra != "":
+		Gfx.text_center(_slip, mid, 127, extra, Gfx.PRINT)
 	if state == State.SLIP and _slip_age > 0.5 and fmod(_t, 1.0) < 0.65:
 		Gfx.text_center(_slip, mid, 138, "click to continue", Gfx.PRINT)
+
+
+# ================================================================ the couriers and the till
+
+## What the meter shows now: the till, and while a visit is still open what its package and
+## its calm-patches have done to it (they are on the record once the visit is).
+func _till_now() -> int:
+	if shift == null:
+		return 0
+	if visit != null and shift.records.size() <= shift.index:
+		return shift.total() + visit.till_change()
+	return shift.total()
+
+
+## rules.json grip.limit_ms: how long a steady hand may take to let go of the grip bar.
+func _grip_limit_s() -> float:
+	return float((rules.get("grip", {}) as Dictionary).get("limit_ms", 1000)) / 1000.0
+
+
+func _shift_line() -> String:
+	if shift.contacts.is_empty():
+		return SHIFT_LINE % [shift.count(), shift.line_per_hour()]
+	return SHIFT_LIST_LINE % [shift.count(), shift.contacts.size(), shift.line_per_hour()]
+
+
+## Tonight's list entry with this id, or {}.
+func _list_entry(id: String) -> Dictionary:
+	if shift == null:
+		return {}
+	for e in shift.contacts:
+		var entry: Dictionary = e
+		if str(entry.get("id", "")) == id:
+			return entry
+	return {}
+
+
+## What the reference sheet calls steady on one row (sheet.json "normal").
+func _sheet_normal(row: String) -> String:
+	for r in sheet.get("rows", []):
+		var line: Dictionary = r
+		if str(line.get("id", "")) == row:
+			return str(line.get("normal", ""))
+	return ""
+
+
+## The slip's line under the call: a courier's package (or the one that never came over the
+## counter) and what the calm-patches cost. Empty when there was neither.
+func _slip_breakdown(s: Dictionary) -> String:
+	var parts := PackedStringArray()
+	if bool(s.get("dropped", false)):
+		parts.append(SLIP_DROP % int(s.get("drop", 0)))
+	elif bool(s.get("contact", false)):
+		parts.append(SLIP_NO_DROP % str(s.get("alias", "")))
+	var calm := int(s.get("calm_spent", 0))
+	if calm > 0:
+		parts.append(SLIP_CALM % calm)
+	return "  •  ".join(parts)
+
+
+## Takes tonight's contact list down from the wall, or hangs it back. It hangs on the sheet's
+## hook: taking one down puts the other back. `on`: 1 down, 0 back, -1 the other way.
+func act_list(on: int = -1) -> void:
+	if not _panels_live():
+		return
+	var want := (not _list_wanted) if on < 0 else on > 0
+	if want == _list_wanted:
+		return
+	_list_wanted = want
+	_list_back = false
+	if want:
+		_list_seen = true
+		_sheet_wanted = false
+		_sheet_back = false
+		if coach != null:
+			coach.event("list_open")
+	audio.play("paper", 1.05 if want else 0.9, -5.0)
+	_log("panel", {"panel": "list", "open": want})
+
+
+## The doctor says one of tonight's codes to the visitor at the counter. The courier it belongs
+## to answers it and hands a package over: credits in the till, whatever the call turns out to
+## be. Anybody else gives a blank look, which costs patience and says nothing about how they
+## are. The exam goes on either way.
+func act_say_code(id: String) -> void:
+	if not _can_act() or visit == null:
+		return
+	var entry := _list_entry(id)
+	if entry.is_empty() or not clipboard.can_say(id):
+		return
+	var token := _begin_action()
+	var res: Dictionary = visit.say_code(entry)
+	var result := str(res.get("result", ""))
+	_log("code", {"entry": id, "result": result, "cost": int(res.get("cost", 0)), "patience": visit.patience})
+	var ok := true
+	match result:
+		"short":
+			_spent(token)
+		"blank":
+			_sync_visit()
+			if coach != null:
+				coach.event("code_said")
+			_base_hint = CODE_BLANK_HINT % int(res.get("cost", 0))
+			_lock = true
+			ok = await _doctor_line(str(entry.get("say", "")), token, 0.3)
+			if not ok:
+				return
+			_lock = false
+			audio.play("beep_low", 1.1, -8.0)
+			_roll_surprise()
+			_patient_line(str(res.get("line", "")), token, 0.0)
+		"drop":
+			if coach != null:
+				coach.event("code_said")
+			_lock = true
+			ok = await _doctor_line(str(entry.get("say", "")), token, 0.3)
+			if not ok:
+				return
+			ok = await _patient_line(str(res.get("line", "")), token, 0.6)
+			if not ok:
+				return
+			_lock = false
+			_sync_visit()
+			audio.play("cash")
+			if coach == null or not coach.is_running():
+				_coach("drop", DROP_COACH_HINT)
+			_roll_surprise()
+			_narrate("PACKAGE", DROP_LINE % [str(res.get("package", "")), int(res.get("pay", 0))], token, 0.0)
+		"tried", "done":
+			audio.play("beep_low", 1.2, -10.0)
+
+
+# ================================================================ the first-night training
+
+func _coach_phase() -> String:
+	match state:
+		State.WAIT:
+			return "wait"
+		State.EXAM:
+			return "exam" if visit != null and visit.in_exam() else ""
+		State.SLIP:
+			return "slip"
+	return ""
+
+
+## Once a frame while the training runs: which part of the night it is, what the current tip
+## points at, and what is open in front of the window that the box must keep clear of.
+func _sync_coach() -> void:
+	if coach == null or not coach.is_running():
+		return
+	coach.set_phase(_coach_phase())
+	coach.paused = guide.is_open() or clinic.scope.is_open()
+	coach.focus = _coach_focus(coach.area())
+	var avoid: Array = []
+	if clipboard.sheet_open or clipboard.list_open:
+		avoid.append(COACH_LEFT_PAPER)
+	if clipboard.card_open:
+		avoid.append(COACH_RIGHT_PAPER)
+	# between patients the hall camera is what the player has to press, on or off: the box
+	# stays clear of where it opens, so that it is never under the second click
+	if clinic.cam_open or state == State.WAIT:
+		avoid.append(Gfx.CAM)
+	if _slip.visible:
+		avoid.append(SLIP_CLIP)
+	var soft: Array = []
+	if state == State.EXAM and rig != null and rig.at_counter():
+		avoid.append(Gfx.rect_to_screen(rig.zone_rect("eyes")).grow(6.0))
+		soft.append(Gfx.rect_to_screen(rig.zone_rect("port")).grow(6.0))
+	coach.avoid = avoid
+	coach.soft = soft
+
+
+## The screen rect a tip's "area" names, as things stand: a paper that is down is pointed at
+## where it is, one that is up at its place on the wall, one under the other at the swap tab.
+func _coach_focus(area: String) -> Rect2:
+	match area:
+		"list":
+			if clipboard.list_open:
+				return Gfx.SHEET
+			if clipboard.sheet_open:
+				return clipboard.swap_tab()
+			return desk.object_rect("list")
+		"sheet":
+			if clipboard.sheet_open:
+				return Gfx.SHEET
+			if clipboard.list_open:
+				return clipboard.swap_tab()
+			return desk.object_rect("sheet")
+		"card":
+			return Gfx.RECORD if clipboard.card_open else desk.object_rect("card")
+		"marks":
+			return COACH_MARKS if clipboard.card_open else desk.object_rect("card")
+		"guide":
+			return desk.object_rect("guide")
+		"cam":
+			return Gfx.CAM if clinic.cam_open else Gfx.THUMB
+		"code":
+			if clipboard.list_open:
+				return COACH_SAY
+			if clipboard.sheet_open:
+				return clipboard.swap_tab()
+			return desk.object_rect("list")
+		"tools":
+			return COACH_TOOLS
+		"talk":
+			return COACH_TALK
+		"decide":
+			return COACH_DECIDE
+		"patience":
+			return COACH_PATIENCE
+		"slip":
+			return SLIP_CLIP if _slip.visible else Rect2()
+		"meter":
+			return Gfx.METER
+		"shutter":
+			return desk.pad_rect("shutter")
+	if area.begins_with("pad:"):
+		return desk.pad_rect(area.substr(4))
+	return Rect2()
+
+
+## The pointer over the training box: its two buttons light up and say what they do; the rest
+## of the box is in front of whatever is behind it. Returns true if the pointer is on the box.
+func _coach_hover(pos: Vector2) -> bool:
+	if coach == null:
+		return false
+	if not coach.is_showing():
+		coach.hover = ""
+		return false
+	var b := coach.button_at(pos)
+	coach.hover = b if b == "skip" or b == "next" else ""
+	match b:
+		"skip":
+			_cursor_kind = "hand"
+			_hover_hint = TRAINING_SKIP_HINT
+			return true
+		"next":
+			_cursor_kind = "hand"
+			_hover_hint = TRAINING_NEXT_HINT
+			return true
+		"box":
+			return true
+	return false
+
+
+func act_training_next() -> void:
+	if coach == null or not coach.is_showing():
+		return
+	coach.next()
+	audio.play("click", 1.1, -8.0)
+
+
+func act_training_skip() -> void:
+	if coach == null or not coach.is_running():
+		return
+	coach.stop(true)
+	audio.play("click", 0.9, -8.0)
+
+
+func _on_training_finished(was_skipped: bool) -> void:
+	_log("training_end", {"skipped": was_skipped, "reached": coach.reached, "tips": coach.count()})
+
+
+# ================================================================ snaps and flares
+
+## One action of the doctor's has run its course: roll whether the patient snaps (drifting
+## only) or flares (anyone, once a visit). What comes up happens a moment later, inside
+## whatever the doctor is doing by then.
+func _roll_surprise() -> void:
+	if visit == null or state != State.EXAM or not visit.in_exam():
+		return
+	var kind := visit.roll_action(_snap_rng)
+	if kind == "" or kind == _surprise or (kind == "flare" and _surprise == "snap"):
+		return
+	_surprise = kind
+	var r: Dictionary = rules.get(kind, {})
+	_surprise_t = _snap_rng.randf_range(float(r.get("delay_min_ms", 600)), float(r.get("delay_max_ms", 1400))) / 1000.0
+	_log("surprise_due", {"kind": kind, "actions": visit.actions, "delay_ms": int(_surprise_t * 1000.0)})
+
+
+## A snap or a flare that has come up waits for its moment. A close-up is no shelter, but it
+## does not cut into a reply on its way, a line still being typed, the typing line, the
+## microphone or the guide.
+func _update_surprise(delta: float) -> void:
+	if _surprise == "":
+		return
+	if state != State.EXAM or visit == null or not visit.in_exam():
+		_surprise = ""
+		return
+	if _thinking or _lock or guide.is_open() or dialogue.input_open or _mic_state != "" or dialogue.typing:
+		return
+	_surprise_t -= delta
+	if _surprise_t > 0.0:
+		return
+	var kind := _surprise
+	_surprise = ""
+	if kind == "snap":
+		_snap_now()
+	else:
+		_flare_now()
+
+
+## The patient comes at the glass: a close-up that is open is knocked out of the doctor's hands.
+func _tear_scope() -> void:
+	if not clinic.scope.is_open():
+		return
+	clinic.scope.tear()      # it closes itself once it has fallen away
+	_papers_return()
+	desk.active = ""
+	audio.stop_loop("scope_hum")
+	_base_hint = ""
+
+
+## A drifting patient turns in the middle of the exam: up against the glass in a blink, and
+## then the same attack as any other (the red bar, the shutter, the glass). Caught, it counts
+## as a right call; missed, it is no call at all.
+func _snap_now() -> void:
+	_tear_scope()
+	var token := _begin_action()
+	_thinking = false
+	_lock = false
+	dialogue.thinking = false
+	if not visit.snap():
+		return
+	_first_visit_done = true
+	_panels_hold = true      # the papers are out of the way at once: all of the window is theirs
+	_log("snap", {"actions": visit.actions})
+	if rig != null:
+		rig.surge(0.6)
+	audio.play("bang", 0.8, 0.0)
+	_shake(5.0, 0.3)
+	_flash_now(Color(1.0, 0.22, 0.18), 0.3, 0.2)
+	_attack_sequence("", token, float((rules.get("snap", {}) as Dictionary).get("lead_ms", 350)) / 1000.0)
+
+
+## Anybody may lose their temper once a visit: a shout and a hand slammed on the glass. It is
+## never an attack (no red bar, nothing to stop). It goes on the TEMPER line, and what it
+## shows agrees with the case.
+func _flare_now() -> void:
+	_tear_scope()
+	var token := _begin_action()
+	_thinking = false
+	_lock = false
+	dialogue.thinking = false
+	var before := _note_keys()
+	var res: Dictionary = visit.flare()
+	if not bool(res.get("ok", false)):
+		return
+	_sync_visit()
+	_log("flare", {"actions": visit.actions, "new_note": bool(res.get("new", false))})
+	if rig != null:
+		rig.surge(0.15)
+		rig.react(str(res.get("face", "")), str(res.get("hands", "")))
+	audio.play("sting")
+	_shake(2.5, 0.2)
+	_mark_new_notes(before)
+	_coach("flare", FLARE_COACH_HINT)
+	_patient_line(str(res.get("line", "")), token, 0.0)
