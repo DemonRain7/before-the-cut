@@ -878,8 +878,26 @@ def port(pid):
             flaps |= flap
         for x, y in ((56, 142), (164, 142)):
             c.fill(c.ell(x, y, 2, 2), "dbe6e0")
-        ring = socket(c, 110, 84)
-        out["port_threads"] = veins(neck & ~grow(flaps, 1) & ~grow(ring, 2), [dict(x=110, y=84, seed=7, n=10, r0=27)])
+        # MIL-SPEC, the same sealed plate as Dana's: flush, four screws, no jacks. His is the private
+        # finish, polished gunmetal with an engraved border and a flush cap, and no department seal
+        # or status light.
+        plate = c.rrect(82, 54, 138, 114, 8)
+        c.fill(grow(plate, 3) & ~plate, skin[3])
+        c.fill(grow(plate, 1) & ~plate, OUTLINE)
+        c.shade(plate, ["12161c", "222a34", "36424e", "56646f", "8a98a4"], light=(-0.8, 0.3), round_px=4, bias=-0.02)
+        inner = c.rrect(93, 65, 127, 103, 4)
+        c.fill(grow(inner, 1) & ~inner, "222a34")       # the engraved border
+        cap = c.ell(110, 84, 6, 6)
+        c.fill(grow(cap, 1) & ~cap, "222a34")           # the cap over the jacks, flush and sealed
+        c.px(108, 81, "a8b6c2")
+        stroke(c, [(97, 78), (108, 67)], "b8c6d0")       # a glint on the polish
+        stroke(c, [(100, 79), (109, 70)], "8a98a4")
+        for sx, sy in ((88, 60), (132, 60), (88, 108), (132, 108)):
+            c.fill(c.ell(sx, sy, 3, 3), "0b1014")
+            c.fill(c.rect(sx - 1, sy - 1, sx + 1, sy + 1), "36424e")
+            c.px(sx - 1, sy - 2, "a8b6c2")
+        out["port_threads"] = veins(neck & ~grow(flaps, 1) & ~grow(plate, 3),
+                                    [dict(x=110, y=84, seed=7, n=10, r0=36, reach=(22, 46))])
     elif pid == "juno":
         neck = c.rect(30, 0, 190, H - 1)
         c.shade(neck, skin[1:], light=(-1.0, 0.1), contrast=0.8, round_px=50, round_amt=0.3, dither=0.9)

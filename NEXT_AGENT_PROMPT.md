@@ -14,8 +14,9 @@ Git: both rounds of November 16 are in commit 822e8d7. The work of November 17 i
 made and pushed to origin/main on November 18 when the student asked. The language work of
 November 18 is in 3f1fcbd, pushed; the work of late November 18 is in a487cea, pushed. The
 data and the code of random signs are in 5b64d87, the model's night signs in 484ff85, every
-part's art in 813b9d0 and the five new characters in e486887, all pushed; the launcher's
--TestNight option is committed after e486887, together with this file. Run git status -sb and git log -3 --oneline:
+part's art in 813b9d0, the five new characters in e486887 and the launcher's -TestNight option
+in 62a5251, all pushed; Vale's redrawn port close-up is committed after 62a5251, together with
+this file. Run git status -sb and git log -3 --oneline:
 anything uncommitted is newer than this file.
 
 Latest checkpoint (November 19, afternoon): every character's art for each part (813b9d0)
@@ -33,8 +34,9 @@ steady and drifting and every sign, and run_tests.gd fails otherwise (case_db.gd
 night_coverage). OPEN, BARELY can now be reached on some nights (test nights D and F); ON
 NOTICE never can (two right calls and both drops make 1,750 at most, under 2,000): for the
 student to decide. The opening card's made-up KESTREL entry fitted Lux; its clue changed and a
-rule test guards it. Not fixed: Vale's port close-up shows a round socket where the binder and
-Dana's close-up show a plate (Vale's port is never examined in play). The scene tests play only
+rule test guards it. Vale's port close-up showed a round socket where the binder and Dana's
+close-up show a plate; when the student said so, it was redrawn as the same sealed plate in his
+own finish (his port is never examined in play). The scene tests play only
 nights A and B; the newer five reach the real scene only in the capture's weapon nights (C to
 F). Checks, all passed: run_tests 1179; the scene test 1079, 1080 in Chinese, 1079 with less
 blood; the window close 5; the proxy 40; over HTTP 199 and 16 wire checks; measure_text 1513
@@ -294,8 +296,8 @@ Next three tasks (first run git status -sb and git log -3 --oneline):
    (.\run-game.ps1 -TestNight C, and D to G likewise); then settles the proposals in
    HANDOFF.md under "For the student to decide" (ON NOTICE, and the five themselves). An agent
    operating the window, or the scene test, is not a substitute.
-3. Small fixes from that play, and Vale's port close-up (draw the MIL-SPEC plate in
-   tools/art/gen_scopes.py); English and Chinese together.
+3. Small fixes from that play, and a scene test for a drifting newer patient (a test night of
+   C to G) if the student wants one; English and Chinese together.
 After these: a short live run in both languages (the model's Chinese inside 55 and 110
 characters, the night's signs and the newer five's voices, the student's real voice through TAB
 in both languages, the new moments with real latency), which is paid and needs the student's explicit yes first; a code is never passed to

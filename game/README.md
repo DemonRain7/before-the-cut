@@ -808,7 +808,9 @@ in model mode with no service behind the address (exit 0, with only the `ObjectD
 were leaked` warning that `--quit-after` causes; `boot_import.sh` and its output). The real
 renderer was not booted on its own: the weapon frames under Screenshots were drawn on it. These
 are automated checks with the dummy audio driver, a simulated microphone and the mock provider;
-no paid service was called. The checks of late November 18 are in
+no paid service was called. After Vale's port close-up was redrawn, the import, the rule tests,
+the scene test in both languages and the text checks ran again with the same results
+(`../validation/2026-11-19/vale-plate/`). The checks of late November 18 are in
 `../validation/2026-11-18/checks-closing/`.
 
 The scene test in Chinese plays the same ten shifts in Chinese and fails on any English that
@@ -1110,10 +1112,10 @@ repository; commit them with the assets. (Godot marks the font atlas pictures `s
   CHOP, PISTON and DIVER), their weapons, test nights C to G, and all of it in Chinese were
   written and drawn by an assistant on November 19; neither the student nor any other person
   has reviewed them.
-- Vale's port close-up shows a round pinned socket, while the binder's MIL-SPEC line reads
-  "Calm skin at the plate" and Dana's close-up of the same model shows a plate. Vale's port is
-  never examined in play (his coat covers it and the port check is stalled, then refused), so
-  nothing a player sees disagrees, but the picture and the binder do not match. Left as it is.
+- Vale's port is never examined in play (his coat covers it and the port check is stalled,
+  then refused), so no player sees his port close-up. Until late on November 19 it showed a
+  round pinned socket where the binder's MIL-SPEC line and Dana's close-up show a plate; it was
+  then redrawn as the same sealed plate in his own finish.
 - `--less-blood` was judged from the frames captured with it and from five picture checks and
   three blood counts in the scene test. Of the final drawing's 91 frames an assistant looked at
   16, as contact sheets (the strikes, the blood moments, the aftermaths, the stop plates, the
