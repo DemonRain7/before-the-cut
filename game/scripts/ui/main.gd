@@ -86,7 +86,31 @@ const DESK_MARKS := [
 	["splat_s0", Vector2(300, 302)], ["splat_s1", Vector2(121, 332)], ["splat_s2", Vector2(40, 341)],
 	["splat_s1", Vector2(519, 318)], ["splat_s0", Vector2(600, 342)],
 ]
-const CUT_AT := {"saw": Vector2(34, 96), "torch": Vector2(92, 58)}              # where the weapon comes through it
+const CUT_AT := {"saw": Vector2(34, 96), "torch": Vector2(92, 58), "picks": Vector2(58, 84)}      # where the weapon comes through it
+## How each kind of weapon sounds and what it leaves. A patient's style is in patients/meta.json
+## ("attack" > "style"); one missing here plays as the saw. Its pictures are drawn by tools/art.
+##   loop   - the sound it makes while it is out ("": none)
+##   bite   - the sound of it landing
+##   knock  - each blow on the closed shutter
+##   pitch  - the scream sample's pitch: down is a roar, up a scream
+##   hot    - the sparks it throws
+##   glow   - the light it carries from the moment they turn (alpha 0: none)
+##   mark   - what it leaves on the pane (fx/<mark>.png)
+##   cut    - what comes through the closed shutter ("": nothing does, only the dents)
+##   deep   - its dents go deep enough to see from the hall
+##   strike - what lands on the player's eyes when it gets through: slash, burn, claw or smash
+const ATTACK_STYLES := {
+	"saw": {"loop": "saw_loop", "bite": "saw_grind", "knock": "bang", "pitch": 0.6, "hot": Color("fbe9b5"),
+		"glow": Color(0, 0, 0, 0), "mark": "gouge_0", "cut": "saw", "deep": false, "strike": "slash"},
+	"torch": {"loop": "torch_loop", "bite": "torch_burst", "knock": "bang", "pitch": 1.12, "hot": Color("c8fff6"),
+		"glow": Color("5ee6e0"), "mark": "scorch", "cut": "torch", "deep": false, "strike": "burn"},
+	"lock": {"loop": "", "bite": "clang", "knock": "clang", "pitch": 1.28, "hot": Color("e8f0ff"),
+		"glow": Color(0, 0, 0, 0), "mark": "smash_0", "cut": "", "deep": false, "strike": "smash"},
+	"fist": {"loop": "servo_loop", "bite": "punch", "knock": "punch", "pitch": 0.76, "hot": Color("ffd89a"),
+		"glow": Color(0, 0, 0, 0), "mark": "smash_1", "cut": "", "deep": true, "strike": "smash"},
+	"picks": {"loop": "hum_loop", "bite": "scrape", "knock": "bang", "pitch": 1.24, "hot": Color("c8f4ff"),
+		"glow": Color(0, 0, 0, 0), "mark": "slit_0", "cut": "picks", "deep": false, "strike": "claw"},
+}
 const HOTSPOT := {"point": Vector2(1, 1), "look": Vector2(6, 6), "hand": Vector2(6, 2), "talk": Vector2(3, 12)}
 const ZONE_LABEL := {"eyes": "LOOK: EYES", "hands": "LOOK: HANDS", "port": "LOOK: PORT"}
 const ZONE_TITLE := {"eyes": "EYES", "hands": "HANDS", "port": "PORT"}
@@ -2453,12 +2477,13 @@ func _attack_sequence(lead_line: String, token: int, lead_s: float = -1.0) -> vo
 		return
 	_telegraphed = true
 	_panels_hold = true      # the papers and the big screen are out of the way: all of the window is theirs
-	var saw := _attack_style() == "saw"
+	var style := _style()
 	if rig != null:
 		rig.frozen = false
 		rig.set_attack(true)
-		if not saw:
-			gore.flare_follow(rig, "tool", 5.0, Color("5ee6e0"))      # the torch arm lights
+		var glow: Color = style["glow"]
+		if glow.a > 0.0:
+			gore.flare_follow(rig, "tool", 5.0, glow)      # the torch arm lights
 	clinic.danger = 1.0
 	clinic.flicker = 1.0
 	clinic.hall_dark = 0.82
@@ -2470,8 +2495,9 @@ func _attack_sequence(lead_line: String, token: int, lead_s: float = -1.0) -> vo
 	audio.play("whine")
 	audio.play("heartbeat")
 	audio.loop("alarm", -7.0)
-	_weapon_loop = "saw_loop" if saw else "torch_loop"
-	audio.loop(_weapon_loop, -9.0)
+	_weapon_loop = str(style["loop"])
+	if _weapon_loop != "":
+		audio.loop(_weapon_loop, -9.0)
 	_flash_now(Color(1.0, 0.22, 0.18), 0.4, 0.25)
 	_shake(3.0, 0.3)
 	_set_voice("", 1.0, 0.0)
@@ -2506,13 +2532,19 @@ func _attack_sequence(lead_line: String, token: int, lead_s: float = -1.0) -> vo
 	_hit()
 
 
+## The patient's weapon, as a key of ATTACK_STYLES.
 func _attack_style() -> String:
-	return rig.attack_style() if rig != null else "saw"
+	var s := rig.attack_style() if rig != null else "saw"
+	return s if ATTACK_STYLES.has(s) else "saw"
+
+
+func _style() -> Dictionary:
+	return ATTACK_STYLES[_attack_style()]
 
 
 ## One sample serves both: pitched down it is a roar, pitched up it is a scream.
 func _scream_pitch() -> float:
-	return 0.6 if _attack_style() == "saw" else 1.12
+	return float(_style()["pitch"])
 
 
 ## A shutter that has been hit before takes the next blows a little to one side.
@@ -2526,8 +2558,10 @@ func _dent_spot(spots: Array, i: int) -> Vector2:
 
 func _stop_attack_audio() -> void:
 	audio.stop_loop("alarm")
-	audio.stop_loop("saw_loop")
-	audio.stop_loop("torch_loop")
+	for s in ATTACK_STYLES.values():
+		var loop_name := str((s as Dictionary)["loop"])
+		if loop_name != "":
+			audio.stop_loop(loop_name)
 	_weapon_loop = ""
 
 
@@ -2544,7 +2578,6 @@ func _on_splat(size: float) -> void:
 func _blow(n: int) -> void:
 	if rig == null:
 		return
-	var saw := _attack_style() == "saw"
 	var origin := Gfx.HOLE.position
 	# the cracks show what the pane has taken tonight, not only in this attack: a pane that was
 	# hit earlier starts from where it was left, and one that is gone is just a hole
@@ -2566,24 +2599,7 @@ func _blow(n: int) -> void:
 			gore.droplets(origin + ClinicView.HIT_HAND, 9, Vector2(0, -1), 1.6, 30.0, 90.0, 2)
 		2:
 			_shake(4.0, 0.3)
-			if saw:
-				audio.play("saw_grind")
-				if pane:
-					clinic.add_decal("fx/gouge_0.png", ClinicView.HIT_TOOL + Vector2(8, -6))
-					if not less_blood:
-						clinic.add_decal("fx/castoff_0.png", ClinicView.HIT_TOOL + Vector2(40, -34), false, 0.0, true)
-					gore.sparks(origin + ClinicView.HIT_TOOL, 28, Vector2(0.6, -0.7), 1.3, 80.0, 260.0)
-					gore.flare_follow(rig, "tool", 3.0, Color("ffb45a"))      # steel on glass
-				else:
-					audio.play("slash", 1.2, -6.0)
-			else:
-				audio.play("torch_burst")
-				if pane:
-					clinic.add_decal("fx/scorch.png", ClinicView.HIT_TOOL)
-					clinic.add_decal("fx/scorch_hot.png", ClinicView.HIT_TOOL, true, 2.6)
-				gore.sparks(origin + ClinicView.HIT_TOOL, 24, Vector2(0.0, -1.0), PI, 60.0, 210.0, Color("c8fff6"))
-				gore.flare_follow(rig, "tool", 8.0, Color("5ee6e0"))          # full flame
-				_flash_now(Color(0.75, 1.0, 1.0), 0.3, 0.2)
+			_weapon_on_glass(pane)
 			if pane:
 				audio.play("glass_crack", 0.85, -2.0)
 				gore.chips(origin + ClinicView.HIT_TOOL, 4)
@@ -2603,6 +2619,53 @@ func _blow(n: int) -> void:
 			gore.droplets(origin + ClinicView.HIT_HEAD, 16, Vector2(0, -1), PI, 30.0, 95.0, 2)
 
 
+## Blow two: the weapon itself on the pane (or on the empty frame, when the pane is gone).
+func _weapon_on_glass(pane: bool) -> void:
+	var style := _style()
+	var at := Gfx.HOLE.position + ClinicView.HIT_TOOL
+	var hot: Color = style["hot"]
+	var mark := "fx/%s.png" % str(style["mark"])
+	match _attack_style():
+		"torch":
+			audio.play("torch_burst")
+			if pane:
+				clinic.add_decal(mark, ClinicView.HIT_TOOL)
+				clinic.add_decal("fx/scorch_hot.png", ClinicView.HIT_TOOL, true, 2.6)
+			gore.sparks(at, 24, Vector2(0.0, -1.0), PI, 60.0, 210.0, hot)
+			gore.flare_follow(rig, "tool", 8.0, style["glow"])          # full flame
+			_flash_now(Color(0.75, 1.0, 1.0), 0.3, 0.2)
+		"lock":
+			audio.play("clang")
+			audio.play("bang", 1.4, -6.0)
+			if pane:
+				clinic.add_decal(mark, ClinicView.HIT_TOOL)
+				gore.chips(at, 4)
+			gore.sparks(at, 14, Vector2(0.3, -0.9), 1.4, 70.0, 220.0, hot)      # steel on glass
+		"fist":
+			audio.play("punch")
+			audio.play("bang", 0.7, -2.0)
+			if pane:
+				clinic.add_decal(mark, ClinicView.HIT_TOOL)
+				gore.chips(at, 8)
+			_shake(6.0, 0.35)
+		"picks":
+			audio.play("scrape", 1.15, -2.0)
+			if pane:
+				clinic.add_decal(mark, ClinicView.HIT_TOOL + Vector2(6, 4))
+				gore.sparks(at, 18, Vector2(0.7, -0.6), 0.8, 60.0, 200.0, hot)
+			gore.flare_follow(rig, "tool", 2.0, hot)      # the chrome catching the lamp
+		_:
+			audio.play("saw_grind")
+			if pane:
+				clinic.add_decal(mark, ClinicView.HIT_TOOL + Vector2(8, -6))
+				if not less_blood:
+					clinic.add_decal("fx/castoff_0.png", ClinicView.HIT_TOOL + Vector2(40, -34), false, 0.0, true)
+				gore.sparks(at, 28, Vector2(0.6, -0.7), 1.3, 80.0, 260.0, hot)
+				gore.flare_follow(rig, "tool", 3.0, Color("ffb45a"))      # steel on glass
+			else:
+				audio.play("slash", 1.2, -6.0)
+
+
 ## While the weapon is on the glass it throws sparks.
 func _attack_fx(delta: float) -> void:
 	if rig == null or _blows < 2:
@@ -2612,11 +2675,18 @@ func _attack_fx(delta: float) -> void:
 		return
 	_spark_t = 0.04
 	var p := rig.attack_point("tool")
-	if _attack_style() == "saw":
-		if clinic.glass_state < 4:      # the saw only sparks while there is glass to bite
-			gore.sparks(p, 3, Vector2(0.55, -0.8), 0.9, 50.0, 170.0)
-	else:
-		gore.sparks(p, 2, Vector2(0.0, 1.0), 1.5, 25.0, 110.0, Color("c8fff6"))
+	var hot: Color = _style()["hot"]
+	match _attack_style():
+		"saw":
+			if clinic.glass_state < 4:      # the saw only sparks while there is glass to bite
+				gore.sparks(p, 3, Vector2(0.55, -0.8), 0.9, 50.0, 170.0, hot)
+		"torch":
+			gore.sparks(p, 2, Vector2(0.0, 1.0), 1.5, 25.0, 110.0, hot)
+		"picks":
+			if clinic.glass_state < 4:      # ten points dragged over the glass
+				gore.sparks(p, 1, Vector2(0.8, -0.4), 1.0, 30.0, 120.0, hot)
+		_:
+			pass      # a lock or a fist throws sparks only where it lands
 
 
 ## Too slow. The pane goes and they come through it at the player: glass, the weapon across
@@ -2628,15 +2698,15 @@ func _hit() -> void:
 	_desk_off()
 	_alert_hint = ""
 	var token := _seq
-	var saw := _attack_style() == "saw"
+	var style := _style()
+	var strike := str(style["strike"])
 	var pitch := _scream_pitch()
 	# where their face ends up: the middle of the window. What flies with them (sparks, drops,
 	# glass) is thrown in view space like the patient; what lands on the doctor's own eyes
 	# (splashes, cuts, flashes) is placed on the screen.
 	var face := Vector2(320, 176)
 	var face_v := Gfx.to_view(face)
-	var hot := Color("fbe9b5") if saw else Color("c8fff6")
-	var cyan := Color("5ee6e0")
+	var hot: Color = style["hot"]
 	audio.stop_loop("alarm")
 	dialogue.clear()
 	if clinic.glass_state < 4:
@@ -2658,25 +2728,19 @@ func _hit() -> void:
 	_shake(9.0, 0.5)
 	if rig != null:
 		gore.take(rig)
-		if saw:
-			gore.flare_follow(rig, "tool", 2.5, Color("ffb45a"))
-		else:
-			gore.flare_follow(rig, "tool", 7.0, cyan)
+		match strike:
+			"slash":
+				gore.flare_follow(rig, "tool", 2.5, Color("ffb45a"))
+			"burn":
+				gore.flare_follow(rig, "tool", 7.0, style["glow"])
+			"claw":
+				gore.flare_follow(rig, "tool", 1.6, hot)
 		rig.pop_target = face_v
 		rig.shake(5.0, 2.4)
 	await _pop_to(1.0, 0.2, true)
 
 	# one: across the eyes
-	if saw:
-		audio.play("slash")
-		audio.play("saw_grind", 1.25, 1.0)
-		gore.slash(Vector2(560, 22), Vector2(116, 334))
-		gore.gash(Vector2(548, 32), Vector2(128, 324), 0.09)
-	else:
-		audio.play("torch_burst", 0.8, 2.0)
-		gore.bloom(Vector2(258, 194), cyan, 230.0, 0.55)
-		gore.afterimage(Vector2(258, 194), 70.0)
-		_flash_now(Color(0.8, 1.0, 1.0), 0.58, 0.2)
+	_strike(strike, 0, face)
 	_shake(10.0, 0.6)
 	gore.sparks(face_v + Vector2(-30, 15), 40, Vector2(0.4, -0.8), PI, 60.0, 280.0, hot)
 	await _wait(0.07, token)
@@ -2700,16 +2764,7 @@ func _hit() -> void:
 	await _wait(0.42, token)
 
 	# two: again, from closer
-	if saw:
-		audio.play("slash", 0.9)
-		audio.play("saw_grind", 1.1)
-		gore.slash(Vector2(70, 60), Vector2(590, 300))
-		gore.gash(Vector2(84, 68), Vector2(576, 292), 0.09)
-	else:
-		audio.play("torch_burst", 0.7, 1.0)
-		gore.bloom(Vector2(392, 166), cyan, 260.0, 0.5)
-		gore.afterimage(Vector2(392, 166), 88.0)
-		_flash_now(Color(0.85, 1.0, 1.0), 0.6, 0.2)
+	_strike(strike, 1, face)
 	audio.play("scream", pitch * 1.2, 1.0)
 	_shake(11.0, 0.5)
 	gore.sparks(face_v + Vector2(25, -5), 30, Vector2(-0.4, -0.8), PI, 60.0, 280.0, hot)
@@ -2724,14 +2779,7 @@ func _hit() -> void:
 	audio.play("hit", 0.8, 2.0)
 	audio.play("crunch", 0.9, 1.0)
 	audio.play("scream", pitch * 0.9, 3.0)
-	if saw:
-		audio.play("slash", 0.75, 2.0)
-		gore.slash(Vector2(346, 4), Vector2(316, 356))
-		gore.gash(Vector2(344, 12), Vector2(318, 350), 0.06)
-	else:
-		audio.play("torch_burst", 0.6, 3.0)
-		gore.bloom(face, cyan, 330.0, 0.4)
-		gore.afterimage(face, 124.0)
+	_strike(strike, 2, face)
 	# the flash stays thin enough to read the face filling the view; the blood that covers it lands a beat later
 	_flash_now(Color(0.86, 0.02, 0.04), 0.55, 0.3)
 	_shake(14.0, 0.5)
@@ -2766,6 +2814,50 @@ func _hit() -> void:
 	await _wait(0.6, token)
 	audio.play("drip")
 	_resolve()      # the dark stays: the night is over (_lights_out)
+
+
+## What reaches the player's eyes, blow by blow (0, 1, 2): the saw across them, the torch in
+## them, ten picks raked over them, or something heavy straight into them. `face` is the
+## middle of the view, where the third one lands.
+func _strike(kind: String, i: int, face: Vector2) -> void:
+	var cyan := Color("5ee6e0")
+	match kind:
+		"burn":
+			var at: Vector2 = [Vector2(258, 194), Vector2(392, 166), face][i]
+			audio.play("torch_burst", [0.8, 0.7, 0.6][i], [2.0, 1.0, 3.0][i])
+			gore.bloom(at, cyan, [230.0, 260.0, 330.0][i], [0.55, 0.5, 0.4][i])
+			gore.afterimage(at, [70.0, 88.0, 124.0][i])
+			if i < 2:
+				_flash_now(Color(0.8 + 0.05 * float(i), 1.0, 1.0), 0.58 + 0.02 * float(i), 0.2)
+		"claw":
+			# five points of one hand, raked across together, the middle one leading
+			var ends: Array = [[Vector2(548, 26), Vector2(132, 330)], [Vector2(82, 54), Vector2(580, 296)], [Vector2(352, 2), Vector2(310, 356)]][i]
+			var a: Vector2 = ends[0]
+			var b: Vector2 = ends[1]
+			var along := (b - a).normalized()
+			var across := along.orthogonal()
+			audio.play("slash", [1.45, 1.3, 1.1][i], [0.0, 0.0, 2.0][i])
+			audio.play("scrape", [1.3, 1.15, 1.0][i], [-2.0, -1.0, 0.0][i])
+			for k in 5:
+				var off := across * (float(k) - 2.0) * 16.0 - along * absf(float(k) - 2.0) * 12.0
+				gore.slash(a + off, b + off, 0.34)
+				gore.gash(a + off, b + off, 0.06 + 0.015 * float(k), 0.34)
+		"smash":
+			var at: Vector2 = [Vector2(250, 186), Vector2(404, 160), face][i]
+			var bite := str(_style()["bite"])
+			audio.play(bite, [1.0, 0.92, 0.82][i], [2.0, 2.0, 3.0][i])
+			audio.play("crunch", [1.15, 1.0, 0.9][i], [-2.0, 0.0, 1.0][i])
+			gore.impact(at, [130.0, 160.0, 210.0][i], 0.5)
+			_flash_now(Color(1.0, 1.0, 1.0), 0.7, 0.12)
+			_shake(14.0, 0.35)
+		_:
+			var ends: Array = [[Vector2(560, 22), Vector2(116, 334)], [Vector2(70, 60), Vector2(590, 300)], [Vector2(346, 4), Vector2(316, 356)]][i]
+			var gash_ends: Array = [[Vector2(548, 32), Vector2(128, 324)], [Vector2(84, 68), Vector2(576, 292)], [Vector2(344, 12), Vector2(318, 350)]][i]
+			audio.play("slash", [1.0, 0.9, 0.75][i], [0.0, 0.0, 2.0][i])
+			if i < 2:
+				audio.play("saw_grind", [1.25, 1.1][i], [1.0, 0.0][i])
+			gore.slash(ends[0], ends[1])
+			gore.gash(gash_ends[0], gash_ends[1], [0.09, 0.09, 0.06][i])
 
 
 ## Brings whoever came through the window closer: at 1 their face fills the screen, past 1
@@ -2814,7 +2906,9 @@ func _add_mess(tex_path: String, center: Vector2) -> void:
 ## The shutter came down in time. It lands on whatever was over the sill; then they go on
 ## hitting it from the far side, and the weapon finds its way through the metal.
 func _caught(token: int) -> void:
-	var saw := _attack_style() == "saw"
+	var style := _style()
+	var cut := str(style["cut"])
+	var hot: Color = style["hot"]
 	var pitch := _scream_pitch()
 	var reached := _blows
 	clinic.clear_wet()      # what was running on the glass has run off it, behind the shutter
@@ -2843,32 +2937,37 @@ func _caught(token: int) -> void:
 		shift.glass_break()
 		clinic.set_glass_left(0, shift.glass_max())
 	await _wait(0.55, token)
+	var knock := str(style["knock"])
+	var deep := bool(style["deep"])
 	for i in 3:
-		audio.play("bang", 1.0 - 0.08 * float(i), float(i))
-		clinic.shutter_dent(_dent_spot(DENT_SPOTS, i))
-		_shake(3.0 + float(i), 0.2)
+		audio.play(knock, 1.0 - 0.08 * float(i), float(i))
+		if knock != "bang":
+			audio.play("bang", 0.8 - 0.06 * float(i), float(i) - 6.0)      # and the slats round it
+		clinic.shutter_dent(_dent_spot(DENT_SPOTS, i), deep)
+		_shake((3.0 + float(i)) * (1.6 if deep else 1.0), 0.2)
 		await _wait(0.34 - 0.07 * float(i), token)
-	if _weapon_loop != "":
-		audio.set_loop_volume(_weapon_loop, -7.0)
-	audio.play("saw_grind" if saw else "torch_burst", 1.0, 2.0)
-	var style := "saw" if saw else "torch"
-	var cut_at: Vector2 = CUT_AT[style]
-	clinic.shutter_cut(style, cut_at, 0.8)
-	if not saw:
-		clinic.under_glow = 1.0
-	var spark_in := 0.0
-	while clinic.cut_active() and token == _seq:
-		await get_tree().process_frame
-		spark_in -= get_process_delta_time()
-		if spark_in <= 0.0:
-			spark_in = 0.03
-			gore.sparks(clinic.cut_point(), 4, Vector2(0.2, 1.0) if saw else Vector2(0.0, 1.0), 1.6, 40.0, 220.0,
-				Color("fbe9b5") if saw else Color("c8fff6"))
-			_shake(2.0, 0.08)
+	if cut != "":
+		if _weapon_loop != "":
+			audio.set_loop_volume(_weapon_loop, -7.0)
+		audio.play(str(style["bite"]), 1.0, 2.0)
+		var picks := cut == "picks"
+		clinic.shutter_cut(cut, CUT_AT[cut], 1.1 if picks else 0.8)
+		if cut == "torch":
+			clinic.under_glow = 1.0
+		var spark_in := 0.0
+		while clinic.cut_active() and token == _seq:
+			await get_tree().process_frame
+			spark_in -= get_process_delta_time()
+			if spark_in <= 0.0:
+				spark_in = 0.03
+				gore.sparks(clinic.cut_point(), 2 if picks else 4, Vector2(0.2, 1.0) if cut == "saw" else Vector2(0.0, 1.0), 1.6, 40.0, 220.0, hot)
+				_shake(1.0 if picks else 2.0, 0.08)
+	else:
+		await _wait(0.2, token)      # nothing gets through: the third blow is the last
 	await _wait(0.45, token)
 	_stop_attack_audio()
 	clinic.flicker = 0.0
-	clinic.under_glow = 0.45 if not saw else 0.0
+	clinic.under_glow = 0.45 if cut == "torch" else 0.0
 	clinic.seep(4)
 	audio.play("drip")
 	await _wait(0.35, token)

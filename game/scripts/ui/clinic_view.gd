@@ -28,6 +28,14 @@ const HIT_HEAD := Vector2(110, 50)
 # the slit a weapon opens in the shutter, inside its 96 x 40 picture
 const CUT_PATH := [Vector2(4, 30), Vector2(20, 25), Vector2(38, 22), Vector2(55, 17), Vector2(74, 13), Vector2(92, 9)]
 const CUT_SIZE := Vector2(96, 40)
+# what each weapon leaves when it comes through the shutter (main.gd ATTACK_STYLES "cut"): the
+# cut, opened along the path; the blade or points at its end ("tooth"); the glow at the end of a
+# burn ("hot", added light). A kind not listed burns like the torch.
+const CUT_ART := {
+	"saw": {"cut": "fx/cut_saw.png", "tooth": "fx/saw_tooth.png"},
+	"torch": {"cut": "fx/burn.png", "hot": "fx/burn_hot.png"},
+	"picks": {"cut": "fx/scrape.png", "tooth": "fx/pick_tips.png"},
+}
 # the foot of the window on the screen, where blood runs out from under the shutter and on
 # over the desk, and how far along it
 const SEEP_Y := 300.0
@@ -423,11 +431,12 @@ func clear_wet() -> void:
 			c.queue_free()
 
 
-## Something hits the far side of the closed shutter: it bulges and jumps.
-func shutter_dent(local: Vector2) -> void:
-	var t := Gfx.tex("fx/dent_%d.png" % (_dent_count % 3))
+## Something hits the far side of the closed shutter: it bulges and jumps. deep: something
+## with a machine behind it, and the dent shows from the hall.
+func shutter_dent(local: Vector2, deep: bool = false) -> void:
+	var t := Gfx.tex(("fx/dent_deep_%d.png" if deep else "fx/dent_%d.png") % (_dent_count % 3))
 	_dent_count += 1
-	_dent_flash = 0.25
+	_dent_flash = 0.4 if deep else 0.25
 	if t == null:
 		return
 	var sp := Sprite2D.new()
@@ -469,22 +478,24 @@ func gore_count() -> int:
 	return _gore_count
 
 
-## A weapon comes through the shutter: "saw" opens a ragged slit, "torch" burns a line.
+## A weapon comes through the shutter: "saw" opens a ragged slit, "torch" burns a line,
+## "picks" scores ten grooves as the points find the seams.
 ## `local` is the top-left corner of the 96 x 40 cut; it opens over `time` seconds.
 func shutter_cut(kind: String, local: Vector2, time: float) -> void:
 	_cut_kind = kind
 	_cut_k = 0.0
 	_cut_time = maxf(0.05, time)
 	_cut_hold = 0.35
-	_cut = Gfx.sprite(_dmg, _dry("fx/cut_saw.png") if kind == "saw" else "fx/burn.png", local)
+	var art: Dictionary = CUT_ART.get(kind, CUT_ART["torch"])
+	_cut = Gfx.sprite(_dmg, _dry(str(art["cut"])), local)
 	_cut.region_enabled = true
 	_cut.region_rect = Rect2(0, 0, 1, CUT_SIZE.y)
 	_cut_hot = null
 	_tooth = null
-	if kind == "saw":
-		_tooth = Gfx.sprite(_dmg, _dry("fx/saw_tooth.png"), local)
-	else:
-		_cut_hot = Gfx.sprite(_dmg, "fx/burn_hot.png", local)
+	if art.has("tooth"):         # the blade or the points, where they have got to
+		_tooth = Gfx.sprite(_dmg, _dry(str(art["tooth"])), local)
+	if art.has("hot"):
+		_cut_hot = Gfx.sprite(_dmg, str(art["hot"]), local)
 		_cut_hot.material = Gfx.additive()
 		_cut_hot.region_enabled = true
 		_cut_hot.region_rect = Rect2(0, 0, 1, CUT_SIZE.y)
@@ -735,11 +746,11 @@ func _update_damage(delta: float) -> void:
 				_cut_hot = null
 		if _tooth != null:
 			var jit := Vector2(float(_rng.randi_range(-1, 1)), float(_rng.randi_range(-1, 1)))
-			_tooth.position = (_cut.position + tip - Vector2(13, 13) + jit).round()
-			_tooth.flip_h = int(_t * 30.0) % 2 == 0
+			_tooth.position = (_cut.position + tip - _tooth.texture.get_size() / 2.0 + jit).round()
+			_tooth.flip_h = _cut_kind == "saw" and int(_t * 30.0) % 2 == 0      # the disc spinning
 	elif _tooth != null:
 		_cut_hold -= delta
-		_tooth.flip_h = int(_t * 30.0) % 2 == 0
+		_tooth.flip_h = _cut_kind == "saw" and int(_t * 30.0) % 2 == 0
 		if _cut_hold <= 0.0:
 			_tooth.queue_free()      # the blade is pulled back out
 			_tooth = null

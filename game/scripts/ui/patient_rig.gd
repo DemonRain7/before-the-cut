@@ -190,7 +190,7 @@ func react(face: String, hands: String) -> void:
 	_react_hands = hands != ""
 	_hold_hands = hands == "fist" or hands == "freeze"
 	if _react_hands:
-		_hand_frame = "hands_react"
+		_hand_frame = gesture_layer(hands)
 	if hands == "slam":
 		shake(3.0, 0.35)
 		impact.emit(1.0)
@@ -200,6 +200,20 @@ func react(face: String, hands: String) -> void:
 		_set_tex("pupils", "pupils_react")
 	_apply_face()
 	_apply_hands()
+
+
+## The hands for a temper gesture: the layer the patient's meta names for it (each patient's
+## "gestures" map covers every gesture his or her signs use), else a picture of that name
+## (hands_fist, hands_point, hands_slam), else the pressure hands. "freeze" holds them still.
+func gesture_layer(gesture: String) -> String:
+	var named := str((meta.get("gestures", {}) as Dictionary).get(gesture, ""))
+	if named != "" and _has_layer(named):
+		return named
+	if gesture == "freeze":
+		return "hands_a"
+	if _has_layer("hands_" + gesture):
+		return "hands_" + gesture
+	return "hands_react"
 
 
 func soften() -> void:

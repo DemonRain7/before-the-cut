@@ -1,17 +1,18 @@
 extends SceneTree
-## Headless smoke test of the real screen. It loads scenes/main.tscn and plays nine shifts
+## Headless smoke test of the real screen. It loads scenes/main.tscn and plays ten shifts
 ## through the same pointer and key entry points a player uses (see tests/play_driver.gd).
 ## The first six check the counter itself under a few rules held still (no couriers, a free
-## CALM, the old line, no snaps or flares, no training); the last three play the night as it
+## CALM, the old line, no snaps or flares, no training); the next three play the night as it
 ## is: the contact list and the paid CALM, the snaps and flares, and the first-night training.
+## The tenth plays test night B, where three patients turn with three other weapons.
 ## Right and wrong are told only at closing: the slip says what the counter did, and through the
-## night the till holds what the counter took in. A blow that lands ends the night (shifts 2 and
-## 4): there is no slip, and the report comes up out of the dark with the visitors nobody saw.
+## night the till holds what the counter took in. A blow that lands ends the night (shifts 2, 4
+## and 10): there is no slip, and the report comes up out of the dark with the visitors nobody saw.
 ## Run from the repository root:
 ##   godot --headless --path game --script res://tests/run_ui_smoke.gd
 ##   godot --headless --path game --script res://tests/run_ui_smoke.gd -- --lang=zh   (in Chinese)
 ## Words are compared as the player reads them: the English line through Lang.t, Lang.tf or
-## Lang.fill, the way the game shows it. In another language the run plays the same nine
+## Lang.fill, the way the game shows it. In another language the run plays the same ten
 ## shifts in it and fails on any English that reached the screen untranslated.
 ## Exit code 0 = all passed, 1 = at least one check failed, 2 = the run did not finish.
 ## This is an automated run. It is not a playtest, and its log says so.
@@ -100,9 +101,11 @@ func _run() -> void:
 	await shift_surprises()
 	main.training_enabled = true
 	await shift_training()
+	var nine: int = main.event_log.memory.size()
+	await shift_attack_styles()
 	voice_words()
 	counter_words()
-	check_log(six)
+	check_log(six, nine)
 	untranslated_words()
 	print("")
 	print("RESULT: %d passed, %d failed" % [passed, failed])
@@ -208,6 +211,38 @@ func right_art(sprite: Variant, plain: String) -> bool:
 	if main.less_blood:
 		return shown.begins_with(plain) and shown.ends_with("_clean")
 	return shown.begins_with(plain) and not shown.ends_with("_clean")
+
+
+## The names of the pictures in one of the clinic's layers (the marks on the glass, or what is
+## on our side of the shutter), as art() gives them.
+func pictures(layer: Node) -> Array:
+	var out: Array = []
+	for c in layer.get_children():
+		out.append(art(c))
+	return out
+
+
+## The attack's sounds that are still going: the alarm and any weapon's loop.
+func attack_loops() -> Array:
+	var out: Array = []
+	if main.audio._loops.has("alarm"):
+		out.append("alarm")
+	for s in MainScript.ATTACK_STYLES.values():
+		var loop_name := str((s as Dictionary)["loop"])
+		if loop_name != "" and main.audio._loops.has(loop_name):
+			out.append(loop_name)
+	return out
+
+
+## Presses the patient twice: the first gets a reaction, the second turns somebody who is
+## drifting. Returns whether the attack has started.
+func press_twice(v: VisitState) -> bool:
+	await d.settle()
+	await d.press()
+	var reacted := v.in_exam() and v.press_count == 1
+	await d.settle()
+	await d.press()
+	return reacted and main.state == MainScript.State.ATTACK and v.attack_cause == "press"
 
 
 ## The log's records of one type, oldest first.
@@ -2073,6 +2108,108 @@ func typing_line(v: VisitState) -> void:
 	box.clear()
 
 
+# ================================================================ shift 10
+
+## Test night B, where Kip, Juno and Rook are drifting. Each turns with his or her own hardware
+## and leaves its own marks: Kip's bike lock and Juno's ten picks are stopped at the shutter
+## after two blows, and Rook's loader fist is let through. Vale's saw and Maren's torch are
+## played in the earlier shifts.
+func shift_attack_styles() -> void:
+	section("Tenth shift: test night B, and three more ways through the glass")
+	var from: int = main.event_log.memory.size()
+	main.surprises_enabled = false      # tonight only the presses turn anybody
+	main.test_night = "B"
+	var was: Dictionary = pin_rules({"contacts": {"per_night": 0}})
+	var opened: bool = await d.open_counter()
+	restore_rules(was)
+	check(opened and main.shift_number == 10 and main.night_name == "B" and main.shift.order == ["maren", "kip", "vale", "juno", "rook"],
+		"a tenth shift starts on test night B: Maren, Kip, Vale, Juno, Rook")
+	check(main.clinic.dent_count() == 0 and not main.clinic.has_cut() and main.shift.glass == 3, "with a new shutter and a new pane")
+
+	section("Maren: TREAT")
+	var v: VisitState = await enter("maren")
+	await d.stamp("treat")
+	check(v.outcome == "treated_ok", "TREAT is right for Maren, steady tonight")
+	await finish_visit("Maren")
+
+	section("Kip: the bike lock, stopped after two blows")
+	v = await enter("kip")
+	check(main.rig.attack_style() == "lock", "Kip's hardware is the bike lock")
+	var turned: bool = await press_twice(v)
+	check(turned, "the first press gets a reaction, the second turns him")
+	var warned: bool = await d.wait_for_telegraph()
+	check(warned and (main.rig._spr["turn"] as Sprite2D).visible and right_art(main.rig._spr["turn"], "turn"), "his face turns: his own turned face, for the blood setting")
+	check(main._weapon_loop == "" and attack_loops() == ["alarm"], "a lock makes no sound until it lands: only the alarm")
+	var struck: bool = await d.until(func() -> bool: return main._blows >= 2, 4.0)
+	check(struck and main.clinic.glass_state == 2, "two blows land and the glass cracks twice")
+	check(pictures(main.clinic._decals).has("smash_0"), "the lock leaves a crushed white star on the glass")
+	check(right_art(main.rig._spr["attack"], "attack_s2") and right_art(main.rig._spr["mouth"], "mouth_turn"),
+		"his own arm on the glass and his own scream, for the blood setting")
+	d.shutter_key()
+	check(v.outcome == "caught" and v.blows_taken == 2 and v.shutter_grade() == "cracked", "SPACE drops the shutter: a cracked stop")
+	var printed: bool = await d.wait_for_slip(40.0)
+	check(printed and main.clinic.dent_count() == 3 and not main.clinic.has_cut(), "he hits the shutter three times, and a lock does not get through it")
+	check(not pictures(main.clinic._dmg).any(func(p: String) -> bool: return p.begins_with("dent_deep")), "the dents are the shallow kind")
+	check(attack_loops().is_empty(), "the alarm is quiet")
+	check(bool(last_record().get("correct", false)) and int(last_record().get("counter", -1)) == 250, "a right call: Trauma Team pays his 250 on account")
+	await finish_visit("Kip")
+	d.key(KEY_G)
+	d.key(KEY_G)
+	check(main.shift.glass == 3 and main.clinic.glass_state == 0 and plan_is([540, 990, 1440], 1800) and main.shift.till() == 570,
+		"between patients G buys both layers back: 80 off the till, 570 left")
+
+	section("Vale: TREAT")
+	v = await enter("vale")
+	await d.stamp("treat")
+	check(v.outcome == "treated_ok", "TREAT is right for Vale, steady tonight")
+	await finish_visit("Vale")
+
+	section("Juno: ten picks, stopped after two blows")
+	v = await enter("juno")
+	check(main.rig.attack_style() == "picks", "Juno's hardware is her ten picks")
+	turned = await press_twice(v)
+	check(turned, "the first press gets a reaction, the second turns her")
+	warned = await d.wait_for_telegraph()
+	check(warned and main._weapon_loop == "hum_loop" and attack_loops() == ["alarm", "hum_loop"], "she hums as she comes")
+	struck = await d.until(func() -> bool: return main._blows >= 2, 4.0)
+	check(struck and pictures(main.clinic._decals).has("slit_0"), "two blows land, and the picks leave ten scratches on the glass")
+	check(right_art(main.rig._spr["attack"], "attack_s2") and right_art(main.rig._spr["mouth"], "mouth_turn"),
+		"her own hands on the glass and her own scream, for the blood setting")
+	d.shutter_key()
+	check(v.outcome == "caught" and v.blows_taken == 2, "SPACE drops the shutter")
+	var cutting: bool = await d.until(func() -> bool: return main.clinic.cut_active(), 6.0)
+	check(cutting and art(main.clinic._cut) == "scrape" and art(main.clinic._tooth) == "pick_tips",
+		"after three dents the points come through the slats and score them, the tips showing where they have got to")
+	printed = await d.wait_for_slip(40.0)
+	check(printed and main.clinic.dent_count() == 6 and main.clinic.has_cut() and main.clinic._tooth == null, "the scoring stays; the points are pulled back")
+	check(attack_loops().is_empty(), "the alarm and the humming are quiet")
+	await finish_visit("Juno")
+	d.key(KEY_G)
+	d.key(KEY_G)
+	check(main.shift.glass == 3 and main.clinic.glass_state == 0 and main.shift.till() == 1440, "both layers bought back again: 1440 in the till")
+
+	section("Rook: the loader fist, and nobody at the shutter")
+	v = await enter("rook")
+	check(main.rig.attack_style() == "fist", "Rook's hardware is the loader arm")
+	turned = await press_twice(v)
+	check(turned, "the first press gets a reaction, the second turns him")
+	warned = await d.wait_for_telegraph()
+	check(warned and attack_loops() == ["alarm", "servo_loop"], "the arm's servos whine as it comes up")
+	struck = await d.until(func() -> bool: return main._blows >= 2, 4.0)
+	check(struck and pictures(main.clinic._decals).has("smash_1"), "the fist leaves four crushed knuckle points on the glass")
+	var hit: bool = await d.until(func() -> bool: return v.outcome == "hit", 4.0)
+	check(hit and main._blows == 3 and v.shutter_grade() == "through", "three blows, and he is through")
+	var close: bool = await d.until(func() -> bool: return main.rig != null and main.rig.pop >= 1.0, 3.0)
+	check(close, "he comes through the window at the player")
+	var flashed: bool = await d.until(func() -> bool: return main.gore._impacts.size() > 0, 3.0)
+	check(flashed and main.gore._streaks.is_empty() and main.gore._gashes.is_empty(), "the fist lands on the player's eyes: a white flash and its cracks, not a cut")
+	await lights_out("Rook", [])
+	check(attack_loops().is_empty(), "the alarm and the servos are quiet")
+	check(logged_since("attack", from).size() == 3 and logged_since("attack_hit", from).size() == 1, "the log has three attacks, one of them through")
+	main.test_night = ""
+	main.surprises_enabled = true
+
+
 # ================================================================ push-to-talk
 
 ## Everything push-to-talk can put on the hint row fits it. The exchange itself needs the patient
@@ -2212,9 +2349,10 @@ func _count_types(records: Array) -> Dictionary:
 	return types
 
 
-## `six`: how many records the log held when the sixth shift was over. The first six shifts and
-## the last three are counted apart, since they were played under different rules.
-func check_log(six: int) -> void:
+## `six` and `nine`: how many records the log held when the sixth and the ninth shifts were over.
+## The first six shifts and the three after them are counted apart, since they were played under
+## different rules; the tenth checks its own records as it goes.
+func check_log(six: int, nine: int) -> void:
 	section("Event log")
 	var all: Dictionary = _count_types(main.event_log.memory)
 	var types: Dictionary = _count_types(main.event_log.memory.slice(0, six))
@@ -2237,18 +2375,18 @@ func check_log(six: int) -> void:
 	check(int(types.get("leaving", 0)) == 2 and int(types.get("gave_up", 0)) == 1, "one patient said twice that he was leaving, and left once")
 	check(int(all.get("intro", 0)) == 1 and int(all.get("intro_end", 0)) == 1, "the opening played once in the session")
 	check(int(all.get("voice", 0)) == 2, "the two refused presses of the speak key were logged, and nothing else of that kind")
-	var later: Dictionary = _count_types(main.event_log.memory.slice(six))
+	var later: Dictionary = _count_types(main.event_log.memory.slice(six, nine))
 	for t in ["contacts", "code", "snap", "flare", "surprise_due", "training", "training_end"]:
-		check(later.has(t), "the last three shifts' log has '%s' records" % t)
+		check(later.has(t), "the seventh to ninth shifts' log has '%s' records" % t)
 	check(int(later.get("visit_start", 0)) == 15 and int(later.get("visit_end", 0)) == 15 and int(later.get("shift_end", 0)) == 3
-		and int(later.get("meter", 0)) == 12, "the last three shifts: fifteen visits, three nights, twelve readings of the meter")
+		and int(later.get("meter", 0)) == 12, "the seventh to ninth shifts: fifteen visits, three nights, twelve readings of the meter")
 	check(int(later.get("contacts", 0)) == 3 and int(later.get("training", 0)) == 1 and int(later.get("training_end", 0)) == 3,
 		"a list every night, one training, ended three times (once at its last tip, twice by hand)")
 	check(int(later.get("code", 0)) == 3 and int(later.get("snap", 0)) == 1 and int(later.get("flare", 0)) == 1 and int(later.get("surprise_due", 0)) == 2,
 		"three codes said (one blank, two drops), one snap and one flare, each logged when it came up")
 	var listed := 0
 	var lists := 0
-	for rec in main.event_log.memory.slice(six):
+	for rec in main.event_log.memory.slice(six, nine):
 		var record: Dictionary = rec
 		if str(record.get("type", "")) != "panel":
 			continue

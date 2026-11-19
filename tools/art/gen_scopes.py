@@ -3,7 +3,7 @@
 Every view is 220 x 186, the size of the counter window. The game stacks:
   eyes:  eyes_back -> iris_r / iris_l (moved by the light) -> pupil frame (natural eyes) -> eyes_front
   grip:  grip_bg -> grip_open or grip_closed
-  port:  port (-> port_threads, pulsing, when a case has them)
+  port:  port (-> port_threads, pulsing, when tonight's port sign is threads)
 Left and right are the patient's own: the patient's right eye is on our left.
 """
 import os
@@ -437,12 +437,17 @@ def wrist(c, skin, y0=38, y1=148):
     return arm
 
 
-def threads(c, x, y, seed=3, n=9, color=THREAD):
+def threads(c, x, y, seed=3, n=9, color=THREAD, r0=25, aim=None, spread=np.pi, reach=(22, 46)):
+    """Dark threads leaving a port at (x, y), starting r0 from its centre. With no aim they leave all
+    round; with one (radians: 0 is right, pi/2 down) they fan out over aim - spread .. aim + spread."""
     rng = np.random.default_rng(seed)
     for i in range(n):
-        a = 2 * np.pi * i / n + rng.uniform(-0.25, 0.25)
-        px_, py_ = x + np.cos(a) * 25, y + np.sin(a) * 25
-        ln = rng.integers(22, 46)
+        if aim is None:
+            a = 2 * np.pi * i / n + rng.uniform(-0.25, 0.25)
+        else:
+            a = aim + spread * ((2.0 * i / (n - 1) - 1.0) if n > 1 else 0.0) + rng.uniform(-0.2, 0.2)
+        px_, py_ = x + np.cos(a) * r0, y + np.sin(a) * r0
+        ln = rng.integers(reach[0], reach[1])
         pts = [(px_, py_)]
         for k in range(4):
             a += rng.uniform(-0.5, 0.5)
@@ -456,43 +461,66 @@ def threads(c, x, y, seed=3, n=9, color=THREAD):
         stroke(c, pts[:2], color, 2)
 
 
+def veins(skin_mask, fans, halo="4a2440"):
+    """The port_threads overlay: each fan is a set of threads() arguments. A bruise of dithered
+    colour runs along every thread, and only the bare skin in skin_mask shows any of it."""
+    t = Canvas(W, H)
+    for kw in fans:
+        threads(t, **kw)
+    line = t.alpha()
+    t.dither(grow(line, 1) & ~line, halo, 0.5)
+    t.erase(~skin_mask)
+    return t
+
+
 def port(pid):
+    """The calm port, and port_threads: the same skin with dark threads under it, laid over the port
+    when tonight's port sign is threads. Every patient has both."""
     skin = SKIN[pid]
     c = Canvas(W, H, "0b1014")
     yy, xx = c.grid()
     out = {}
     if pid == "kip":
         c.fill(c.all(), "121c22")
-        wrist(c, skin)
+        arm = wrist(c, skin)
         sl = c.rect(0, 30, 44, 156)
         c.shade(sl, CLOTH["hivis"], light=(-0.2, -1.0), round_px=10)
         c.fill(c.rect(34, 30, 38, 156), "a3b5b6")
         c.outline(OUTLINE, sl)
-        socket(c, 124, 92, scuffed=True)
+        ring = socket(c, 124, 92, scuffed=True)
         for fx, fy in ((84, 60), (166, 70), (176, 120), (92, 130), (150, 136)):
             c.px(fx, fy, skin[2])
+        out["port_threads"] = veins(arm & ~grow(sl, 1) & ~grow(ring, 2),
+                                    [dict(x=124, y=92, seed=11, n=9, r0=27, reach=(26, 52))])
     elif pid == "rook":
         c.fill(c.all(), "121c22")
-        wrist(c, skin, 28, 158)
+        arm = wrist(c, skin, 28, 158)
         c.glow(c.all(), "3a2020", 118, 94, 54, amt=0.9, power=0.9)
         c.glow(c.all(), "1c1218", 118, 94, 36, amt=0.8, power=0.9)
-        socket(c, 118, 94, r=26, burnt=(1, 2))
+        ring = socket(c, 118, 94, r=26, burnt=(1, 2))
         for dx, dy in ((-34, -18), (30, 26), (38, -12), (-26, 30), (8, -38), (-40, 6)):
             c.fill(c.rect(118 + dx, 94 + dy, 119 + dx, 95 + dy), "7a4630")
             c.px(118 + dx + 2, 94 + dy + 1, "1c1218")
         stroke(c, [(150, 60), (176, 78), (204, 82)], skin[5], 2)
         for t in (158, 172, 188):
             stroke(c, [(t, 64 + (t - 150) // 3), (t + 2, 76 + (t - 150) // 3)], skin[5])
+        # the burnt pins are on the lower rim: the threads run out from that side
+        out["port_threads"] = veins(arm & ~grow(ring, 2),
+                                    [dict(x=118, y=94, seed=13, n=8, r0=29, aim=1.58, spread=1.3, reach=(30, 58))],
+                                    halo="8a4466")
     elif pid == "maren":
         c.fill(c.all(), "121c22")
-        wrist(c, skin)
+        arm = wrist(c, skin)
         gl = c.rect(150, 30, W - 1, 156)
         c.shade(gl, CLOTH["glove"], light=(-0.2, -1.0), round_px=12)
         c.fill(c.rect(150, 30, 153, 156), "6a4a2a")
         for y in (58, 92, 126):
             stroke(c, [(160, y), (W - 1, y + 3)], "6a4a2a")
         c.outline(OUTLINE, gl)
-        socket(c, 96, 94)
+        ring = socket(c, 96, 94)
+        # they run toward the glove and go on under its cuff
+        out["port_threads"] = veins(arm & ~grow(gl, 1) & ~grow(ring, 2),
+                                    [dict(x=96, y=94, seed=17, n=8, r0=27, aim=0.0, spread=1.35, reach=(30, 60))])
         burn = smooth(c.ell(40, 74, 16, 9) | c.ell(50, 80, 10, 7), 2)
         c.fill(burn, skin[5])
         c.dither(burn, "f8c8c0", 0.5)
@@ -506,17 +534,16 @@ def port(pid):
         c.fill(c.rect(33, 0, 33, H - 1), OUTLINE)
         c.fill(c.rect(187, 0, 187, H - 1), OUTLINE)
         c.dither(c.rect(34, 0, 186, 20), skin[1], 0.6)
+        flaps = c.none()
         for s, pts in ((-1, [(0, 100), (62, 132), (48, H), (0, H)]), (1, [(W, 100), (158, 132), (172, H), (W, H)])):
             flap = c.poly(pts)
             c.shade(flap, CLOTH["suit"], light=(-0.8, 0.3), round_px=10)
             c.outline(OUTLINE, flap)
+            flaps |= flap
         for x, y in ((56, 142), (164, 142)):
             c.fill(c.ell(x, y, 2, 2), "dbe6e0")
-        t = Canvas(W, H)
-        threads(t, 110, 84, seed=7, n=10)
-        c.blit(t)
-        socket(c, 110, 84)
-        out["port_threads"] = t
+        ring = socket(c, 110, 84)
+        out["port_threads"] = veins(neck & ~grow(flaps, 1) & ~grow(ring, 2), [dict(x=110, y=84, seed=7, n=10, r0=27)])
     elif pid == "juno":
         neck = c.rect(30, 0, 190, H - 1)
         c.shade(neck, skin[1:], light=(-1.0, 0.1), contrast=0.8, round_px=50, round_amt=0.3, dither=0.9)
@@ -530,9 +557,11 @@ def port(pid):
             c.fill(c.rect(52, gy + 3, 76, gy + 3), "0b1014")
         c.fill(c.ell(64, 126, 2, 2), "5ee6e0")
         c.outline(OUTLINE, vb)
+        jacks = c.none()
         for i in range(4):
             y = 40 + i * 26
             j = c.rrect(118, y, 146, y + 18, 3)
+            jacks |= j
             c.fill(grow(j, 1), OUTLINE)
             c.shade(j, CLOTH["chrome"], light=(-0.8, 0.3), round_px=4, bias=-0.05)
             c.fill(c.rect(123, y + 5, 141, y + 13), "07090c")
@@ -550,6 +579,12 @@ def port(pid):
         top = c.poly([(0, 160), (70, 172), (150, 172), (W, 160), (W, H), (0, H)])
         c.shade(top, CLOTH["leather"], light=(-0.8, 0.3), round_px=8)
         c.outline(OUTLINE, top)
+        # out from every jack, sideways: toward the voice box and toward the back of the neck
+        fans = []
+        for i in range(4):
+            fans.append(dict(x=132, y=49 + i * 26, seed=19 + i, n=2, r0=19, aim=np.pi, spread=0.45, reach=(20, 40)))
+            fans.append(dict(x=132, y=49 + i * 26, seed=29 + i, n=2, r0=19, aim=0.0, spread=0.45, reach=(18, 34)))
+        out["port_threads"] = veins(neck & ~grow(vb, 1) & ~grow(jacks, 2) & ~grow(top, 1), fans)
     out["port"] = c
     return out
 
@@ -586,8 +621,10 @@ def main(only=None):
         g1.blit(parts["grip_open"])
         g2 = grip_bg()
         g2.blit(parts["grip_closed"])
-        contact_sheet([("eyes", ev), ("grip open", g1), ("grip closed", g2), ("port", parts["port"])],
-                      os.path.join(OUT, "scope_%s.png" % pid), scale=2, per_row=4)
+        pt = parts["port"].copy()
+        pt.blit(parts["port_threads"])
+        contact_sheet([("eyes", ev), ("grip open", g1), ("grip closed", g2), ("port", parts["port"]), ("port threads", pt)],
+                      os.path.join(OUT, "scope_%s.png" % pid), scale=2, per_row=5)
     print("scopes written")
 
 

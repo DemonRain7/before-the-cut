@@ -627,10 +627,15 @@ The five in the order of night A, each row as normal / broken:
   pushed, she looks hurt, face and voice agreeing / she goes still, no face, no voice.
 
 A drifting patient turns when pressed twice and may snap; a drifting Vale or Rook also turns
-when Trauma Team is called, and the others go with the crew. Not drawn yet (`HANDOFF.md`, Next
-three tasks): a drifting Kip, Rook or Juno attacks with the portrait unchanged, and dark threads
-at the port are drawn only for Vale, whose port is never examined, so anyone else's threads are
-in the card's note and the report but not in the picture.
+when Trauma Team is called, and the others go with the crew. Each turns with their own hardware,
+drawn and heard as their own: Vale's saw and Maren's torch come through a closed shutter; Kip's
+bike lock and Rook's loader fist only dent it, the fist deep enough to see from the hall; Juno's
+ten picks score it. What gets through lands differently too: the saw slashes, the torch burns,
+the picks claw and the lock and the fist smash. Any row of anyone can be the broken one, so every
+patient has the pictures for all of them: dark threads at the port in the bust wherever the bust
+shows the port (Kip's and Rook's wrists in every picture of the hands, Juno's neck) and in every
+port close-up, and a picture for each gesture the temper signs use (`tools/art/gen_patients.py`;
+`run_tests.gd` `test_art()` checks that none is missing).
 
 ## Saying it in your own words
 

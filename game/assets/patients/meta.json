@@ -1,5 +1,24 @@
 {
  "juno": {
+  "attack": {
+   "face": [
+    80,
+    84
+   ],
+   "hand": [
+    138,
+    104
+   ],
+   "head": [
+    80,
+    56
+   ],
+   "style": "picks",
+   "tool": [
+    40,
+    106
+   ]
+  },
   "blink": [
    2.0,
    4.5
@@ -8,24 +27,46 @@
    "brows": "neutral",
    "mouth": "closed"
   },
+  "gestures": {
+   "point": "hands_react",
+   "slam": "hands_slam"
+  },
   "layers": [
+   "attack",
+   "attack_b",
+   "attack_s1",
+   "attack_s1_b",
+   "attack_s1_b_clean",
+   "attack_s1_clean",
+   "attack_s2",
+   "attack_s2_b",
+   "attack_s2_b_clean",
+   "attack_s2_clean",
    "body",
+   "body_t",
    "brows_angry",
    "brows_neutral",
    "brows_worried",
    "hands_a",
    "hands_b",
    "hands_react",
+   "hands_slam",
    "head",
    "lids",
    "mouth_a",
    "mouth_angry",
    "mouth_b",
    "mouth_closed",
+   "mouth_turn",
+   "mouth_turn_b",
+   "mouth_turn_b_clean",
+   "mouth_turn_clean",
    "mouth_upset",
    "pupils",
    "pupils_b",
-   "pupils_react"
+   "pupils_react",
+   "turn",
+   "turn_clean"
   ],
   "mouth_y": 96,
   "zones": {
@@ -50,6 +91,25 @@
   }
  },
  "kip": {
+  "attack": {
+   "face": [
+    80,
+    86
+   ],
+   "hand": [
+    138,
+    108
+   ],
+   "head": [
+    80,
+    62
+   ],
+   "style": "lock",
+   "tool": [
+    32,
+    114
+   ]
+  },
   "blink": [
    1.4,
    3.2
@@ -58,22 +118,50 @@
    "brows": "worried",
    "mouth": "closed"
   },
+  "gestures": {
+   "fist": "hands_fist",
+   "raise": "hands_react",
+   "slam": "hands_slam"
+  },
   "layers": [
+   "attack",
+   "attack_b",
+   "attack_s1",
+   "attack_s1_b",
+   "attack_s1_b_clean",
+   "attack_s1_clean",
+   "attack_s2",
+   "attack_s2_b",
+   "attack_s2_b_clean",
+   "attack_s2_clean",
    "body",
    "brows_angry",
    "brows_neutral",
    "brows_worried",
    "hands_a",
+   "hands_a_t",
    "hands_b",
+   "hands_b_t",
+   "hands_fist",
+   "hands_fist_t",
    "hands_react",
+   "hands_react_t",
+   "hands_slam",
+   "hands_slam_t",
    "head",
    "lids",
    "mouth_a",
    "mouth_angry",
    "mouth_b",
    "mouth_closed",
+   "mouth_turn",
+   "mouth_turn_b",
+   "mouth_turn_b_clean",
+   "mouth_turn_clean",
    "mouth_upset",
-   "pupils"
+   "pupils",
+   "turn",
+   "turn_clean"
   ],
   "mouth_y": 97,
   "zones": {
@@ -125,6 +213,11 @@
    "brows": "neutral",
    "mouth": "closed"
   },
+  "gestures": {
+   "freeze": "hands_a",
+   "raise": "hands_react",
+   "slam": "hands_slam"
+  },
   "layers": [
    "attack",
    "attack_b",
@@ -143,6 +236,7 @@
    "hands_a",
    "hands_b",
    "hands_react",
+   "hands_slam",
    "head",
    "lids",
    "mouth_a",
@@ -181,6 +275,25 @@
   }
  },
  "rook": {
+  "attack": {
+   "face": [
+    80,
+    78
+   ],
+   "hand": [
+    138,
+    108
+   ],
+   "head": [
+    80,
+    52
+   ],
+   "style": "fist",
+   "tool": [
+    38,
+    122
+   ]
+  },
   "blink": [
    3.0,
    6.0
@@ -189,22 +302,47 @@
    "brows": "angry",
    "mouth": "closed"
   },
+  "gestures": {
+   "fist": "hands_fist",
+   "slam": "hands_react"
+  },
   "layers": [
+   "attack",
+   "attack_b",
+   "attack_s1",
+   "attack_s1_b",
+   "attack_s1_b_clean",
+   "attack_s1_clean",
+   "attack_s2",
+   "attack_s2_b",
+   "attack_s2_b_clean",
+   "attack_s2_clean",
    "body",
    "brows_angry",
    "brows_neutral",
    "brows_worried",
    "hands_a",
+   "hands_a_t",
    "hands_b",
+   "hands_b_t",
+   "hands_fist",
+   "hands_fist_t",
    "hands_react",
+   "hands_react_t",
    "head",
    "lids",
    "mouth_a",
    "mouth_angry",
    "mouth_b",
    "mouth_closed",
+   "mouth_turn",
+   "mouth_turn_b",
+   "mouth_turn_b_clean",
+   "mouth_turn_clean",
    "mouth_upset",
-   "pupils"
+   "pupils",
+   "turn",
+   "turn_clean"
   ],
   "mouth_y": 92,
   "zones": {
@@ -253,6 +391,11 @@
    "brows": "neutral",
    "mouth": "closed"
   },
+  "gestures": {
+   "fist": "hands_react",
+   "point": "hands_point",
+   "slam": "hands_slam"
+  },
   "layers": [
    "attack",
    "attack_b",
@@ -270,7 +413,9 @@
    "brows_worried",
    "hands_a",
    "hands_b",
+   "hands_point",
    "hands_react",
+   "hands_slam",
    "head",
    "lids",
    "mouth_a",

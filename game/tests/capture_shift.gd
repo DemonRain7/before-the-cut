@@ -12,10 +12,10 @@ extends SceneTree
 ## moment it waits for never came. Use it to check this script without opening a window:
 ##   godot --headless --audio-driver Dummy --fixed-fps 60 --path game --script res://tests/capture_shift.gd
 ##
-## Five shifts are played, so that the opening, the first night's training, tonight's contact
+## Nine shifts are played, so that the opening, the first night's training, tonight's contact
 ## list and its codes, the guide, the booth walls, the hourly meter, the doctor's own marks, a
 ## flare, a snap, a patient who runs out of patience, every way an attack can end, a night that
-## ends with the doctor and the glass fitter are all seen:
+## ends with the doctor, the glass fitter and every patient's weapon are all seen:
 ##   shift 1: the opening cards, then the first night's training, one frame a tip: tonight's list
 ##            and how to read it, the hall camera's two monitors, Kip's intake card, his code and
 ##            his package, the reference sheet, the three tools with what the sheet expects drawn
@@ -40,14 +40,18 @@ extends SceneTree
 ##   shift 5: Vale breaks the pane again; between patients the till buys it back, one layer at a
 ##            time; Maren turns behind the mended glass and has the whole bar again; the report
 ##            says what the glass cost
+##   shifts 6 to 9, test night B (Kip, Juno and Rook drifting, each pressed twice to turn him or
+##            her): Kip's bike lock and Juno's picks are stopped after two blows and Rook's loader
+##            fist gets through (6); the fist is stopped and dents the shutter deep (7); the lock
+##            gets through (8); the picks get through (9). G buys the glass back between patients.
 ## The glass belongs to the shift: a blow that lands in one attack leaves less time in the next.
 ## That is why the same two patients are seen with three blows, one blow and none.
 ## Right and wrong are told only on the report. A slip says what the counter did, and each report
 ## is read the way a player reads it: a frame of the first visit's page, one of the last visit's
 ## page and one of the night's totals.
 ##
-## The night is played under the game's own rules: the line of 240 an hour, two couriers on
-## each night's list, CALM at 30 credits. Each night's seed is fixed (seed_for()), so that the
+## The night is played under the game's own rules: the line of 400 an hour, two couriers on
+## each night's list, CALM at 30 credits (the weapon nights have no couriers). Each night's seed is fixed (seed_for()), so that the
 ## list is the same in every run: Kip and Maren on the first night, Rook and Juno afterwards.
 ## Snaps and flares are switched off for the run, since a random one would cut into a staged
 ## scene. The flare of shift 2 and the snap of shift 3 are cued instead: their rules are pinned
@@ -63,6 +67,7 @@ extends SceneTree
 ##                    the attack scenes (the snap among them) and the glass fitter. The training is
 ##                    switched off for it, so the guide opens by itself at the first patient, as
 ##                    with --no-training, and is closed with ESC
+##   --weapons-only   only shifts 6 to 9, the weapon nights (the training switched off as above)
 ##   --less-blood     passed on to the game: the same scenes without the blood
 
 const MainScript = preload("res://scripts/ui/main.gd")
@@ -81,6 +86,7 @@ var d: PlayDriver = null
 var output_dir: String = ""
 var count: int = 0
 var attacks_only: bool = false
+var weapons_only: bool = false
 var dry: bool = false              # headless: nothing is drawn, so nothing is saved
 var missed: int = 0                # moments a shot waited for that never came
 
@@ -122,6 +128,9 @@ func _initialize() -> void:
 			output_dir = path if path.is_absolute_path() else ProjectSettings.globalize_path("res://../" + path)
 		elif a == "--attacks-only":
 			attacks_only = true
+		elif a == "--weapons-only":
+			attacks_only = true
+			weapons_only = true
 	dry = DisplayServer.get_name() == "headless"
 	if not dry:
 		DirAccess.make_dir_recursive_absolute(output_dir)
@@ -155,6 +164,20 @@ func _run() -> void:
 	main.has_fixed_seed = true
 	d.move(Vector2(330, 250))
 	await d.seconds(0.6)
+	if not weapons_only:
+		await first_five(later_nights)
+	# ---------------------------------------------------------------- shifts 6 to 9
+	await weapon_nights()
+	if dry:
+		print("DRY RUN: %d frames would be captured, %d moments missed. Nothing was drawn or saved." % [count, missed])
+	else:
+		print("Captured %d frames to %s (%d moments missed)" % [count, output_dir, missed])
+	await d.leave()
+	quit(0 if missed == 0 else 1)
+
+
+## Shifts 1 to 5 (the header lists what each shows). later_nights: the seed from the second on.
+func first_five(later_nights: int) -> void:
 	# ---------------------------------------------------------------- shift 1
 	if attacks_only:
 		await d.open_counter()
@@ -214,12 +237,6 @@ func _run() -> void:
 	await quick("treat", "juno-behind-mended-glass")
 	await maren_whole_bar()
 	await report_shot("report-5")
-	if dry:
-		print("DRY RUN: %d frames would be captured, %d moments missed. Nothing was drawn or saved." % [count, missed])
-	else:
-		print("Captured %d frames to %s (%d moments missed)" % [count, output_dir, missed])
-	await d.leave()
-	quit(0 if missed == 0 else 1)
 
 
 ## The end-of-shift report, read the way a player reads it: the first visit's page, the last
@@ -501,6 +518,8 @@ func turn_shots(who: String, upto: int) -> void:
 ## The shutter is dropped now: the plate that says how the stop went, what the shutter lands
 ## on, the dents, and the weapon coming through.
 func stopped_shots(who: String) -> void:
+	var style: Dictionary = MainScript.ATTACK_STYLES.get(main.rig.attack_style() if main.rig != null else "", {})
+	var cuts := str(style.get("cut", "")) != ""      # a lock or a fist does not come through, it only dents
 	d.shutter_key()
 	reached(main.visit != null and main.visit.outcome == "caught", who + ": the shutter is in time")
 	await d.seconds(0.1)
@@ -511,10 +530,13 @@ func stopped_shots(who: String) -> void:
 	await d.until(func() -> bool: return main.clinic.dent_count() >= 2, 4.0)
 	await d.seconds(0.04)
 	await shot(who + "-shutter-dents")
-	await d.until(func() -> bool: return main.clinic.cut_active(), 4.0)
-	await d.seconds(0.45)
-	await shot(who + "-cuts-through")
-	await d.until(func() -> bool: return main.clinic.has_cut() and not main.clinic.cut_active(), 4.0)
+	if cuts:
+		await d.until(func() -> bool: return main.clinic.cut_active(), 4.0)
+		await d.seconds(0.45)
+		await shot(who + "-cuts-through")
+		await d.until(func() -> bool: return main.clinic.has_cut() and not main.clinic.cut_active(), 4.0)
+	else:
+		reached(await d.until(func() -> bool: return main.clinic.dent_count() >= 3, 4.0), who + ": the third dent")
 	await d.seconds(0.6)
 	await shot(who + "-shutter-after")
 	reached(await d.wait_for_slip(), who + ": the slip prints")
@@ -1255,3 +1277,55 @@ func maren_whole_bar() -> void:
 	reached(await d.wait_for_slip(), "maren-5: the slip prints")
 	await shot("maren-5-stopped-slip")
 	await d.take_slip()
+
+
+# ================================================================ shifts 6 to 9: the weapons
+
+## Test night B (data/nights.json): Maren and Vale steady; Kip, Juno and Rook drifting, each with
+## his or her own hardware, so each leaves its own marks on the glass and the shutter and lands
+## its own way on the player's eyes.
+func weapon_nights() -> void:
+	await weapon_night("6", [["maren", "treat"], ["kip", "stopped"], ["vale", "treat"], ["juno", "stopped"], ["rook", "through"]])
+	await weapon_night("7", [["maren", "treat"], ["kip", "refer"], ["vale", "treat"], ["juno", "refer"], ["rook", "stopped"]])
+	await weapon_night("8", [["maren", "treat"], ["kip", "through"]])
+	await weapon_night("9", [["maren", "treat"], ["kip", "refer"], ["vale", "treat"], ["juno", "through"]])
+
+
+## One shift on test night B. plan lists [id, what] in the night's order: "treat" or "refer"
+## (decided with no examination), "stopped" (pressed twice: the second press turns them, and the
+## shutter drops after the second blow) or "through" (pressed twice, and nobody drops it: the
+## night ends with them). Between patients G buys back what an attack took out of the glass.
+func weapon_night(shift: String, plan: Array) -> void:
+	main.test_night = "B"
+	var was := pin_rules({"contacts": {"per_night": 0}})      # no couriers: only the visits
+	reached(await d.open_counter(), "night %s: the counter opens" % shift)
+	restore_rules(was)
+	reached(main.night_name == "B" and main.shift.glass == main.shift.glass_max(), "night %s: test night B, behind a whole pane" % shift)
+	for step in plan:
+		var who := str(step[0])
+		var what := str(step[1])
+		if what == "treat" or what == "refer":
+			await quick(what)
+			continue
+		var stem := "%s-%s" % [who, shift]
+		await d.settle()
+		reached(await d.buzz_in(), stem + ": comes to the counter")
+		reached(main.visit != null and str(main.visit.case_data.get("id", "")) == who, stem + ": the visit is " + who + "'s")
+		await d.settle()
+		await d.press()
+		await d.settle()
+		var due := blows_due()
+		await d.press()
+		reached(main.visit != null and main.visit.attack_cause == "press", stem + ": the second press turns them")
+		if what == "stopped":
+			await turn_shots(stem, 2)
+			await stopped_shots(stem)
+			if main.state != MainScript.State.REPORT:      # somebody is still to come
+				for layer in range(main.shift.glass, main.shift.glass_max()):
+					d.key(KEY_G)
+				reached(main.shift.glass == main.shift.glass_max(), stem + ": G buys the glass back")
+		else:
+			await turn_shots(stem, due)
+			await through_shots(stem)
+	await report_shot("report-" + shift)
+	main.test_night = ""

@@ -11,7 +11,7 @@ extends Node2D
 ##   light  - the weapon's flare (additive, dithered: see Gfx.dither)
 ## The rest happens to the player's own eyes and is laid out on the screen:
 ##   streak - the slash across the view (additive)
-##   flash  - the torch bloom in the face (additive, dithered)
+##   flash  - the torch bloom in the face, the white of a blow landing (additive, dithered)
 ##   blot   - the holes a torch burns in the player's sight (dithered)
 ##   lens   - splats that land on the player's view and run
 ##   vig    - a red ring closing in from the edges
@@ -50,6 +50,7 @@ var _streaks: Array = []
 var _blooms: Array = []
 var _gashes: Array = []            # cuts across the player's view: they stay, and bleed
 var _burns: Array = []             # the holes a torch leaves in the player's sight
+var _impacts: Array = []           # blows that land on the player's face
 var _flare_rig: PatientRig = null  # whose weapon is throwing light
 var _flare_point: String = "tool"
 var _flare_r: float = 0.0
@@ -100,6 +101,7 @@ func clear() -> void:
 	_blooms.clear()
 	_gashes.clear()
 	_burns.clear()
+	_impacts.clear()
 	flare_off()
 	vignette = 0.0
 	_vig_a = 0.0
@@ -109,7 +111,7 @@ func clear() -> void:
 
 func busy() -> bool:
 	return not (_shards.is_empty() and _drops.is_empty() and _sparks.is_empty() and _streaks.is_empty()
-		and _blooms.is_empty() and _burns.is_empty())
+		and _blooms.is_empty() and _burns.is_empty() and _impacts.is_empty())
 
 
 func splat_count() -> int:
@@ -269,9 +271,10 @@ func splat(pos: Vector2, kind: String = "m", scale: float = 1.0, delay: float = 
 	_dirty = true
 
 
-## The saw comes across the player's view from `a` to `b`.
-func slash(a: Vector2, b: Vector2) -> void:
-	_streaks.append({"a": a, "b": b, "age": 0.0, "life": 0.3})
+## The saw comes across the player's view from `a` to `b`. width < 1: something finer, a pick
+## or a blade's edge.
+func slash(a: Vector2, b: Vector2, width: float = 1.0) -> void:
+	_streaks.append({"a": a, "b": b, "age": 0.0, "life": 0.3, "w": width})
 	_dirty = true
 
 
@@ -281,9 +284,20 @@ func bloom(pos: Vector2, color: Color, radius: float, life: float) -> void:
 	_dirty = true
 
 
+## A blow lands on the player's face: the view goes white where it lands and cracks of light
+## run out from there.
+func impact(pos: Vector2, radius: float, life: float = 0.5) -> void:
+	var rays: Array = []
+	var n := 11
+	for i in n:
+		rays.append([float(i) * TAU / float(n) + _rng.randf_range(-0.22, 0.22), _rng.randf_range(0.7, 1.6), _rng.randf_range(-0.5, 0.5)])
+	_impacts.append({"pos": pos, "r": radius, "age": 0.0, "life": life, "rays": rays})
+	_dirty = true
+
+
 ## What the blade leaves across the player's view once the streak has passed: an open line
-## from `a` to `b` that stays where it is and runs.
-func gash(a: Vector2, b: Vector2, delay: float = 0.0) -> void:
+## from `a` to `b` that stays where it is and runs. width < 1: a finer cut that bleeds less.
+func gash(a: Vector2, b: Vector2, delay: float = 0.0, width: float = 1.0) -> void:
 	if less_blood:
 		return
 	var n := maxi(4, int(a.distance_to(b) / 24.0))
@@ -293,7 +307,10 @@ func gash(a: Vector2, b: Vector2, delay: float = 0.0) -> void:
 		var wob := 0.0 if (i == 0 or i == n) else _rng.randf_range(-3.5, 3.5)
 		pts.append((a.lerp(b, float(i) / float(n)) + normal * wob).round())
 	var runs: Array = []
-	for i in _rng.randi_range(8, 11):
+	var run_count := _rng.randi_range(8, 11)
+	if width < 1.0:
+		run_count = maxi(3, int(float(run_count) * width))
+	for i in run_count:
 		var f := _rng.randf_range(0.06, 0.94) * float(n)
 		var k := mini(int(f), n - 1)
 		var at := (pts[k] as Vector2).lerp(pts[k + 1] as Vector2, f - float(k)).round()
@@ -306,7 +323,7 @@ func gash(a: Vector2, b: Vector2, delay: float = 0.0) -> void:
 			"w": float(_rng.randi_range(1, 3)),
 			"wait": _rng.randf_range(0.0, 0.45),
 		})
-	_gashes.append({"pts": pts, "age": -delay, "runs": runs})
+	_gashes.append({"pts": pts, "age": -delay, "runs": runs, "w": width})
 	_dirty = true
 
 
@@ -324,7 +341,7 @@ func _process(delta: float) -> void:
 	_step(_shards, delta, GRAVITY * 0.8)
 	_step(_drops, delta, GRAVITY)
 	_step(_sparks, delta, GRAVITY * 0.55)
-	for list in [_streaks, _blooms, _burns]:
+	for list in [_streaks, _blooms, _burns, _impacts]:
 		var arr: Array = list
 		var i := arr.size() - 1
 		while i >= 0:
@@ -462,9 +479,10 @@ func _draw_streak() -> void:
 		var from := a0.lerp(b0, tail * 0.85)
 		var to := a0.lerp(b0, head)
 		var fade := 1.0 - tail
-		_streak.draw_line(from, to, Color(RED2, 0.55 * fade), 13.0)
-		_streak.draw_line(from, to, Color(RED3, 0.8 * fade), 6.0)
-		_streak.draw_line(from, to, Color(1, 1, 1, fade), 2.0)
+		var k := float(streak.get("w", 1.0))
+		_streak.draw_line(from, to, Color(RED2, 0.55 * fade), 13.0 * k)
+		_streak.draw_line(from, to, Color(RED3, 0.8 * fade), 6.0 * k)
+		_streak.draw_line(from, to, Color(1, 1, 1, fade), maxf(1.0, 2.0 * k))
 
 
 ## Soft light, drawn the way the rest of the game is drawn: it thins out, it never goes misty.
@@ -493,6 +511,22 @@ func _draw_flash() -> void:
 			var ang := float(i) * TAU / 8.0 + 0.3
 			var reach := r * (1.5 if i % 2 == 0 else 1.05)
 			_flash.draw_line(pos, pos + Vector2(cos(ang), sin(ang)) * reach, Color(1, 1, 1, 0.75 * a), 2.0)
+	for im in _impacts:
+		var blow: Dictionary = im
+		var k := float(blow["age"]) / float(blow["life"])
+		var a := minf(1.0, 1.4 * (1.0 - k) * (1.0 - k))
+		var pos: Vector2 = blow["pos"]
+		var r := float(blow["r"])
+		Gfx.soft_disc(_flash, pos, r * (0.3 + 0.35 * sqrt(k)), Color.WHITE, a, 0.5)
+		for ray in blow["rays"]:
+			# each crack runs out, kinks once, and keeps going
+			var ang := float(ray[0])
+			var reach := r * float(ray[1]) * (0.45 + 0.55 * sqrt(k))
+			var kink := pos + Vector2(cos(ang), sin(ang)) * reach * 0.55
+			var bent := ang + float(ray[2])
+			var tip := kink + Vector2(cos(bent), sin(bent)) * reach * 0.45
+			_flash.draw_line(pos, kink, Color(1, 1, 1, 0.9 * a), 3.0)
+			_flash.draw_line(kink, tip, Color(1, 1, 1, 0.65 * a), 2.0)
 
 
 func _draw_blot() -> void:
@@ -542,11 +576,13 @@ func _draw_lens() -> void:
 				if float(i + 1) > shown:
 					p1 = p0.lerp(p1, shown - float(i))
 				var mid := (float(i) + 0.5) / float(last)
-				var w := 2.0 + 6.0 * sin(PI * mid)                    # widest in the middle
+				var fine := float(cut.get("w", 1.0))
+				var w := (2.0 + 6.0 * sin(PI * mid)) * fine            # widest in the middle
+				var rim := 3.0 if fine >= 1.0 else 2.0
 				match pass_i:
 					0:
-						_lens.draw_line(p0, p1, RED0, w + 3.0)
-						_lens.draw_circle(p0, (w + 3.0) / 2.0, RED0)
+						_lens.draw_line(p0, p1, RED0, w + rim)
+						_lens.draw_circle(p0, (w + rim) / 2.0, RED0)
 					1:
 						_lens.draw_line(p0, p1, RED1, w)
 						_lens.draw_circle(p0, w / 2.0, RED1)

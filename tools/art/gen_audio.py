@@ -490,6 +490,62 @@ def torch_burst():
     return at(1.0, (0.0, whoomp), (0.02, hiss), (0.05, crackle * 0.5))
 
 
+def clang():
+    """Kip's bike lock on glass or steel: a hard knock, then the hollow bar ringing off it
+    (a free bar's partials, so it never sounds like a bell)."""
+    knock = lp(noise(0.04), 6000) * env(int(SR * 0.04), 0.0005, 0.008)
+    ring = sum(sine(f, 0.9) * a for f, a in ((440, 1.0), (1213, 0.6), (2378, 0.4), (3931, 0.22))) * env(int(SR * 0.9), 0.001, 0.2)
+    thud = sweep(180, 70, 0.15) * env(int(SR * 0.15), 0.001, 0.04)
+    return at(1.0, (0.0, knock), (0.0, ring * 0.5), (0.0, thud * 0.6))
+
+
+def punch():
+    """Rook's LOADER fist landing: the piston's crack, the whole arm's weight behind it, then
+    the piston venting."""
+    crack = hp(noise(0.03), 1500) * env(int(SR * 0.03), 0.0005, 0.006)
+    boom = sweep(95, 34, 0.45) * env(int(SR * 0.45), 0.001, 0.13)
+    body = lp(noise(0.2), 700) * env(int(SR * 0.2), 0.001, 0.05)
+    vent = bp(noise(0.5), 2500, 7000) * env(int(SR * 0.5), 0.05, 0.12) * 0.25
+    return at(0.8, (0.0, crack * 0.7), (0.0, boom), (0.0, body * 0.8), (0.12, vent))
+
+
+def servo_loop():
+    """Rook's LOADER arm wound up: a servo whine with the pistons hissing in turn. Every part
+    fits the 0.6 seconds exactly, so it loops clean."""
+    sec = 0.6
+    x = t(sec)
+    whine = np.sin(2 * np.pi * 330 * x) * 0.3 + np.sign(np.sin(2 * np.pi * 165 * x)) * 0.08
+    pump = 0.35 + 0.65 * np.sin(2 * np.pi * 5 * x) ** 2
+    hiss = loop_noise(sec, lambda f: ((f > 1800) & (f < 7000)) * 1.0) * 0.5
+    return whine + hiss * pump
+
+
+def hum_loop():
+    """Juno's DEFT fingers out: one held chord through the chrome, with a singer's vibrato.
+    Whole cycles in the second, so it loops clean."""
+    sec = 1.0
+    x = t(sec)
+    vib = np.sin(2 * np.pi * 5 * x)
+    tone = sum(a * np.sin(2 * np.pi * f * x + 0.012 * f / 5.0 * vib) for f, a in ((880, 0.5), (1320, 0.25), (1760, 0.15)))
+    buzz = np.sign(np.sin(2 * np.pi * 110 * x)) * 0.05
+    return tone + buzz
+
+
+def scrape():
+    """Ten DEFT picks across steel: a scale run backwards, one squealing note per point."""
+    step = 0.1
+    out = np.zeros(int(SR * 1.2))
+    for i, s in enumerate((0, 2, 4, 5, 7, 9, 11, 12, 14, 16)):
+        f = 1760.0 * 2 ** (-s / 12.0)
+        d = step + 0.07
+        y = sine(f, d) * 0.6 + np.sign(sine(f * 1.5, d)) * 0.1 + hp(noise(d), 4000) * 0.3
+        y = y * env(len(y), 0.004, 0.06)
+        k = int(SR * i * step)
+        y = y[:len(out) - k]
+        out[k:k + len(y)] += y
+    return lp(out, 9000) * fade(np.ones(len(out)), 0.005, 0.1)
+
+
 def tinnitus():
     """What is left in your ears afterwards."""
     sec = 2.8
@@ -587,11 +643,13 @@ SOUNDS = {
     "jingle_good": (lambda: jingle([523.3, 659.3, 784.0, 1046.5]), 0.5),
     "jingle_bad": (lambda: jingle([392.0, 349.2, 311.1, 233.1], 0.2, 0.35), 0.5),
     "glass_fit": (glass_fit, 0.6),
+    "clang": (clang, 0.75), "punch": (punch, 0.9), "servo_loop": (servo_loop, 0.35), "hum_loop": (hum_loop, 0.3),
+    "scrape": (scrape, 0.6),
 }
 # The sounds of the first build share one random stream, in the order above. Every sound added
 # since starts from a fresh stream instead: adding one changes no other file, and writing it
 # alone gives the same file as a full build. Add new sounds here as well as above.
-FRESH = {"radio", "siren", "glass_fit"}
+FRESH = {"radio", "siren", "glass_fit", "clang", "punch", "servo_loop", "hum_loop", "scrape"}
 
 
 def main(only=None):

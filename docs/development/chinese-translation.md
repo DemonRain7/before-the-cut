@@ -161,7 +161,7 @@ Run these before a commit that touches any words (`AGENTS.md`, Languages):
   catches those.
 - `python measure_text.py --lang zh` in `tools/art` measures every line as it reads in Chinese
   (and `python measure_text.py` in English).
-- The scene test with ` -- --lang=zh` plays the nine shifts in Chinese and fails on any English
+- The scene test with ` -- --lang=zh` plays the ten shifts in Chinese and fails on any English
   that reached the screen untranslated (`run_ui_smoke.gd` `untranslated_words()`).
 
 On November 18 all three passed: 0 problems, 616 lines that fit in each language, 954 scene

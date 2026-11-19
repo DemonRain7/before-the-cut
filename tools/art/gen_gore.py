@@ -20,7 +20,7 @@ D = "fx"
 
 # where the three blows land on the glass (also used by the game: see clinic_view.gd)
 HIT_HAND = (170, 118)      # the open palm, on our right
-HIT_TOOL = (60, 126)       # the saw or the torch, on our left
+HIT_TOOL = (60, 126)       # the weapon (saw, torch, lock, fist, picks), on our left
 HIT_HEAD = (110, 50)       # the forehead
 
 
@@ -229,6 +229,46 @@ def scorch_hot():
     for x, ln in ((23, 7), (27, 11), (30, 6)):
         stroke(c, [(x, 31), (x, 31 + ln)], "warm5")
         c.px(x, 31 + ln, "warm7")
+    return c
+
+
+def smash(seed, w=48, h=46, knuckles=0):
+    """Where something heavy and blunt met the glass: the crushed white point, short splits
+    running off it and a ring punched down round it. knuckles: that many crushed points in
+    a row (a fist) in place of one (a bike lock)."""
+    c = Canvas(w, h)
+    cx, cy = w / 2.0, h / 2.0
+    if knuckles:
+        pts = [(cx + (i - (knuckles - 1) / 2.0) * 9.0, cy - 2 + abs(i - (knuckles - 1) / 2.0) * 1.6) for i in range(knuckles)]
+    else:
+        pts = [(cx, cy)]
+    lines = []
+    for k, (x, y) in enumerate(pts):
+        lines += crack_set(seed + k, x, y, 7 if knuckles else 9, min(w, h) * (0.4 if knuckles else 0.46))
+    draw_cracks(c, lines, 1.0)
+    rings(c, seed + 20, cx, cy, (14, 21) if knuckles else (7, 13), n=11, keep=0.72)
+    for k, (x, y) in enumerate(pts):
+        crush(c, seed + 30 + k, x, y, 2.5 if knuckles else 3.4)
+    return c
+
+
+def slit(seed=95):
+    """Ten points dragged down the glass: two hands of five fine scratches, each starting
+    where its tip bit in."""
+    rng = np.random.default_rng(seed)
+    w, h = 60, 48
+    c = Canvas(w, h)
+    for x0, y0 in ((9, 6), (25, 13)):
+        for i in range(5):
+            x = x0 + i * 4.5 + rng.uniform(-0.6, 0.6)
+            y = y0 + abs(i - 2) * 2.0 + rng.uniform(-1, 1)
+            ln = rng.uniform(19, 27)
+            bend = rng.uniform(5, 9)
+            pts = [(x + bend * (t ** 1.5), y + ln * t) for t in np.linspace(0, 1, 7)]
+            stroke(c, [(px + 1, py + 1) for px, py in pts], "ink1")
+            stroke(c, pts, "dbe6e0")
+            c.px(int(round(x)), int(round(y)), "ffffff")
+    c.speckle(c.rect(6, 4, w - 6, h - 4) & ~c.alpha(), "ffffff", 0.03, seed=seed)
     return c
 
 
@@ -460,8 +500,10 @@ def shard(seed, size):
 
 
 # ------------------------------------------------------------------ the shutter
-def dent(seed, rx=11, ry=9):
-    """A blow from the far side: the slats bulge toward us around a lumpy knuckle shape."""
+def dent(seed, rx=11, ry=9, deep=False):
+    """A blow from the far side: the slats bulge toward us around a lumpy knuckle shape.
+    deep: a blow with a machine behind it, deep enough to see from the hall: the middle
+    driven in further and a slat seam torn open across it."""
     rng = np.random.default_rng(seed)
     w, h = rx * 2 + 10, ry * 2 + 10
     c = Canvas(w, h)
@@ -491,6 +533,19 @@ def dent(seed, rx=11, ry=9):
         y = cy + rng.uniform(-ry, ry) * 0.8
         x = cx + s_ * rx * 0.9
         stroke(c, [(x, y), (x + s_ * rng.uniform(3, 6), y + rng.uniform(-1, 1))], "ink1")
+    if deep:
+        rng = np.random.default_rng(seed + 50)
+        core = c.ell(cx + 1, cy, rx * 0.5, ry * 0.45) & m      # where it went furthest: a sharper bump
+        c.dither(core & (lit > 0.0), "steel5", 0.75)
+        c.dither(core & (lit <= 0.0), "steel0", 0.75)
+        c.fill(c.edge(core, 1, 0) | c.edge(core, 0, -1), "ink1")
+        c.fill(c.edge(core, -1, 0) | c.edge(core, 0, 1), "white")
+        y = cy + rng.uniform(-1.5, 1.5)                  # and a slat seam torn open across it
+        split = c.seg([(cx - rx * 0.55, y), (cx + rng.uniform(-2, 2), y + rng.uniform(-1, 1)), (cx + rx * 0.5, y + rng.uniform(-1.5, 1.5))], 1) & m
+        c.fill(grow(split, 1) & m & ~split, "white")
+        c.fill(split, "ink0")
+        c.speckle(grow(m, 4) & ~grow(m, 2), "warm2", 0.12, seed=seed + 2)
+        c.speckle(grow(m, 4) & ~grow(m, 2), "ink1", 0.1, seed=seed + 3)
     return c
 
 
@@ -585,6 +640,56 @@ def burn_hot():
         ln = int(rng.integers(3, 12))
         stroke(c, [(x, y), (x, y + ln)], "warm5")
         c.px(x, y + ln, "warm7")
+    return c
+
+
+def scrape(seed=97):
+    """The picks through the shutter: ten points scoring the slats along the cut path, two
+    hands of five. Each groove skips where its point chattered over a seam, and the metal it
+    turned up catches the lamp here and there."""
+    rng = np.random.default_rng(seed)
+    c = Canvas(CUT_W, CUT_H)
+    pts = cut_path()
+    for k in range(10):
+        off = (k - 4.5) * 2.0 + (1.5 if k >= 5 else -1.5)
+        line = [(x + rng.uniform(-0.5, 0.5), y + off + rng.uniform(-0.4, 0.4)) for x, y in pts]
+        keep = np.ones(CUT_W, dtype=bool)
+        x = int(rng.integers(2, 9))
+        while x < CUT_W:
+            gap = int(rng.integers(1, 4))
+            keep[x:x + gap] = False
+            x += gap + int(rng.integers(4, 12))
+        groove = c.seg(line, 1) & keep[None, :]
+        if k in (0, 5):
+            c.fill(c.seg([(x, y - 1) for x, y in line], 1) & keep[None, :] & ~groove, "steel5")
+        c.fill(groove, "ink0")
+        ys, xs = np.nonzero(groove)
+        for i in rng.integers(0, max(1, len(xs)), 4):
+            if len(xs):
+                c.px(xs[i], ys[i] - 1, "white")
+    for x in (10, 27, 45, 63, 81):                       # where the tips came through a seam
+        y = int(np.interp(x, [p[0] for p in pts], [p[1] for p in pts]))
+        hole = c.ell(x, y + rng.uniform(-3, 3), 1.5, 1.2)
+        c.fill(grow(hole, 1) & ~hole, "steel1")
+        c.fill(hole, "ink0")
+    return c
+
+
+def pick_tips():
+    """Five chrome points showing through the slats where the scrape has got to."""
+    c = Canvas(26, 26)
+    m = c.none()
+    for i in range(5):
+        x = 5.0 + i * 4.0
+        y0 = 3.0 + abs(i - 2) * 2.5
+        m |= c.poly([(x - 1.4, y0), (x + 1.4, y0), (x + 0.4, y0 + 15), (x - 0.4, y0 + 15)])
+    c.fill(m, "steel4")
+    c.fill(m & ~c.edge(m, -1, 0), "steel5")
+    c.fill(c.edge(m, 1, 0) & m, "steel2")
+    for i in range(5):
+        x = int(5 + i * 4)
+        c.px(x, int(3 + abs(i - 2) * 2.5) + 2, "white")
+    c.outline("ink0")
     return c
 
 
@@ -686,11 +791,14 @@ def main():
     aimed = [put("splat_a%d" % i, splat(72, 400 + i, spikes=11, core=0.12, drops=28, aim=np.pi * (0.2 + 0.3 * i), spread=0.35)) for i in range(2)]
     glass = [put("hand_0", handprint(1, drag=0)), put("hand_1", handprint(2, drag=22)), put("smear_0", smear()),
              put("castoff_0", castoff()), put("gouge_0", gouge()), put("scorch", scorch()), put("scorch_hot", scorch_hot()),
-             put("spray_0", spray())]
+             put("spray_0", spray()), put("smash_0", smash(120)), put("smash_1", smash(130, 62, 52, knuckles=4)),
+             put("slit_0", slit())]
     shards = [put("shard_%d" % i, shard(500 + i, s)) for i, s in enumerate((6, 8, 10, 13, 16, 20, 25, 31))]
     sh = [put("dent_%d" % i, dent(600 + i, rx, ry)) for i, (rx, ry) in enumerate(((11, 9), (13, 10), (9, 8)))]
     sh += [put("cut_saw", cut_saw()), put("saw_tooth", saw_tooth()), put("burn", burn()), put("burn_hot", burn_hot())]
     sh += [put("cut_saw_clean", cut_saw(clean=True)), put("saw_tooth_clean", saw_tooth(clean=True))]
+    sh += [put("dent_deep_%d" % i, dent(610 + i, rx, ry, deep=True)) for i, (rx, ry) in enumerate(((15, 12), (17, 13), (14, 11)))]
+    sh += [put("scrape", scrape()), put("pick_tips", pick_tips())]
     contact_sheet(small + mid + aimed + glass + shards + sh, os.path.join(OUT, "gore_items.png"), scale=3, per_row=8, bg="teal3")
     contact_sheet(big, os.path.join(OUT, "gore_big.png"), scale=2, per_row=3, bg="paper3")
     wide = [put("crack_%d" % s, cracks(s)) for s in (1, 2, 3)]

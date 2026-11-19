@@ -26,8 +26,19 @@ const VoiceInput = preload("res://scripts/core/voice_input.gd")
 const Gfx = preload("res://scripts/ui/gfx.gd")
 const Lang = preload("res://scripts/core/lang.gd")
 const Clipboard = preload("res://scripts/ui/clipboard.gd")
+const MainScript = preload("res://scripts/ui/main.gd")
+const ClinicView = preload("res://scripts/ui/clinic_view.gd")
 
 const NOTE_MAX_PX := 186   # width of the note column on the patient record
+## The layers every patient's bust carries (tools/art/gen_patients.py): the face and hands of
+## the visit, and the turn and the three poses of the attack, each in a copy for --less-blood.
+const BUST_LAYERS := ["body", "head", "lids", "pupils", "brows_angry", "brows_neutral", "brows_worried",
+	"mouth_a", "mouth_b", "mouth_closed", "mouth_angry", "mouth_upset", "hands_a", "hands_b", "hands_react",
+	"turn", "turn_clean", "mouth_turn", "mouth_turn_b", "mouth_turn_clean", "mouth_turn_b_clean",
+	"attack", "attack_b", "attack_s1", "attack_s1_b", "attack_s2", "attack_s2_b",
+	"attack_s1_clean", "attack_s1_b_clean", "attack_s2_clean", "attack_s2_b_clean"]
+## Every patient's close-ups (tools/art/gen_scopes.py): the penlight, the grip and the port.
+const SCOPE_FILES := ["eyes_back", "eyes_front", "iris_l", "iris_r", "grip_open", "grip_closed", "port", "port_threads"]
 const SHEET_TEXT_ROOM := 182.0    # the sheet's text column (tools/art/measure_text.py "sheet")
 const SHEET_TITLE_ROOM := 220.0   # the rule under the sheet's title
 
@@ -37,6 +48,7 @@ var rules: Dictionary = {}
 var sheet: Dictionary = {}
 var parts: Dictionary = {}
 var cases: Dictionary = {}
+var templates: Dictionary = {}
 var contacts_data: Dictionary = {}
 
 
@@ -106,8 +118,10 @@ func _initialize() -> void:
 	sheet = db["sheet"]
 	parts = db["parts"]
 	cases = db["cases"]
+	templates = db["templates"]
 	contacts_data = db["contacts"]
 	test_data()
+	test_art()
 	test_parts()
 	test_verdict_any_time()
 	test_looks()
@@ -170,6 +184,100 @@ func test_data() -> void:
 		for text in texts:
 			var w: float = font.get_string_size(str(text), HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x
 			ok(w <= NOTE_MAX_PX, "%s note fits one record line (%d px): %s" % [id, int(w), str(text)])
+
+
+## Any part of anyone can be the one that is wrong tonight, and anyone can turn, so every
+## patient carries the art for all of it: the bust's layers, a picture for each gesture the
+## temper signs use, dark threads at the port wherever the bust shows the port, the close-ups,
+## and the sounds and marks of the weapon.
+func test_art() -> void:
+	var loaded: Variant = CaseDB.load_json("res://assets/patients/meta.json")
+	ok(typeof(loaded) == TYPE_DICTIONARY, "the patients' meta.json loads")
+	if typeof(loaded) != TYPE_DICTIONARY:
+		return
+	var meta: Dictionary = loaded
+	for id in templates.keys():
+		var t: Dictionary = templates[id]
+		var pid := str(t.get("sprite", id))
+		ok(meta.has(pid), "%s has an entry in the patients' meta" % id)
+		if not meta.has(pid):
+			continue
+		var pm: Dictionary = meta[pid]
+		var layers: Array = pm.get("layers", [])
+		var missing: Array = []
+		for layer in BUST_LAYERS:
+			if not layers.has(layer):
+				missing.append(layer)
+		eq(missing, [], "%s has every layer of the bust and of the attack" % id)
+		var unfiled: Array = []
+		for layer in layers:
+			if not ResourceLoader.exists("res://assets/patients/%s/%s.png" % [pid, str(layer)]):
+				unfiled.append(layer)
+		eq(unfiled, [], "%s: every layer the meta lists has its picture" % id)
+		ok(ResourceLoader.exists("res://assets/patients/%s/hallcam.png" % pid), "%s has a hall-camera silhouette" % id)
+		# the weapon
+		var attack: Dictionary = pm.get("attack", {})
+		var style := str(attack.get("style", ""))
+		ok(MainScript.ATTACK_STYLES.has(style), "%s's weapon, '%s', is one the game plays" % [id, style])
+		for key in ["hand", "tool", "head", "face"]:
+			ok((attack.get(key, []) as Array).size() == 2, "%s's attack says where the %s is" % [id, key])
+		# a picture for every gesture of the temper signs
+		var gestures: Dictionary = pm.get("gestures", {})
+		var used: Array = []
+		var temper: Dictionary = (t.get("signs", {}) as Dictionary).get("temper", {})
+		for state in ["normal", "broken"]:
+			for s in temper.get(state, []):
+				for when in ["press", "flare"]:
+					var g := str(((s as Dictionary).get(when, {}) as Dictionary).get("hands", ""))
+					if g != "" and not used.has(g):
+						used.append(g)
+		ok(not used.is_empty(), "%s's temper signs move the hands" % id)
+		for g in used:
+			var named := str(gestures.get(g, ""))
+			ok(layers.has(named), "%s's '%s' gesture names its picture (%s)" % [id, g, named])
+		# dark threads at the port, wherever the bust shows it
+		var any_threads := false
+		var hand_threads := false
+		for layer in layers:
+			if str(layer).ends_with("_t"):
+				any_threads = true
+				hand_threads = hand_threads or str(layer).begins_with("hands_")
+		if not bool((t.get("port", {}) as Dictionary).get("covered", false)):
+			ok(any_threads, "%s's port shows on the bust, and the bust can show threads at it" % id)
+		if hand_threads:
+			var plain: Array = []
+			var hand_layers: Array = ["hands_a", "hands_b", "hands_react"]
+			for g in used:
+				hand_layers.append(str(gestures.get(g, "")))
+			for layer in hand_layers:
+				if str(layer).begins_with("hands_") and not layers.has(str(layer) + "_t") and not plain.has(layer):
+					plain.append(layer)
+			eq(plain, [], "%s's port is on the hands, so every picture of the hands can show threads at it" % id)
+		# the close-ups
+		var gone: Array = []
+		for f in SCOPE_FILES:
+			if not ResourceLoader.exists("res://assets/scope/%s/%s.png" % [pid, f]):
+				gone.append(f)
+		eq(gone, [], "%s has every close-up, the port with threads included" % id)
+	# every weapon's sounds and marks
+	for style in MainScript.ATTACK_STYLES.keys():
+		var s: Dictionary = MainScript.ATTACK_STYLES[style]
+		var files: Array = ["fx/%s.png" % str(s["mark"])]
+		for key in ["loop", "bite", "knock"]:
+			if str(s[key]) != "":
+				files.append("audio/%s.wav" % str(s[key]))
+		var cut := str(s["cut"])
+		if cut != "":
+			ok(ClinicView.CUT_ART.has(cut) and MainScript.CUT_AT.has(cut), "the %s's cut, '%s', has its pictures and its place" % [style, cut])
+			for path in (ClinicView.CUT_ART.get(cut, {}) as Dictionary).values():
+				files.append(str(path))
+		for i in 3:
+			files.append(("fx/dent_deep_%d.png" if bool(s["deep"]) else "fx/dent_%d.png") % i)
+		var absent: Array = []
+		for f in files:
+			if not ResourceLoader.exists("res://assets/" + str(f)):
+				absent.append(f)
+		eq(absent, [], "the %s's sounds and marks are all there" % style)
 
 
 ## The spec binder (rules version 7, data/parts.json): a patient is a set of parts, one model
