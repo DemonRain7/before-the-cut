@@ -5,6 +5,7 @@ param(
     [switch]$LessBlood,
     [switch]$Mute,
     [string]$Seed = '',
+    [string]$TestNight = '',
     [switch]$ImportOnly
 )
 
@@ -72,6 +73,8 @@ if ($AgentUrl) {
 if ($LessBlood) { $gameOptions += '--less-blood' }
 if ($Mute) { $gameOptions += '--mute' }
 if ($Seed) { $gameOptions += "--seed=$Seed" }
+# A fixed night of game/data/nights.json every shift; the nights are named by capital letters.
+if ($TestNight) { $gameOptions += "--test-night=$($TestNight.ToUpperInvariant())" }
 $gameArguments = @('--path', $gameDir)
 if ($gameOptions.Count -gt 0) { $gameArguments += @('--') + $gameOptions }
 & $GodotPath @gameArguments

@@ -83,15 +83,15 @@ in the editor once.
 | `-LessBlood` | the attack scenes without blood: no splatter, pools or stains, and a clean face, hand, shutter cut and broken glass. The red flash and the red edge of the screen stay |
 | `-Mute` | start with sound off (M toggles it in the game) |
 | `-Seed 123` | fixed seed for the night (who comes, who of them drifts and which signs they show), the order of the visitors, the night's contact list and the small random timings |
+| `-TestNight C` | that test night of `data/nights.json` (A to H) every shift, instead of a drawn night (The patients, below) |
 
 Without the script, import once (`godot --headless --path game --import`, again if it stops
-with an error), then: `godot --path game -- --agent-url=http://127.0.0.1:8787 --model --less-blood --mute --seed=123`
+with an error), then: `godot --path game -- --agent-url=http://127.0.0.1:8787 --model --less-blood --mute --seed=123 --test-night=C`
 (everything after `--` is optional). The environment variable `BTC_AGENT_URL` also sets the
 address. These have no script option:
 
 | Game option | Effect |
 | --- | --- |
-| `--test-night=C` | that test night of `data/nights.json` (A to H) every shift, instead of a drawn night (The patients, below) |
 | `--authored-order` | test night A every shift, the night as written (the tests and the capture script use it) |
 | `--no-intro` | no opening cards, no first-night training and no counter guide opening by itself |
 | `--no-training` | the opening cards, but no training: the counter guide opens by itself at the first patient instead, as before November 17 |

@@ -13,13 +13,13 @@ English and Chinese: a change to its English is a change to its Chinese in the s
 Git: both rounds of November 16 are in commit 822e8d7. The work of November 17 is in e7f94d7,
 made and pushed to origin/main on November 18 when the student asked. The language work of
 November 18 is in 3f1fcbd, pushed; the work of late November 18 is in a487cea, pushed. The
-data and the code of random signs are in 5b64d87, the model's night signs in 484ff85 and
-every part's art in 813b9d0, all pushed; the five new characters are committed after 813b9d0,
-together with this file. Run git status -sb and git log -3 --oneline:
+data and the code of random signs are in 5b64d87, the model's night signs in 484ff85, every
+part's art in 813b9d0 and the five new characters in e486887, all pushed; the launcher's
+-TestNight option is committed after e486887, together with this file. Run git status -sb and git log -3 --oneline:
 anything uncommitted is newer than this file.
 
 Latest checkpoint (November 19, afternoon): every character's art for each part (813b9d0)
-and five new characters, built by Claude (Opus 5.5) and checked; nobody has played it. Every
+and five new characters (e486887), built by Claude (Opus 5.5) and checked; nobody has played it. Every
 sign a template can draw has its picture (a _t twin with dark threads of every hands layer
 where the bust shows the port, a hands layer for each temper gesture, close-ups of both eyes,
 the grip and the port with and without threads), and every patient turns with a weapon of
@@ -39,7 +39,8 @@ nights A and B; the newer five reach the real scene only in the capture's weapon
 F). Checks, all passed: run_tests 1179; the scene test 1079, 1080 in Chinese, 1079 with less
 blood; the window close 5; the proxy 40; over HTTP 199 and 16 wire checks; measure_text 1513
 lines in each language; dry captures 439, 439, 334 and 235; the weapon nights drawn on a hidden
-desktop, 235 frames, none missed. Mock calls only; nothing paid.
+desktop, 235 frames, none missed. Mock calls only; nothing paid. run-game.ps1 -TestNight C
+plays a test night (a stand-in for Godot and a headless boot checked it; no window was opened).
 
 Previous checkpoint (November 19, early): the data and the code of random signs, then the model's
 night signs, built by Claude (Opus 5.5) and checked; nobody has played it. The five characters stay as they are; each night draws
@@ -290,7 +291,7 @@ Next three tasks (first run git status -sb and git log -3 --oneline):
 2. The student plays and reads (.\run-game.ps1, with headphones): a drawn night in Chinese from
    a fresh start and a night in English, reading every card, tip, sheet, slip and report page
    and typing with a real Chinese input method; then the test nights with the newer five
-   (godot --path game -- --test-night=C, and D to G likewise); then settles the proposals in
+   (.\run-game.ps1 -TestNight C, and D to G likewise); then settles the proposals in
    HANDOFF.md under "For the student to decide" (ON NOTICE, and the five themselves). An agent
    operating the window, or the scene test, is not a substitute.
 3. Small fixes from that play, and Vale's port close-up (draw the MIL-SPEC plate in
