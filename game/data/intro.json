@@ -90,7 +90,7 @@
       "items": [
         {"key": "sheet", "text": "REFERENCE SHEET [R]. Kessler's spec pages for this patient's models: what steady looks like, and what is merely odd. Click it to take it down. It never decides for you."},
         {"key": "list", "text": "CONTACT LIST [L]. Tonight's contacts: an alias, two clues and a code each. SAY the code to the one visitor who fits both clues: a package, +{pay}. Anyone else: -{code_cost} patience."},
-        {"key": "till", "text": "TILL and HOUR. One patient is one hour. The meter reads the till each hour: stay over the line. Bounties and bills come in at closing, before the last reading."},
+        {"key": "till", "text": "TILL and HOUR. One patient is one hour. The meter reads the till each hour: stay over the line. Treated or handed over, a patient's fee comes in; the bills come at closing, before the last reading."},
         {"key": "camera", "text": "HALL CAMERA [C]. Who is next. Click it, then the big screen, to buzz them in. ENTER does it at once."}
       ]
     },

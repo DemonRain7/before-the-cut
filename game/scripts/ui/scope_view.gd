@@ -309,7 +309,10 @@ func _update_grip(delta: float) -> void:
 # ------------------------------------------------------------------ port
 func _build_port() -> void:
 	_layer("scope/%s/port.png" % _pid)
-	if Gfx.has_tex("scope/%s/port_threads.png" % _pid):
+	# the dark threads are a sign of the night, not of the person: only a port sign with
+	# threads (case_db compose sets port.threads) draws them
+	var port: Dictionary = _case.get("port", {}) if typeof(_case.get("port")) == TYPE_DICTIONARY else {}
+	if bool(port.get("threads", false)) and Gfx.has_tex("scope/%s/port_threads.png" % _pid):
 		_threads = _layer("scope/%s/port_threads.png" % _pid)
 	_light = _layer("scope/light.png")
 	_light.material = Gfx.additive()

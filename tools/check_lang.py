@@ -51,15 +51,18 @@ ART = os.path.join(ROOT, "tools", "art")
 # the notes to authors) is never shown and stays English.
 _PART_TEXT = ("tag", "both", "fine", "one", "fine_one", "normal")
 SHOWN = {
+    # a character (version 3): what every night shares, then each sign a night can draw
+    # (signs.<row>.<normal|broken>[i]) and the endings for either truth
     "cases/*.json": [
         ("name",), ("role",), ("request",), ("teaser",), ("opening", "*"),
-        ("looks", "*"), ("checks", "*", "note"), ("claims", "*", "line"), ("claims", "*", "note"),
-        ("topics", "*", "q"), ("topics", "*", "a"), ("topics", "*", "deflect"), ("topics", "*", "note"),
-        ("lines", "*"), ("lines", "*", "*"),
-        ("press", "*", "line"), ("press", "*", "note"), ("flare", "line"), ("flare", "note"),
+        ("looks", "*"), ("claims", "*", "line"), ("claims", "*", "note"),
+        ("topics", "*", "q"), ("topics", "*", "deflect"),
+        ("lines", "*"), ("lines", "*", "*"), ("press_end", "*"),
         ("attack", "telegraph"), ("attack", "line"), ("exit", "*"),
-        ("rows", "*", "text"), ("outcomes", "*", "title"), ("outcomes", "*", "text"),
-    ],
+    ] + [("signs", "*", "*", "*", key) for key in ("text", "note", "look", "after")]
+      + [("signs", "*", "*", "*", "answers", "*", key) for key in ("a", "note")]
+      + [("signs", "*", "*", "*", part, key) for part in ("press", "flare") for key in ("line", "note")]
+      + [("outcomes", "*", "*", key) for key in ("title", "text")],
     # a contact's alias is a code name: the same in every language (drawn with Gfx.text_raw)
     "contacts.json": [
         ("title",), ("clues", "*", "text"),

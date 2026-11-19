@@ -1,8 +1,15 @@
 extends RefCounted
-## Loads rules.json, sheet.json, parts.json (the spec binder), the case files and contacts.json,
-## and checks them before the game uses them. It also assembles each patient's reference sheet
-## from the models they wear (sheet_for).
+## Loads rules.json, sheet.json, parts.json (the spec binder), the characters (cases/<id>.json),
+## the test nights (nights.json) and contacts.json, and checks them before the game uses them.
+## It also assembles each patient's reference sheet from the models they wear (sheet_for).
 ## A data mistake is reported as a readable list instead of a broken visit.
+##
+## A character file (version 3) is a template: who the patient is, which never changes, and for
+## each sheet row the ways that part of them can be on a night ("signs": normal ones and broken
+## ones). A night gives each visitor a truth and one sign per row (ShiftState.draw_night, or a
+## test night of nights.json); compose() turns template and pick into the case a visit plays,
+## in the shape every other script reads. Every pick a night could make is composed and checked
+## when the data loads (validate_template).
 ## Used as: const CaseDB = preload("res://scripts/core/case_db.gd")
 
 const Lang = preload("res://scripts/core/lang.gd")
@@ -33,53 +40,563 @@ static func load_json(path: String) -> Variant:
 	return json.data
 
 
-## Returns {"rules", "sheet", "parts", "cases": {id: case}, "contacts", "errors": [String]}.
-## Each case comes back with its models resolved (resolve_parts).
+## Returns {"rules", "sheet", "parts", "templates": {id: template}, "nights": {name: night},
+## "people": {id: case}, "cases": {id: case}, "contacts", "errors": [String]}.
+## templates are the characters of rules.json `roster` as written. people is each of them
+## composed steady with every part normal: what no night changes (age, fee, request, models),
+## for the contact clues. cases is test night A composed (the night as it was written before
+## the signs were drawn), in the order rules.json `shift_order` lists it. Every case comes back
+## with its models resolved (resolve_parts).
 static func load_all(dir: String = DATA_DIR) -> Dictionary:
-	var out := {"rules": {}, "sheet": {}, "parts": {}, "cases": {}, "contacts": {}, "errors": []}
+	var out := {"rules": {}, "sheet": {}, "parts": {}, "templates": {}, "nights": {}, "people": {},
+		"cases": {}, "contacts": {}, "errors": []}
 	var errors: Array = out["errors"]
 	var rules: Variant = load_json(dir + "/rules.json")
 	if typeof(rules) != TYPE_DICTIONARY:
 		errors.append("rules.json is missing or is not valid JSON.")
 		return out
 	out["rules"] = rules
-	errors.append_array(validate_rules(rules))
 	var sheet: Variant = load_json(dir + "/sheet.json")
 	if typeof(sheet) != TYPE_DICTIONARY:
 		errors.append("sheet.json is missing or is not valid JSON.")
 	else:
 		out["sheet"] = sheet
 		errors.append_array(validate_sheet(sheet))
+	errors.append_array(validate_rules(rules, out["sheet"]))
 	var parts: Variant = load_json(dir + "/parts.json")
 	if typeof(parts) != TYPE_DICTIONARY:
 		errors.append("parts.json is missing or is not valid JSON.")
 	else:
 		out["parts"] = parts
 		errors.append_array(validate_parts(parts))
-	for id in rules.get("shift_order", []):
+	for id in roster_of(rules):
 		var path := "%s/cases/%s.json" % [dir, str(id)]
-		var c: Variant = load_json(path)
-		if typeof(c) != TYPE_DICTIONARY:
+		var t: Variant = load_json(path)
+		if typeof(t) != TYPE_DICTIONARY:
 			errors.append("cases/%s.json is missing or is not valid JSON." % str(id))
 			continue
-		for e in validate_case(c, rules, out["sheet"], out["parts"]):
+		for e in validate_template(t, rules, out["sheet"], out["parts"]):
 			errors.append("%s: %s" % [str(id), str(e)])
-		resolve_parts(c, out["parts"])
-		out["cases"][str(id)] = c
+		out["templates"][str(id)] = t
+		var person := compose(t, {"truth": "stable"})
+		if not person.is_empty():
+			resolve_parts(person, out["parts"])
+			out["people"][str(id)] = person
+	var nights: Variant = load_json(dir + "/nights.json")
+	if typeof(nights) != TYPE_DICTIONARY or typeof(nights.get("nights")) != TYPE_DICTIONARY:
+		errors.append("nights.json is missing, is not valid JSON or has no 'nights'.")
+	else:
+		out["nights"] = nights["nights"]
 	var contacts: Variant = load_json(dir + "/contacts.json")
 	if typeof(contacts) != TYPE_DICTIONARY:
 		errors.append("contacts.json is missing or is not valid JSON.")
 	else:
 		out["contacts"] = contacts
-		errors.append_array(validate_contacts(contacts, out["cases"], rules))
+		errors.append_array(validate_contacts(contacts, out["people"], rules))
+	errors.append_array(validate_nights(out["nights"], out["templates"], rules, out["sheet"], out["parts"],
+		out["people"], out["contacts"]))
+	var night_a: Variant = (out["nights"] as Dictionary).get("A")
+	if typeof(night_a) == TYPE_DICTIONARY:
+		out["cases"] = compose_night(out["templates"], night_a, out["parts"])
+		var order: Variant = rules.get("shift_order")
+		if typeof(order) == TYPE_ARRAY and night_order(night_a) != _strings(order):
+			errors.append("nights.json: night A must list rules.json shift_order, in that order.")
+	else:
+		errors.append("nights.json: night A (the night as written, for --authored-order) is missing.")
 	return out
 
 
-static func validate_rules(rules: Dictionary) -> Array:
+## The items of a list as strings.
+static func _strings(list: Array) -> Array:
+	var out: Array = []
+	for v in list:
+		out.append(str(v))
+	return out
+
+
+## Who can come in on a night: rules.json `roster`, or the authored `shift_order` when a rule
+## set has no roster.
+static func roster_of(rules: Dictionary) -> Array:
+	var r: Variant = rules.get("roster")
+	if typeof(r) == TYPE_ARRAY and not (r as Array).is_empty():
+		return (r as Array).duplicate()
+	return (rules.get("shift_order", []) as Array).duplicate()
+
+
+# ------------------------------------------------------------------ characters and nights
+# the tool that tests a row (speech and temper have none: a question, a push)
+const ROW_TOOL := {"eyes": "penlight", "hands": "grip", "port": "port"}
+
+
+## A dictionary inside `d` under `key`, made when it is missing or is not a dictionary.
+static func _dict(d: Dictionary, key: String) -> Dictionary:
+	if typeof(d.get(key)) != TYPE_DICTIONARY:
+		d[key] = {}
+	return d[key]
+
+
+## One sign of a template's row: {"sign": {...}, "ok": true for a normal one}, or {} when the row
+## has no sign with that id. An empty id is the row's first normal sign.
+static func find_sign(t: Dictionary, row: String, id: String = "") -> Dictionary:
+	var signs: Variant = t.get("signs")
+	if typeof(signs) != TYPE_DICTIONARY or typeof(signs.get(row)) != TYPE_DICTIONARY:
+		return {}
+	for kind in ["normal", "broken"]:
+		var list: Variant = signs[row].get(kind)
+		if typeof(list) != TYPE_ARRAY:
+			continue
+		for s in list:
+			if typeof(s) != TYPE_DICTIONARY:
+				continue
+			if str(s.get("id", "")) == id or (id == "" and kind == "normal"):
+				return {"sign": s, "ok": kind == "normal"}
+	return {}
+
+
+## The ids of one row's signs of one kind ("normal" or "broken"), in file order.
+static func sign_ids(t: Dictionary, row: String, kind: String) -> Array:
+	var out: Array = []
+	var signs: Variant = t.get("signs")
+	if typeof(signs) != TYPE_DICTIONARY or typeof(signs.get(row)) != TYPE_DICTIONARY:
+		return out
+	var list: Variant = signs[row].get(kind)
+	if typeof(list) == TYPE_ARRAY:
+		for s in list:
+			if typeof(s) == TYPE_DICTIONARY:
+				out.append(str(s.get("id", "")))
+	return out
+
+
+## The rows on which a broken sign of this character can be found whatever the patient says:
+## the eyes and the grip when insisting gets the test done, the port when it shows or insisting
+## gets it checked, and speech and temper always.
+static func reachable_rows(t: Dictionary) -> Array:
+	var checks: Dictionary = t.get("checks", {}) if typeof(t.get("checks")) == TYPE_DICTIONARY else {}
+	var covered := false
+	if typeof(t.get("port")) == TYPE_DICTIONARY:
+		covered = bool(t["port"].get("covered", false))
+	var out: Array = []
+	for row in ROWS:
+		if not ROW_TOOL.has(row):
+			out.append(row)
+			continue
+		var spec: Variant = checks.get(ROW_TOOL[row])
+		var insisted := typeof(spec) == TYPE_DICTIONARY and str(spec.get("insist", "")) == "comply"
+		if insisted or (row == "port" and not covered):
+			out.append(row)
+	return out
+
+
+## The case one night plays: the character's template with the night's truth and one sign per
+## row put in, in the shape the visit, the patient, the close-ups and the report read (a case of
+## version 2 had all of it written out). pick is {"truth": "stable" or "drifting",
+## "signs": {row: sign id}}; a row the pick leaves out takes its first normal sign. Returns {}
+## when the pick names a sign the template does not have. The case lists the signs it was made
+## with in "signs" ({row: id}), and a port sign with dark threads sets port.threads.
+static func compose(t: Dictionary, pick: Dictionary) -> Dictionary:
+	var truth := str(pick.get("truth", "stable"))
+	var drifting := truth == "drifting"
+	var chosen: Dictionary = pick.get("signs", {}) if typeof(pick.get("signs")) == TYPE_DICTIONARY else {}
+	var c: Dictionary = t.duplicate(true)
+	for key in ["signs", "outcomes", "press_end"]:
+		c.erase(key)
+	c["truth"] = truth
+	var looks := _dict(c, "looks")
+	var checks := _dict(c, "checks")
+	var lines := _dict(c, "lines")
+	var rows := {}
+	var used := {}
+	for row in ROWS:
+		var found := find_sign(t, row, str(chosen.get(row, "")))
+		if found.is_empty():
+			return {}
+		var sign: Dictionary = (found["sign"] as Dictionary).duplicate(true)
+		used[row] = str(sign.get("id", ""))
+		var evidence: Array = []
+		match row:
+			"eyes":
+				var eyes := _dict(c, "eyes")
+				var own: Dictionary = sign.get("eyes", {}) if typeof(sign.get("eyes")) == TYPE_DICTIONARY else {}
+				for side in EYE_SLOT.keys():
+					if typeof(own.get(side)) == TYPE_DICTIONARY:
+						_dict(eyes, side).merge(own[side], true)
+				evidence = ["check:penlight"]
+			"hands":
+				c["grip"] = sign.get("grip", {})
+				if sign.has("after"):
+					lines["after:grip"] = sign["after"]
+				evidence = ["check:grip"]
+			"port":
+				var port := _dict(c, "port")
+				if bool(sign.get("threads", false)):
+					port["threads"] = true
+				evidence = ["check:port"] if bool(port.get("covered", false)) else ["look:port", "check:port"]
+			"speech":
+				var answers: Dictionary = sign.get("answers", {}) if typeof(sign.get("answers")) == TYPE_DICTIONARY else {}
+				var asked: Array = []
+				for topic in c.get("topics", []):
+					if typeof(topic) != TYPE_DICTIONARY:
+						continue
+					var tid := str(topic.get("id", ""))
+					asked.append(tid)
+					var said: Dictionary = answers.get(tid, {}) if typeof(answers.get(tid)) == TYPE_DICTIONARY else {}
+					topic["a"] = str(said.get("a", ""))
+					topic["note"] = str(said.get("note", ""))
+				var told: Variant = sign.get("evidence")
+				if typeof(told) == TYPE_ARRAY and not (told as Array).is_empty():
+					asked = told as Array
+				for tid in asked:
+					evidence.append("ask:" + str(tid))
+			"temper":
+				var ends: Dictionary = t.get("press_end", {}) if typeof(t.get("press_end")) == TYPE_DICTIONARY else {}
+				var end := "attack" if drifting else "walkout"
+				c["press"] = [sign.get("press", {}), {"line": str(ends.get(end, "")), "end": end}]
+				c["flare"] = sign.get("flare", {})
+				evidence = ["press"]
+		if ROW_TOOL.has(row) and typeof(checks.get(ROW_TOOL[row])) == TYPE_DICTIONARY:
+			checks[ROW_TOOL[row]]["note"] = str(sign.get("note", ""))
+		if ZONES.has(row) and sign.has("look"):
+			looks[row] = str(sign["look"])
+		rows[row] = {"ok": bool(found["ok"]), "text": str(sign.get("text", "")), "evidence": evidence}
+	c["rows"] = rows
+	c["signs"] = used
+	if not drifting:
+		c["attack"] = {"on_refer": false, "telegraph": "", "line": ""}
+	var outcomes: Variant = t.get("outcomes")
+	c["outcomes"] = {}
+	if typeof(outcomes) == TYPE_DICTIONARY and typeof(outcomes.get(truth)) == TYPE_DICTIONARY:
+		c["outcomes"] = (outcomes[truth] as Dictionary).duplicate(true)
+	return c
+
+
+## A pick in a few words, for the error list: "steady" or "drifting: eyes dead, speech it".
+static func describe_pick(pick: Dictionary) -> String:
+	var signs: Dictionary = pick.get("signs", {}) if typeof(pick.get("signs")) == TYPE_DICTIONARY else {}
+	var parts_said: Array = []
+	for row in ROWS:
+		if signs.has(row):
+			parts_said.append("%s %s" % [row, str(signs[row])])
+	var head := "steady" if str(pick.get("truth", "")) == "stable" else str(pick.get("truth", ""))
+	return head if parts_said.is_empty() else "%s: %s" % [head, ", ".join(parts_said)]
+
+
+## Enough of the picks a night could make for one character to check every sign in its place:
+## steady with each normal sign, drifting with each set of broken rows a night may draw (at least
+## `threshold` of them on rows the doctor can reach, reachable_rows) and drifting with each
+## further broken sign.
+static func check_picks(t: Dictionary, threshold: int) -> Array:
+	var picks: Array = [{"truth": "stable", "signs": {}}]
+	for row in ROWS:
+		for id in sign_ids(t, row, "normal").slice(1):
+			picks.append({"truth": "stable", "signs": {row: id}})
+	var reach := reachable_rows(t)
+	for mask in range(1, 1 << ROWS.size()):
+		var signs := {}
+		var reached := 0
+		for i in ROWS.size():
+			if mask & (1 << i):
+				var ids := sign_ids(t, ROWS[i], "broken")
+				signs[ROWS[i]] = str(ids[0]) if not ids.is_empty() else ""
+				if reach.has(ROWS[i]):
+					reached += 1
+		if reached >= threshold:
+			picks.append({"truth": "drifting", "signs": signs})
+	for row in ROWS:
+		for id in sign_ids(t, row, "broken").slice(1):
+			var signs := {row: id}
+			var reached := 1 if reach.has(row) else 0
+			for other in reach:
+				if reached >= threshold:
+					break
+				var ids := sign_ids(t, str(other), "broken")
+				if str(other) == row or ids.is_empty():
+					continue
+				signs[str(other)] = str(ids[0])
+				reached += 1
+			picks.append({"truth": "drifting", "signs": signs})
+	return picks
+
+
+## A character file (version 3): what every night shares, then the picks of check_picks(),
+## each composed and checked as the case it would be (validate_case). An error found in several
+## picks is listed once, with the first pick it was found in.
+static func validate_template(t: Dictionary, rules: Dictionary, sheet: Dictionary = {}, parts: Dictionary = {}) -> Array:
+	var errors: Array = []
+	if int(t.get("version", 0)) != 3:
+		errors.append("version must be 3 (a character whose signs each night draws).")
+	if t.has("truth"):
+		errors.append("a character has no truth of its own: each night gives one.")
+	var signs: Variant = t.get("signs")
+	if typeof(signs) != TYPE_DICTIONARY:
+		errors.append("signs must give each sheet row its normal and broken signs.")
+		return errors
+	var covered := typeof(t.get("port")) == TYPE_DICTIONARY and bool(t["port"].get("covered", false))
+	for row in ROWS:
+		var spec: Variant = signs.get(row)
+		if typeof(spec) != TYPE_DICTIONARY:
+			errors.append("signs.%s is missing." % row)
+			continue
+		var seen: Array = []
+		for kind in ["normal", "broken"]:
+			var list: Variant = spec.get(kind)
+			if typeof(list) != TYPE_ARRAY or (list as Array).is_empty():
+				errors.append("signs.%s.%s must list at least one sign: any part can be fine or broken on a night." % [row, kind])
+				continue
+			for s in list:
+				var id := str(s.get("id", "")) if typeof(s) == TYPE_DICTIONARY else ""
+				if id == "":
+					errors.append("signs.%s.%s: every sign needs an id." % [row, kind])
+					continue
+				if seen.has(id):
+					errors.append("signs.%s: sign id '%s' is used twice." % [row, id])
+				seen.append(id)
+				if row == "port" and kind == "normal" and bool(s.get("threads", false)):
+					errors.append("signs.port.%s: a normal port has no dark threads." % id)
+				if row == "port" and covered and s.has("look"):
+					errors.append("signs.port.%s: the port is covered, so a glance cannot show it (no 'look')." % id)
+	var ends: Variant = t.get("press_end")
+	for end in ["walkout", "attack"]:
+		if typeof(ends) != TYPE_DICTIONARY or str(ends.get(end, "")) == "":
+			errors.append("press_end.%s is missing (the second push: a walkout when steady, an attack when drifting)." % end)
+	var outcomes: Variant = t.get("outcomes")
+	for truth in ["stable", "drifting"]:
+		if typeof(outcomes) != TYPE_DICTIONARY or typeof(outcomes.get(truth)) != TYPE_DICTIONARY:
+			errors.append("outcomes.%s is missing." % truth)
+	var attack: Variant = t.get("attack")
+	if typeof(attack) != TYPE_DICTIONARY or str(attack.get("telegraph", "")) == "" or str(attack.get("line", "")) == "":
+		errors.append("attack needs 'telegraph' and 'line': on a night this character drifts, they can turn.")
+	var threshold := maxi(1, int(sheet.get("threshold", 1)))
+	var reach := reachable_rows(t)
+	if reach.size() < threshold:
+		errors.append("only %d rows (%s) can be tested whatever the patient says; a drifting night needs %d." % [reach.size(), ", ".join(reach), threshold])
+	if not errors.is_empty():
+		return errors
+	var found := {}
+	for pick in check_picks(t, int(sheet.get("threshold", 1))):
+		var c := compose(t, pick)
+		if c.is_empty():
+			errors.append("the pick (%s) names a sign the file does not have." % describe_pick(pick))
+			continue
+		for e in validate_case(c, rules, sheet, parts):
+			if not found.has(e):
+				found[e] = true
+				errors.append("%s (%s)" % [str(e), describe_pick(pick)])
+	return errors
+
+
+## A night's cases in the order its visitors come: {id: case}, each composed and resolved.
+## night is {"visitors": [{"id", "truth", "signs"?}]} (nights.json or ShiftState.draw_night).
+static func compose_night(templates: Dictionary, night: Dictionary, parts: Dictionary) -> Dictionary:
+	var out := {}
+	for v in night.get("visitors", []):
+		if typeof(v) != TYPE_DICTIONARY or not templates.has(str(v.get("id", ""))):
+			continue
+		var c := compose(templates[str(v["id"])], {"truth": str(v.get("truth", "stable")), "signs": v.get("signs", {})})
+		if c.is_empty():
+			continue
+		resolve_parts(c, parts)
+		out[str(v["id"])] = c
+	return out
+
+
+## The ids of a night's visitors, in order.
+static func night_order(night: Dictionary) -> Array:
+	var out: Array = []
+	for v in night.get("visitors", []):
+		if typeof(v) == TYPE_DICTIONARY:
+			out.append(str(v.get("id", "")))
+	return out
+
+
+## The test nights of nights.json: each lists its visitors in order, each with a truth and, for
+## any row that should show a particular sign, that sign. Each visitor is composed and checked as
+## the case it would be, so a drifting one shows at least the house rule's count of broken lines
+## the doctor can reach and a steady one shows none. With rules.json `night` and the people of
+## the roster, each test night must also be one the draw could make on the first night of a
+## session (night_drawable): a test night is a night of the game, only not left to chance.
+static func validate_nights(nights: Dictionary, templates: Dictionary, rules: Dictionary, sheet: Dictionary = {},
+		parts: Dictionary = {}, people: Dictionary = {}, contacts: Dictionary = {}) -> Array:
+	var errors: Array = []
+	for night_name in nights.keys():
+		var where := "nights.json: night %s" % str(night_name)
+		var night: Variant = nights[night_name]
+		var visitors: Variant = night.get("visitors") if typeof(night) == TYPE_DICTIONARY else null
+		if typeof(visitors) != TYPE_ARRAY or (visitors as Array).is_empty():
+			errors.append(where + " must list its visitors.")
+			continue
+		var seen: Array = []
+		var composed := {}
+		var sound := true
+		for v in visitors:
+			var id := str(v.get("id", "")) if typeof(v) == TYPE_DICTIONARY else ""
+			if not templates.has(id):
+				errors.append("%s: visitor '%s' is not on the roster." % [where, id])
+				sound = false
+				continue
+			if seen.has(id):
+				errors.append("%s: %s comes twice." % [where, id])
+				sound = false
+			seen.append(id)
+			var truth := str(v.get("truth", ""))
+			if not (truth == "stable" or truth == "drifting"):
+				errors.append("%s: %s needs truth 'stable' or 'drifting'." % [where, id])
+				sound = false
+				continue
+			var pick := {"truth": truth, "signs": v.get("signs", {})}
+			var c := compose(templates[id], pick)
+			if c.is_empty():
+				errors.append("%s: %s names a sign its file does not have (%s)." % [where, id, describe_pick(pick)])
+				sound = false
+				continue
+			composed[id] = c
+			for e in validate_case(c, rules, sheet, parts):
+				errors.append("%s: %s: %s" % [where, id, str(e)])
+		if sound and not people.is_empty():
+			for e in night_drawable(rules, night, composed, people, contacts):
+				errors.append("%s: %s" % [where, str(e)])
+	return errors
+
+
+## Why the draw (ShiftState.draw_night) could not have made this night, or [] when it could:
+## rules.json night.visitors visitors; a number of them drifting that night.drifting gives a
+## weight; for each drifting one a number of broken rows that night.broken gives a weight; fees
+## inside fee_window; at least contacts.per_night visitors who can carry a fair contact
+## (fair_couriers); and on the first night of a session (first_of_session), with
+## first_opens_steady, a steady first visitor who can carry one, so the training visit can show
+## a code. cases is the night composed ({id: case}); people is CaseDB.people.
+static func night_drawable(rules: Dictionary, night: Dictionary, cases: Dictionary, people: Dictionary, contacts: Dictionary,
+		first_of_session: bool = true) -> Array:
+	var errors: Array = []
+	var spec: Variant = rules.get("night")
+	if typeof(spec) != TYPE_DICTIONARY:
+		return errors
+	var ids := night_order(night)
+	var want := int(spec.get("visitors", ids.size()))
+	if ids.size() != want:
+		errors.append("it has %d visitors, and rules.json night.visitors asks for %d." % [ids.size(), want])
+	var drifting: Array = []
+	for id in ids:
+		if typeof(cases.get(id)) == TYPE_DICTIONARY and str(cases[id].get("truth", "")) == "drifting":
+			drifting.append(id)
+	var counts: Variant = spec.get("drifting")
+	if typeof(counts) == TYPE_DICTIONARY and not (counts as Dictionary).has(str(drifting.size())):
+		errors.append("%d of its visitors drift; rules.json night.drifting never draws that many." % drifting.size())
+	var broken: Variant = spec.get("broken")
+	for id in drifting:
+		var n := broken_count(cases[id])
+		if typeof(broken) == TYPE_DICTIONARY and not (broken as Dictionary).has(str(n)):
+			errors.append("%s shows %d broken rows; rules.json night.broken never draws that many." % [id, n])
+	var couriers := fair_couriers(contacts, people, ids)
+	if first_of_session and bool(spec.get("first_opens_steady", false)) and not ids.is_empty():
+		var first := str(ids[0])
+		if drifting.has(first):
+			errors.append("its first visitor, %s, drifts; the first night of a session opens with a steady visitor." % first)
+		if not couriers.has(first):
+			errors.append("its first visitor, %s, has no fair contact entry tonight, so the training visit could not show a code." % first)
+	var window := fee_window(rules, ids.size())
+	var fees := fees_of(people, ids)
+	if not window.is_empty() and (fees < int(window[0]) or fees > int(window[1])):
+		errors.append("its visitors' fees add up to %d; rules.json night.fees_under_line asks for %d to %d." % [fees, int(window[0]), int(window[1])])
+	var per := 0
+	if typeof(rules.get("contacts")) == TYPE_DICTIONARY:
+		per = int(rules["contacts"].get("per_night", 0))
+	if couriers.size() < mini(per, ids.size()):
+		errors.append("only %d of its visitors can carry a fair contact; rules.json contacts.per_night asks for %d." % [couriers.size(), per])
+	return errors
+
+
+## How many sheet rows of a composed case show a broken sign.
+static func broken_count(c: Dictionary) -> int:
+	var n := 0
+	var rows: Variant = c.get("rows")
+	if typeof(rows) != TYPE_DICTIONARY:
+		return n
+	for row in ROWS:
+		var r: Variant = rows.get(row)
+		if typeof(r) == TYPE_DICTIONARY and not bool(r.get("ok", true)):
+			n += 1
+	return n
+
+
+## What a night's fees must add up to under rules.json night.fees_under_line, as [low, high]:
+## less than the line (line.per_hour for each visitor), and no less than the line less one drop
+## (contacts.pay). So right calls alone never hold the line, and one drop can. [] when the rule
+## is off.
+static func fee_window(rules: Dictionary, visitors: int) -> Array:
+	var spec: Variant = rules.get("night")
+	if typeof(spec) != TYPE_DICTIONARY or not bool(spec.get("fees_under_line", false)):
+		return []
+	var line := 0
+	if typeof(rules.get("line")) == TYPE_DICTIONARY:
+		line = int(rules["line"].get("per_hour", 0)) * visitors
+	var pay := 0
+	if typeof(rules.get("contacts")) == TYPE_DICTIONARY:
+		pay = int(rules["contacts"].get("pay", 0))
+	return [line - pay, line - 1]
+
+
+## Whether these visitors' fees fall inside fee_window (always, when the rule is off).
+static func fees_fit(rules: Dictionary, people: Dictionary, ids: Array) -> bool:
+	var window := fee_window(rules, ids.size())
+	if window.is_empty():
+		return true
+	var fees := fees_of(people, ids)
+	return fees >= int(window[0]) and fees <= int(window[1])
+
+
+## What these visitors' fees add up to. people is CaseDB.people (or any {id: case}).
+static func fees_of(people: Dictionary, ids: Array) -> int:
+	var fees := 0
+	for id in ids:
+		var p: Variant = people.get(str(id))
+		if typeof(p) == TYPE_DICTIONARY:
+			fees += int(p.get("fee", 0))
+	return fees
+
+
+## What the test nights leave unseen: a character never steady or never drifting, or a sign
+## never shown. The rule checks ask for nothing unseen, so every character's every look, and
+## every attack, comes up on some test night.
+static func night_coverage(nights: Dictionary, templates: Dictionary) -> Array:
+	var seen := {}
+	for night in nights.values():
+		if typeof(night) != TYPE_DICTIONARY:
+			continue
+		for v in night.get("visitors", []):
+			var id := str(v.get("id", "")) if typeof(v) == TYPE_DICTIONARY else ""
+			if not templates.has(id):
+				continue
+			var c := compose(templates[id], {"truth": str(v.get("truth", "")), "signs": v.get("signs", {})})
+			if c.is_empty():
+				continue
+			seen["%s:%s" % [id, str(c["truth"])]] = true
+			for row in ROWS:
+				seen["%s:%s:%s" % [id, row, str(c["signs"].get(row, ""))]] = true
+	var missing: Array = []
+	for id in templates.keys():
+		for truth in ["stable", "drifting"]:
+			if not seen.has("%s:%s" % [str(id), truth]):
+				missing.append("%s is never %s" % [str(id), "steady" if truth == "stable" else truth])
+		for row in ROWS:
+			for kind in ["normal", "broken"]:
+				for sid in sign_ids(templates[id], row, kind):
+					if not seen.has("%s:%s:%s" % [str(id), row, str(sid)]):
+						missing.append("%s's %s sign '%s' is never shown" % [str(id), row, str(sid)])
+	return missing
+
+
+## rules.json. sheet (sheet.json) gives the house rule's threshold, the fewest broken rows a
+## drifting visitor may be drawn with.
+static func validate_rules(rules: Dictionary, sheet: Dictionary = {}) -> Array:
 	var errors: Array = []
 	var order: Variant = rules.get("shift_order")
 	if typeof(order) != TYPE_ARRAY or (order as Array).is_empty():
 		errors.append("rules.json: shift_order must list at least one case id.")
+	var roster: Variant = rules.get("roster")
+	if rules.has("roster") and (typeof(roster) != TYPE_ARRAY or (roster as Array).is_empty()):
+		errors.append("rules.json: roster must list at least one character id.")
+	if rules.has("night"):
+		errors.append_array(_validate_night(rules, maxi(1, int(sheet.get("threshold", 1)))))
 	# the grip limit is no longer a rule: each hands model has its own (parts.json limit_ms)
 	for group in ["costs", "reassure", "attack", "scoring", "line", "patience"]:
 		if typeof(rules.get(group)) != TYPE_DICTIONARY:
@@ -103,6 +620,37 @@ static func validate_rules(rules: Dictionary) -> Array:
 					errors.append("rules.json: contacts.%s must be 0 or more." % key)
 			if int(contacts.get("per_night", 0)) > 2:
 				errors.append("rules.json: contacts.per_night is at most 2 (the list paper has room for two).")
+	return errors
+
+
+## rules.json `night`, how a night is drawn (ShiftState.draw_night): a number of visitors the
+## roster can fill; for how many of them drift and how many rows a drifting one shows broken,
+## each number with a positive weight. A drifting visitor shows at least `threshold` broken rows
+## (the house rule), at most one per row, and with first_opens_steady one visitor is left to
+## open the night steady.
+static func _validate_night(rules: Dictionary, threshold: int) -> Array:
+	var errors: Array = []
+	var spec: Variant = rules["night"]
+	if typeof(spec) != TYPE_DICTIONARY:
+		return ["rules.json: 'night' must be an object."]
+	var visitors := int(spec.get("visitors", 0))
+	var size := roster_of(rules).size()
+	if visitors < 1 or visitors > size:
+		errors.append("rules.json: night.visitors must be from 1 to the size of the roster (%d)." % size)
+	var steady_first := bool(spec.get("first_opens_steady", false))
+	for key in ["drifting", "broken"]:
+		var w: Variant = spec.get(key)
+		if typeof(w) != TYPE_DICTIONARY or (w as Dictionary).is_empty():
+			errors.append("rules.json: night.%s must give at least one number and its weight." % key)
+			continue
+		var lo := threshold if key == "broken" else 0
+		var hi := ROWS.size() if key == "broken" else visitors - (1 if steady_first else 0)
+		for count in (w as Dictionary).keys():
+			var n := int(str(count)) if str(count).is_valid_int() else -1
+			if n < lo or n > hi or float(w[count]) <= 0.0:
+				errors.append("rules.json: night.%s: '%s' must be a number from %d to %d with a positive weight." % [key, str(count), lo, hi])
+	if int(spec.get("tries", 0)) < 1:
+		errors.append("rules.json: night.tries must be at least 1.")
 	return errors
 
 
@@ -527,7 +1075,7 @@ static func validate_case(c: Dictionary, rules: Dictionary, sheet: Dictionary = 
 	# sheet rows: the fixed truth
 	var rows: Dictionary = c.get("rows", {}) if typeof(c.get("rows")) == TYPE_DICTIONARY else {}
 	var broken := 0
-	var broken_reachable := false
+	var broken_reachable := 0
 	for row in ROWS:
 		var spec: Variant = rows.get(row)
 		if typeof(spec) != TYPE_DICTIONARY:
@@ -560,7 +1108,7 @@ static func validate_case(c: Dictionary, rules: Dictionary, sheet: Dictionary = 
 		if not ok:
 			broken += 1
 			if reachable:
-				broken_reachable = true
+				broken_reachable += 1
 	if drifting and broken == 0:
 		errors.append("a drifting patient needs at least one broken sheet line.")
 	var threshold := int(sheet.get("threshold", 1))
@@ -568,8 +1116,11 @@ static func validate_case(c: Dictionary, rules: Dictionary, sheet: Dictionary = 
 		errors.append("a drifting patient needs at least %d broken sheet lines (sheet.json threshold)." % threshold)
 	if not drifting and broken > 0:
 		errors.append("a stable patient must have no broken sheet line.")
-	if drifting and broken > 0 and not broken_reachable:
+	if drifting and broken > 0 and broken_reachable == 0:
 		errors.append("at least one broken line must be impossible to refuse for good.")
+	elif drifting and broken >= threshold and broken_reachable < threshold:
+		# the house rule must be reachable: a doctor who does everything can find enough lines
+		errors.append("only %d broken lines can be found whatever the patient says; the house rule asks for %d." % [broken_reachable, threshold])
 	if rows.has("eyes") and bool(rows["eyes"].get("ok", true)) != eyes_ok:
 		errors.append("rows.eyes.ok does not match the eye data.")
 	if rows.has("hands") and release > 0 and limit > 0 and bool(rows["hands"].get("ok", true)) != (release <= limit):
@@ -642,8 +1193,10 @@ static func clue_matches(clue: Dictionary, cases: Dictionary) -> Array:
 	return out
 
 
-## The contact list must be fair: a clue alone never points at one visitor, the two clues of an
-## entry together point at exactly its own, and no two entries share an alias or a code line.
+## The contact list as written: every clue fits at least two people of the roster, every entry's
+## two clues both fit its own courier, and no two entries share an alias or a code line. Whether
+## an entry is fair on a night depends on who else comes in, so each night keeps only the fair
+## ones (fair_contacts). `cases` is CaseDB.people (or any {id: case}).
 static func validate_contacts(contacts: Dictionary, cases: Dictionary, rules: Dictionary) -> Array:
 	var errors: Array = []
 	var clues: Variant = contacts.get("clues")
@@ -704,26 +1257,65 @@ static func validate_contacts(contacts: Dictionary, cases: Dictionary, rules: Di
 		if typeof(used) != TYPE_ARRAY or (used as Array).size() != 2:
 			errors.append("contacts.json: entry '%s' must give exactly two clues." % id)
 			continue
-		var fits: Array = []
-		for k in cases.keys():
-			fits.append(str(k))
-		var known := true
 		for cl in used:
 			if not (clues as Dictionary).has(str(cl)):
 				errors.append("contacts.json: entry '%s' uses unknown clue '%s'." % [id, str(cl)])
-				known = false
-				continue
-			var matched := clue_matches(clues[str(cl)], cases)
-			var kept: Array = []
-			for f in fits:
-				if matched.has(str(f)):
-					kept.append(str(f))
-			fits = kept
-		if known and not cases.is_empty() and (fits.size() != 1 or str(fits[0]) != case_id):
-			errors.append("contacts.json: entry '%s' clues fit %s, not just '%s'." % [id, str(fits), case_id])
+			elif cases.has(case_id) and not clue_fits(clues[str(cl)], cases[case_id]):
+				errors.append("contacts.json: entry '%s' clue '%s' does not fit its own courier '%s'." % [id, str(cl), case_id])
 	var per_night := 0
 	if typeof(rules.get("contacts")) == TYPE_DICTIONARY:
 		per_night = int(rules["contacts"].get("per_night", 0))
 	if per_night > couriers.size():
 		errors.append("contacts.json: the rules ask for %d contacts a night but only %d visitors can be one." % [per_night, couriers.size()])
 	return errors
+
+
+## The pool entries that are fair tonight, in list order: the courier comes in tonight (`ids`),
+## each clue fits at least two of tonight's visitors, so alone it gives nobody away, and the two
+## together fit the courier and nobody else who comes in. `people` is CaseDB.people.
+static func fair_contacts(contacts: Dictionary, people: Dictionary, ids: Array) -> Array:
+	var out: Array = []
+	var clues: Variant = contacts.get("clues")
+	var pool: Variant = contacts.get("pool")
+	if typeof(clues) != TYPE_DICTIONARY or typeof(pool) != TYPE_ARRAY:
+		return out
+	var tonight := {}
+	for id in ids:
+		if people.has(str(id)):
+			tonight[str(id)] = people[str(id)]
+	for e in pool:
+		if typeof(e) != TYPE_DICTIONARY or not tonight.has(str(e.get("case", ""))):
+			continue
+		var used: Variant = e.get("clues")
+		if typeof(used) != TYPE_ARRAY or (used as Array).size() != 2:
+			continue
+		var fits: Array = tonight.keys()
+		var fair := true
+		for cl in used:
+			if not (clues as Dictionary).has(str(cl)):
+				fair = false
+				break
+			var matched := clue_matches(clues[str(cl)], tonight)
+			if matched.size() < 2:
+				fair = false
+				break
+			var kept: Array = []
+			for f in fits:
+				if matched.has(str(f)):
+					kept.append(str(f))
+			fits = kept
+		if fair and fits.size() == 1 and str(fits[0]) == str(e["case"]):
+			out.append(e)
+	return out
+
+
+## Tonight's visitors who can carry a fair contact (fair_contacts), in the order they come.
+static func fair_couriers(contacts: Dictionary, people: Dictionary, ids: Array) -> Array:
+	var have := {}
+	for e in fair_contacts(contacts, people, ids):
+		have[str((e as Dictionary).get("case", ""))] = true
+	var out: Array = []
+	for id in ids:
+		if have.has(str(id)):
+			out.append(str(id))
+	return out

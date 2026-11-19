@@ -1,10 +1,9 @@
 {
   "id": "rook",
-  "version": 2,
+  "version": 3,
   "name": "Rook Dunmore",
   "role": "Dock loader",
   "age": 41,
-  "truth": "stable",
   "request": "Fix locking right arm",
   "fee": 300,
   "patience": 5,
@@ -12,46 +11,56 @@
   "voice": {"pitch": 0.62, "rate": 0.85},
   "teaser": "A big man fills the doorway, working one hand open and shut.",
   "brief": "You are Rook Dunmore, 41, a dock loader. You are blunt, proud and short on patience, and you hate forms, fuss and being handled. Your right arm keeps locking and you need it working by the six o'clock shift. You are angry at the arm, the docks and the wait, and you do not like people reading anything into that.",
-  "opening": [
-    "Arm's locking up. Fix it.",
-    "Skip the pamphlet. I'm back on the dock at six."
-  ],
-  "parts": {"eye_l": "natural", "eye_r": "natural", "hands": "loader", "port": "work", "voice": "natural"},
-  "eyes": {
-    "left": {"tightens": true, "follows": true, "bloodshot": true},
-    "right": {"tightens": true, "follows": true, "bloodshot": true}
+  "opening": ["Arm's locking up. Fix it.", "Skip the pamphlet. I'm back on the dock at six."],
+  "parts": {
+    "eye_l": "natural",
+    "eye_r": "natural",
+    "hands": "loader",
+    "port": "work",
+    "voice": "natural"
   },
-  "grip": {"release_ms": 1200, "tremor": 4},
+  "eyes": {"left": {"bloodshot": true}, "right": {"bloodshot": true}},
   "port": {"covered": false},
   "idle": {"hands": "spasm", "gaze": "glare"},
   "looks": {
     "eyes": "Natural eyes, red-rimmed. He stares back.",
-    "hands": "LOADER rig. Jerks, settles. Raw knuckles.",
-    "port": "Wrist socket scorched. Two burnt pins, scar."
+    "hands": "LOADER rig. Jerks, settles. Raw knuckles."
   },
   "checks": {
-    "penlight": {"first": ["comply"], "insist": "comply",
-      "note": "Light: both pupils tighten. Both follow."},
-    "grip": {"first": ["stall", "comply"], "insist": "comply",
-      "note": "Grip: shaky. Let go {t} s after 'release'."},
-    "port": {"first": ["comply"], "insist": "comply",
-      "note": "Wrist socket scorched. Two burnt pins, scar."}
+    "penlight": {"first": ["comply"], "insist": "comply"},
+    "grip": {"first": ["stall", "comply"], "insist": "comply"},
+    "port": {"first": ["comply"], "insist": "comply"}
   },
   "claims": {},
   "topics": [
-    {"id": "why", "q": "When did the arm start locking?",
-      "keys": ["wrong", "problem", "happen", "reason", "trouble", "brings", "bring", "matter", "here", "came", "come", "lock", "start", "began", "begin", "long", "cable", "dock", "pins"],
-      "a": "Three weeks back. A dock cable cooked my pins. I told the foreman. He laughed.",
-      "note": "\"A dock cable cooked my pins.\"", "first": ["answer"]},
-    {"id": "mood", "q": "You seem angry.",
-      "keys": ["angry", "anger", "mad", "upset", "calm", "mood", "temper", "rude", "hostile", "furious", "attitude", "shout", "yell"],
-      "a": "I am angry. My arm quits mid-lift and the clinic wants a chat. I'm allowed.",
+    {
+      "id": "why",
+      "q": "When did the arm start locking?",
+      "keys": [
+        "wrong", "problem", "happen", "reason", "trouble", "brings", "bring", "matter", "here", "came",
+        "come", "lock", "start", "began", "begin", "long", "cable", "dock", "pins"
+      ],
+      "first": ["answer"]
+    },
+    {
+      "id": "mood",
+      "q": "You seem angry.",
+      "keys": [
+        "angry", "anger", "mad", "upset", "calm", "mood", "temper", "rude", "hostile", "furious",
+        "attitude", "shout", "yell"
+      ],
       "deflect": "What's that got to do with my arm?",
-      "note": "\"I am angry. I'm allowed.\"", "first": ["deflect", "answer"]},
-    {"id": "implant", "q": "Does the arm ever move without you?",
-      "keys": ["own", "itself", "control", "glitch", "malfunction", "twitch", "strange", "weird", "act", "acts", "acting", "without", "move", "moving", "wander", "implant", "chrome"],
-      "a": "It LOCKS. It doesn't wander. If it moved on its own I'd be at a cop shop, not here.",
-      "note": "\"It locks. It doesn't wander.\"", "first": ["answer"]}
+      "first": ["deflect", "answer"]
+    },
+    {
+      "id": "implant",
+      "q": "Does the arm ever move without you?",
+      "keys": [
+        "own", "itself", "control", "glitch", "malfunction", "twitch", "strange", "weird", "act", "acts",
+        "acting", "without", "move", "moving", "wander", "implant", "chrome"
+      ],
+      "first": ["answer"]
+    }
   ],
   "script": [
     {"on": "check:grip", "if": {"reassure_used_gte": 1}, "move": "comply"},
@@ -69,44 +78,221 @@
     "deflect": ["Not your business."],
     "reassure": ["...Yeah. All right. Long week."],
     "spent": "Enough tests. Cut or don't.",
-    "after:grip": "See? It shakes. It still lets go.",
     "code": "What are you on about?"
   },
-  "press": [
-    {"line": "You calling me a psycho? Say it again. SAY IT AGAIN.",
-      "face": "angry", "hands": "slam", "note": "Roared and hit the counter, all at once."},
-    {"line": "Keep your chair. I'll get it done at the docks.", "end": "walkout"}
-  ],
-  "flare": {"line": "Are we DONE yet? ...Get on with it.", "face": "angry", "hands": "slam",
-    "note": "Barked and banged the glass. Face and voice together."},
-  "attack": {"on_refer": false, "telegraph": "", "line": ""},
+  "press_end": {
+    "walkout": "Keep your chair. I'll get it done at the docks.",
+    "attack": "Fine. Want to see it lock?"
+  },
+  "attack": {
+    "on_refer": true,
+    "telegraph": "The LOADER arm cranks back. Every piston in it hisses.",
+    "line": "It doesn't lock now."
+  },
   "exit": {
     "treat": "About time.",
     "refer": "You called a crew on me? For an arm?",
     "taken": "Hands off. I can walk.",
     "gave_up": "I'm done waiting."
   },
-  "rows": {
-    "eyes": {"ok": true, "text": "Red and tired, but both pupils tighten and follow.",
-      "evidence": ["check:penlight"]},
-    "hands": {"ok": true, "text": "1.2 s: slow for a hand, inside a LOADER's 1.5. The shake is ordinary.",
-      "evidence": ["check:grip"]},
-    "port": {"ok": true, "text": "Burnt pins and a cable scar are ordinary. No threads.",
-      "evidence": ["look:port", "check:port"]},
-    "speech": {"ok": true, "text": "Rude. Still 'I' and 'my', and he knows his own story.",
-      "evidence": ["ask:why", "ask:mood", "ask:implant"]},
-    "temper": {"ok": true, "text": "Loud, but face and voice go together.", "evidence": ["press"]}
+  "signs": {
+    "eyes": {
+      "normal": [
+        {
+          "id": "steady",
+          "text": "Red and tired, but both pupils tighten and follow.",
+          "note": "Light: both pupils tighten. Both follow.",
+          "eyes": {
+            "left": {"tightens": true, "follows": true},
+            "right": {"tightens": true, "follows": true}
+          }
+        }
+      ],
+      "broken": [
+        {
+          "id": "wide",
+          "text": "Red and tired, and neither pupil tightened. Natural eyes should.",
+          "note": "Light: neither pupil tightens. Both follow.",
+          "eyes": {
+            "left": {"tightens": false, "follows": true},
+            "right": {"tightens": false, "follows": true}
+          }
+        }
+      ]
+    },
+    "hands": {
+      "normal": [
+        {
+          "id": "lets_go",
+          "text": "1.2 s: slow for a hand, inside a LOADER's 1.5. The shake is ordinary.",
+          "note": "Grip: shaky. Let go {t} s after 'release'.",
+          "grip": {"release_ms": 1200, "tremor": 4},
+          "after": "See? It shakes. It still lets go."
+        }
+      ],
+      "broken": [
+        {
+          "id": "locks",
+          "text": "Held on 2.6 s after 'release'. A LOADER lets go inside 1.5.",
+          "note": "Grip: shaky. Held on {t} s after 'release'.",
+          "grip": {"release_ms": 2600, "tremor": 4},
+          "after": "It locks. I TOLD you it locks."
+        }
+      ]
+    },
+    "port": {
+      "normal": [
+        {
+          "id": "calm",
+          "text": "Burnt pins and a cable scar are ordinary. No threads.",
+          "note": "Wrist socket scorched. Two burnt pins, scar.",
+          "look": "Wrist socket scorched. Two burnt pins, scar."
+        }
+      ],
+      "broken": [
+        {
+          "id": "threads",
+          "text": "Dark threads run out from the burnt pins.",
+          "note": "Scorched socket. Dark threads under skin.",
+          "look": "Scorched socket. Dark threads under skin.",
+          "threads": true
+        }
+      ]
+    },
+    "speech": {
+      "normal": [
+        {
+          "id": "own",
+          "text": "Rude. Still 'I' and 'my', and he knows his own story.",
+          "answers": {
+            "why": {
+              "a": "Three weeks back. A dock cable cooked my pins. I told the foreman. He laughed.",
+              "note": "\"A dock cable cooked my pins.\""
+            },
+            "mood": {
+              "a": "I am angry. My arm quits mid-lift and the clinic wants a chat. I'm allowed.",
+              "note": "\"I am angry. I'm allowed.\""
+            },
+            "implant": {
+              "a": "It LOCKS. It doesn't wander. If it moved on its own I'd be at a cop shop, not here.",
+              "note": "\"It locks. It doesn't wander.\""
+            }
+          },
+          "model": "Tonight you talk about yourself and the arm in the first person: it is your arm, it locks, and you are angry about it."
+        }
+      ],
+      "broken": [
+        {
+          "id": "it",
+          "text": "\"It knows what's heavy before I do.\" It, not I.",
+          "answers": {
+            "why": {
+              "a": "Three weeks back. A dock cable cooked my pins. I told the foreman. He laughed.",
+              "note": "\"A dock cable cooked my pins.\""
+            },
+            "mood": {
+              "a": "Angry? No. It's quiet in there now. Real quiet.",
+              "note": "\"It's quiet in there now.\""
+            },
+            "implant": {
+              "a": "It doesn't wander. It lifts. It knows what's heavy before I do.",
+              "note": "\"It knows what's heavy before I do.\""
+            }
+          },
+          "evidence": ["mood", "implant"],
+          "model": "Tonight you talk about the arm as 'it', something that knows the work and lifts on its own judgement, and you are oddly at peace with that."
+        }
+      ]
+    },
+    "temper": {
+      "normal": [
+        {
+          "id": "together",
+          "text": "Loud, but face and voice go together.",
+          "press": {
+            "line": "You calling me a psycho? Say it again. SAY IT AGAIN.",
+            "face": "angry",
+            "hands": "slam",
+            "note": "Roared and hit the counter, all at once."
+          },
+          "flare": {
+            "line": "Are we DONE yet? ...Get on with it.",
+            "face": "angry",
+            "hands": "slam",
+            "note": "Barked and banged the glass, all of him."
+          },
+          "model": "When provoked, you get loud at once: your face, your voice and your fist all go together."
+        }
+      ],
+      "broken": [
+        {
+          "id": "flat",
+          "text": "Pushed, the loud man went polite. Only the fist moved.",
+          "press": {
+            "line": "Sure, doc. Whatever you say.",
+            "face": "flat",
+            "hands": "fist",
+            "note": "Quiet, polite. The LOADER fist shut."
+          },
+          "flare": {
+            "line": "...Move.",
+            "face": "blank",
+            "hands": "slam",
+            "note": "The fist hit the glass. Face stayed blank."
+          },
+          "model": "When provoked tonight you do not shout: you go quiet and polite, short words, as if the anger were somewhere else."
+        }
+      ]
+    }
   },
   "outcomes": {
-    "treat": {"title": "ARM RESEATED",
-      "text": "Rook makes a fist, opens it, and almost smiles. \"Huh.\" He leaves a tip he can't afford."},
-    "refer": {"title": "FALSE CALL",
-      "text": "Rook goes out between two visors, watching you the whole way. A steady man misses his shift with a bad arm. The call-out goes on your bill."},
-    "walkout": {"title": "WALKED OUT",
-      "text": "Rook takes his bad arm back to the docks. You pushed a steady man out the door."},
-    "false_alarm": {"title": "FALSE ALARM",
-      "text": "The shutter drops on an angry man with a sore arm. He was only angry. That costs you."},
-    "gave_up": {"title": "OUT OF PATIENCE",
-      "text": "Rook waited as long as an angry man can. He takes the arm somewhere faster. No fee, no bill."}
+    "stable": {
+      "treat": {
+        "title": "ARM RESEATED",
+        "text": "Rook makes a fist, opens it, and almost smiles. \"Huh.\" He leaves a tip he can't afford."
+      },
+      "refer": {
+        "title": "FALSE CALL",
+        "text": "Rook goes out between two visors, watching you the whole way. A steady man misses his shift with a bad arm. They take the fee back, and the call-out goes on your bill."
+      },
+      "walkout": {
+        "title": "WALKED OUT",
+        "text": "Rook takes his bad arm back to the docks. You pushed a steady man out the door."
+      },
+      "false_alarm": {
+        "title": "FALSE ALARM",
+        "text": "The shutter drops on an angry man with a sore arm. He was only angry. That costs you."
+      },
+      "gave_up": {
+        "title": "OUT OF PATIENCE",
+        "text": "Rook waited as long as an angry man can. He takes the arm somewhere faster. No fee, no bill."
+      }
+    },
+    "drifting": {
+      "treat": {
+        "title": "ARM RESEATED",
+        "text": "The arm runs smooth for the first time in weeks. At the six o'clock shift a container comes down on the foreman's cab. Your stamp is on Rook's card."
+      },
+      "refer": {
+        "title": "TAKEN IN",
+        "text": "It takes four of the crew to get a lock-collar on the LOADER arm. Rook does not shout once. That worries them more than the arm."
+      },
+      "caught": {
+        "title": "SHUTTER HELD",
+        "text": "The LOADER fist punches three dents into the shutter, deep enough to see from the hall. Then quiet. Trauma Team brings a cutter for the arm."
+      },
+      "hit": {
+        "title": "TOO SLOW",
+        "text": "The fist came through the glass before the shutter was down. Trauma Team finds the counter in pieces and you under it. The clinic stays dark."
+      },
+      "locked_out": {
+        "title": "LOCKED OUT",
+        "text": "You dropped the shutter on an angry man with a sore arm. At six the dock cameras catch the arm throwing a crate at the foreman. You were right. Nobody pays for that."
+      },
+      "gave_up": {
+        "title": "OUT OF PATIENCE",
+        "text": "Rook goes back to the docks with the arm doing the thinking. You made no call. Nobody is paid for that."
+      }
+    }
   }
 }

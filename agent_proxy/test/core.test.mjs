@@ -6,7 +6,7 @@ import { loadGameData, startServer } from "../src/dev_server.mjs";
 const { cases, rules } = loadGameData();
 let serial = 0;
 const state = () => ({patience:6, patience_max:6, granted:[], refusals:{}, reassured:[], claims:[], asked:{}, press_count:0, reassure_used:0, history:[]});
-const body = (kind="ask", id="why", text="What happened?") => ({protocol:PROTOCOL, session_id:"test-session", visit_id:"test-visit-"+(++serial), case_id:"kip", case_version:2, event:{type:kind,id,text}, state:state(), conversation_history:[], limits:{max_line_chars:110}});
+const body = (kind="ask", id="why", text="What happened?") => ({protocol:PROTOCOL, session_id:"test-session", visit_id:"test-visit-"+(++serial), case_id:"kip", case_version:3, event:{type:kind,id,text}, state:state(), conversation_history:[], limits:{max_line_chars:110}});
 const novel = {reply:"I missed a delivery to be here. Can we work something out?", reaction:"Slides a battered dispatch badge onto the counter.", cooperates:false};
 const fixture = (answer=novel) => ({name:"fixture",model:"fixture",async generate(){return {text:JSON.stringify(answer),mock:true};}});
 function handler(provider=fixture(),limits={}) {
@@ -81,7 +81,7 @@ test("prompt uses character facts and verbatim history with no answer bank or en
  const b=body();b.conversation_history=[{role:"doctor",text:"I can call your dispatcher."},{role:"patient",text:"Please don't; I need this job."}];
  const req=validateRequest(b,cases).req;const p=buildPrompt(cases.kip,rules,req,110);
  assert.ok(p.system.includes("bicycle fall")); assert.ok(p.user.includes("Please don't"));
- assert.ok(!p.system.includes(cases.kip.topics[0].a)); assert.ok(!p.user.includes("legal_moves"));
+ assert.ok(!p.system.includes(cases.kip.signs.speech.normal[0].answers.why.a)); assert.ok(!p.user.includes("legal_moves"));
  assert.ok(!JSON.stringify(p.schema).includes('"enum"')); assert.deepEqual(p.schema.required,["reply","reaction"]);
 });
 test("speech mentioning symptoms, instrument readings or markup is not semantically blocked",()=>{

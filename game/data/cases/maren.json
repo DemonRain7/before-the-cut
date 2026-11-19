@@ -1,10 +1,9 @@
 {
   "id": "maren",
-  "version": 2,
+  "version": 3,
   "name": "Maren Holt",
   "role": "Night-shift welder",
   "age": 54,
-  "truth": "drifting",
   "request": "Tune welding-arm servos",
   "fee": 400,
   "patience": 6,
@@ -17,11 +16,7 @@
     "My hands keep working after I stop. I thought a tune-up might settle them."
   ],
   "parts": {"eye_l": "natural", "eye_r": "natural", "hands": "seam", "port": "work", "voice": "natural"},
-  "eyes": {
-    "left": {"tightens": false, "follows": true},
-    "right": {"tightens": true, "follows": true}
-  },
-  "grip": {"release_ms": 1700, "tremor": 0},
+  "eyes": {"left": {}, "right": {}},
   "port": {"covered": true},
   "idle": {"hands": "work", "gaze": "soft"},
   "looks": {
@@ -30,32 +25,42 @@
     "port": "Glove cuff covers the wrist. Port not visible."
   },
   "checks": {
-    "penlight": {"first": ["comply"], "insist": "comply",
-      "note": "Light: R tightens, L stays wide. Both follow."},
-    "grip": {"first": ["comply"], "insist": "comply",
-      "note": "Grip: held on {t} s after 'release'."},
-    "port": {"first": ["comply"], "insist": "comply",
-      "note": "Wrist socket: calm skin, an old weld burn."}
+    "penlight": {"first": ["comply"], "insist": "comply"},
+    "grip": {"first": ["comply"], "insist": "comply"},
+    "port": {"first": ["comply"], "insist": "comply"}
   },
   "claims": {},
   "topics": [
-    {"id": "why", "q": "What do you mean, keep working?",
-      "keys": ["wrong", "problem", "happen", "reason", "trouble", "brings", "bring", "matter", "here", "came", "come", "working", "work", "mean", "hands", "weld", "servo", "tune", "stop", "keep"],
-      "a": "The hands finish jobs I don't remember starting. Good welds, too. Better than mine.",
-      "note": "\"The hands finish jobs I don't remember.\"", "first": ["answer"]},
-    {"id": "sleep", "q": "How are you sleeping?",
-      "keys": ["sleep", "slept", "rest", "tired", "awake", "night", "bed", "dream", "insomnia", "exhaust", "nap"],
-      "a": "I wake up at the bench with the torch warm. I don't remember getting up.",
-      "note": "\"I wake up at the bench, torch warm.\"", "first": ["answer"]},
-    {"id": "fear", "q": "Do the hands ever frighten you?",
-      "keys": ["frighten", "afraid", "scare", "scared", "fear", "worry", "worried", "terrif", "nervous", "trust", "hands"],
-      "a": "A little. They know the work. I don't always know what they've decided.",
+    {
+      "id": "why",
+      "q": "What do you mean, keep working?",
+      "keys": [
+        "wrong", "problem", "happen", "reason", "trouble", "brings", "bring", "matter", "here", "came",
+        "come", "working", "work", "mean", "hands", "weld", "servo", "tune", "stop", "keep"
+      ],
+      "first": ["answer"]
+    },
+    {
+      "id": "sleep",
+      "q": "How are you sleeping?",
+      "keys": [
+        "sleep", "slept", "rest", "tired", "awake", "night", "bed", "dream", "insomnia", "exhaust",
+        "nap"
+      ],
+      "first": ["answer"]
+    },
+    {
+      "id": "fear",
+      "q": "Do the hands ever frighten you?",
+      "keys": [
+        "frighten", "afraid", "scare", "scared", "fear", "worry", "worried", "terrif", "nervous",
+        "trust", "hands"
+      ],
       "deflect": "Oh, I don't like to complain.",
-      "note": "\"They know the work.\"", "first": ["deflect", "answer"]}
+      "first": ["deflect", "answer"]
+    }
   ],
-  "script": [
-    {"on": "ask:fear", "move": "deflect"}
-  ],
+  "script": [{"on": "ask:fear", "move": "deflect"}],
   "lines": {
     "comply": ["Of course.", "Whatever you need."],
     "comply:port": "Of course. Let me get the glove.",
@@ -64,47 +69,218 @@
     "deflect": ["It isn't worth your time."],
     "reassure": ["Thank you, dear. You're kind."],
     "spent": "I shouldn't keep you. Just tell me, doctor.",
-    "after:grip": "Sorry. It holds on sometimes.",
     "code": "I'm sorry, dear. I don't follow."
   },
-  "press": [
-    {"line": "I'd rather you didn't say that.",
-      "face": "blank", "hands": "freeze", "note": "Went still. Empty face, flat voice."},
-    {"line": "Oh. Oh no. Doctor, the hands...", "end": "attack"}
-  ],
-  "flare": {"line": "Oh! I'm sorry, dear. It does that.", "face": "blank", "hands": "slam",
-    "note": "Her hand hit the glass on its own. Her face stayed empty."},
-  "attack": {"on_refer": false,
+  "press_end": {
+    "walkout": "I think I'd better go, dear. Sorry to have bothered you.",
+    "attack": "Oh. Oh no. Doctor, the hands..."
+  },
+  "attack": {
+    "on_refer": false,
     "telegraph": "Her hands rise before she does. The torch arm lights.",
-    "line": "I'm sorry. I'm so sorry."},
+    "line": "I'm sorry. I'm so sorry."
+  },
   "exit": {
     "treat": "Thank you, dear. I knew you'd understand.",
     "refer": "They're coming for me? ...All right, dear. If you think so.",
     "taken": "No need to hold me, dears. I'll come quietly.",
     "gave_up": "I've kept you long enough, dear."
   },
-  "rows": {
-    "eyes": {"ok": false, "text": "Her left pupil never tightened, and it is a natural eye.",
-      "evidence": ["check:penlight"]},
-    "hands": {"ok": false, "text": "Held on 1.7 s after 'release'. A SEAM lets go inside 0.8.", "evidence": ["check:grip"]},
-    "port": {"ok": true, "text": "Calm skin and an old weld burn. Nothing wrong there.",
-      "evidence": ["check:port"]},
-    "speech": {"ok": false, "text": "\"The hands finish jobs I don't remember starting.\"",
-      "evidence": ["ask:why", "ask:sleep", "ask:fear"]},
-    "temper": {"ok": false, "text": "Pushed, she went still: no face, no voice.", "evidence": ["press"]}
+  "signs": {
+    "eyes": {
+      "normal": [
+        {
+          "id": "steady",
+          "text": "Tired and burnt, but both pupils tighten and follow.",
+          "note": "Light: both pupils tighten. Both follow.",
+          "eyes": {
+            "left": {"tightens": true, "follows": true},
+            "right": {"tightens": true, "follows": true}
+          }
+        }
+      ],
+      "broken": [
+        {
+          "id": "wide",
+          "text": "Her left pupil never tightened, and it is a natural eye.",
+          "note": "Light: R tightens, L stays wide. Both follow.",
+          "eyes": {
+            "left": {"tightens": false, "follows": true},
+            "right": {"tightens": true, "follows": true}
+          }
+        }
+      ]
+    },
+    "hands": {
+      "normal": [
+        {
+          "id": "lets_go",
+          "text": "Let go in 0.6 s, inside the SEAM limit of 0.8.",
+          "note": "Grip: stiff. Let go {t} s after 'release'.",
+          "grip": {"release_ms": 600, "tremor": 1},
+          "after": "There. They do listen, mostly."
+        }
+      ],
+      "broken": [
+        {
+          "id": "holds",
+          "text": "Held on 1.7 s after 'release'. A SEAM lets go inside 0.8.",
+          "note": "Grip: held on {t} s after 'release'.",
+          "grip": {"release_ms": 1700, "tremor": 0},
+          "after": "Sorry. It holds on sometimes."
+        }
+      ]
+    },
+    "port": {
+      "normal": [
+        {
+          "id": "calm",
+          "text": "Calm skin and an old weld burn. Nothing wrong there.",
+          "note": "Wrist socket: calm skin, an old weld burn."
+        }
+      ],
+      "broken": [
+        {
+          "id": "threads",
+          "text": "Dark threads under the glove cuff, out from the socket.",
+          "note": "Dark threads run past the old weld burn.",
+          "threads": true
+        }
+      ]
+    },
+    "speech": {
+      "normal": [
+        {
+          "id": "own",
+          "text": "Worried, but every line is 'I' and 'my', and she remembers her work.",
+          "answers": {
+            "why": {
+              "a": "They keep moving a little after I stop. A servo slipping, I expect. Thirty years of welding does that.",
+              "note": "\"A servo slipping, I expect.\""
+            },
+            "sleep": {
+              "a": "Not well, dear. Night shifts. I sleep in the afternoons, when the yard is quiet.",
+              "note": "\"I sleep in the afternoons.\""
+            },
+            "fear": {
+              "a": "A little. I've had them thirty years. They've never done a thing I didn't ask.",
+              "note": "\"They've never done a thing I didn't ask.\""
+            }
+          },
+          "model": "Tonight your hands are your own. They twitch a little after you stop, which you put down to a slipping servo, but you remember every job you did."
+        }
+      ],
+      "broken": [
+        {
+          "id": "lost",
+          "text": "\"The hands finish jobs I don't remember starting.\"",
+          "answers": {
+            "why": {
+              "a": "The hands finish jobs I don't remember starting. Good welds, too. Better than mine.",
+              "note": "\"The hands finish jobs I don't remember.\""
+            },
+            "sleep": {
+              "a": "I wake up at the bench with the torch warm. I don't remember getting up.",
+              "note": "\"I wake up at the bench, torch warm.\""
+            },
+            "fear": {
+              "a": "A little. They know the work. I don't always know what they've decided.",
+              "note": "\"They know the work.\""
+            }
+          },
+          "model": "Tonight your hands sometimes finish welding work you do not remember starting, and you have woken at the bench beside a warm torch; you are frightened and would rather not worry anyone."
+        }
+      ]
+    },
+    "temper": {
+      "normal": [
+        {
+          "id": "together",
+          "text": "Pushed, she looks hurt, and her face and voice agree.",
+          "press": {
+            "line": "Oh, dear. That's not a kind thing to say.",
+            "face": "upset",
+            "hands": "raise",
+            "note": "Hurt, in her face and voice at once."
+          },
+          "flare": {
+            "line": "Doctor, please! ...Oh, I'm sorry. I'm just tired.",
+            "face": "upset",
+            "hands": "slam",
+            "note": "Slapped the glass, hurt, then sorry."
+          },
+          "model": "When provoked, you are plainly hurt: it shows in your face and your voice at the same moment, and you apologise for raising it."
+        }
+      ],
+      "broken": [
+        {
+          "id": "blank",
+          "text": "Pushed, she went still: no face, no voice.",
+          "press": {
+            "line": "I'd rather you didn't say that.",
+            "face": "blank",
+            "hands": "freeze",
+            "note": "Went still. Empty face, flat voice."
+          },
+          "flare": {
+            "line": "Oh! I'm sorry, dear. It does that.",
+            "face": "blank",
+            "hands": "slam",
+            "note": "Hand hit the glass on its own. Face empty."
+          },
+          "model": "When provoked tonight you go still: empty face, flat quiet voice, as if you had stepped away from yourself."
+        }
+      ]
+    }
   },
   "outcomes": {
-    "treat": {"title": "SERVOS TUNED",
-      "text": "The servos run beautifully. Two nights later the shipyard reports a welder who would not stop. Your stamp is on her card."},
-    "refer": {"title": "TAKEN IN",
-      "text": "The crew locks the torch arm before it can lift. Maren thanks them for it, and then you. The city pays the handover fee. It is not much."},
-    "caught": {"title": "SHUTTER HELD",
-      "text": "The torch burns a bright line through the slats and goes out. \"I'm sorry,\" she keeps saying from the other side, until Trauma Team comes."},
-    "hit": {"title": "TOO SLOW",
-      "text": "The torch arm reaches you before the shutter does. The last thing you hear is Maren saying sorry. Nobody else is seen tonight."},
-    "locked_out": {"title": "LOCKED OUT",
-      "text": "The shutter comes down on a tired woman mid-sentence. \"That's all right, dear.\" Before closing, the yard reports her hands. You were right. It did not feel like it."},
-    "gave_up": {"title": "OUT OF PATIENCE",
-      "text": "\"Never mind, dear.\" Maren goes back to the yard with hands that do not listen to her. You made no call. Nobody is paid for that."}
+    "stable": {
+      "treat": {
+        "title": "SERVOS TUNED",
+        "text": "The servos settle. Maren flexes her gloves, smiles, and says she might sleep tonight. The fee is in old notes, folded neatly."
+      },
+      "refer": {
+        "title": "FALSE CALL",
+        "text": "Trauma Team scans a tired welder and finds a slipping servo. Maren apologises to them for the trouble. They take the fee back, and the call-out goes on your bill."
+      },
+      "walkout": {
+        "title": "WALKED OUT",
+        "text": "Maren goes back to the yard with the servos still slipping. Nobody gets paid."
+      },
+      "false_alarm": {
+        "title": "FALSE ALARM",
+        "text": "The shutter drops on a tired woman mid-sentence. She was only tired. The yard hears about it. That costs you."
+      },
+      "gave_up": {
+        "title": "OUT OF PATIENCE",
+        "text": "Maren decides not to be a bother any longer and goes home. No fee, no bill."
+      }
+    },
+    "drifting": {
+      "treat": {
+        "title": "SERVOS TUNED",
+        "text": "The servos run beautifully. Two nights later the shipyard reports a welder who would not stop. Your stamp is on her card."
+      },
+      "refer": {
+        "title": "TAKEN IN",
+        "text": "The crew locks the torch arm before it can lift. Maren thanks them for it, and then you. The fee they left on the counter is yours to keep."
+      },
+      "caught": {
+        "title": "SHUTTER HELD",
+        "text": "The torch burns a bright line through the slats and goes out. \"I'm sorry,\" she keeps saying from the other side, until Trauma Team comes."
+      },
+      "hit": {
+        "title": "TOO SLOW",
+        "text": "The torch arm reaches you before the shutter does. The last thing you hear is Maren saying sorry. Nobody else is seen tonight."
+      },
+      "locked_out": {
+        "title": "LOCKED OUT",
+        "text": "The shutter comes down on a tired woman mid-sentence. \"That's all right, dear.\" Before closing, the yard reports her hands. You were right. It did not feel like it."
+      },
+      "gave_up": {
+        "title": "OUT OF PATIENCE",
+        "text": "\"Never mind, dear.\" Maren goes back to the yard with hands that do not listen to her. You made no call. Nobody is paid for that."
+      }
+    }
   }
 }

@@ -103,7 +103,7 @@ func setup(p_case: Dictionary, p_meta: Dictionary) -> void:
 		_add(back, key)
 	_add(front, "hands")
 	_add(front, "attack")
-	_set_tex("body", "body")
+	_set_tex("body", _threads_layer("body"))
 	_set_tex("pupils", "pupils")
 	_set_tex("head", "head")
 	_set_tex("lids", "lids")
@@ -545,7 +545,16 @@ func _apply_face() -> void:
 
 
 func _apply_hands() -> void:
-	_set_tex("hands", _hand_frame)
+	_set_tex("hands", _threads_layer(_hand_frame))
+
+
+## A layer with dark threads at the port (`<layer>_t`) on a night the port sign has them
+## (case_db compose sets port.threads), when the picture shows the port and has that twin.
+func _threads_layer(layer: String) -> String:
+	var port: Variant = case_data.get("port")
+	if typeof(port) == TYPE_DICTIONARY and bool(port.get("threads", false)) and _has_layer(layer + "_t"):
+		return layer + "_t"
+	return layer
 
 
 func _breath() -> float:

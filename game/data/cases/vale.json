@@ -1,10 +1,9 @@
 {
   "id": "vale",
-  "version": 2,
+  "version": 3,
   "name": "Adrian Vale",
   "role": "Corporate security",
   "age": 38,
-  "truth": "drifting",
   "request": "Remove reflex-rig limiter",
   "fee": 600,
   "patience": 5,
@@ -16,12 +15,14 @@
     "Good evening. Adrian Vale, Kessler Security.",
     "I'd like the limiter taken off my reflex rig. I pay double for discretion."
   ],
-  "parts": {"eye_l": "talon", "eye_r": "talon", "hands": "reflex", "port": "milspec", "voice": "natural"},
-  "eyes": {
-    "left": {"tightens": false, "follows": false},
-    "right": {"tightens": false, "follows": true}
+  "parts": {
+    "eye_l": "talon",
+    "eye_r": "talon",
+    "hands": "reflex",
+    "port": "milspec",
+    "voice": "natural"
   },
-  "grip": {"release_ms": 200, "tremor": 0},
+  "eyes": {"left": {}, "right": {}},
   "port": {"covered": true},
   "idle": {"hands": "still", "gaze": "fixed"},
   "looks": {
@@ -30,36 +31,48 @@
     "port": "Collar buttoned to the jaw. Port not visible."
   },
   "checks": {
-    "penlight": {"first": ["explain:idle", "comply"], "insist": "comply",
-      "note": "Light: shutters never snap. L won't follow."},
-    "grip": {"first": ["comply"], "insist": "comply",
-      "note": "Grip: exact. Let go {t} s after 'release'."},
-    "port": {"first": ["stall"], "insist": "refuse",
-      "note": "Neck socket: dark threads under the skin."}
+    "penlight": {"first": ["explain:idle", "comply"], "insist": "comply"},
+    "grip": {"first": ["comply"], "insist": "comply"},
+    "port": {"first": ["stall"], "insist": "refuse"}
   },
   "claims": {
-    "idle": {"line": "Combat optics. They idle indoors, so they won't react. You can skip that one.",
-      "note": "Says his optics idle indoors.", "row": "eyes"}
+    "idle": {
+      "line": "Combat optics. They idle indoors, so they won't react. You can skip that one.",
+      "note": "Says his optics idle indoors.",
+      "row": "eyes"
+    }
   },
   "topics": [
-    {"id": "why", "q": "Why remove the limiter?",
-      "keys": ["wrong", "problem", "happen", "reason", "trouble", "brings", "bring", "matter", "here", "came", "come", "limiter", "remove", "removal", "reflex", "faster", "perform", "speed"],
-      "a": "I perform better without it. The limiter costs me a quarter second. In my work that is a funeral.",
-      "note": "\"I perform better without it.\"", "first": ["answer"]},
-    {"id": "lapses", "q": "Any lapses? Lost time?",
-      "keys": ["lapse", "lost", "lose", "time", "memory", "remember", "forget", "forgot", "blackout", "gap", "gaps", "missing", "blank"],
-      "a": "None. I remember every shift. I can recite them, if you like.",
+    {
+      "id": "why",
+      "q": "Why remove the limiter?",
+      "keys": [
+        "wrong", "problem", "happen", "reason", "trouble", "brings", "bring", "matter", "here", "came",
+        "come", "limiter", "remove", "removal", "reflex", "faster", "perform", "speed"
+      ],
+      "first": ["answer"]
+    },
+    {
+      "id": "lapses",
+      "q": "Any lapses? Lost time?",
+      "keys": [
+        "lapse", "lost", "lose", "time", "memory", "remember", "forget", "forgot", "blackout", "gap",
+        "gaps", "missing", "blank"
+      ],
       "deflect": "I'm cleared for duty. That is in my file.",
-      "note": "\"None. I remember every shift.\"", "first": ["deflect", "answer"]},
-    {"id": "sleep", "q": "How are you sleeping?",
-      "keys": ["sleep", "slept", "rest", "tired", "awake", "night", "bed", "dream", "insomnia", "exhaust", "nap"],
-      "a": "It doesn't need much sleep. I take what's left.",
-      "note": "\"It doesn't need much sleep.\"", "first": ["answer"]}
+      "first": ["deflect", "answer"]
+    },
+    {
+      "id": "sleep",
+      "q": "How are you sleeping?",
+      "keys": [
+        "sleep", "slept", "rest", "tired", "awake", "night", "bed", "dream", "insomnia", "exhaust",
+        "nap"
+      ],
+      "first": ["answer"]
+    }
   ],
-  "script": [
-    {"on": "check:penlight", "move": "explain:idle"},
-    {"on": "ask:lapses", "move": "deflect"}
-  ],
+  "script": [{"on": "check:penlight", "move": "explain:idle"}, {"on": "ask:lapses", "move": "deflect"}],
   "lines": {
     "comply": ["Of course.", "As you wish."],
     "comply:penlight": "If you insist.",
@@ -70,44 +83,216 @@
     "deflect": ["That is not relevant."],
     "reassure": ["Thank you. I do appreciate a professional."],
     "spent": "I believe we're done with questions. Your decision, doctor.",
-    "after:grip": "Satisfied?",
     "code": "I'm afraid I don't follow, doctor."
   },
-  "press": [
-    {"line": "I understand your concern, doctor.",
-      "face": "flat", "hands": "fist", "note": "Calm face, level voice. His fist creaked shut."},
-    {"line": "Unfortunate.", "end": "attack"}
-  ],
-  "flare": {"line": "Faster, doctor.", "face": "flat", "hands": "slam",
-    "note": "His palm hit the glass. His face never moved."},
-  "attack": {"on_refer": true,
+  "press_end": {"walkout": "I'll take my business elsewhere, doctor.", "attack": "Unfortunate."},
+  "attack": {
+    "on_refer": true,
     "telegraph": "His optics snap to pinpoints. The rig under his sleeve whines.",
-    "line": "The rig disagrees."},
+    "line": "The rig disagrees."
+  },
   "exit": {
     "treat": "A pleasure. Discretion, as agreed.",
     "refer": "You called them. I see.",
+    "taken": "Mind the suit. This will be in my report, doctor.",
     "gave_up": "Another time, doctor."
   },
-  "rows": {
-    "eyes": {"ok": false, "text": "TALON shutters snap in light. His never did, and the left never followed.",
-      "evidence": ["check:penlight"]},
-    "hands": {"ok": true, "text": "Let go in 0.2 s, inside the REFLEX limit of 0.3.", "evidence": ["check:grip"]},
-    "port": {"ok": false, "text": "Dark threads under the buttoned collar.", "evidence": ["check:port"]},
-    "speech": {"ok": false, "text": "\"It doesn't need much sleep.\" It, not I.", "evidence": ["ask:sleep"]},
-    "temper": {"ok": false, "text": "Calm face and level voice while the fist closed.", "evidence": ["press"]}
+  "signs": {
+    "eyes": {
+      "normal": [
+        {
+          "id": "snaps",
+          "text": "TALON shutters snapped tight in the light. Both followed.",
+          "note": "Light: both shutters snap. Both follow.",
+          "eyes": {
+            "left": {"tightens": true, "follows": true},
+            "right": {"tightens": true, "follows": true}
+          }
+        }
+      ],
+      "broken": [
+        {
+          "id": "dead",
+          "text": "TALON shutters snap in light. His never did, and the left never followed.",
+          "note": "Light: shutters never snap. L won't follow.",
+          "eyes": {
+            "left": {"tightens": false, "follows": false},
+            "right": {"tightens": false, "follows": true}
+          }
+        }
+      ]
+    },
+    "hands": {
+      "normal": [
+        {
+          "id": "lets_go",
+          "text": "Let go in 0.2 s, inside the REFLEX limit of 0.3.",
+          "note": "Grip: exact. Let go {t} s after 'release'.",
+          "grip": {"release_ms": 200, "tremor": 0},
+          "after": "Satisfied?"
+        }
+      ],
+      "broken": [
+        {
+          "id": "holds",
+          "text": "Held on 0.7 s after 'release'. A REFLEX lets go inside 0.3.",
+          "note": "Grip: exact. Held on {t} s after 'release'.",
+          "grip": {"release_ms": 700, "tremor": 0},
+          "after": "Satisfied?"
+        }
+      ]
+    },
+    "port": {
+      "normal": [
+        {
+          "id": "calm",
+          "text": "Calm skin at the sealed plate. No threads.",
+          "note": "Neck socket: a sealed plate, calm skin."
+        }
+      ],
+      "broken": [
+        {
+          "id": "threads",
+          "text": "Dark threads under the buttoned collar.",
+          "note": "Neck socket: dark threads under the skin.",
+          "threads": true
+        }
+      ]
+    },
+    "speech": {
+      "normal": [
+        {
+          "id": "own",
+          "text": "Cold and exact, but always 'I'. He knows his own shifts.",
+          "answers": {
+            "why": {
+              "a": "I perform better without it. The limiter costs me a quarter second. In my work that is a funeral.",
+              "note": "\"I perform better without it.\""
+            },
+            "lapses": {
+              "a": "None. I remember every shift. I can recite them, if you like.",
+              "note": "\"None. I remember every shift.\""
+            },
+            "sleep": {
+              "a": "Four hours. I sleep when the contract allows.",
+              "note": "\"I sleep when the contract allows.\""
+            }
+          },
+          "model": "Tonight you speak of yourself in the first person. The rig is equipment you own and you are fully in charge of it; you simply want it faster."
+        }
+      ],
+      "broken": [
+        {
+          "id": "it",
+          "text": "\"It doesn't need much sleep.\" It, not I.",
+          "answers": {
+            "why": {
+              "a": "I perform better without it. The limiter costs me a quarter second. In my work that is a funeral.",
+              "note": "\"I perform better without it.\""
+            },
+            "lapses": {
+              "a": "None. I remember every shift. I can recite them, if you like.",
+              "note": "\"None. I remember every shift.\""
+            },
+            "sleep": {
+              "a": "It doesn't need much sleep. I take what's left.",
+              "note": "\"It doesn't need much sleep.\""
+            }
+          },
+          "evidence": ["sleep"],
+          "model": "Tonight you sometimes speak of the rig as 'it', a separate, tireless thing that needs little sleep; you mention this calmly, as a fact."
+        }
+      ]
+    },
+    "temper": {
+      "normal": [
+        {
+          "id": "together",
+          "text": "Pushed, cold anger shows in his face and voice at once.",
+          "press": {
+            "line": "Careful, doctor. I'm paying for discretion, not opinions.",
+            "face": "angry",
+            "hands": "point",
+            "note": "Jaw set and voice hardened, together."
+          },
+          "flare": {
+            "line": "Doctor. My time is expensive.",
+            "face": "angry",
+            "hands": "slam",
+            "note": "Cold anger, face and voice. A palm on glass."
+          },
+          "model": "When provoked, your anger is cold but real: it shows in your jaw, your eyes and your voice at the same moment."
+        }
+      ],
+      "broken": [
+        {
+          "id": "flat",
+          "text": "Calm face and level voice while the fist closed.",
+          "press": {
+            "line": "I understand your concern, doctor.",
+            "face": "flat",
+            "hands": "fist",
+            "note": "Calm face, level voice. His fist creaked shut."
+          },
+          "flare": {
+            "line": "Faster, doctor.",
+            "face": "flat",
+            "hands": "slam",
+            "note": "His palm hit the glass. His face never moved."
+          },
+          "model": "When provoked tonight your face and voice stay perfectly level and polite, whatever your hands are doing."
+        }
+      ]
+    }
   },
   "outcomes": {
-    "treat": {"title": "LIMITER PULLED",
-      "text": "Vale pays double and thanks you. At 03:10 the feeds show a Kessler lobby and a lot of tape. Your name is on the work order."},
-    "refer": {"title": "TAKEN IN",
-      "text": "Vale offers the crew his wrists, perfectly politely. The rig is still whining when the door shuts."},
-    "caught": {"title": "SHUTTER HELD",
-      "text": "Three dents in the shutter, then saw teeth through the slats. They stop a hand short of you. Boots, a shout, quiet. Trauma Team collects him."},
-    "hit": {"title": "TOO SLOW",
-      "text": "You were half a second late. The saw was not. Trauma Team finds you on the floor, too late to help. The clinic stays dark."},
-    "locked_out": {"title": "LOCKED OUT",
-      "text": "You dropped the shutter on a polite man mid-sentence. Trauma Team picked him up two streets away, the rig still running. You were right. Nobody pays for that."},
-    "gave_up": {"title": "OUT OF PATIENCE",
-      "text": "Vale thanks you for your time and walks back out into the city. You made no call. Whatever he does tonight, nobody asked you."}
+    "stable": {
+      "treat": {
+        "title": "LIMITER PULLED",
+        "text": "Vale pays double, thanks you, and leaves exactly on the minute. The feeds stay quiet all night. Discretion, as agreed."
+      },
+      "refer": {
+        "title": "FALSE CALL",
+        "text": "Trauma Team scans a Kessler man and finds nothing but a contract. Kessler's lawyers call before the van is back. They take the fee back, and the call-out goes on your bill."
+      },
+      "walkout": {
+        "title": "WALKED OUT",
+        "text": "Vale takes his business elsewhere. Someone else is paid double for discretion tonight."
+      },
+      "false_alarm": {
+        "title": "FALSE ALARM",
+        "text": "The shutter drops on a polite man in a pressed suit. He was only cold. Kessler will remember the clinic. That costs you."
+      },
+      "gave_up": {
+        "title": "OUT OF PATIENCE",
+        "text": "Vale checks his watch once, thanks you for your time and leaves. No fee, no bill."
+      }
+    },
+    "drifting": {
+      "treat": {
+        "title": "LIMITER PULLED",
+        "text": "Vale pays double and thanks you. At 03:10 the feeds show a Kessler lobby and a lot of tape. Your name is on the work order."
+      },
+      "refer": {
+        "title": "TAKEN IN",
+        "text": "Vale offers the crew his wrists, perfectly politely. The rig is still whining when the door shuts."
+      },
+      "caught": {
+        "title": "SHUTTER HELD",
+        "text": "Three dents in the shutter, then saw teeth through the slats. They stop a hand short of you. Boots, a shout, quiet. Trauma Team collects him."
+      },
+      "hit": {
+        "title": "TOO SLOW",
+        "text": "You were half a second late. The saw was not. Trauma Team finds you on the floor, too late to help. The clinic stays dark."
+      },
+      "locked_out": {
+        "title": "LOCKED OUT",
+        "text": "You dropped the shutter on a polite man mid-sentence. Trauma Team picked him up two streets away, the rig still running. You were right. Nobody pays for that."
+      },
+      "gave_up": {
+        "title": "OUT OF PATIENCE",
+        "text": "Vale thanks you for your time and walks back out into the city. You made no call. Whatever he does tonight, nobody asked you."
+      }
+    }
   }
 }

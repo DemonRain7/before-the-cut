@@ -68,6 +68,7 @@ extends SceneTree
 const MainScript = preload("res://scripts/ui/main.gd")
 const VisitState = preload("res://scripts/core/visit_state.gd")
 const ShiftState = preload("res://scripts/core/shift_state.gd")
+const CaseDB = preload("res://scripts/core/case_db.gd")
 const PlayDriver = preload("res://tests/play_driver.gd")
 const Gfx = preload("res://scripts/ui/gfx.gd")
 const Lang = preload("res://scripts/core/lang.gd")
@@ -281,9 +282,10 @@ func seed_for(cases: Array, training: bool) -> int:
 	var want: Array = cases.duplicate()
 	want.sort()
 	var order: Array = ShiftState.new(main.rules, []).order
+	var pool := CaseDB.fair_contacts(main.contact_data, main.people, order)      # the entries the game draws from
 	for s in range(1, 5001):
 		var got: Array = []
-		for e in ShiftState.draw_contacts(main.rules, main.contact_data.get("pool", []), order, s, training):
+		for e in ShiftState.draw_contacts(main.rules, pool, order, s, training):
 			got.append(str((e as Dictionary).get("case", "")))
 		got.sort()
 		if got == want:

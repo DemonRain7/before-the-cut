@@ -15,8 +15,9 @@ extends Control
 ## night: there is no slip, and the report comes up out of the dark.
 ##
 ## Launch options (after "--" on the command line), all optional:
-##   --seed=123                          fixed shift seed
-##   --authored-order                    patients in the order rules.json lists them (tests, captures)
+##   --seed=123                          fixed shift seed (the same seed draws the same night)
+##   --test-night=B                      play that test night of data/nights.json every shift, instead of drawing one
+##   --authored-order                    test night A every shift: the night as written (tests, captures)
 ##   --agent-url=http://127.0.0.1:8787   patient-agent proxy (or environment BTC_AGENT_URL)
 ##   --model                             autonomous patient dialogue through the proxy
 ##   --mute                              start with sound off
@@ -234,7 +235,12 @@ var rules: Dictionary = {}
 var sheet: Dictionary = {}        # sheet.json: what no model changes
 var parts: Dictionary = {}        # parts.json: the spec binder
 var visit_sheet: Dictionary = {}  # the sheet on the wall now: for the patient at the counter (case_db sheet_for)
-var cases: Dictionary = {}
+var cases: Dictionary = {}        # tonight's visitors composed (case_db compose_night); night A until a shift starts
+var templates: Dictionary = {}    # cases/<id>.json: the characters of the roster as written
+var people: Dictionary = {}       # each of them steady with every part normal: what no night changes (contact clues)
+var nights: Dictionary = {}       # data/nights.json: the test nights
+var night: Dictionary = {}        # tonight: {"visitors": [{"id", "truth", "signs"}]}, drawn or a test night
+var night_name: String = ""       # the test night being played, or "" for a drawn one
 var meta: Dictionary = {}
 var data_errors: Array = []
 var shift: ShiftState = null
@@ -247,7 +253,8 @@ var shift_seed: int = 0
 var shift_number: int = 0
 var fixed_seed: int = 0
 var has_fixed_seed: bool = false
-var authored_order: bool = false     # true: rules.json shift_order as written, never shuffled
+var authored_order: bool = false     # true (--authored-order): test night A every shift, never drawn
+var test_night: String = ""          # --test-night=<name>: that night of data/nights.json every shift
 var agent_url: String = ""
 var use_model: bool = false
 var start_muted: bool = false
@@ -355,12 +362,13 @@ var _shake_amp: float = 0.0
 var _flash_a: float = 0.0
 var _flash_fall: float = 1.0
 var _flash_color := Color.WHITE
-var _rng := RandomNumberGenerator.new()      # shift-seeded: beats and arrivals
+var _rng := RandomNumberGenerator.new()      # shift-seeded: beats (the night has a generator of its own)
 var _snap_rng := RandomNumberGenerator.new()   # visit-seeded: snaps and flares
 var _surprise: String = ""        # "snap" or "flare": rolled, and due once _surprise_t has run out
 var _surprise_t: float = 0.0
 var _fx_rng := RandomNumberGenerator.new()   # cosmetic only
 var _boot_rng := RandomNumberGenerator.new()
+var _db: Dictionary = {}          # CaseDB.load_all(): what the night draw reads
 
 
 # ================================================================ setup
@@ -369,10 +377,14 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	Lang.load_saved()      # before anything puts words together: the sheet is filled as it is hung
 	var db: Dictionary = CaseDB.load_all()
+	_db = db
 	rules = db["rules"]
 	sheet = db["sheet"]
 	parts = db.get("parts", {})
 	cases = db["cases"]
+	templates = db.get("templates", {})
+	people = db.get("people", {})
+	nights = db.get("nights", {})
 	data_errors = db["errors"]
 	contact_data = db.get("contacts", {})
 	var m: Variant = CaseDB.load_json("res://assets/patients/meta.json")
@@ -386,6 +398,9 @@ func _ready() -> void:
 	else:
 		data_errors.append("data/intro.json is missing or is not valid JSON.")
 	_read_launch_options()
+	if test_night != "" and not nights.has(test_night):
+		data_errors.append("--test-night=%s: data/nights.json has no night '%s'." % [test_night, test_night])
+		cases = {}      # nothing to play: the title card shows the problem and does not start
 	_build()
 	_start_session()
 	_apply_language()
@@ -410,6 +425,8 @@ func _read_launch_options() -> void:
 			less_blood = true
 		elif a == "--authored-order":
 			authored_order = true
+		elif a.begins_with("--test-night="):
+			test_night = a.substr(13).strip_edges()
 		elif a == "--no-intro":
 			intro_enabled = false
 		elif a == "--no-training":
@@ -458,7 +475,8 @@ func _build() -> void:
 	add_child(screens)
 	var line_rules: Dictionary = rules.get("line", {})
 	var per_hour := int(line_rules.get("per_hour", 0))
-	var hours := (rules.get("shift_order", []) as Array).size()
+	var night_rules: Dictionary = rules.get("night", {}) if typeof(rules.get("night")) == TYPE_DICTIONARY else {}
+	var hours := int(night_rules.get("visitors", (rules.get("shift_order", []) as Array).size()))
 	var repair_cost := int((rules.get("attack", {}) as Dictionary).get("repair_cost", 0))
 	var contact_rules: Dictionary = rules.get("contacts", {})
 	var calm_rules: Dictionary = rules.get("reassure", {})
@@ -1187,16 +1205,32 @@ func act_restart() -> void:
 	_start_shift()
 
 
+## Tonight: the test night asked for (--test-night, or night A with --authored-order), or one
+## drawn from the shift seed (ShiftState.draw_night). A drawn night that comes out empty, which
+## only broken data can make, falls back to night A.
+func _night_for_shift() -> Dictionary:
+	night_name = test_night if test_night != "" else ("A" if authored_order else "")
+	if night_name == "":
+		var drawn := ShiftState.draw_night(_db, shift_seed, shift_number == 1)
+		if not CaseDB.night_order(drawn).is_empty():
+			return drawn
+		night_name = "A"
+	return (nights.get(night_name, {}) as Dictionary).duplicate(true)
+
+
 func _start_shift() -> void:
 	shift_number += 1
 	shift_seed = fixed_seed if has_fixed_seed else int(_boot_rng.randi())
 	_rng.seed = shift_seed
-	var order: Array = [] if authored_order else ShiftState.arrival_order(rules, cases, shift_seed, shift_number == 1)
-	shift = ShiftState.new(rules, order)
+	night = _night_for_shift()
+	cases = CaseDB.compose_night(templates, night, parts)
+	shift = ShiftState.new(rules, CaseDB.night_order(night))
 	# the training night puts its first visitor on the list, so the code is shown on the first exam
 	var training := training_enabled and intro_enabled and not _trained and coach != null and coach.has_steps()
 	var contact_rules: Dictionary = rules.get("contacts", {})
-	shift.contacts = ShiftState.draw_contacts(rules, contact_data.get("pool", []), shift.order, shift_seed, training)
+	# only the entries that are fair among tonight's visitors: no clue alone gives anybody away
+	var pool := CaseDB.fair_contacts(contact_data, people, shift.order)
+	shift.contacts = ShiftState.draw_contacts(rules, pool, shift.order, shift_seed, training)
 	clipboard.set_contacts(shift.contacts, contact_data.get("clues", {}), str(contact_data.get("title", "")),
 		int(contact_rules.get("pay", 0)), int(contact_rules.get("wrong_cost", 1)))
 	var client: Variant = null
@@ -1239,7 +1273,9 @@ func _start_shift() -> void:
 	audio.trim_db = 0.0
 	clinic.set_cam("")
 	clinic.corner_text = ""
-	_log("shift_start", {"shift": shift_number, "seed": shift_seed, "order": shift.order, "agent_mode": agent.mode})
+	_log("shift_start", {"shift": shift_number, "seed": shift_seed, "night": night_name if night_name != "" else "drawn",
+		"order": shift.order, "agent_mode": agent.mode})
+	_log("night", {"name": night_name, "visitors": (night.get("visitors", []) as Array).duplicate(true)})
 	var ids: Array = []
 	for e in shift.contacts:
 		ids.append(str((e as Dictionary).get("id", "")))
@@ -3892,8 +3928,9 @@ func _draw_slip() -> void:
 		Gfx.text_raw(_slip, Vector2(x0, y), lines[i], Gfx.INKT)
 		y += Gfx.LINE
 	_slip.draw_rect(Rect2(x0, 102, w, 1), Gfx.PAPER1)
-	# what the counter took in: the fee for work done, whoever paid it. The package and the
-	# calm-patches go on the line below; the rest of the visit's money waits for closing.
+	# what the counter took in: the fee, for work done or paid on account by Trauma Team, whoever
+	# the patient was. The package and the calm-patches go on the line below; the rest of the
+	# visit's money waits for closing.
 	var fee := int(s.get("counter_fee", 0))
 	var paid := Lang.tf("%s credits", [Gfx.money(fee)])
 	_fit(_slip, x0, 105, SLIP_COUNTER, w - Gfx.text_w(paid, true) - SLIP_GAP, Gfx.INKT)

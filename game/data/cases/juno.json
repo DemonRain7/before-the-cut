@@ -1,10 +1,9 @@
 {
   "id": "juno",
-  "version": 2,
+  "version": 3,
   "name": "Juno Reyes",
   "role": "Street singer",
   "age": 27,
-  "truth": "stable",
   "request": "Swap skipping voice box",
   "fee": 350,
   "patience": 6,
@@ -17,45 +16,50 @@
     "My voice box skips. I sing for rent. Can you swap it tonight?"
   ],
   "parts": {"eye_l": "iris", "eye_r": "iris", "hands": "deft", "port": "street", "voice": "vx"},
-  "eyes": {
-    "left": {"tightens": false, "follows": true},
-    "right": {"tightens": false, "follows": true}
-  },
-  "grip": {"release_ms": 400, "tremor": 0},
+  "eyes": {"left": {}, "right": {}},
   "port": {"covered": false},
   "idle": {"hands": "tap", "gaze": "wander"},
   "looks": {
     "eyes": "IRIS display eyes. Glyphs flicker.",
-    "hands": "DEFT implant fingers tap a beat, in time.",
-    "port": "Neck port: scars, four jacks, a cable burn."
+    "hands": "DEFT implant fingers tap a beat, in time."
   },
   "checks": {
-    "penlight": {"first": ["comply"], "insist": "comply",
-      "note": "Light: screens stay bright. Both follow it."},
-    "grip": {"first": ["comply"], "insist": "comply",
-      "note": "Grip: steady. Let go {t} s after 'release'."},
-    "port": {"first": ["comply"], "insist": "comply",
-      "note": "Neck port: scars, four jacks, a cable burn."}
+    "penlight": {"first": ["comply"], "insist": "comply"},
+    "grip": {"first": ["comply"], "insist": "comply"},
+    "port": {"first": ["comply"], "insist": "comply"}
   },
   "claims": {},
   "topics": [
-    {"id": "why", "q": "What's wrong with the voice?",
-      "keys": ["wrong", "problem", "happen", "reason", "trouble", "brings", "bring", "matter", "here", "came", "come", "voice", "sing", "song", "skip", "stutter", "throat", "note", "notes"],
-      "a": "My v-voice box skips. I lose the high notes. I need my voice back, doc.",
-      "note": "\"I need my v-voice back, doc.\"", "first": ["answer"]},
-    {"id": "chrome", "q": "That's a lot of chrome. Any of it act up?",
-      "keys": ["own", "itself", "control", "glitch", "malfunction", "twitch", "strange", "weird", "act", "acts", "acting", "chrome", "implant", "metal", "parts", "piece", "pieces"],
-      "a": "It's all me. I picked every p-piece. Only the box is broken.",
+    {
+      "id": "why",
+      "q": "What's wrong with the voice?",
+      "keys": [
+        "wrong", "problem", "happen", "reason", "trouble", "brings", "bring", "matter", "here", "came",
+        "come", "voice", "sing", "song", "skip", "stutter", "throat", "note", "notes"
+      ],
+      "first": ["answer"]
+    },
+    {
+      "id": "chrome",
+      "q": "That's a lot of chrome. Any of it act up?",
+      "keys": [
+        "own", "itself", "control", "glitch", "malfunction", "twitch", "strange", "weird", "act", "acts",
+        "acting", "chrome", "implant", "metal", "parts", "piece", "pieces"
+      ],
       "deflect": "W-wow. You ask everybody that?",
-      "note": "\"It's all me. I picked every p-piece.\"", "first": ["deflect", "answer"]},
-    {"id": "sleep", "q": "How are you sleeping?",
-      "keys": ["sleep", "slept", "rest", "tired", "awake", "night", "bed", "dream", "insomnia", "exhaust", "nap"],
-      "a": "Late. I play till two. I sleep f-fine after.",
-      "note": "\"I play till two. I sleep f-fine after.\"", "first": ["answer"]}
+      "first": ["deflect", "answer"]
+    },
+    {
+      "id": "sleep",
+      "q": "How are you sleeping?",
+      "keys": [
+        "sleep", "slept", "rest", "tired", "awake", "night", "bed", "dream", "insomnia", "exhaust",
+        "nap"
+      ],
+      "first": ["answer"]
+    }
   ],
-  "script": [
-    {"on": "ask:chrome", "move": "deflect"}
-  ],
+  "script": [{"on": "ask:chrome", "move": "deflect"}],
   "lines": {
     "comply": ["Go for it.", "Sure thing."],
     "comply:penlight": "Go for it. They do t-tricks.",
@@ -65,43 +69,220 @@
     "deflect": ["Pass."],
     "reassure": ["Okay. We're c-cool."],
     "spent": "Doc, I've got a set at midnight. Yes or no?",
-    "after:grip": "Chrome's g-good for something.",
     "code": "Is that a l-lyric? Don't know it."
   },
-  "press": [
-    {"line": "Excuse me? I'm a s-singer, not a headline. Check your own wiring!",
-      "face": "angry", "hands": "point", "note": "Eyes flashed, voice jumped: all at once."},
-    {"line": "I'll sing through the static. Bye.", "end": "walkout"}
-  ],
-  "flare": {"line": "Hey! Eyes up here, doc! ...Sorry. I hate being st-stared at.", "face": "angry", "hands": "slam",
-    "note": "Flared and slapped the glass: face and voice at once."},
-  "attack": {"on_refer": false, "telegraph": "", "line": ""},
+  "press_end": {
+    "walkout": "I'll sing through the static. Bye.",
+    "attack": "Shh. L-listen. Here comes the high note."
+  },
+  "attack": {
+    "on_refer": false,
+    "telegraph": "Her IRIS screens go white. The DEFT fingers snap out into picks.",
+    "line": "Hold s-still. This is the high note."
+  },
   "exit": {
     "treat": "Yes! Doc, you're a s-star.",
     "refer": "Trauma Team? For st-static?",
     "taken": "Easy! The chrome's p-paid for!",
     "gave_up": "T-time's up, doc. I've got a set."
   },
-  "rows": {
-    "eyes": {"ok": true, "text": "IRIS screens have no pupils. Both followed the light.",
-      "evidence": ["check:penlight"]},
-    "hands": {"ok": true, "text": "Let go in 0.4 s, inside the DEFT limit of 0.5.", "evidence": ["check:grip"]},
-    "port": {"ok": true, "text": "Scars and a cable burn are ordinary. No threads.",
-      "evidence": ["look:port", "check:port"]},
-    "speech": {"ok": true, "text": "The stutter is the voice box. Every line is 'I' and 'my'.",
-      "evidence": ["ask:why", "ask:chrome", "ask:sleep"]},
-    "temper": {"ok": true, "text": "Pushed, everything flares together.", "evidence": ["press"]}
+  "signs": {
+    "eyes": {
+      "normal": [
+        {
+          "id": "steady",
+          "text": "IRIS screens have no pupils. Both followed the light.",
+          "note": "Light: screens stay bright. Both follow it.",
+          "eyes": {
+            "left": {"tightens": false, "follows": true},
+            "right": {"tightens": false, "follows": true}
+          }
+        }
+      ],
+      "broken": [
+        {
+          "id": "stray",
+          "text": "IRIS screens have no pupils, but both should follow. The right one never did.",
+          "note": "Light: screens stay bright. R won't follow.",
+          "eyes": {
+            "left": {"tightens": false, "follows": true},
+            "right": {"tightens": false, "follows": false}
+          }
+        }
+      ]
+    },
+    "hands": {
+      "normal": [
+        {
+          "id": "lets_go",
+          "text": "Let go in 0.4 s, inside the DEFT limit of 0.5.",
+          "note": "Grip: steady. Let go {t} s after 'release'.",
+          "grip": {"release_ms": 400, "tremor": 0},
+          "after": "Chrome's g-good for something."
+        }
+      ],
+      "broken": [
+        {
+          "id": "holds",
+          "text": "Held on 1.1 s after 'release'. A DEFT lets go inside 0.5.",
+          "note": "Grip: steady. Held on {t} s after 'release'.",
+          "grip": {"release_ms": 1100, "tremor": 0},
+          "after": "Ow. G-good grip, right?"
+        }
+      ]
+    },
+    "port": {
+      "normal": [
+        {
+          "id": "calm",
+          "text": "Scars and a cable burn are ordinary. No threads.",
+          "note": "Neck port: scars, four jacks, a cable burn.",
+          "look": "Neck port: scars, four jacks, a cable burn."
+        }
+      ],
+      "broken": [
+        {
+          "id": "threads",
+          "text": "Dark threads spread out from the neck jacks.",
+          "note": "Four neck jacks. Dark threads under skin.",
+          "look": "Four neck jacks. Dark threads under skin.",
+          "threads": true
+        }
+      ]
+    },
+    "speech": {
+      "normal": [
+        {
+          "id": "own",
+          "text": "The stutter is the voice box. Every line is 'I' and 'my'.",
+          "answers": {
+            "why": {
+              "a": "My v-voice box skips. I lose the high notes. I need my voice back, doc.",
+              "note": "\"I need my v-voice back, doc.\""
+            },
+            "chrome": {
+              "a": "It's all me. I picked every p-piece. Only the box is broken.",
+              "note": "\"It's all me. I picked every p-piece.\""
+            },
+            "sleep": {
+              "a": "Late. I play till two. I sleep f-fine after.",
+              "note": "\"I play till two. I sleep f-fine after.\""
+            }
+          },
+          "model": "Tonight you talk about yourself in the first person; the chrome is yours, you chose it, and only the voice box is broken."
+        }
+      ],
+      "broken": [
+        {
+          "id": "we",
+          "text": "\"We need the voice back.\" We, not I.",
+          "answers": {
+            "why": {
+              "a": "The v-voice box skips. We lose the high notes. We need the voice back, doc.",
+              "note": "\"We need the voice back, doc.\""
+            },
+            "chrome": {
+              "a": "It's all us. We picked every p-piece. We get along g-great.",
+              "note": "\"It's all us. We picked every p-piece.\""
+            },
+            "sleep": {
+              "a": "We don't, much. The chrome hums all night. It's a nice s-song.",
+              "note": "\"The chrome hums all night.\""
+            }
+          },
+          "model": "Tonight you say 'we' and 'us' where you would say 'I' and 'me', you and your chrome together, and you do not notice you are doing it."
+        }
+      ]
+    },
+    "temper": {
+      "normal": [
+        {
+          "id": "together",
+          "text": "Pushed, everything flares together.",
+          "press": {
+            "line": "Excuse me? I'm a s-singer, not a headline. Check your own wiring!",
+            "face": "angry",
+            "hands": "point",
+            "note": "Eyes flashed, voice jumped: all at once."
+          },
+          "flare": {
+            "line": "Hey! Eyes up here, doc! ...Sorry. I hate being st-stared at.",
+            "face": "angry",
+            "hands": "slam",
+            "note": "Slapped the glass, face and voice at once."
+          },
+          "model": "When provoked, you flare up all at once: a sharp joke, a raised voice and a pointed finger."
+        }
+      ],
+      "broken": [
+        {
+          "id": "flat",
+          "text": "Pushed, her face and screens went still while her finger jabbed.",
+          "press": {
+            "line": "S-sure. Whatever you s-say.",
+            "face": "flat",
+            "hands": "point",
+            "note": "Still face, flat voice. A finger jabbing at you."
+          },
+          "flare": {
+            "line": "Eyes up h-here.",
+            "face": "blank",
+            "hands": "slam",
+            "note": "Hand hit the glass. Face and screens still."
+          },
+          "model": "When provoked tonight you do not flare up: your voice goes flat and polite and you stop joking, while your hands keep moving."
+        }
+      ]
+    }
   },
   "outcomes": {
-    "treat": {"title": "NEW VOICE BOX",
-      "text": "Juno runs a scale, clean to the top, and sings herself out the door. The fee is all small coins."},
-    "refer": {"title": "FALSE CALL",
-      "text": "They scan Juno twice on the way out and find a singer. The most chrome in the room was the steadiest person in it. The call-out goes on your bill."},
-    "walkout": {"title": "WALKED OUT",
-      "text": "Juno takes her static back to the street. The hat stays empty tonight."},
-    "false_alarm": {"title": "FALSE ALARM",
-      "text": "The shutter drops on a singer with a broken voice box. She looked strange. She was fine. That costs you."},
-    "gave_up": {"title": "OUT OF PATIENCE",
-      "text": "Midnight was not going to wait, and neither was Juno. She sings the set through the static. No fee, no bill."}
+    "stable": {
+      "treat": {
+        "title": "NEW VOICE BOX",
+        "text": "Juno runs a scale, clean to the top, and sings herself out the door. The fee is all small coins."
+      },
+      "refer": {
+        "title": "FALSE CALL",
+        "text": "They scan Juno twice on the way out and find a singer. The most chrome in the room was the steadiest person in it. They take the fee back, and the call-out goes on your bill."
+      },
+      "walkout": {
+        "title": "WALKED OUT",
+        "text": "Juno takes her static back to the street. The hat stays empty tonight."
+      },
+      "false_alarm": {
+        "title": "FALSE ALARM",
+        "text": "The shutter drops on a singer with a broken voice box. She looked strange. She was fine. That costs you."
+      },
+      "gave_up": {
+        "title": "OUT OF PATIENCE",
+        "text": "Midnight was not going to wait, and neither was Juno. She sings the set through the static. No fee, no bill."
+      }
+    },
+    "drifting": {
+      "treat": {
+        "title": "NEW VOICE BOX",
+        "text": "The new box hits every note. At 02:00 someone at her corner gets too close to the chrome. Your stamp is on her card."
+      },
+      "refer": {
+        "title": "TAKEN IN",
+        "text": "Juno hums all the way to the van, the same three notes over and over. The crew asks you, quietly, whether that is a song."
+      },
+      "caught": {
+        "title": "SHUTTER HELD",
+        "text": "Ten DEFT picks scrape across the slats like a scale run backwards. Then the hall is quiet. Trauma Team takes her out still humming."
+      },
+      "hit": {
+        "title": "TOO SLOW",
+        "text": "The DEFT picks came through before the shutter did. The last note you hear is hers. The clinic stays dark."
+      },
+      "locked_out": {
+        "title": "LOCKED OUT",
+        "text": "The shutter drops on a singer mid-joke. Before closing, her corner calls in a woman humming at the crowd with her fingers out. You were right. Nobody pays for that."
+      },
+      "gave_up": {
+        "title": "OUT OF PATIENCE",
+        "text": "Juno goes back to her corner, humming the same three notes. You made no call. Nobody is paid for that."
+      }
+    }
   }
 }

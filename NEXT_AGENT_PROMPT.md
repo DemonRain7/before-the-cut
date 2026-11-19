@@ -1,6 +1,6 @@
 # Continue Before the Cut
 
-Updated November 18, 2026, late evening. Work on main in this repository, the only active checkout;
+Updated November 19, 2026. Work on main in this repository, the only active checkout;
 pull first. The sibling fathom directory is an archive. Do not write there or copy its Git history.
 
 Read AGENTS.md, HANDOFF.md, game/README.md, docs/development/chinese-translation.md and
@@ -12,11 +12,31 @@ English and Chinese: a change to its English is a change to its Chinese in the s
 
 Git: both rounds of November 16 are in commit 822e8d7. The work of November 17 is in e7f94d7,
 made and pushed to origin/main on November 18 when the student asked. The language work of
-November 18 is in 3f1fcbd, pushed. The work of the latest checkpoint is committed after it,
+November 18 is in 3f1fcbd, pushed; the work of late November 18 is in a487cea, pushed. The
+work of the latest checkpoint is committed after it,
 together with this file. Run git status -sb and git log -3 --oneline: anything uncommitted is
 newer than this file.
 
-Latest checkpoint (November 18, late evening): the student's five requests of that evening,
+Latest checkpoint (November 19): the data and the code of random signs, built by Claude (Opus
+5.5) and checked; nobody has played it. The five characters stay as they are; each night draws
+from its seed who of them drift (one to three) and which sign each sheet row shows (two to four
+broken rows on a drifting visitor, at least two of them rows the doctor can test whatever the
+patient says). cases/<id>.json (version 3) lists each character's normal and broken signs, row
+by row, with their notes, looks, readings, answers, reactions, report lines and a sentence for
+the model; case_db.gd compose() builds the night's case and checks every sign in its place.
+data/nights.json has fixed test nights A (as written), B (the truths turned round) and H
+(--test-night=<name>; --authored-order plays A). Rules version 9: Trauma Team's bounty is the
+patient's own fee, paid on account at the counter and kept or taken back at closing; the line
+is 400 an hour; the visitors' fees come under the line but within one drop of it. Not done yet:
+attack art for Kip, Rook and Juno, and dark threads on any port but Vale's (a drifting Kip
+attacks as an unchanged portrait; a port with threads looks clean). The model's briefs still
+state Vale's and Maren's drift as fact, and the game does not send the night's signs. OPEN,
+BARELY and ON NOTICE are out of reach with the present five. Checks, all passed: run_tests 996;
+the scene test 1001, 1002 in Chinese, 1001 with less blood; the window close 5; the proxy 39;
+over HTTP 199 and 15 wire checks; dry captures 204, 204, 99 and 99; measure_text 908 lines in
+each language.
+
+Previous checkpoint (November 18, late evening): the student's five requests of that evening,
 paraphrased: say whether a call succeeded only at the end, so the player is less sure, and go
 over the whole logic for holes; what is 黑丝 (answered in chat: the assistant's shorthand for the
 dark threads that spread from a port, 黑色纹路 in the game; the glossary now warns that 黑丝
@@ -45,10 +65,9 @@ characters with all their assets. Built by Claude (Opus 5.5) and checked:
   buzzed in, and the report comes up under LIGHTS OUT with the visitors still in the hall
   named as never seen; the hour is not read, the meter stays at that hour and no line is held.
   The event log records lights_out.
-Not built yet: random signs with the per-part art, and the five new characters (Next three
-tasks).
+Not built then: random signs with the per-part art, and the five new characters.
 
-Previous checkpoint (November 18, evening): the student's requests of that day, built by Claude
+Earlier checkpoint (November 18, evening): the student's requests of that day, built by Claude
 (Opus 5.5). After the November 17 build was pushed and opened for them in a window, the student
 sent a screenshot of the third opening card (THE LANTERNS) and asked, paraphrased: what the
 card and "chrome" mean; a language option on the title screen, Chinese first, with everything
@@ -230,32 +249,31 @@ read only with python -I), and no English picture or sound changed. Commit each 
 gained the language field, the Chinese limits, the Chinese prompt and the transcription
 language.
 
-Random signs, answered late on November 18: build them, with the art, now. Nothing of it is
-built yet: only the arrival order, the two contacts, the timing of snaps and flares and a few
-offline line variants are random. The plan is the assistant's proposal of that afternoon,
-taken in full: fixed characters whose condition each night draws from its seed (one to three
-drifting, never the first patient of a session; at least two broken lines each, one of them
-needing a tool or a question; harmless decoys on the steady ones), a sign library keyed by slot
-and model on top of the spec binder, every character's normal look, an abnormal look for each
-part and attack art (only Vale and Maren have attack art now), neutral model briefs with the
-night's signs sent by the game, a validator run over a few hundred generated nights, and fixed
-test nights (A as now, B the reverse, more for the new characters) with a coverage check.
-HANDOFF.md, Student decisions, November 18, items 2 and 4, has the proposal and the answer.
+Random signs, answered late on November 18: build them, with the art, now. The data and the
+code are built (November 19, above); the art and the model's briefs are not. What was built
+differs from the proposal of that afternoon in three ways: the signs live in each character's
+file (cases/<id>.json, version 3) rather than in a sign library keyed by slot and model; a
+steady visitor shows only normal signs (no decoys yet); and the money changed (rules version 9)
+because drawn truths broke the old line. HANDOFF.md, Student decisions, November 18, items 2
+and 4, has the proposal and the answer.
 
 Next three tasks (first run git status -sb and git log -3 --oneline):
-1. Prepare two Braintrust replies due November 19, 23:59 New York (the soonest deadline), once
+1. Prepare two Braintrust replies due today, November 19, 23:59 New York (the soonest deadline), once
    the student has picked two G1 pitches with fewer than two replies: specific, moment-based
    notes in English for the student's review, never sent unasked. G1 is submitted; leave its
    snapshots, slides and narration alone.
-2. Random signs with every character's art for each part (above; HANDOFF.md, Next three tasks,
-   has the order of the work): the case files' parts and data/signs.json, the night composer
-   and its validator over a few hundred seeds, the test nights and the coverage check, the art
-   from tools/art/ (the port clean, with dark threads and raw, the other parts' abnormal looks,
-   attack art for Kip, Rook and Juno), exit lines and neutral briefs, in English and Chinese
-   together, with mock calls only.
-3. Five new characters with all their assets: case files, contacts' clues, Chinese, the
-   proxy's imports and briefs, every part's art and an attack. HANDOFF.md has the working
-   sketch (a nurse, a noodle cook, a netrunner, an off-duty police officer, a pit fighter).
+2. Every character's art for each part, and the model's briefs (the rest of request 3), from
+   tools/art/ only: the port clean and with dark threads for every character (the portrait's
+   <layer>_t twins where the port shows, the close-up's port_threads.png), attack art for Kip,
+   Rook and Juno with the attack drawing made general; then briefs that hold on any night, the
+   game sending the night's speech and temper signs, and the proxy adding each sign's sentence
+   for the model. English and Chinese together; mock calls only.
+3. Five new characters with all their assets: case files with every sign of every row,
+   contacts' clues, Chinese, the proxy's imports and briefs, every part's art and an attack,
+   test nights that show their signs (and Rook's broken eyes and temper and Maren's dark
+   threads), and a coverage check that fails on a sign no test night shows. HANDOFF.md has the
+   working sketch (a nurse, a noodle cook, a net diver, an off-duty police officer, a pit
+   fighter).
 Once they are built, the student plays and reads (.\run-game.ps1, with headphones): a night in
 Chinese from a fresh start and a night in English, reading every card, tip, sheet, slip and
 report page and typing with a real Chinese input method; then settles the proposals in

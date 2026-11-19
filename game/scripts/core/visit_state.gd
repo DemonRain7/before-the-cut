@@ -17,10 +17,12 @@ extends RefCounted
 ## attack mid-exam; anyone may flare once a visit (a shout and a hand on the glass, never an
 ## attack, TEMPER evidence only). The training visit has neither.
 ## The result is told twice (rules version 8). At the counter only what does not depend on the
-## truth: the fee for work done, whoever the patient was, the drop and CALM, and words that
-## hold either way (rules.json "counter"). The rest comes in at closing, with the night's
-## reports: whether the call was right, what Trauma Team pays or bills, and the bill for work
-## on a patient who drifted (credits_for() less counter_credits_for()).
+## truth: the fee, whoever the patient was, the drop and CALM, and words that hold either way
+## (rules.json "counter"). Since rules version 9 the fee comes in for a patient Trauma Team took
+## as well as for work done: the crew pays it on account. The rest comes in at closing, with the
+## night's reports: whether the call was right, Trauma Team keeping what it paid or taking it
+## back with the call-out, and the bill for work on a patient who drifted (credits_for() less
+## counter_credits_for()).
 ## This class owns the truth, the evidence, patience, attacks and the result. The patient
 ## AI supplies original dialogue and decides exam cooperation. The offline script alone
 ## uses authored move choices. Physical test readings, scoring and attack timing stay here.
@@ -690,7 +692,8 @@ func credits_for(p_outcome: String) -> int:
 		"treated_drifting":
 			return int(_rule("scoring", "treat_drifting", -400))
 		"referred_drifting", "caught":
-			return int(_rule("scoring", "refer_drifting", 120))
+			# Trauma Team's bounty: the patient's fee, plus refer_drifting (rules version 9)
+			return int(case_data.get("fee", 0)) + int(_rule("scoring", "refer_drifting", 0))
 		"referred_stable":
 			# the crew came out for a steady patient: the call-out is billed
 			return int(_rule("scoring", "false_call", -150))
@@ -710,17 +713,21 @@ func is_correct(p_outcome: String) -> bool:
 	return false
 
 
-## What an outcome pays at the counter, on the spot: the fee for the work, whoever the patient
-## was. Everything that depends on the truth comes in at closing.
+## What an outcome pays at the counter, on the spot (rules version 9): the patient's fee, for
+## work done or for a patient Trauma Team took, whoever the patient was. The crew pays the fee on
+## account; its report at closing keeps it as the bounty for a drifting patient, or takes it back
+## with the call-out for a steady one. A shutter, a walkout or a patient who gave up pays nothing
+## here. So the readings through the night move with the work done, never with the truth.
 func counter_credits_for(p_outcome: String) -> int:
-	if p_outcome.begins_with("treated"):
+	if p_outcome.begins_with("treated") or p_outcome.begins_with("referred") or p_outcome == "caught":
 		return int(case_data.get("fee", 0))
 	return 0
 
 
-## What the same outcome adds at closing, when the night's reports are in: Trauma Team's
-## bounty or bill, the bill for work on a patient who drifted (it takes the fee back too), the
-## cost of a shutter dropped on somebody steady.
+## What the same outcome adds at closing, when the night's reports are in: refer_drifting on top
+## of the fee Trauma Team paid for a drifting patient; the fee back and the call-out for a steady
+## one; the fee back and the bill for work on a patient who drifted; the cost of a shutter dropped
+## on somebody steady.
 func closing_credits_for(p_outcome: String) -> int:
 	return credits_for(p_outcome) - counter_credits_for(p_outcome)
 

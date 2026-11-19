@@ -200,8 +200,28 @@ class Script:
         self.enums = {}      # enum name -> set of values
         self._collect()
 
-    def _collect(self):
+    def _logical_lines(self):
+        """The lines with a signature that runs on over several lines (its parameter list
+        broken after a comma) joined into one."""
+        out = []
+        held = ""
         for line in self.blank_lines:
+            if held:
+                held += " " + line.strip()
+            elif re.match(r"^\t*(?:static\s+)?func\s", line):
+                held = line
+            else:
+                out.append(line)
+                continue
+            if held.count("(") <= held.count(")"):
+                out.append(held)
+                held = ""
+        if held:
+            out.append(held)
+        return out
+
+    def _collect(self):
+        for line in self._logical_lines():
             m = FUNC_RE.match(line)
             if m:
                 if m.group(1) != "":

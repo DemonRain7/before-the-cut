@@ -358,14 +358,18 @@ def verdicts():
 
 def visit_money(rules, fees, pay, calm_most):
     """Every figure a visit can show on the report (its counter, closing and in-all money, and
-    the totals row): the fee with or without a drop and the calm-patches, each scoring rule the
-    same way, and the fee a patient who drifted takes back at closing."""
-    scoring = {k: int(v) for k, v in rules["scoring"].items()}
+    the totals row): the fee with or without a drop and the calm-patches, the fee with Trauma
+    Team's bounty on top (rules version 9: the crew pays the fee on account), each scoring rule
+    the same way, and at closing the fee taken back with a bill: the call-out for a steady
+    patient, or the work on one who drifted."""
+    scoring = {k: int(v) for k, v in rules["scoring"].items() if not isinstance(v, str)}      # not its note
+    bounty = scoring.get("refer_drifting", 0)
     out = set()
-    for v in set(fees) | set(scoring.values()) | {0}:
+    for v in set(fees) | {fee + bounty for fee in fees} | set(scoring.values()) | {0}:
         out |= {v, v + pay, v - calm_most, v + pay - calm_most}
     for fee in fees:
-        out.add(scoring.get("treat_drifting", 0) - fee)
+        for k in ("treat_drifting", "false_call"):
+            out.add(scoring.get(k, 0) - fee)
     return sorted(out)
 
 
@@ -700,20 +704,36 @@ def main():
         rows.append(check("request", cid + ".request", c["request"]))
         for z, t in c["looks"].items():
             rows.append(check("look", cid + ".looks." + z, t))
-        for t, chk in c["checks"].items():
-            rows.append(check("note", cid + ".checks." + t, chk["note"].replace("{t}", "0.0")))
+        # every sign of every row (case data version 3): the night picks one sign a row, so any of
+        # them can be the one on the screen: its card note, its look, its line after the grip,
+        # its answers, its reaction to a press and its flare, and its row on the report
+        for row, kinds in c.get("signs", {}).items():
+            for kind in ("normal", "broken"):
+                for s in kinds.get(kind, []):
+                    where = "%s.signs.%s.%s" % (cid, row, s.get("id", "?"))
+                    if s.get("note"):
+                        rows.append(check("note", where + ".note", s["note"].replace("{t}", "0.0")))
+                    if s.get("look"):
+                        rows.append(check("look", where + ".look", s["look"]))
+                    if s.get("after"):
+                        rows.append(check("line", where + ".after", s["after"]))
+                    for tid, said in s.get("answers", {}).items():
+                        rows.append(check("note", where + ".answers." + tid + ".note", said.get("note", "")))
+                        rows.append(check("line", where + ".answers." + tid + ".a", said.get("a", "")))
+                    for k in ("press", "flare"):
+                        p = s.get(k, {})
+                        if p.get("note"):
+                            rows.append(check("note", where + "." + k + ".note", p["note"]))
+                        if p.get("line"):
+                            rows.append(check("line", where + "." + k + ".line", p["line"]))
+                    rows.append(check_finding(where + ".text", s.get("text", ""), kind == "normal"))
         for k, cl in c.get("claims", {}).items():
             rows.append(check("note", cid + ".claims." + k, cl["note"]))
         for tp in c["topics"]:
             rows.append(check("question", cid + ".topics." + tp["id"] + ".q", tp["q"]))
-            rows.append(check("note", cid + ".topics." + tp["id"] + ".note", tp["note"]))
-            rows.append(check("line", cid + ".topics." + tp["id"] + ".a", tp["a"]))
-        for i, p in enumerate(c["press"]):
-            if "note" in p:
-                rows.append(check("note", cid + ".press%d.note" % i, p["note"]))
-            rows.append(check("line", cid + ".press%d.line" % i, p["line"]))
-        for r, row in c["rows"].items():
-            rows.append(check_finding(cid + ".rows." + r, row["text"], bool(row.get("ok", True))))
+        # the line after the last press: the walk-out for somebody steady, the turn for somebody drifting
+        for k, s in c.get("press_end", {}).items():
+            rows.append(check("line", cid + ".press_end." + k, s))
         # the visit's page of the report: who it was, what the player did beside what was true,
         # and how it ended; and its row among the totals
         role = tr("%s, %d" % (c["role"], int(c["age"]))) + tally_gap + tr("For: %s" % c["request"])
@@ -723,12 +743,15 @@ def main():
         rows.append(("visit_call", cid + ":_draw_visit_page call", w, widest_call + " | " + was,
                      " TOO WIDE (limit %d)" % REPORT_WIDTH if w > REPORT_WIDTH else ""))
         rows.append(check("report_name", cid + ".name (totals row)", c["name"], bold=True, limit=REPORT_NAME_ROOM - 4))
-        for k, o in c["outcomes"].items():
-            rows.append(check("outcome", cid + ".outcomes." + k, o["text"]))
-            rows.append(check_lines("visit_text", cid + ".outcomes." + k + ".lines", o["text"], REPORT_WIDTH - 16, visit_lines))
-            rows.append(check("visit_title", cid + ".outcomes." + k + ".title", o["title"], bold=True))
-            rows.append(check("totals_row", cid + ".outcomes." + k + ".title (totals row)", o["title"],
-                              limit=REPORT_VISIT_ROOM - tw(widest_money) - SLIP_GAP))
+        # how a visit ends, for either truth: the night decides which of the two it is
+        for truth, ends in c["outcomes"].items():
+            for k, o in ends.items():
+                where = "%s.outcomes.%s.%s" % (cid, truth, k)
+                rows.append(check("outcome", where, o["text"]))
+                rows.append(check_lines("visit_text", where + ".lines", o["text"], REPORT_WIDTH - 16, visit_lines))
+                rows.append(check("visit_title", where + ".title", o["title"], bold=True))
+                rows.append(check("totals_row", where + ".title (totals row)", o["title"],
+                                  limit=REPORT_VISIT_ROOM - tw(widest_money) - SLIP_GAP))
         rows.append(check("line", cid + ".teaser", c["teaser"]))
         for k, v in c["lines"].items():
             for s in (v if isinstance(v, list) else [v]):
@@ -739,7 +762,8 @@ def main():
     # "counter", filled with the widest name), and under the rule what the counter took in
     names = [c["name"] for c in cases]
     longest_name = max(names, key=tw) if names else ""
-    head = tr("INTAKE SLIP %d/%d" % (len(rules.get("shift_order", [])), len(rules.get("shift_order", []))))
+    visitors = int(rules.get("night", {}).get("visitors", len(rules.get("shift_order", []))))
+    head = tr("INTAKE SLIP %d/%d" % (visitors, visitors))
     w = text_width(head) + 1 + SLIP_GAP + tw(longest_name) + 1
     rows.append(("slip_call", "main.gd:_draw_slip head", w, head + " | " + longest_name,
                  " TOO WIDE (limit %d)" % SLIP_WIDTH if w > SLIP_WIDTH else ""))
@@ -768,7 +792,8 @@ def main():
     for name, text in consts(MAIN_GD, r"^SLIP_LATER$"):
         rows.append(check("slip_call", "main.gd:" + name, text, limit=SLIP_WIDTH))
     # the numbers the words are filled with (main.gd: _ready)
-    hours = len(rules.get("shift_order", []))
+    # one visitor is one hour (rules.json night.visitors since rules version 9)
+    hours = visitors
     per_hour = int(rules.get("line", {}).get("per_hour", 0))
     threshold = int(sheet.get("threshold", 0))
     glass = int(rules.get("attack", {}).get("glass", 0))
@@ -786,8 +811,11 @@ def main():
     longest_package = max(packages, key=lambda t: tw(t)) if packages else ""
     aliases = [str(e.get("alias", "")) for e in contact_data.get("pool", [])]
     longest_alias = max(aliases, key=lambda t: tw(t, True)) if aliases else ""
-    best = sum(sorted(fees | {int(rules["scoring"].get("refer_drifting", 0))}, reverse=True)[:1]) * hours
-    worst = min(int(v) for v in rules["scoring"].values()) * hours
+    # the widest readings: every hour at the dearest fee with Trauma Team's bounty on top, and
+    # every drop of the night; or every hour at the worst a visit can cost
+    best = (max(fees | {0}) + max(0, int(rules["scoring"].get("refer_drifting", 0)))) * hours \
+        + int(contacts.get("pay", 0)) * int(contacts.get("per_night", 0))
+    worst = min(int(v) for v in rules["scoring"].values() if not isinstance(v, str)) * hours
     line_total = per_hour * hours
     # the end-of-shift report
     for t in rules.get("titles", []):

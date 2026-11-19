@@ -42,7 +42,7 @@ const clip = (bytes = wav(1.5)) => ({
 });
 
 const dialogue = (visit) => ({
-	protocol: PROTOCOL, session_id: "voice-session", visit_id: visit, case_id: "kip", case_version: 2,
+	protocol: PROTOCOL, session_id: "voice-session", visit_id: visit, case_id: "kip", case_version: 3,
 	event: { type: "say", id: "free", text: "Are you all right?" },
 	state: { patience: 6, patience_max: 6, granted: [], refusals: {}, reassured: [], claims: [], asked: {}, press_count: 0, reassure_used: 0, history: [] },
 	conversation_history: [], limits: { max_line_chars: 110 },

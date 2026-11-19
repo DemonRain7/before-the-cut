@@ -1,0 +1,186 @@
+{
+  "version": 1,
+  "note": "Test nights (version 1, added 2026-11-18 with rules version 9): fixed nights beside the drawn ones, played with --test-night=<name> (night A also with --authored-order, and it is the night a test or a capture builds when it names nobody). Each lists its visitors in the order they come, each with a truth and the sign each sheet row shows: an id from that character's cases/<id>.json signs (a row left out shows the first normal sign). Every night must be one the draw could make on the first night of a session (case_db night_drawable): the right number of visitors, drifting visitors and broken rows, a steady first visitor who can carry a fair contact, fees under the line and within one drop of it, and enough fair contacts.",
+  "nights": {
+    "A": {
+      "note": "The night as written, and the order of rules.json shift_order: Kip, Rook and Juno steady; Vale and Maren drifting, each with four broken rows and one that looks fine (Vale's grip, Maren's port). Fees 1900.",
+      "visitors": [
+        {
+          "id": "kip",
+          "truth": "stable",
+          "signs": {
+            "eyes": "steady",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "own",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "rook",
+          "truth": "stable",
+          "signs": {
+            "eyes": "steady",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "own",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "vale",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "dead",
+            "hands": "lets_go",
+            "port": "threads",
+            "speech": "it",
+            "temper": "flat"
+          }
+        },
+        {
+          "id": "juno",
+          "truth": "stable",
+          "signs": {
+            "eyes": "steady",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "own",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "maren",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "wide",
+            "hands": "holds",
+            "port": "calm",
+            "speech": "lost",
+            "temper": "blank"
+          }
+        }
+      ]
+    },
+    "B": {
+      "note": "The first five with the truths turned round: Maren and Vale steady, Kip, Juno and Rook drifting with two, four and three broken rows. Kip's eyes and grip, Juno's eyes, grip, port and temper, Rook's grip, port and speech. Fees 1900.",
+      "visitors": [
+        {
+          "id": "maren",
+          "truth": "stable",
+          "signs": {
+            "eyes": "steady",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "own",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "kip",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "drags",
+            "hands": "holds",
+            "port": "calm",
+            "speech": "own",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "vale",
+          "truth": "stable",
+          "signs": {
+            "eyes": "snaps",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "own",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "juno",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "stray",
+            "hands": "holds",
+            "port": "threads",
+            "speech": "own",
+            "temper": "flat"
+          }
+        },
+        {
+          "id": "rook",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "steady",
+            "hands": "locks",
+            "port": "threads",
+            "speech": "it",
+            "temper": "together"
+          }
+        }
+      ]
+    },
+    "H": {
+      "note": "Three drifting with few signs each: Vale's grip and speech (his port, which he will not show, looks fine), Kip's port, speech and temper, Juno's grip and speech. Rook opens and Maren comes fourth, both steady. With nights A and B it shows every sign of Kip, Juno and Vale; Rook's eyes and temper and Maren's port are left to the nights with the new visitors. Fees 1900.",
+      "visitors": [
+        {
+          "id": "rook",
+          "truth": "stable",
+          "signs": {
+            "eyes": "steady",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "own",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "vale",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "snaps",
+            "hands": "holds",
+            "port": "calm",
+            "speech": "it",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "kip",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "steady",
+            "hands": "lets_go",
+            "port": "threads",
+            "speech": "it",
+            "temper": "flat"
+          }
+        },
+        {
+          "id": "maren",
+          "truth": "stable",
+          "signs": {
+            "eyes": "steady",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "own",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "juno",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "steady",
+            "hands": "holds",
+            "port": "calm",
+            "speech": "we",
+            "temper": "together"
+          }
+        }
+      ]
+    }
+  }
+}

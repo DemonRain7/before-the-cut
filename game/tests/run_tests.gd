@@ -1,6 +1,6 @@
 extends SceneTree
-## Headless rule tests for the reference-sheet loop (case data version 2, rules version 7,
-## sheet version 4, parts version 1, contacts version 1). The second decision is a call to
+## Headless rule tests for the reference-sheet loop (case data version 3, rules version 9,
+## sheet version 4, parts version 1, contacts version 1, nights version 1). The second decision is a call to
 ## Trauma Team; in the rules and the data its id is "refer". Rules version 4 added the hourly
 ## line, the patient who leaves when patience runs out, and the counter glass that remembers
 ## every blow for the rest of the shift. Rules version 5 lets the doctor pay, between patients,
@@ -8,6 +8,10 @@ extends SceneTree
 ## codes, a CALM that costs credits, a line that right calls alone no longer hold, and the
 ## patient who snaps or flares. Rules version 7 moves the grip limit into the spec binder
 ## (data/parts.json): a patient is a set of parts, and the sheet is pulled for their models.
+## Rules version 8 tells right and wrong only at closing, and a patient who gets through the
+## window ends the night. Rules version 9 draws each night from the seed (who comes, who drifts,
+## and which sign each row shows: any row of anyone can be the broken one), makes Trauma Team's
+## bounty the patient's fee, paid on account at the counter, and puts the line at 400 an hour.
 ## Run from the repository root:  godot --headless --path game --script res://tests/run_tests.gd
 ## These check program rules only. They are not a playtest and say nothing about fun.
 
@@ -120,7 +124,7 @@ func _initialize() -> void:
 	test_line()
 	test_glass()
 	test_repair()
-	test_arrivals()
+	test_night_draw()
 	test_contacts()
 	test_codes()
 	test_calm_cost()
@@ -357,7 +361,7 @@ func test_verdict_any_time() -> void:
 			eq(v.phase, VisitState.Phase.ATTACK, "%s: attack phase" % id)
 		else:
 			eq(v.outcome, "referred_drifting", "%s: quiet handover" % id)
-			eq(v.settlement()["credits"], int(rules["scoring"]["refer_drifting"]), "%s: handover fee" % id)
+			eq(v.settlement()["credits"], int(cases[id]["fee"]) + int(rules["scoring"]["refer_drifting"]), "%s: Trauma Team's bounty is the fee" % id)
 			eq(v.settlement()["title"], "TAKEN IN", "%s: the slip names the handover" % id)
 
 
@@ -516,7 +520,7 @@ func test_press_and_attack() -> void:
 		eq(v.press()["result"], "attack", "%s: second press brings the attack" % id)
 		eq(v.attack_cause, "press", "%s: cause recorded" % id)
 		eq(v.shutter()["result"], "caught", "%s: shutter stops it" % id)
-		eq(v.settlement()["credits"], int(rules["scoring"]["refer_drifting"]), "%s: caught pays the handover fee" % id)
+		eq(v.settlement()["credits"], int(cases[id]["fee"]) + int(rules["scoring"]["refer_drifting"]), "%s: caught pays the bounty" % id)
 		ok(v.settlement()["correct"], "%s: caught counts as right" % id)
 		v = visit(id)
 		v.press()
@@ -681,16 +685,19 @@ func test_counter_and_closing() -> void:
 	eq([a["counter_fee"], b["counter_fee"]], [fee_kip, fee_maren], "and the counter takes the fee from both")
 	eq([a["closing"], b["closing"]], [0, int(rules["scoring"]["treat_drifting"]) - fee_maren],
 		"at closing the work on somebody who drifted is billed, and takes the fee back")
-	# called in: nothing at the counter either way; the bounty or the call-out bill comes at closing
+	# called in: the crew pays the fee on account either way (rules version 9); at closing it keeps
+	# it as the bounty, or takes it back and bills the call-out
 	var called_steady := visit("kip")
 	called_steady.verdict("refer")
 	var called_drifting := visit("maren")
 	called_drifting.verdict("refer")
 	var c := called_steady.settlement()
 	var d := called_drifting.settlement()
-	eq([c["counter_title"], c["counter"], d["counter"]], [d["counter_title"], 0, 0], "a call to the crew prints the same slip and takes nothing in")
-	eq([c["closing"], d["closing"]], [int(rules["scoring"]["false_call"]), int(rules["scoring"]["refer_drifting"])],
-		"the call-out bill or the bounty comes at closing")
+	eq([c["counter_title"], c["counter"], d["counter"]], [d["counter_title"], fee_kip, fee_maren],
+		"a call to the crew prints the same slip and takes the fee in on account, from either")
+	eq([c["closing"], d["closing"]], [int(rules["scoring"]["false_call"]) - fee_kip, int(rules["scoring"]["refer_drifting"])],
+		"at closing the fee is taken back with the call-out bill, or kept as the bounty")
+	eq([a["counter"], b["counter"]], [c["counter"], d["counter"]], "a treat and a call bring in the same at the counter")
 	# the shutter before any attack: the same slip for a false alarm and a lock-out
 	var shut_steady := visit("kip")
 	shut_steady.shutter()
@@ -708,8 +715,8 @@ func test_counter_and_closing() -> void:
 	courier_visit.say_code(entry)
 	courier_visit.verdict("refer")
 	var g := courier_visit.settlement()
-	eq([g["counter"], g["counter_fee"], g["closing"]], [int(rules["contacts"]["pay"]), 0, int(rules["scoring"]["false_call"])],
-		"a drop is paid at the counter; the call-out still waits for closing")
+	eq([g["counter"], g["counter_fee"], g["closing"]], [int(rules["contacts"]["pay"]) + fee_kip, fee_kip, int(rules["scoring"]["false_call"]) - fee_kip],
+		"a drop is paid at the counter, with the fee on account; the call-out still waits for closing")
 	for s in [a, b, c, d, e, f, g]:
 		eq(int(s["counter"]) + int(s["closing"]), int(s["credits"]), "%s %s: the counter and closing make the whole visit" % [s["case_id"], s["outcome"]])
 	# the till through the night is counter money; at closing it is everything
@@ -742,7 +749,7 @@ func test_generated_speech_findings() -> void:
 	eq(speech.text, actual, "feedback retains the answer actually heard")
 	ok(speech.text != cases.vale.rows.speech.text, "feedback does not substitute the authored sleep quote")
 	ok(bool(speech.seen), "the recorded answer was heard")
-	eq([s.truth, s.outcome, s.credits], ["drifting", "caught", 120], "dialogue does not alter truth, attack or payment")
+	eq([s.truth, s.outcome, s.credits], ["drifting", "caught", int(cases.vale.fee) + int(rules.scoring.refer_drifting)], "dialogue does not alter truth, attack or payment")
 	eq([s.rows[0].ok, s.rows[2].ok], [false, false], "physical findings remain fixed")
 	var free := visit("kip")
 	free.apply_dialogue("free", "I want to get back to work.")
@@ -803,17 +810,17 @@ func test_shift() -> void:
 	var pay := int(rules["contacts"]["pay"])
 	play(shift, {"kip": "treat", "rook": "treat", "vale": "refer", "juno": "treat", "maren": "refer"})
 	var rep := shift.report()
-	eq(rep["total"], 1140, "perfect calls alone: 1140")
+	eq(rep["total"], 1900, "perfect calls alone: 1900, the night's fees")
 	eq(rep["correct"], 5, "perfect shift calls")
 	eq(rep["line"], 5 * int(rules["line"]["per_hour"]), "five hours put the line at five times the hourly figure")
-	eq(rep["line"], 1200, "which is 1200")
+	eq(rep["line"], 2000, "which is 2000")
 	ok(not bool(rep["line_held"]), "right calls alone no longer hold the line: the night needs a drop")
 	eq(rep["title"], "THE CUT", "and a night of right calls with no drop is the cut")
 	eq([rep["drops"], rep["drop_total"]], [0, 0], "no drop was made")
 	shift = ShiftState.new(rules)
 	play(shift, {"kip": "treat", "rook": "treat", "vale": "refer", "juno": "treat", "maren": "refer"}, [], ["kip"])
 	rep = shift.report()
-	eq([rep["total"], rep["drops"], rep["drop_total"]], [1140 + pay, 1, pay], "perfect calls and one drop")
+	eq([rep["total"], rep["drops"], rep["drop_total"]], [1900 + pay, 1, pay], "perfect calls and one drop")
 	ok(bool(rep["line_held"]), "perfect calls and one drop hold the line")
 	eq(rep["title"], "STEADY HANDS", "perfect shift title")
 	shift = ShiftState.new(rules)
@@ -826,14 +833,14 @@ func test_shift() -> void:
 	shift = ShiftState.new(rules)
 	play(shift, {"kip": "refer", "rook": "refer", "vale": "refer", "juno": "refer", "maren": "refer"})
 	rep = shift.report()
-	eq(rep["total"], -210, "call-everyone total: three call-outs billed")
+	eq(rep["total"], 550, "call-everyone total: two bounties, less three call-outs")
 	eq(rep["correct"], 2, "call-everyone calls")
 	ok(not bool(rep["line_held"]), "call-everyone ends under the line")
 	eq(rep["title"], "THE CUT", "call-everyone title")
 	# with both drops one needless call can be afforded; with one drop it cannot, nor can two calls
 	var one := ShiftState.new(rules)
 	play(one, {"kip": "treat", "rook": "treat", "vale": "refer", "juno": "refer", "maren": "refer"}, [], ["kip", "rook"])
-	eq(one.report()["total"], 640 + 2 * pay, "one false call and two drops")
+	eq(one.report()["total"], 1400 + 2 * pay, "one false call and two drops: exactly the line")
 	eq(one.report()["correct"], 4, "one false call leaves four right calls")
 	ok(bool(one.report()["line_held"]), "one false call and both drops still hold the line")
 	var one_drop := ShiftState.new(rules)
@@ -841,7 +848,7 @@ func test_shift() -> void:
 	ok(not bool(one_drop.report()["line_held"]), "one false call and one drop do not")
 	var two := ShiftState.new(rules)
 	play(two, {"kip": "treat", "rook": "refer", "vale": "refer", "juno": "refer", "maren": "refer"}, [], ["kip", "rook"])
-	eq(two.report()["total"], 190 + 2 * pay, "two false calls and two drops")
+	eq(two.report()["total"], 950 + 2 * pay, "two false calls and two drops")
 	ok(not bool(two.report()["line_held"]), "two false calls end under the line, drops or not")
 	# the report says in words what the till means, and its title reads the whole night
 	eq(str(rep["line_text"]), str(rules["line_text"]["short"]), "a night under the line says so")
@@ -885,19 +892,23 @@ func test_shift() -> void:
 	ok(not bool(thin_rep["line_held"]), "which is under the line")
 	eq(thin_rep["title"], "THE CUT", "four right calls under the line are still the cut")
 	var sore := ShiftState.new(rules)
-	for row in [[250 + pay, true, false], [300 + pay, true, false], [350, true, false], [120, true, false], [-300, false, true]]:
+	for row in [[250 + pay, true, false], [300 + pay, true, false], [600, true, false], [350, true, false], [0, false, true]]:
 		sore.record({"credits": row[0], "correct": row[1], "injured": row[2]})
 		sore.advance()
 	ok(bool(sore.report()["line_held"]) and int(sore.report()["correct"]) == 4, "four right calls, line held, one blow taken")
 	eq(sore.report()["title"], "OPEN, BARELY",
 		"should a blow ever not end the night, a night that hurt you is still not called a good one")
-	# with the line held, fewer right calls keep their own names; patients who left earn nothing
-	var three := ShiftState.new(rules)
+	# with the line held, fewer right calls keep their own names; patients who left earn nothing.
+	# At 400 an hour night A holds the line only with four right calls or five (the best three make
+	# 1950; see below), so these titles are read against the old line of 240 an hour
+	var old_line := rules.duplicate(true)
+	old_line["line"]["per_hour"] = 240
+	var three := ShiftState.new(old_line)
 	play(three, {"kip": "treat", "rook": "treat", "vale": "gave_up", "juno": "treat", "maren": "gave_up"}, [], ["kip", "rook"])
 	var three_rep := three.report()
 	eq([three_rep["total"], three_rep["correct"], three_rep["line_held"]], [900 + 2 * pay, 3, true], "three treated, two left unanswered, two drops: line held")
 	eq(three_rep["title"], "OPEN, BARELY", "three right calls over the line: open, barely")
-	var low := ShiftState.new(rules)
+	var low := ShiftState.new(old_line)
 	play(low, {"kip": "treat", "rook": "gave_up", "vale": "gave_up", "juno": "treat", "maren": "gave_up"}, [], ["kip", "juno"])
 	var low_rep := low.report()
 	eq([low_rep["total"], low_rep["correct"], low_rep["line_held"]], [1200, 2, true], "a till exactly on the line holds it")
@@ -908,6 +919,7 @@ func test_shift() -> void:
 	var every_night_named := true
 	var cut_is_under := true
 	var some_held := false
+	var held_needs_four := true
 	var options := ["treat", "refer", "shutter", "gave_up"]
 	for drops in [[], ["kip", "juno"]]:
 		for n in int(pow(options.size(), 5)):
@@ -922,9 +934,11 @@ func test_shift() -> void:
 			every_night_named = every_night_named and str(night_rep["title"]) != "" and str(night_rep["text"]) != ""
 			cut_is_under = cut_is_under and ((str(night_rep["title"]) == "THE CUT") == (not bool(night_rep["line_held"])))
 			some_held = some_held or bool(night_rep["line_held"])
+			held_needs_four = held_needs_four and (not bool(night_rep["line_held"]) or int(night_rep["correct"]) >= 4)
 	ok(every_night_named, "all 2 x 1024 combinations of calls end in a titled report")
 	ok(cut_is_under, "THE CUT is given to every night under the line and to no other")
 	ok(some_held, "and with drops some nights hold the line")
+	ok(held_needs_four, "at 400 an hour night A holds the line only with four right calls or five")
 	for entry in rules["titles"]:
 		ok(str(entry["title"]) != "" and str(entry["text"]) != "", "report title '%s' has its text" % str(entry["title"]))
 	var titles: Array = rules["titles"]
@@ -959,18 +973,23 @@ func test_line() -> void:
 	eq([shift.reading()["hour"], shift.readings().size(), shift.hours_under()], [0, 0, 0], "no reading before the first visit ends")
 	var right_calls := 0
 	for id in cases.keys():
-		right_calls += int(cases[id]["fee"]) if str(cases[id]["truth"]) == "stable" else int(rules["scoring"]["refer_drifting"])
+		right_calls += int(cases[id]["fee"]) + (0 if str(cases[id]["truth"]) == "stable" else int(rules["scoring"]["refer_drifting"]))
 	ok(right_calls < 5 * per, "right calls alone fall short of the night's line")
 	ok(right_calls + int(rules["contacts"]["pay"]) >= 5 * per, "one drop on top of them holds it")
-	for id in cases.keys():
-		if str(cases[id]["truth"]) == "stable":
-			ok(int(cases[id]["fee"]) > per, "%s: a steady patient's fee puts the till ahead of the line" % id)
+	# right calls alone: the fees come in hour by hour, a call to the crew like a treat, and the
+	# till trails the line at every reading by less than one drop
+	var plain := ShiftState.new(rules)
+	play(plain, {"kip": "treat", "rook": "treat", "vale": "refer", "juno": "treat", "maren": "refer"})
+	var trails := plain.readings().size() == 5
+	for r in plain.readings():
+		trails = trails and not bool(r["held"]) and int(r["margin"]) > -int(rules["contacts"]["pay"])
+	ok(trails, "night A, right calls and no drop: under the line at every reading, by less than a drop")
 	play(shift, {"kip": "treat", "rook": "treat", "vale": "refer", "juno": "treat", "maren": "refer"}, [], ["kip"])
 	var seen: Array = []
 	for r in shift.readings():
 		seen.append([r["hour"], r["till"], r["line"], r["held"]])
-	eq(seen, [[1, 550, 240, true], [2, 850, 480, true], [3, 850, 720, true], [4, 1200, 960, true], [5, 1440, 1200, true]],
-		"a perfect night with an early drop: five readings, each over its line, the bounties only in the last")
+	eq(seen, [[1, 550, 400, true], [2, 850, 800, true], [3, 1450, 1200, true], [4, 1800, 1600, true], [5, 2200, 2000, true]],
+		"a perfect night with an early drop: five readings, each over its line; Trauma Team pays its fees on account")
 	eq(shift.hours_under(), 0, "no hour of it under")
 	ok(bool(shift.reading()["last"]) and not bool(shift.reading(4)["last"]), "the fifth reading is the last one")
 	eq(shift.hour(), 5, "the clock does not run past the shift")
@@ -979,23 +998,24 @@ func test_line() -> void:
 	var slow := ShiftState.new(rules)
 	play(slow, {"kip": "gave_up", "rook": "treat", "vale": "refer", "juno": "treat", "maren": "refer"}, [], ["rook", "juno"])
 	eq([slow.readings()[0]["held"], slow.readings()[0]["margin"]], [false, -per], "a first patient who left: one hour under at the first reading")
-	ok(bool(slow.readings()[1]["held"]), "the next fee brings the till back over")
-	eq([slow.readings()[2]["held"], slow.readings()[2]["till"]], [false, 600], "Vale's bounty waits for closing, so the third hour is under too")
+	eq([slow.readings()[1]["held"], slow.readings()[1]["till"]], [false, 600], "a fee and a drop do not make up the lost hour at once")
+	eq([slow.readings()[2]["held"], slow.readings()[2]["till"]], [true, 1200], "the fee Trauma Team pays for Vale on account brings the till back to the line")
 	eq([slow.hours_under(), slow.report()["hours_under"]], [2, 2], "both hours under are counted")
 	ok(bool(slow.report()["line_held"]), "and a reading on the way does not decide the night")
 	eq(slow.report()["title"], "A GOOD NIGHT'S WORK", "four right calls, nobody hurt, line held at closing")
 	# on the line counts as holding it; a short shift is read against its own hours
-	var at_120 := rules.duplicate(true)
-	at_120["line"]["per_hour"] = int(rules["scoring"]["refer_drifting"])
-	var even := ShiftState.new(at_120, ["vale"])
+	var at_fee := rules.duplicate(true)
+	at_fee["line"]["per_hour"] = int(cases["vale"]["fee"]) + int(rules["scoring"]["refer_drifting"])
+	var even := ShiftState.new(at_fee, ["vale"])
 	play(even, {"vale": "refer"})
-	eq([even.reading()["held"], even.reading()["margin"], even.report()["line"]], [true, 0, int(at_120["line"]["per_hour"])],
+	eq([even.reading()["held"], even.reading()["margin"], even.report()["line"]], [true, 0, int(at_fee["line"]["per_hour"])],
 		"a till exactly on the line holds it")
 	var none := rules.duplicate(true)
 	none.erase("line")
 	var free := ShiftState.new(none)
-	play(free, {"kip": "refer", "rook": "refer", "vale": "refer", "juno": "refer", "maren": "refer"})
-	eq([free.report()["line"], free.report()["line_held"]], [0, false], "without a line the meter wants nothing, and a till below zero is still under it")
+	play(free, {"kip": "refer", "rook": "refer", "vale": "treat", "juno": "refer", "maren": "treat"})
+	eq([free.report()["line"], free.report()["line_held"], free.total() < 0], [0, false, true],
+		"without a line the meter wants nothing, and a till below zero is still under it")
 
 
 ## The glass (rules version 4): the pane takes three blows a shift. Each blow that lands before
@@ -1039,7 +1059,7 @@ func test_glass() -> void:
 	eq(v.take_blow(), 2, "blows are counted while the shutter is up")
 	v.shutter()
 	eq([v.settlement()["grade"], v.settlement()["blows"]], ["cracked", 2], "two blows first: stopped, but the glass paid")
-	eq(v.settlement()["credits"], int(rules["scoring"]["refer_drifting"]), "a late stop is paid like a clean one: the glass is the cost")
+	eq(v.settlement()["credits"], int(cases["vale"]["fee"]) + int(rules["scoring"]["refer_drifting"]), "a late stop is paid like a clean one: the glass is the cost")
 	eq(v.take_blow(), 2, "nothing lands once the shutter is down")
 	v = visit("maren")
 	v.press()
@@ -1090,7 +1110,7 @@ func test_repair() -> void:
 	v.verdict("treat")
 	night.record(v.settlement())
 	night.advance()
-	eq([night.reading(2)["till"], night.reading(2)["line"], night.reading(2)["held"]], [550 - cost, 2 * per, true],
+	eq([night.reading(2)["till"], night.reading(2)["line"], night.reading(2)["margin"]], [550 - cost, 2 * per, 550 - cost - 2 * per],
 		"the second reading counts the glass")
 	eq(night.reading(1), first, "the first one still does not")
 	# an empty frame: one layer puts glass back in it
@@ -1128,50 +1148,167 @@ func test_repair() -> void:
 	eq([plain.repair_cost(), plain.can_repair(), plain.repair_glass(), plain.glass], [0, false, {}, 2], "without a price nobody mends glass")
 
 
-## The arrival order (added November 15): drawn from the shift seed, always the same five, the
-## first shift of a session opening with a steady patient, and the listed order when it is off.
-func test_arrivals() -> void:
-	var listed: Array = rules["shift_order"]
-	var sorted_listed := listed.duplicate()
-	sorted_listed.sort()
+## The night (rules version 9): who comes in, who of them drifts and which sign each sheet row
+## shows are drawn from the shift seed. Every drawn night is one the rules allow and every case
+## in it holds; the same seed gives the same night; the first night of a session opens with a
+## steady visitor who can carry a fair contact; a broken row can be any row; and the test nights
+## of nights.json are nights the draw could make.
+func test_night_draw() -> void:
+	var db: Dictionary = CaseDB.load_all()
+	var people: Dictionary = db["people"]
+	var templates: Dictionary = db["templates"]
+	var roster: Array = CaseDB.roster_of(rules)
+	var sorted_roster := roster.duplicate()
+	sorted_roster.sort()
+	var problems: Array = []
+	var repeat_ok := true
 	var orders := {}
-	var all_same_five := true
-	var all_repeatable := true
-	var first_always_steady := true
+	var drift_counts := {}
+	var broken_counts := {}
+	var first_steady := true
 	var later_opens_drifting := false
-	for s in range(1, 41):
-		var a: Array = ShiftState.arrival_order(rules, cases, s, true)
-		var b: Array = ShiftState.arrival_order(rules, cases, s, true)
-		var sorted_a := a.duplicate()
-		sorted_a.sort()
-		all_same_five = all_same_five and sorted_a == sorted_listed
-		all_repeatable = all_repeatable and a == b
-		first_always_steady = first_always_steady and str(cases[str(a[0])]["truth"]) == "stable"
-		orders[JSON.stringify(a)] = true
-		var later: Array = ShiftState.arrival_order(rules, cases, s, false)
-		later_opens_drifting = later_opens_drifting or str(cases[str(later[0])]["truth"]) == "drifting"
-	ok(all_same_five, "arrivals: every drawn order holds the same five patients once each")
-	ok(all_repeatable, "arrivals: the same seed always gives the same order")
-	ok(first_always_steady, "arrivals: the first shift of a session opens with a steady patient")
-	ok(orders.size() >= 10, "arrivals: forty seeds give many orders (%d)" % orders.size())
-	ok(later_opens_drifting, "arrivals: a later shift may open with a drifting patient")
-	var off := rules.duplicate(true)
-	off["arrivals"]["shuffle"] = false
-	eq(ShiftState.arrival_order(off, cases, 7, true), listed, "arrivals: with shuffle off the listed order stands")
-	var drawn: Array = ShiftState.arrival_order(rules, cases, 7, true)
-	var shift := ShiftState.new(rules, drawn)
-	eq(shift.current_id(), str(drawn[0]), "arrivals: the shift follows the order it was given")
-	eq(ShiftState.new(rules).current_id(), str(listed[0]), "arrivals: given no order, a shift keeps the listed one")
+	var broken_rows := {}
+	var shown := {}
+	for s in range(1, 501):
+		var first := s % 2 == 1
+		var n: Dictionary = ShiftState.draw_night(db, s, first)
+		repeat_ok = repeat_ok and n == ShiftState.draw_night(db, s, first)
+		var composed := CaseDB.compose_night(templates, n, parts)
+		var ids := CaseDB.night_order(n)
+		orders[JSON.stringify(ids)] = true
+		if roster.size() == int(rules["night"]["visitors"]):
+			var sorted_ids := ids.duplicate()
+			sorted_ids.sort()
+			if sorted_ids != sorted_roster:
+				problems.append("seed %d: the night is not the whole roster (%s)" % [s, str(ids)])
+		var drifting := 0
+		for id in ids:
+			if not composed.has(id):
+				problems.append("seed %d: %s does not compose" % [s, id])
+				continue
+			var c: Dictionary = composed[id]
+			for e in CaseDB.validate_case(c, rules, sheet, parts):
+				problems.append("seed %d, %s: %s" % [s, id, str(e)])
+			if str(c["truth"]) == "drifting":
+				drifting += 1
+				broken_counts[CaseDB.broken_count(c)] = true
+				for row in CaseDB.ROWS:
+					if not bool(c["rows"][row]["ok"]):
+						broken_rows["%s:%s" % [id, row]] = true
+			for row in CaseDB.ROWS:
+				shown["%s:%s:%s" % [id, row, str(c["signs"][row])]] = true
+		drift_counts[drifting] = true
+		for e in CaseDB.night_drawable(rules, n, composed, people, contacts_data, first):
+			problems.append("seed %d: %s" % [s, str(e)])
+		if first:
+			first_steady = first_steady and str(composed[ids[0]]["truth"]) == "stable"
+		else:
+			later_opens_drifting = later_opens_drifting or str(composed[ids[0]]["truth"]) == "drifting"
+	for p in problems.slice(0, 8):
+		print("  ", p)
+	eq(problems.size(), 0, "500 drawn nights: each is one the rules allow, and every case in it holds")
+	ok(repeat_ok, "the same seed always draws the same night")
+	ok(orders.size() >= 30, "500 seeds give many orders (%d)" % orders.size())
+	ok(first_steady, "the first night of a session opens with a steady visitor")
+	ok(later_opens_drifting, "a later night may open with a drifting visitor")
+	var drift_keys: Array = []
+	for k in (rules["night"]["drifting"] as Dictionary).keys():
+		drift_keys.append(int(k))
+	var broken_keys: Array = []
+	for k in (rules["night"]["broken"] as Dictionary).keys():
+		broken_keys.append(int(k))
+	var got_drift: Array = drift_counts.keys()
+	var got_broken: Array = broken_counts.keys()
+	for l in [drift_keys, broken_keys, got_drift, got_broken]:
+		l.sort()
+	eq(got_drift, drift_keys, "every number of drifting visitors the rules allow comes up, and no other")
+	eq(got_broken, broken_keys, "every number of broken rows the rules allow comes up, and no other")
+	var never_broken: Array = []
+	for id in roster:
+		for row in CaseDB.ROWS:
+			if not broken_rows.has("%s:%s" % [str(id), row]):
+				never_broken.append("%s:%s" % [str(id), row])
+	eq(never_broken, [], "every row of every character is drawn broken on some night")
+	var never_shown: Array = []
+	for id in roster:
+		for row in CaseDB.ROWS:
+			for kind in ["normal", "broken"]:
+				for sid in CaseDB.sign_ids(templates[str(id)], row, kind):
+					if not shown.has("%s:%s:%s" % [str(id), row, str(sid)]):
+						never_shown.append("%s:%s:%s" % [str(id), row, str(sid)])
+	eq(never_shown, [], "every sign of every character is drawn on some night")
+	# the money: a night's fees come under the line and within one drop of it
+	var line := int(rules["line"]["per_hour"]) * int(rules["night"]["visitors"])
+	var pay := int(rules["contacts"]["pay"])
+	eq(CaseDB.fee_window(rules, 5), [line - pay, line - 1], "the fees of five visitors must come to %d-%d" % [line - pay, line - 1])
+	eq(CaseDB.fees_of(people, rules["shift_order"]), 1900, "night A's fees: 1900")
+	ok(CaseDB.fees_fit(rules, people, rules["shift_order"]), "and they fit the window")
+	var lax := rules.duplicate(true)
+	lax["night"]["fees_under_line"] = false
+	ok(CaseDB.fee_window(lax, 5).is_empty() and CaseDB.fees_fit(lax, people, ["vale"]), "with the rule off any fees fit")
+	# the test nights
+	var nights: Dictionary = db["nights"]
+	eq(CaseDB.validate_nights(nights, templates, rules, sheet, parts, people, contacts_data), [], "every test night is a night the draw could make")
+	var a := CaseDB.compose_night(templates, nights["A"], parts)
+	eq(CaseDB.night_order(nights["A"]), rules["shift_order"], "night A lists shift_order")
+	eq(a.keys(), cases.keys(), "night A is what the game loads first")
+	var truths := []
+	var broken_a := []
+	for id in CaseDB.night_order(nights["A"]):
+		truths.append(str(a[id]["truth"]))
+		broken_a.append(CaseDB.broken_count(a[id]))
+	eq(truths, ["stable", "stable", "drifting", "stable", "drifting"], "night A: Vale and Maren drift, as written")
+	eq(broken_a, [0, 0, 4, 0, 4], "night A: each of them shows four broken rows")
+	eq([a["vale"]["rows"]["hands"]["ok"], a["vale"]["rows"]["port"]["ok"], a["maren"]["rows"]["hands"]["ok"], a["maren"]["rows"]["port"]["ok"]],
+		[true, false, false, true], "night A: Vale's grip and Maren's port are the rows that look fine")
+	# a night the draw could not make is caught
+	var bad := (nights["A"] as Dictionary).duplicate(true)
+	bad["visitors"][0]["truth"] = "drifting"
+	bad["visitors"][0]["signs"] = {"eyes": "drags", "hands": "holds", "speech": "it"}
+	bad["visitors"][3]["truth"] = "drifting"
+	bad["visitors"][3]["signs"] = {"eyes": "stray", "speech": "we"}
+	var bad_cases := CaseDB.compose_night(templates, bad, parts)
+	var bad_errors := CaseDB.night_drawable(rules, bad, bad_cases, people, contacts_data)
+	ok(has_error(bad_errors, "opens with a steady visitor"), "a first night that opens drifting is caught")
+	ok(has_error(bad_errors, "never draws that many"), "four drifting visitors are caught")
+	eq(CaseDB.night_drawable(rules, bad, bad_cases, people, contacts_data, false).size(), 1,
+		"on a later night only the count of drifting visitors is wrong")
+	var short := (nights["A"] as Dictionary).duplicate(true)
+	(short["visitors"] as Array).pop_front()
+	var short_errors := CaseDB.night_drawable(rules, short, CaseDB.compose_night(templates, short, parts), people, contacts_data)
+	ok(has_error(short_errors, "asks for 5"), "a night of four visitors is caught")
+	ok(has_error(short_errors, "fees add up to 1650"), "and so are its fees, out of the window for four hours")
+	# bad draw rules are caught
+	var wrong := rules.duplicate(true)
+	wrong["night"]["visitors"] = 9
+	wrong["night"]["broken"] = {"1": 1, "x": 2}
+	wrong["night"]["tries"] = 0
+	var rule_errors := CaseDB.validate_rules(wrong, sheet)
+	ok(has_error(rule_errors, "night.visitors must be from 1"), "more visitors than the roster holds is caught")
+	var all_drift := rules.duplicate(true)
+	all_drift["night"]["drifting"] = {"5": 1}
+	ok(has_error(CaseDB.validate_rules(all_drift, sheet), "night.drifting: '5'"), "all five drifting, with a steady first visitor, is caught")
+	ok(has_error(rule_errors, "night.broken: '1'") and has_error(rule_errors, "night.broken: 'x'"),
+		"fewer broken rows than the house rule, or no number at all, is caught")
+	ok(has_error(rule_errors, "night.tries"), "no tries is caught")
+	# the shift plays the night it is given
+	var drawn: Dictionary = ShiftState.draw_night(db, 7, true)
+	var shift := ShiftState.new(rules, CaseDB.night_order(drawn))
+	eq(shift.current_id(), str(CaseDB.night_order(drawn)[0]), "the shift follows the night it was given")
+	eq(ShiftState.new(rules).current_id(), str(rules["shift_order"][0]), "given no order, a shift keeps night A's")
 
 
 ## Tonight's contacts (rules version 6, data/contacts.json): a fair list, drawn from the seed.
+## Since rules version 9 fairness is a matter of the night: only the entries that are fair among
+## tonight's visitors are drawn (CaseDB.fair_contacts).
 func test_contacts() -> void:
-	eq(CaseDB.validate_contacts(contacts_data, cases, rules), [], "the shipped contact list is fair")
+	var people: Dictionary = CaseDB.load_all()["people"]
+	eq(CaseDB.validate_contacts(contacts_data, people, rules), [], "the shipped contact list is sound")
 	var clues: Dictionary = contacts_data["clues"]
 	var alone_ok := true
 	for cid in clues.keys():
-		alone_ok = alone_ok and CaseDB.clue_matches(clues[cid], cases).size() >= 2
-	ok(alone_ok, "no clue alone points at one visitor")
+		alone_ok = alone_ok and CaseDB.clue_matches(clues[cid], people).size() >= 2
+	ok(alone_ok, "no clue alone points at one person of the roster")
 	var pair_ok := true
 	var per_case := {}
 	for e in contacts_data["pool"]:
@@ -1182,9 +1319,26 @@ func test_contacts() -> void:
 				both.append(f)
 		pair_ok = pair_ok and both == [str(e["case"])]
 		per_case[str(e["case"])] = int(per_case.get(str(e["case"]), 0)) + 1
-	ok(pair_ok, "every entry's two clues together point at its own visitor only")
-	for id in cases.keys():
+	ok(pair_ok, "on night A every entry's two clues together point at its own visitor only")
+	eq(CaseDB.fair_contacts(contacts_data, people, rules["shift_order"]).size(), (contacts_data["pool"] as Array).size(),
+		"so on night A every entry is fair")
+	for id in people.keys():
 		ok(int(per_case.get(id, 0)) >= 2, "%s can be a courier under two different entries" % id)
+	# fairness is a matter of who comes in
+	var without_juno: Array = []
+	for e in CaseDB.fair_contacts(contacts_data, people, ["kip", "rook", "vale", "maren"]):
+		without_juno.append(str(e["id"]))
+	ok(not without_juno.has("kip_a") and not without_juno.has("kip_b") and without_juno.has("rook_a"),
+		"with Juno away, 'Under thirty.' and 'Here to swap a part.' each point at Kip alone: neither of his entries is used, Rook's is")
+	var loose := contacts_data.duplicate(true)
+	loose["pool"][0]["clues"] = ["under_thirty", "fee_low"]
+	var loose_ids: Array = []
+	for e in CaseDB.fair_contacts(loose, people, rules["shift_order"]):
+		loose_ids.append(str(e["id"]))
+	ok(not loose_ids.has("kip_a") and loose_ids.size() == (loose["pool"] as Array).size() - 1,
+		"an entry whose two clues fit Kip and Juno both is not used on a night they both come")
+	eq(CaseDB.fair_couriers(contacts_data, people, ["juno", "maren", "kip", "rook"]), ["kip", "rook"],
+		"with Juno, Maren, Kip and Rook in, only Kip and Rook can carry a fair contact, in the order they come")
 	eq(CaseDB.clue_matches({"eyes": "implants_both"}, cases), ["juno", "vale"], "implants in both eyes: Juno and Vale (Kip keeps one natural eye)")
 	eq(CaseDB.clue_matches({"request_starts": "Swap"}, cases), ["juno", "kip"], "the swaps: Juno and Kip")
 	# bad lists are caught
@@ -1192,8 +1346,8 @@ func test_contacts() -> void:
 	bad["clues"]["over_forty"]["age_min"] = 50
 	ok(has_error(CaseDB.validate_contacts(bad, cases, rules), "gives one away"), "a clue that fits one visitor alone is caught")
 	bad = contacts_data.duplicate(true)
-	bad["pool"][0]["clues"] = ["under_thirty", "fee_low"]
-	ok(has_error(CaseDB.validate_contacts(bad, cases, rules), "not just"), "an entry whose clues fit two visitors is caught")
+	bad["pool"][0]["clues"] = ["over_forty", "fee_low"]
+	ok(has_error(CaseDB.validate_contacts(bad, cases, rules), "does not fit its own courier"), "an entry whose clue does not fit its own courier is caught")
 	bad = contacts_data.duplicate(true)
 	bad["pool"][1]["say"] = bad["pool"][0]["say"]
 	ok(has_error(CaseDB.validate_contacts(bad, cases, rules), "code line"), "two entries with one code line are caught")
@@ -1280,7 +1434,7 @@ func test_codes() -> void:
 	missed.verdict("refer")
 	missed.shutter()
 	var ms := missed.settlement()
-	eq([ms["missed_drop"], ms["drop"], ms["credits"]], [true, 0, int(rules["scoring"]["refer_drifting"])], "no code, no drop")
+	eq([ms["missed_drop"], ms["drop"], ms["credits"]], [true, 0, int(cases["vale"]["fee"]) + int(rules["scoring"]["refer_drifting"])], "no code, no drop")
 	# a drifting courier still drifts: the drop and the call are separate
 	var risky := visit("maren")
 	risky.set_contact(courier("maren"))
@@ -1384,7 +1538,7 @@ func test_surprises() -> void:
 	eq([s.phase, s.attack_cause], [VisitState.Phase.ATTACK, "snap"], "a snap is an attack")
 	s.shutter()
 	var ss := s.settlement()
-	eq([ss["outcome"], ss["correct"], ss["credits"], ss["snapped"], ss["cause"]], ["caught", true, int(rules["scoring"]["refer_drifting"]), true, "snap"],
+	eq([ss["outcome"], ss["correct"], ss["credits"], ss["snapped"], ss["cause"]], ["caught", true, int(cases["vale"]["fee"]) + int(rules["scoring"]["refer_drifting"]), true, "snap"],
 		"caught in time: a right call, paid like one")
 	var late := visit("maren")
 	late.snap()

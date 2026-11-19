@@ -21,7 +21,7 @@ anyone else and it costs that visitor's patience.
 
 You are squeezed too. Your chair, your tools and your own two hands are on lease from Harrow,
 and its meter reads your till once an hour: every patient is one hour, and every hour the till
-has to be 240 further along. A night that closes under that line is the last one. Five right
+has to be 400 further along. A night that closes under that line is the last one. Five right
 calls alone do not hold it: the night needs at least one drop.
 
 The screen is the inside of your booth: one large window with the patient across the counter,
@@ -164,7 +164,7 @@ changes only on the title card, where nothing is half-said.
 pictures tell the story: FIRED (Kessler walks you out; you keep its spec binder), THE DEBT
 (Kessler sells what you owe to Harrow Credit, which leases you your chair, your tools and your
 own hands), THE LANTERNS (their back-street clinic, their contacts, tonight's list and what a
-drop pays), THE LINE (240 an hour), THE DRIFT (street implants are illegal, cheap and sometimes
+drop pays), THE LINE (400 an hour), THE DRIFT (street implants are illegal, cheap and sometimes
 torn out of a soldier; some who wear them drift and can turn without warning, most are only
 tired, scared or angry) and BEFORE THE CUT (check them against the binder; TREAT, TRAUMA TEAM,
 the SHUTTER). Any click or ENTER moves on; ESC skips the rest.
@@ -422,10 +422,12 @@ closing. During the night the doctor learns what was done, never whether it was 
   HELD, SHUTTER DOWN, WALKED OUT or OUT OF PATIENCE, with a line of text that does not give the
   truth away, the money AT THE COUNTER, a drop, a missed drop or CALM, and "Right or wrong: at
   closing."
-- **At the counter** come in only fees for work done, drops, and CALM and glass going out. A
-  treated patient pays the fee at the counter whatever their truth; the bill for a drifting
-  one comes at closing. Trauma Team's bounty or call-out bill, the shutter's bounty or fine and
-  the cost of a blow all come at closing too.
+- **At the counter** come in the fees, drops, and CALM and glass going out. A treated patient
+  pays the fee at the counter whatever their truth; the bill for a drifting one comes at
+  closing. Trauma Team pays the fee on account for anyone it takes, on a call or after the
+  shutter held, whatever their truth (rules version 9): at closing its report keeps the fee as
+  the bounty for a drifting patient, or takes it back for a steady one and bills the call-out.
+  The fine for a shutter on a steady patient and the cost of a blow come at closing too.
 - **Nothing else tells.** The intake card holds only the doctor's own marks; the meter's lamps
   show what was done; a shutter on a patient who did not turn falls quiet (no bounty plate, no
   sound of money); the slip's sound follows only the counter money; the crew says the same
@@ -440,12 +442,12 @@ closing. During the night the doctor learns what was done, never whether it was 
 
 | What happened | At the counter | At closing | In all | Counts as a right call |
 | --- | --- | --- | --- | --- |
-| Treated a steady patient | their fee (250 to 350) | 0 | the fee | yes |
+| Treated a steady patient | their fee (250 to 600) | 0 | the fee | yes |
 | Treated a drifting patient | their fee | -(fee + 400) | -400 | no |
-| Trauma Team took a drifting patient | 0 | +120 | +120 | yes |
-| The patient turned and the shutter came down in time | 0 | +120 | +120 | yes |
+| Trauma Team took a drifting patient | their fee, on account | 0 (the fee is the bounty) | the fee | yes |
+| The patient turned and the shutter came down in time | their fee, on account | 0 | the fee | yes |
 | The patient turned and got through | 0 | -300 | -300, and the night ends | only if it was your call to Trauma Team that set them off |
-| Trauma Team called on a steady patient | 0 | -150 (the call-out is billed) | -150 | no |
+| Trauma Team called on a steady patient | their fee, on account | -(fee + 150): the fee taken back, the call-out billed | -150 | no |
 | Shutter on a steady patient | 0 | -100 | -100 | no |
 | Shutter on a drifting patient during the exam | 0 | 0 | 0 | yes |
 | Pressed until they walked out | 0 | 0 | 0 | no |
@@ -454,13 +456,14 @@ closing. During the night the doctor learns what was done, never whether it was 
 | CALM | -30 a use | | | not a call |
 
 Two things are not hidden, by their nature. A patient who turns on a call shows by turning
-that they were drifting (only Vale does that, on a call to Trauma Team). And a quiet hand-over
-is not proof of a steady patient: Maren drifts but goes with the crew without a fight. The
+that they were drifting (a drifting Vale or Rook does that, on a call to Trauma Team). And a
+quiet hand-over is not proof of a steady patient: a drifting Kip, Juno or Maren goes with the
+crew without a fight. The
 readings during the night can mislead: a night of treatments reads well at the counter and may
 still close under the line when the bills come in.
 
-**The lender's line.** The meter wants 240 more in the till every hour (`line.per_hour`), so
-hour n needs n x 240 and the night needs 1,200. After each slip the meter reads the till
+**The lender's line.** The meter wants 400 more in the till every hour (`line.per_hour`), so
+hour n needs n x 400 and the night needs 2,000. After each slip the meter reads the till
 against the line for that hour: over, or UNDER THE LINE in red. Until the last hour it reads
 only what came in at the counter (fees, drops, less CALM and glass); the last reading is taken
 at closing, with every visit's bounties and bills in. A reading under the line is counted and
@@ -468,15 +471,21 @@ shown in the report, but the shift goes on; only the last reading decides the ni
 under the line is the ending called THE CUT, whatever else went right. A night that ends with
 the doctor killed is LIGHTS OUT: nobody reads the meter, and no line is held.
 
-Five right calls make 1,140: under the line. With one drop they make 1,440, with both 1,740,
+On test night A (fees 250, 300, 600, 350 and 400; Vale and Maren drifting) five right calls
+make 1,900, the night's fees: under the line. With one drop they make 2,200, with both 2,500,
 less what CALM and glass cost. Treating everyone makes 100 and calling Trauma Team on everyone
-makes -210. One needless call can be afforded only with both drops (1,240 when it is Juno, the
-largest fee to lose); with one drop it cannot. Two needless calls end under the line, drops or
-not (790 with both drops, for Rook and Juno). These totals are asserted by the rule tests, and
-so is that every one of the 1,024 combinations of calls, with no drop and with two, ends in a
-titled report, and that THE CUT is given exactly to the nights that end under the line. The
-till can be spent on two things: CALM and new counter glass (below). All numbers are
-first-pass values in `data/rules.json` that no player has tuned.
+makes 550. One needless call can be afforded only with both drops (exactly 2,000 when it is
+Juno, the largest steady fee to lose, and a till exactly on the line holds it); with one drop
+it cannot. Two needless calls end under the line, drops or not (1,550 with both drops, for Rook
+and Juno). Treating Vale and shutting Maren out before she turns leave four right calls and,
+with both drops, 1,100: still the cut. A drawn night works the same way, because its fees come
+under 2,000 but within one drop of it. These totals are asserted by the rule tests, and so is
+that on night A every one of the 1,024 combinations of calls, with no drop and with two, ends
+in a titled report, that THE CUT is given exactly to the nights that end under the line, and
+that none holds the line with fewer than four right calls. So with these five, OPEN, BARELY
+(three right calls) and ON NOTICE cannot be reached; whether to change them is the student's to
+decide. The till can be spent on two things: CALM and new counter glass (below). All numbers
+are first-pass values in `data/rules.json` that no player has tuned.
 
 **When a patient turns** there is a warning line and a short beat. Then a red bar in the slot
 of the sill fills from the warning to the moment they are through; its notches are the blows
@@ -542,27 +551,86 @@ and can be ordered, and pointing at it says why when it cannot (a patient is at 
 or every layer is whole). The money comes off the till at once, and the till may go under zero
 for it. The meter counts it at every later reading; readings already taken do not change. The
 report shows what was paid ("Till, after 120 paid for glass"). A whole pane from an empty
-frame costs 120, half an hour of the line at 240 an hour, so safety is bought with the same
+frame costs 120, under a third of an hour of the line at 400 an hour, so safety is bought with the same
 credits the lender wants. The arm that fits the layer wipes the pane as it goes; blood on the
 sill and the booth walls and the damage to the shutter stay until the shift ends. The price,
 the debt and the absence of any other limit are first guesses that nobody has played against.
 
 ## The five patients (spoilers)
 
-Who comes in is `rules.json`, `shift_order`. Since November 15 each shift shuffles that order
-from its seed, and the first shift of a session opens with a steady patient (`arrivals`; set
-`shuffle` to false for the listed order). Which two of them are contacts tonight is drawn from
-the same seed. Each case file in `data/cases/` holds the truth, the parts the patient wears, the
-evidence for every line of the sheet, the authored offline lines (among them the blank look at a wrong code), the flare
-and the outcome text. The table is in the listed order.
+[Student, November 18: the characters stay as they are, but for randomness any of their parts
+may be the abnormal one.] Who comes in is `rules.json` `roster`: Kip, Rook, Vale, Juno and
+Maren, every night, in an order drawn from the shift seed. Who of them drifts, and which sign
+each of the five sheet rows shows, is drawn from the same seed (`rules.json` `night`,
+`shift_state.gd` `draw_night`), so one seed always gives the same night:
 
-| Patient | Wants | Truth | What the sheet shows |
-| --- | --- | --- | --- |
-| Kip Marlow, bike courier | cracked optic swapped | steady | nervous and shaky, every line normal; his flare is all of him at once |
-| Rook Dunmore, dock loader | locking arm fixed | steady | rude, burnt pins, a twitch: all ordinary; flares with face and voice together |
-| Adrian Vale, corporate security | reflex-rig limiter removed | drifting | one eye never follows; threads under a buttoned collar; "it", not "I"; calm face over a closing fist; his palm hits the glass while his face never moves. Turns when Trauma Team is called or when pressed twice; may snap |
-| Juno Reyes, street singer | skipping voice box swapped | steady | loud implants and a stutter: all ordinary; flares with face and voice at once |
-| Maren Holt, welder | servos tuned | drifting | a natural pupil that never tightens; holds on 1.7 s after "release"; goes blank when pushed; her hand hits the glass on its own while her face stays empty. Goes quietly with Trauma Team; turns when pressed twice; may snap |
+- One to three of them drift (weights 1, 2 and 1). A steady visitor shows only normal signs.
+- A drifting visitor shows two to four broken rows (weights 2, 2 and 1), at least two of them
+  (`sheet.json` `threshold`) rows the doctor can test whatever the patient says: the speech
+  and the temper, and the eyes, the grip or the port where the patient gives in when the
+  doctor insists, or the port is uncovered (`case_db.gd` `reachable_rows`). Every other row
+  shows one of the character's normal signs, drawn too.
+- The first night of a session opens with a steady visitor who is on the contact list.
+- The night's fees come under the line but within one drop of it (`night.fees_under_line`),
+  and each contact's clues pick out exactly one of tonight's visitors (`case_db.gd`
+  `fair_contacts`); a draw that breaks either is drawn again. Which two are contacts tonight
+  is drawn from the same seed.
+
+Each case file in `data/cases/` (version 3) is the character's template: the parts they wear,
+their fee, the authored offline lines (among them the blank look at a wrong code), the flare,
+the outcome text for either truth, and for each sheet row the normal and the broken signs, each
+with the card's note, the look, the readings, the answers to the three questions, the reaction
+to a press, the report's line and a sentence for the model. `case_db.gd` `compose()` builds the
+night's case from a pick (`{truth, signs}`), and the template check puts every sign in its
+place.
+
+Fixed test nights are in `data/nights.json`, for the tests, the captures and checking a sign by
+eye: `--test-night=<name>` plays one, `--authored-order` plays A, and a test or a capture that
+names no night builds A. Each is a night the draw could make on the first night of a session.
+
+| Night | Steady | Drifting, and their broken rows |
+| --- | --- | --- |
+| A, the night as written before | Kip, Rook, Juno | Vale: eyes, port, speech, temper. Maren: eyes, grip, speech, temper |
+| B, the truths turned round | Maren, Vale | Kip: eyes, grip. Juno: eyes, grip, port, temper. Rook: grip, port, speech |
+| H, three who drift | Rook, Maren | Vale: grip, speech. Kip: port, speech, temper. Juno: grip, speech |
+
+Together they show every sign of Kip, Juno and Vale. Rook's broken eyes and temper and Maren's
+dark threads wait for the nights with the new visitors.
+
+The five in the order of night A, each row as normal / broken:
+
+- **Kip Marlow**, bike courier, 22, fee 250, wants his cracked left optic swapped. Eyes: the
+  right tightens, the left has no pupil, both follow / the left won't follow. Grip: jittery,
+  lets go / holds on after "release". Port: a scuffed wrist socket on calm skin / dark threads
+  under the skin. Speech: nervous and fast, all "I" and "my" / "It picks the turns now."
+  Temper: pushed, the whole kid reacts at once / he goes calm and only his fist answers.
+- **Rook Dunmore**, dock loader, 41, fee 300, wants his locking right arm fixed. Eyes: both
+  tighten and follow / neither pupil tightens. Grip: shaky, lets go / holds on. Port: a
+  scorched wrist socket with two burnt pins / dark threads under the skin. Speech: rude, but
+  "I" and "my" / "It knows what's heavy before I do." Temper: loud, face and voice together /
+  the loud man goes polite and only the fist moves.
+- **Adrian Vale**, corporate security, 38, fee 600, wants the limiter taken off his reflex rig.
+  Eyes: both shutters snap, both follow / the shutters never snap and the left won't follow.
+  Grip: exact, lets go / holds on. Port: a sealed plate at his neck, which he will not show, so
+  it is never examined / dark threads under the skin. Speech: cold and exact, always "I" / "It
+  doesn't need much sleep." Temper: cold anger in face and voice at once / a calm face and a
+  level voice while the fist closes.
+- **Juno Reyes**, street singer, 27, fee 350, wants her skipping voice box swapped. Eyes: the
+  IRIS screens stay bright, both follow / the right won't follow. Grip: steady, lets go / holds
+  on. Port: four neck jacks, scars and a cable burn / dark threads under the skin. Speech: the
+  stutter is the voice box, every line "I" and "my" / "We need the voice back." Temper:
+  everything flares together / her face and screens go still while her finger jabs.
+- **Maren Holt**, night-shift welder, 54, fee 400, wants her welding-arm servos tuned. Eyes:
+  both tighten and follow / the left stays wide. Grip: stiff, lets go / holds on. Port: a wrist
+  socket by an old weld burn / dark threads past the burn. Speech: worried, all "I" and "my",
+  and she remembers her work / "The hands finish jobs I don't remember starting." Temper:
+  pushed, she looks hurt, face and voice agreeing / she goes still, no face, no voice.
+
+A drifting patient turns when pressed twice and may snap; a drifting Vale or Rook also turns
+when Trauma Team is called, and the others go with the crew. Not drawn yet (`HANDOFF.md`, Next
+three tasks): a drifting Kip, Rook or Juno attacks with the portrait unchanged, and dark threads
+at the port are drawn only for Vale, whose port is never examined, so anyone else's threads are
+in the card's note and the report but not in the picture.
 
 ## Saying it in your own words
 
@@ -718,7 +786,7 @@ uses (`tests/play_driver.gd`). The first six check the counter itself with a few
 still (no contacts, a free CALM, the old line, no snaps or flares, no training): a careful
 night, a reckless one, the typing line and the odd cases, the hourly line with a patient who
 leaves, the glass down to nothing, and the booth walls with the glass mended. The last three
-play the night as it is: the contact list and the paid CALM at 240 an hour; a flare and a snap,
+play the night as it is: the contact list and the paid CALM at 400 an hour; a flare and a snap,
 each cued by pinning its rules for one action; and the first-night training. It proves the flow
 holds together; it does not show that it looks right, sounds right or is fun. It presses the
 shutter within one frame of the moment it chooses, so it says nothing about whether a person
@@ -902,8 +970,8 @@ repository; commit them with the assets. (Godot marks the font atlas pictures `s
   transcript unit in the desk are all proposals. A paper that is down covers the top of one
   side of the window (132 of its 440 pixels in width); whether that is comfortable in play is
   unknown.
-- Every number added on November 16, 17 and 18 is a first guess that nobody has played against:
-  240 an hour for the line, 300 a drop, two contacts a night, 1 patience for a wrong code, 30
+- Every number added from November 16 to 19 is a first guess that nobody has played against:
+  400 an hour for the line, a bounty equal to the patient's fee, the draw's weights, 300 a drop, two contacts a night, 1 patience for a wrong code, 30
   credits for CALM, a snap's 3 free actions, 0.08 a step and 0.30 at most, a flare's 0.10, the
   0.35 s between a snap and its attack, eight seconds before a patient with no patience leaves,
   an attack window of 1.8 s with blows at 0.54, 0.99 and 1.44 s, three glass lamps a night,

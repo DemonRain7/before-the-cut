@@ -2,15 +2,22 @@ extends RefCounted
 ## One shift: the queue of patients, tonight's contacts, the running totals, the lender's line
 ## and the counter glass.
 ##
+## The night (rules version 9, rules.json "night"): who comes in, who of them drifts and which
+## sign each of them shows are drawn from the shift seed (draw_night()), or taken from a test
+## night of data/nights.json. Either way the night is a list of visitors, each with a truth and
+## a sign per sheet row; CaseDB.compose_night() turns it into the cases the visits play.
+##
 ## The line (rules.json "line"): Kessler sold the doctor's debt to Harrow Credit, and Harrow's
 ## meter reads the till once an hour. One finished visit is one hour; hour n wants n x per_hour
 ## in the till. Readings on the way are warnings. The last one decides the night (see report()).
 ##
 ## Two kinds of money (rules version 8). Through the night the till holds only what came in at
-## the counter: fees for work done, drops, less CALM and glass (till()). Whether each call was
-## right, and what it brings (Trauma Team's bounty or bill, the bill for work on somebody who
-## drifted), comes in at closing with the night's reports, before the last reading (total()).
-## So the readings on the way say nothing about who was drifting.
+## the counter: fees (for work done, or paid on account by Trauma Team for a patient it took,
+## since rules version 9), drops, less CALM and glass (till()). Whether each call was right, and
+## what it brings (Trauma Team keeping its fee as the bounty or taking it back with the call-out,
+## the bill for work on somebody who drifted), comes in at closing with the night's reports,
+## before the last reading (total()). So the readings on the way say nothing about who was
+## drifting, and a treat and a call to Trauma Team read the same.
 ##
 ## A patient who gets through the window kills the doctor (record()): the night ends there, the
 ## rest of the line goes home unseen, and the report is the last thing (is_done(), report()).
@@ -26,6 +33,8 @@ extends RefCounted
 ## doctor can pay to have one layer refitted (repair_glass()): "repair_cost" credits out of the
 ## till for one more blow. The meter counts that money at every reading after it was spent.
 ## Used as: const ShiftState = preload("res://scripts/core/shift_state.gd")
+
+const CaseDB = preload("res://scripts/core/case_db.gd")
 
 var rules: Dictionary = {}
 var order: Array = []
@@ -44,40 +53,134 @@ func _init(p_rules: Dictionary = {}, p_order: Array = []) -> void:
 	glass = glass_max()
 
 
-## Who comes in tonight, and in what order. rules.json `shift_order` lists the patients in
-## their authored order; with `arrivals.shuffle` the order is drawn from the shift seed, so the
-## same seed always gives the same night. With `arrivals.first_shift_opens_steady` the first
-## shift of a session opens with a steady patient (truth "stable"), so a new player meets the
-## desk before anyone can turn on them. Later shifts may open with anyone.
-static func arrival_order(p_rules: Dictionary, p_cases: Dictionary, p_seed: int, first_of_session: bool) -> Array:
-	var ids: Array = (p_rules.get("shift_order", []) as Array).duplicate()
-	var arrivals: Dictionary = p_rules.get("arrivals", {})
-	if not bool(arrivals.get("shuffle", false)) or ids.size() < 2:
-		return ids
-	var rng := RandomNumberGenerator.new()      # its own generator: the shift's beats stay as they were
-	rng.seed = p_seed
-	for i in range(ids.size() - 1, 0, -1):
+## Tonight's visitors, drawn from the shift seed (rules.json "night"): who comes in, from the
+## roster, and in what order; who of them drifts; and which sign each sheet row of each of them
+## shows. The same seed always gives the same night. The draw has a generator of its own, so
+## the shift's beats stay as they were.
+##
+## A set of visitors whose fees break night.fees_under_line (CaseDB.fees_fit), or that leaves
+## fewer visitors able to carry a fair contact than contacts.per_night (CaseDB.fair_couriers),
+## is drawn again, up to night.tries times; the last set drawn stands. On the first night of a
+## session, with night.first_opens_steady, the night opens with a steady visitor who can carry a
+## fair contact, so a new player meets the desk before anyone can turn on them and the training
+## visit can show a code. Later nights may open with anyone.
+##
+## A drifting visitor shows a night.broken number of broken rows, at least sheet.json threshold
+## of them on rows the doctor can test whatever the patient says (CaseDB.reachable_rows); every
+## other row shows one of that character's normal signs, drawn too. db is CaseDB.load_all().
+## Returns a night in the shape of data/nights.json: {"visitors": [{"id", "truth", "signs"}]}.
+static func draw_night(db: Dictionary, p_seed: int, first_of_session: bool) -> Dictionary:
+	var p_rules: Dictionary = db.get("rules", {})
+	var spec: Dictionary = p_rules.get("night", {}) if typeof(p_rules.get("night")) == TYPE_DICTIONARY else {}
+	var templates: Dictionary = db.get("templates", {})
+	var people: Dictionary = db.get("people", {})
+	var contact_data: Dictionary = db.get("contacts", {})
+	var threshold := maxi(1, int((db.get("sheet", {}) as Dictionary).get("threshold", 1)))
+	var roster: Array = []
+	for id in CaseDB.roster_of(p_rules):
+		if templates.has(str(id)) and people.has(str(id)):
+			roster.append(str(id))
+	var count := clampi(int(spec.get("visitors", roster.size())), 0, roster.size())
+	var per := 0
+	if typeof(p_rules.get("contacts")) == TYPE_DICTIONARY:
+		per = maxi(0, int(p_rules["contacts"].get("per_night", 0)))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("night:%d" % p_seed)
+	var ids: Array = []
+	var couriers: Array = []
+	for attempt in maxi(1, int(spec.get("tries", 1))):
+		ids = roster.duplicate()
+		_shuffle(ids, rng)
+		ids = ids.slice(0, count)
+		couriers = CaseDB.fair_couriers(contact_data, people, ids)
+		if CaseDB.fees_fit(p_rules, people, ids) and couriers.size() >= mini(per, count):
+			break
+	var steady_first := first_of_session and bool(spec.get("first_opens_steady", false)) and not ids.is_empty()
+	if steady_first and not couriers.is_empty():
+		var lead: String = couriers[rng.randi_range(0, couriers.size() - 1)]
+		ids.erase(lead)
+		ids.push_front(lead)
+	var open: Array = range(1 if steady_first else 0, ids.size())
+	var k := clampi(_weighted(rng, spec.get("drifting", {}), 0), 0, open.size())
+	_shuffle(open, rng)
+	var drifting := {}
+	for i in k:
+		drifting[int(open[i])] = true
+	var visitors: Array = []
+	for i in ids.size():
+		var t: Dictionary = templates[ids[i]]
+		var broken: Array = []
+		if drifting.has(i):
+			broken = _broken_rows(t, rng, _weighted(rng, spec.get("broken", {}), threshold), threshold)
+		var signs := {}
+		for row in CaseDB.ROWS:
+			var pool := CaseDB.sign_ids(t, row, "broken" if broken.has(row) else "normal")
+			if not pool.is_empty():
+				signs[row] = pool[rng.randi_range(0, pool.size() - 1)]
+		visitors.append({"id": ids[i], "truth": "drifting" if drifting.has(i) else "stable", "signs": signs})
+	return {"name": "", "visitors": visitors}
+
+
+## One number from {number: weight} (rules.json night.drifting, night.broken), or fallback when
+## there is nothing to draw from.
+static func _weighted(rng: RandomNumberGenerator, weights: Variant, fallback: int) -> int:
+	if typeof(weights) != TYPE_DICTIONARY or (weights as Dictionary).is_empty():
+		return fallback
+	var keys: Array = (weights as Dictionary).keys()
+	keys.sort_custom(func(a, b): return int(str(a)) < int(str(b)))
+	var total := 0.0
+	for key in keys:
+		total += maxf(0.0, float(weights[key]))
+	if total <= 0.0:
+		return fallback
+	var roll := rng.randf() * total
+	for key in keys:
+		roll -= maxf(0.0, float(weights[key]))
+		if roll < 0.0:
+			return int(str(key))
+	return int(str(keys[keys.size() - 1]))
+
+
+## Which rows of a drifting visitor show broken: n of them (never fewer than threshold),
+## threshold of them from the rows the doctor can test whatever the patient says
+## (CaseDB.reachable_rows), the rest from any other row.
+static func _broken_rows(t: Dictionary, rng: RandomNumberGenerator, n: int, threshold: int) -> Array:
+	var reachable := CaseDB.reachable_rows(t)
+	var reach: Array = []
+	var rest: Array = []
+	for row in CaseDB.ROWS:
+		if CaseDB.sign_ids(t, row, "broken").is_empty():
+			continue
+		if reachable.has(row):
+			reach.append(row)
+		else:
+			rest.append(row)
+	_shuffle(reach, rng)
+	var out: Array = reach.slice(0, threshold)
+	var others: Array = reach.slice(threshold) + rest
+	_shuffle(others, rng)
+	for row in others:
+		if out.size() >= maxi(n, threshold):
+			break
+		out.append(row)
+	return out
+
+
+## Shuffles a list in place (Fisher-Yates) with the given generator.
+static func _shuffle(a: Array, rng: RandomNumberGenerator) -> void:
+	for i in range(a.size() - 1, 0, -1):
 		var j := rng.randi_range(0, i)
-		var swap: Variant = ids[i]
-		ids[i] = ids[j]
-		ids[j] = swap
-	if first_of_session and bool(arrivals.get("first_shift_opens_steady", false)):
-		for i in ids.size():
-			var c: Dictionary = p_cases.get(str(ids[i]), {})
-			if str(c.get("truth", "")) == "stable":
-				if i > 0:
-					var steady: Variant = ids[i]
-					ids.remove_at(i)
-					ids.insert(0, steady)
-				break
-	return ids
+		var swap: Variant = a[i]
+		a[i] = a[j]
+		a[j] = swap
 
 
 ## Tonight's contacts: rules.json contacts.per_night entries of the pool, each for a different
-## visitor who comes in tonight, drawn from the shift seed with a generator of their own.
-## `first_on_list` (the training night) puts the first visitor on the list, so the first visit
-## can show how a code works. The list is not in arrival order, so it says nothing about who
-## comes when.
+## visitor who comes in tonight, drawn from the shift seed with a generator of their own. The
+## game passes the entries that are fair tonight (CaseDB.fair_contacts), so neither clue alone
+## gives anybody away and the two together fit the courier only. `first_on_list` (the training
+## night) puts the first visitor on the list, so the first visit can show how a code works. The
+## list is not in arrival order, so it says nothing about who comes when.
 static func draw_contacts(p_rules: Dictionary, pool: Array, p_order: Array, p_seed: int, first_on_list: bool = false) -> Array:
 	var per := 0
 	if typeof(p_rules.get("contacts")) == TYPE_DICTIONARY:
@@ -93,11 +196,7 @@ static func draw_contacts(p_rules: Dictionary, pool: Array, p_order: Array, p_se
 			entries.append(e)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("contacts:%d" % p_seed)
-	for i in range(entries.size() - 1, 0, -1):
-		var j := rng.randi_range(0, i)
-		var swap: Variant = entries[i]
-		entries[i] = entries[j]
-		entries[j] = swap
+	_shuffle(entries, rng)
 	var out: Array = []
 	var taken: Dictionary = {}
 	if first_on_list:
