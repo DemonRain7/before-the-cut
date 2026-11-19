@@ -10,7 +10,8 @@ until the player presses ENTER.
 
 The Godot game remains playable offline using the authored comparison. Real AI requires
 a configured provider; the default proxy is a **synthetic mock**, not an intelligent patient
-and not a speech service. The mock cannot hear: it returns the same labelled sentence for any clip.
+and not a speech service. The mock cannot hear: it returns the same labelled sentence for any clip,
+in the language the game asks for.
 
 ## Run locally
 
@@ -68,7 +69,15 @@ entry needs shared counters and deployment/authentication review before external
 
 Request: `protocol: "3"`, session/visit/case identifiers, case version, `event`
 with `type`, `id` and the doctor's exact `text`, current visit state,
-`conversation_history`, and a reply-length limit.
+`conversation_history`, a reply-length limit, and the player's `language`.
+
+`language` is `"en"` or `"zh"`, the language the player chose on the title card. A request
+without it is English; any other value is refused with `400 bad_request` (message
+`language`). In Chinese the patient is told to write `reply` and `reaction` in Simplified
+Chinese and to keep people's names and code names (Kip, SPARROW) in Latin letters, as the game
+writes them. A hanzi takes the room of two letters on the dialogue strip, so Chinese has
+smaller length limits of its own (see Bounds). The language is written to the log with each
+entry; the words are not.
 
 Supported actions: `check`, `ask`, `press`, `reassure`, `say`. `say` carries a sentence the
 player typed (or spoke and then sent) in their own words.
@@ -107,9 +116,15 @@ Request:
   "protocol": "3",
   "session_id": "1a2b3c4d",
   "visit_id": "1a2b3c4d-2-rook",
-  "audio": {"mime": "audio/wav", "data": "<base64>"}
+  "audio": {"mime": "audio/wav", "data": "<base64>"},
+  "language": "en"
 }
 ```
+
+`language` is optional and takes the same values as above: the speech service is told which
+language the clip is spoken in (OpenAI gets it as the ISO-639-1 `language` field), and a
+Chinese transcript is asked for in Simplified characters. The mock answers in the language
+asked for.
 
 `audio.data` is a plain WAV file in base64: a 44-byte header, PCM, mono, 16 kHz, 16 bit.
 Only the header is decoded here. Anything else is refused with `400 bad_request`.
@@ -149,7 +164,8 @@ The game shows a short hint for each of these and leaves whatever was already ty
 ## Bounds
 
 These are technical and cost limits, not an answer-selection policy. The game holds the same
-numbers in `game/data/rules.json` (`agent` and `agent.voice`); change both together.
+numbers in `game/data/rules.json` (`agent`, `agent.voice` and `agent.languages`); change both
+together. The Chinese numbers are `DEFAULT_LIMITS.languages.zh` here.
 
 | Limit | Patient lines | Push-to-talk clips |
 | --- | --- | --- |
@@ -160,6 +176,7 @@ numbers in `game/data/rules.json` (`agent` and `agent.voice`); change both toget
 | Game deadline | 4 s | 7 s |
 | Request size | 32 KiB | 512 KiB (10 s of audio is about 417 KiB in base64) |
 | Output | 256 tokens; reply asked at 110 characters, refused only over 220; reaction up to 110 | 256 tokens; transcript up to 300 characters |
+| Output in Chinese | reply asked at 55 characters, refused only over 110; reaction asked at 55, accepted up to 110 | the same as English |
 | History | 48 most recent entries | none: a clip carries no conversation |
 
 Why they changed on November 14 (previously 4 calls per visit, 60 per session, 2 s / 2.5 s

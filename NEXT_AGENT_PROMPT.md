@@ -1,18 +1,70 @@
 # Continue Before the Cut
 
-Updated November 18, 2026. Work on main in this repository, the only active checkout;
+Updated November 18, 2026, evening. Work on main in this repository, the only active checkout;
 pull first. The sibling fathom directory is an archive. Do not write there or copy its Git history.
 
-Read AGENTS.md, HANDOFF.md, game/README.md and
+Read AGENTS.md, HANDOFF.md, game/README.md, docs/development/chinese-translation.md and
 docs/development/story-and-clarity-2026-11-17.md first. The only live run is described in
 docs/development/live-model-results-2026-11-15.md.
-Communicate in Chinese; write game text, code and documents in English.
+Communicate in Chinese; write code and documents in English. The game's own text is bilingual,
+English and Chinese: a change to its English is a change to its Chinese in the same commit
+(student, November 18; AGENTS.md, Languages).
 
-Git: both rounds of November 16 are in commit 822e8d7. The work of November 17 is in the commit
-after it, made on November 18 when the student asked for it to be pushed, and is on origin/main.
-Run git status -sb and git log -3 --oneline; anything uncommitted is newer than this file.
+Git: both rounds of November 16 are in commit 822e8d7. The work of November 17 is in e7f94d7,
+made and pushed to origin/main on November 18 when the student asked. The work of November 18
+was not committed when this file was written. Run git status -sb and git log -3 --oneline: a
+commit after e7f94d7 holds the November 18 work, and anything uncommitted beyond it is newer
+than this file.
 
-Latest checkpoint (November 17, evening): the student's five notes. They were first given to
+Latest checkpoint (November 18, evening): the student's requests of that day, built by Claude
+(Opus 5.5). After the November 17 build was pushed and opened for them in a window, the student
+sent a screenshot of the third opening card (THE LANTERNS) and asked, paraphrased: what the
+card and "chrome" mean; a language option on the title screen, Chinese first, with everything
+translated, and a change on one side always made on the other; an opening redrawn for the new
+story; and reference sheets that differ from patient to patient, with a reason in the story
+(implant models), organized by model and body part rather than by character, so that a
+character is a set of parts and the cast is easier to extend. They answered three questions:
+download Fusion Pixel Font for the glyphs; keep the patients' names and the contacts' code
+names in English and translate companies, gangs and the rest; and, for the Chinese title,
+"think of a more reasonable and interesting one". What was built:
+- The language. English | 中文 in the title card's top-right corner, kept in
+  user://settings.cfg and changed only there. scripts/core/lang.gd translates each shown line
+  where it is drawn, from catalogs in game/data/lang/zh/ (about 720 lines in 12 catalogs)
+  keyed by the exact English; the rules, the data and the event log stay English. Ten pictures
+  with painted words have _zh twins (their words in tools/art/words.py), and the sign reads
+  先别下刀 ("don't cut yet") over a small BEFORE THE CUT, as does the window's title. Names,
+  code names, the binder's model names and the key names stay English. The glyphs are
+  Fusion Pixel Font's 10-pixel cut (OFL 1.1), built into assets/fonts/zh.fnt, the fallback of
+  every Counter Sans font. The input method is on only while the typing line is open in
+  Chinese. Chinese is typed out and held at half the English rate per character.
+- The patients answer in the player's language: the request names it, the proxy refuses an
+  unknown one before any call, asks for Chinese with names and code names in Latin letters,
+  holds Chinese to 55 characters a line and 110 a reply (rules.json agent.languages and
+  core.mjs DEFAULT_LIMITS.languages, together) and passes the language on to transcription.
+  The offline patient's lines are in the case catalogs, and it listens for the Chinese words
+  of lang/zh/topics.json too.
+- The opening's pictures were redrawn: FIRED in three panels, the debt file stamped SOLD TO
+  HARROW, the Lanterns' CONTACT and PACKAGE tags, a crate of filed-off military surplus and a
+  visitor whose eye implant glitches; the cards' words were rewritten (intro.json version 5).
+  The words that teach the rules say implant where they said chrome; chrome is left as slang
+  around Juno.
+- The spec binder (game/data/parts.json): the factory normal of each implant model, by slot
+  (eyes NATURAL, KITE, IRIS, TALON; hands NATURAL 1.0 s, LOADER 1.5, SEAM 0.8, DEFT 0.5,
+  REFLEX 0.3; ports STREET, WORK, MIL-SPEC; voices NATURAL, VX-9). Each case's parts name a
+  model per slot, and case_db.gd sheet_for() builds the sheet for the patient at the counter;
+  between patients the sheet is the baseline body. The close-ups name the model, and the
+  grip's LIMIT is the hands model's (rules.json version 7 has no grip.limit_ms). Rook's
+  release moved to 1.2 s and Vale's to 0.2 s so that each keeps its verdict against its own
+  model; no case's truth or row's verdict changed. case_db.gd refuses data that wears a model
+  the binder lacks or whose verdicts disagree with the models.
+- Three checks keep the languages in step: python tools/check_lang.py, measure_text.py
+  --lang zh in tools/art, and the scene test with -- --lang=zh, which fails on any English
+  that reaches the Chinese screen.
+In the November 17 checkpoint below, the IMPLANT readout and rules.json grip.limit_ms are
+superseded: the penlight readout names each eye's model (NO PUPIL for an eye without one),
+and the grip's limit is the hands model's.
+
+Previous checkpoint (November 17, evening): the student's five notes. They were first given to
 Claude (Fable), whose quota ran out partway; Claude (Opus 5.5) took over in the same working
 tree and finished them. The notes, paraphrased: pass and fail were unclear, with nothing
 pointing at the reference sheet (how long is a reasonable grip?); CALM should go, or cost
@@ -70,30 +122,36 @@ player's own crosses against the house rule (CROSSED n/2, advice only). The pati
 thinking pose while a reply is on its way and watches the doctor while the microphone is
 open. HANDOFF.md has every table and where each thing lives in the code.
 
-The notes and requests are the student's. Every layout, key, price, number, name and sentence
-above is an assistant proposal. The student has not reviewed or played any of it. Do not
-present it as approved or as tuned.
+The notes and requests are the student's. Every layout, key, price, number, name, model,
+picture, translation and sentence above is an assistant proposal. The student has not reviewed
+or played any of it, and no person has read the Chinese. Do not present it as approved, tuned
+or reviewed.
 
-Checks on the evening of November 17 (automated, mock provider, simulated microphone, no paid
-call): 820 rule checks, 940 scene checks over nine shifts (the same with --less-blood), 5
-normal-close checks, 38 proxy tests, 196 HTTP game checks and 15 wire checks, 514 measured
-text lines and 30 linted scripts. All passed with exit code 0 and an empty standard error. The
-hidden-desktop runner drew 196 frames of four shifts and 91 attack frames with --less-blood,
-with zero missed moments and no window on the user's desktop, and the main scene booted there
-on the real renderer. Claude looked at about 60 frames of a first drawing (two changes
-followed) and, in the final drawing, at the frames those changes touched, the other new words
-and 16 of the 91 less-blood frames; no person has. Logs and frames: validation/2026-11-17/
-(local, ignored by Git). The counts of November 16 are not results for this build. The scene
-test cues snaps and flares and presses the shutter within one frame, so it says nothing about
-human timing. Nobody has operated this build in a visible window, listened to it, spoken to it
-or run it against a live model. Do not claim a playtest, a listening test, a voice test or a
+Checks on the evening of November 18, on the final tree (automated, mock provider, simulated
+microphone, no paid call): 934 rule checks, 953 scene checks over nine shifts (954 in Chinese,
+953 with --less-blood), 5 normal-close checks, 39 proxy tests, 196 HTTP game checks and 15 wire
+checks (in English), the translation check with 0 problems, 616 measured text lines in each
+language and 31 linted scripts. All passed with exit code 0 and an empty standard error. The
+hidden-desktop runner drew 196 frames of four shifts in English, the same 196 in Chinese and 91
+attack frames with --less-blood, with zero missed moments and no window on the user's desktop,
+and the main scene booted there on the real renderer. Claude looked at a few frames of each
+final drawing (the first opening card, the training's sheet tip, the penlight readouts, the
+grip against LIMIT 1.5s, a slip; in Chinese the Lanterns card, the readouts, the transcript, a
+slip); no person has. Logs and frames: validation/2026-11-18/ (local, ignored by Git). The
+counts of November 17 and 16 are not results for this build. The scene test cues snaps and
+flares and presses the shutter within one frame, so it says nothing about human timing.
+Nobody has operated this build in a visible window, read its Chinese in play, typed with a
+real input method, listened to it, spoken to it or run it against a live model, in either
+language. Do not claim a playtest, a listening test, a voice test, a translation review or a
 live result for it.
 
 Known engine problem: Godot 4.7.2's headless import from an empty cache is not reliable. In 20
-tries each it crashed (0xC0000005) twice on this tree and once on 822e8d7, and twice more on
-this tree it printed engine errors without crashing; in the final check run it crashed while
-writing the fonts and left the copy's checks failing. A second import mended that copy, the one
-crash it was tried on.
+tries each on November 17 it crashed (0xC0000005) twice on that day's tree and once on 822e8d7,
+and twice more on that tree it printed engine errors without crashing; in that day's final
+check run it crashed while writing the fonts and left the copy's checks failing. A second
+import mended that copy, the one crash it was tried on. On November 18 the one import of a copy
+with no cache was clean and the copy passed its checks, which says little about a crash that
+came twice in twenty tries.
 Before you trust checks on a fresh copy, import it with .\run-game.ps1 -ImportOnly (or import
 twice). The cause is not known. Evidence: validation/2026-11-17/fresh-import-repeats/ and
 validation/2026-11-17/launcher-test/.
@@ -120,38 +178,67 @@ paid run needs the student's own yes to the provider, the model, the number of c
 
 The student's recording is finished, so the window, mouse, keyboard, sound and microphone may
 be used for testing. The student's last word on the screen itself (November 15) was to keep
-the computer usable while screenshots were made, and the rounds of November 16 and 17 ran only
-headless and through tools/run_hidden.py. Keep working in the background unless the student
-says the window may be taken over.
+the computer usable while screenshots were made, and the rounds of November 16, 17 and 18 ran
+only headless and through tools/run_hidden.py. On November 18 the November 17 build was started
+in a visible window because the student asked to look at it (run-game.ps1; exit code 0 when
+they closed it). Keep working in the background unless the student says the window may be
+taken over.
 
 Keep the design: Normal Reference Sheet; optional, unordered observations/tools/questions/
 pressure; early decisions; TREAT or Trauma Team; shutter defense. The training only points
 and never forces an order. The model writes its own speech and can evade or lie. The game owns
 truth, physical results, codes and drops. Keep the offline comparison. Limits are unchanged:
-16 replies/visit, 256 output tokens and the existing deadlines. Any later limit change must
-match rules.json and core.mjs. Art and sound come from tools/art, never from hand edits: on
-November 17 gen_booth.py redrew clinic/booth.png without the HOUSE RULE sign and wrote
-ui/obj_list.png, and gen_clinic.py wrote clinic/list.png; no sound was added. Commit each
-.import and .uid file with its asset. The proxy did not change on November 16 or 17.
+16 replies/visit, 256 output tokens and the existing deadlines; Chinese has its own pair (55
+characters a line, 110 a reply) in both places. Any later limit change must match rules.json
+and core.mjs. Art and sound come from tools/art, never from hand edits: on November 17
+gen_booth.py redrew clinic/booth.png without the HOUSE RULE sign and wrote ui/obj_list.png, and
+gen_clinic.py wrote clinic/list.png; no sound was added. On November 18 every generator that
+paints words writes the English picture and its _zh twin together from tools/art/words.py,
+gen_font.py builds assets/fonts/zh.fnt from the cut in tools/art/fonts/ (font_zh.py reads it;
+extract_zh_font.py records how it was cut from the downloaded release, and a downloaded file is
+read only with python -I), and no English picture or sound changed. Commit each .import and
+.uid file with its asset. The proxy did not change on November 16 or 17; on November 18 it
+gained the language field, the Chinese limits, the Chinese prompt and the transcription
+language.
 
-Next three tasks (first run git status -sb; the work of November 17 is committed and pushed):
-1. The student plays a first night from a fresh start with headphones (.\run-game.ps1): the
-   training from start to end, the eye test and the grip with their readouts and LIMIT 1s,
-   the list and its clues, a right code and a wrong one, CALM at its price, a long exam of a
-   drifting patient (a snap) and a flare; then a second night without the training, to see
-   whether 240 an hour feels fair. Then settle the proposals listed in HANDOFF.md under "For
-   the student to decide" and tune the numbers from what the student felt. The questions of
-   November 16 (the booth, the papers, the glass) are still open and belong to the same
-   session. An agent operating the window, or the scene test, is not a substitute.
-2. Test the student's real voice through TAB, and look at the new moments with real latency
-   in a short live run. That run is paid and needs the student's explicit yes first. A code is
-   never passed to the model, so the patient AI does not know one was said. The visual check
-   of the PATIENT SAID row and paste support for the typing line are still open.
-3. Prepare two Braintrust replies due November 19, 23:59 New York, once pitches are selected;
-   draft for student review, never send unasked. G1 is submitted; leave its snapshots,
-   slides and narration alone.
-After these: the fresh-import crash. Try another Godot version on a copy, or report it
-upstream with the logs; a public report is a post and needs the student's yes.
+Waiting for the student since November 18: random signs. They asked whether abnormal signs
+could appear at random on different parts of a patient, from assets prepared in advance, and
+added that a fixed test wave showing every possible situation should remain. Nothing of it is
+built: only the arrival order, the two contacts, the timing of snaps and flares and a few
+offline line variants are random now. The assistant proposed fixed characters whose condition
+each night draws from its seed (one to three drifting, never the first patient of a session;
+at least two broken lines each, one of them needing a tool or a question; harmless decoys on
+the steady ones), a sign library keyed by slot and model on top of the spec binder, port
+overlays and attack art for Kip, Rook and Juno, neutral model briefs with the night's signs
+sent by the game, a validator run over a few hundred generated nights, two fixed test nights
+(A as now, B the reverse) with a coverage check, in three playable steps (rules and data, art,
+words) ending in a small paid live check that needs its own yes. It asked whether to do step 1
+and stop for the student to play, or all three steps in a row. HANDOFF.md, Student decisions,
+November 18, item 2, has the whole proposal.
+
+Next three tasks (first run git status -sb; the work of November 18 was not committed when
+this file was written):
+1. Prepare two Braintrust replies due November 19, 23:59 New York (the soonest deadline), once
+   the student has picked two G1 pitches with fewer than two replies: specific, moment-based
+   notes in English for the student's review, never sent unasked. G1 is submitted; leave its
+   snapshots, slides and narration alone.
+2. The student plays and reads (.\run-game.ps1, with headphones): a first night in Chinese
+   from a fresh start, reading every card, tip, sheet and slip, typing a sentence with a real
+   Chinese input method and marking what reads wrong; then a night in English. Look at the
+   sheets changing with the patient and the redrawn opening, and at the open questions of
+   November 16 and 17 (the training, the readouts and LIMIT, the list, CALM's price, a snap and
+   a flare, whether 240 an hour is fair). Then settle the proposals in HANDOFF.md under "For
+   the student to decide" and correct the translation from what the student marks, in both
+   languages at once. An agent operating the window, or the scene test, is not a substitute.
+3. Random signs, once the student answers (step 1 and stop, or all three steps), built on the
+   spec binder, in English and Chinese together.
+After these: a short live run in both languages (the model's Chinese inside 55 and 110
+characters, the student's real voice through TAB in both languages, the new moments with real
+latency), which is paid and needs the student's explicit yes first; a code is never passed to
+the model, so the patient AI does not know one was said. Then the visual check of the PATIENT
+SAID row, paste support for the typing line, and the fresh-import crash (another Godot version
+on a copy, or an upstream report with the logs; a public report is a post and needs the
+student's yes).
 
 Update the handoffs at checkpoints with actual results and remaining work. Commit and push
 normally to main when authorized; never force-push, add Co-Authored-By or add AI commit

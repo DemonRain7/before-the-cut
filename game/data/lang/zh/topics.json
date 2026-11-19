@@ -1,0 +1,73 @@
+{
+	"note": "Words the offline patient listens for in Chinese, for every patient (scripts/core/scripted_brain.gd topic_for_text). Chinese has no spaces, so a word counts wherever it appears in the typed line: one point for each word of a topic, added to the English keys' score; the highest score wins and a tie goes to the topic the case lists first. Like the English keys, the words leave out bare question words (why: 为什么), which would pull every question to one topic, and single characters that sit inside everyday words (气 in 天气). A case's own words are in its catalog's topics (<case>:<topic>), and a word in both lists counts twice. Nothing here is shown, so strings stays empty.",
+	"keep": [],
+	"strings": {},
+	"topics": {
+		"why": [
+			"怎么了",
+			"怎么回事",
+			"出什么事",
+			"出了什么事",
+			"什么问题",
+			"什么毛病",
+			"哪里不对",
+			"哪儿不对",
+			"为什么来",
+			"来这",
+			"来干",
+			"干嘛来",
+			"需要什么",
+			"想要什么",
+			"要做什么",
+			"帮你什么",
+			"原因",
+			"理由",
+			"发生",
+			"坏了"
+		],
+		"sleep": [
+			"睡",
+			"失眠",
+			"休息",
+			"累",
+			"困",
+			"梦",
+			"熬夜",
+			"疲惫",
+			"疲劳"
+		],
+		"implant": [
+			"自己动",
+			"自己乱",
+			"自己会",
+			"乱动",
+			"自作主张",
+			"不听使唤",
+			"不受控",
+			"失控",
+			"控制",
+			"故障",
+			"抽搐",
+			"抽动",
+			"奇怪",
+			"古怪",
+			"义体",
+			"机械"
+		],
+		"chrome": [
+			"义体",
+			"零件",
+			"部件",
+			"改装",
+			"机械",
+			"自己动",
+			"乱动",
+			"不听使唤",
+			"失控",
+			"故障",
+			"抽搐",
+			"奇怪",
+			"古怪"
+		]
+	}
+}

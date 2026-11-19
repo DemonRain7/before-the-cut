@@ -85,7 +85,7 @@ try {
   const sceneClips = scene ? clips.filter(r => r.session_id === scene[1]) : [];
   const late = sceneClips.filter(r => r.scenario === 'stt_slow');
   const numbersOnly = ['scenario', 't', 'request_id', 'route', 'provider', 'model', 'status', 'code', 'latency_ms', 'session_id', 'visit_id',
-    'audio_seconds', 'audio_bytes', 'input_tokens', 'output_tokens', 'transcript_chars'];
+    'language', 'audio_seconds', 'audio_bytes', 'input_tokens', 'output_tokens', 'transcript_chars'];
   wire.push(['the scene reported the clips it sent', Boolean(scene) && Number(scene[2]) > 0]);
   wire.push([`every clip the scene sent reached a proxy, and a tap, silence or a dead microphone sent nothing (${sceneClips.length} clips)`,
     Boolean(scene) && sceneClips.length === Number(scene[2])]);

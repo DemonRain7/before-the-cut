@@ -11,6 +11,7 @@ extends Node2D
 ## name or a line on it.
 
 const Gfx = preload("res://scripts/ui/gfx.gd")
+const Lang = preload("res://scripts/core/lang.gd")
 
 signal blip
 
@@ -56,6 +57,8 @@ var input_caret: int = 0
 var input_status: String = ""  # "" typing | "opening" | "listening" | "transcribing": the microphone has the line
 var input_level: float = 0.0   # 0..1: how loud the microphone hears the player
 var input_seconds: float = 0.0
+var input_ime: String = ""     # what an input method is still putting together (pinyin): not typed yet
+var input_ime_at: int = 0      # the input method's own caret, within it
 var chips: Array = []          # [{"id", "key", "label"}] small buttons on the name line
 var chips_dim: bool = false
 var chip_hover: String = ""
@@ -71,13 +74,15 @@ var _caret_t: float = 0.0
 var _rows: Array = [Vector2i(0, 0)]   # where the typed line breaks: [start, end) pairs
 
 
+## raw: the words are the doctor's own (typed or spoken), shown exactly as they were said.
+## Anything else is shown in the player's language.
 func say(p_speaker: String, p_text: String, p_speaker_color: Color = Gfx.WARM6,
-		p_text_color: Color = Gfx.TEAL7, p_rate: float = 46.0) -> void:
+		p_text_color: Color = Gfx.TEAL7, p_rate: float = 46.0, raw: bool = false) -> void:
 	clear_menu()
 	speaker = p_speaker
 	speaker_color = p_speaker_color
 	text_color = p_text_color
-	lines = Gfx.wrap_text(p_text, TEXT_W)
+	lines = Gfx.wrap_raw(p_text, TEXT_W) if raw else Gfx.wrap_text(p_text, TEXT_W)
 	_page = 0
 	_open_page()
 	rate = p_rate
@@ -95,7 +100,7 @@ func _open_page() -> void:
 	shown = 0
 	_acc = 0.0
 	more = _page + PAGE_LINES < lines.size()
-	_page_hold = PAGE_HOLD + PAGE_HOLD_PER_CHAR * float(total)
+	_page_hold = PAGE_HOLD + PAGE_HOLD_PER_CHAR * Lang.per_char() * float(total)
 
 
 ## A click: shows the rest of the page at once; on a full page, turns to the next one.
@@ -199,6 +204,8 @@ func open_input(prefill: String = "") -> void:
 	clear_menu()
 	input_open = true
 	input_status = ""
+	input_ime = ""
+	input_ime_at = 0
 	input_level = 0.0
 	input_seconds = 0.0
 	input_set(prefill)
@@ -211,6 +218,8 @@ func close_input() -> void:
 	input_status = ""
 	input_text = ""
 	input_caret = 0
+	input_ime = ""
+	input_ime_at = 0
 	_rows = [Vector2i(0, 0)]
 	queue_redraw()
 
@@ -266,6 +275,28 @@ func input_move(by: int) -> void:
 	_caret_t = _t
 
 
+## What an input method (pinyin, for one) is still putting together: shown at the caret and
+## underlined until the input method hands the characters over, which then arrive one by one like
+## typed ones. at: the input method's own caret, within text.
+func input_compose(text: String, at: int) -> void:
+	input_ime = text if input_open else ""
+	input_ime_at = clampi(at, 0, input_ime.length())
+	_caret_t = _t
+	queue_redraw()
+
+
+## Where the caret stood when the input method began, in this node's coordinates, at the foot of
+## the row: the input method opens its list of candidates there.
+func caret_point() -> Vector2:
+	var at := _caret_place()
+	return Vector2(TEXT_X + at.x, TEXT_Y + TEXT_PITCH * (at.y + 1.0))
+
+
+## The typed line with what the input method holds put in at the caret.
+func _with_ime() -> String:
+	return input_text.substr(0, input_caret) + input_ime + input_text.substr(input_caret)
+
+
 ## How many more characters the line takes (by count; a wide line can fill up sooner).
 func input_room() -> int:
 	return INPUT_MAX - input_text.length()
@@ -277,7 +308,7 @@ func _break_rows(s: String) -> Array:
 	var start := 0
 	var last_space := -1
 	for i in s.length():
-		if i > start and Gfx.text_w(s.substr(start, i - start + 1)) > TEXT_W:
+		if i > start and Gfx.text_w_raw(s.substr(start, i - start + 1)) > TEXT_W:
 			var cut := i
 			if last_space > start and last_space < i:
 				cut = last_space + 1
@@ -292,13 +323,18 @@ func _break_rows(s: String) -> Array:
 
 ## Row and x offset of the caret.
 func _caret_place() -> Vector2:
+	return _place(input_text, _rows, input_caret)
+
+
+## Row and x offset of position at in s, which breaks into rows.
+func _place(s: String, rows: Array, at: int) -> Vector2:
 	var row := 0
-	for i in _rows.size():
-		var r: Vector2i = _rows[i]
-		if r.x <= input_caret:
+	for i in rows.size():
+		var r: Vector2i = rows[i]
+		if r.x <= at:
 			row = i
-	var from: Vector2i = _rows[row]
-	return Vector2(Gfx.text_w(input_text.substr(from.x, input_caret - from.x)), float(row))
+	var from: Vector2i = rows[row]
+	return Vector2(Gfx.text_w_raw(s.substr(from.x, at - from.x)), float(row))
 
 
 # ------------------------------------------------------------------ the small buttons
@@ -346,7 +382,7 @@ func _process(delta: float) -> void:
 	_t += delta
 	if typing:
 		if shown < total:
-			_acc += delta * rate
+			_acc += delta * rate / Lang.per_char()
 			var step := int(_acc)
 			if step > 0:
 				_acc -= float(step)
@@ -360,8 +396,8 @@ func _process(delta: float) -> void:
 						if _blip_gap >= 2:
 							_blip_gap = 0
 							blip.emit()
-					if ch == "." or ch == "?" or ch == "!" or ch == ",":
-						_acc -= 4.0 if ch != "," else 2.0      # a short breath at punctuation
+					if ".?!,。？！，、…".contains(ch):
+						_acc -= 2.0 if ",，、".contains(ch) else 4.0      # a short breath at punctuation
 						break
 		elif more:
 			_page_hold -= delta      # nobody clicked: the page turns by itself
@@ -410,7 +446,7 @@ func _draw_line() -> void:
 			break
 		var l := lines[i]
 		var part: String = l if left >= l.length() else l.substr(0, left)
-		Gfx.text(self, Vector2(TEXT_X, y), part, text_color)
+		Gfx.text_raw(self, Vector2(TEXT_X, y), part, text_color)      # wrap_text translated it
 		left -= l.length()
 		y += TEXT_PITCH
 	var turn := more and shown >= total      # the rest of the line is on the next page
@@ -468,26 +504,42 @@ func _draw_input() -> void:
 				if i < on:
 					col = Gfx.GRN3 if i < METER_BARS - 4 else Gfx.AMBER
 				draw_rect(Rect2(x + 4.0 * float(i), TEXT_Y + 2.0, 3, 6), col)
-			Gfx.text(self, Vector2(x + 4.0 * float(METER_BARS) + 6.0, TEXT_Y), "%.1f s" % input_seconds, Gfx.TEAL6)
+			Gfx.text(self, Vector2(x + 4.0 * float(METER_BARS) + 6.0, TEXT_Y), Lang.tf("%.1f s", [input_seconds]), Gfx.TEAL6)
 			Gfx.text(self, Vector2(TEXT_X, TEXT_Y + TEXT_PITCH), "Let go when you have said it.", Gfx.TEAL5)
 		"opening":
 			# the key is down but the device is not ready: a dim light, and no promise that it hears
 			draw_rect(Rect2(TEXT_X, TEXT_Y + 2.0, 6, 6), Gfx.AMBER if fmod(_t, 0.3) < 0.15 else Gfx.RED1)
 			var dots := ".".repeat(1 + int(_t * 6.0) % 3)
-			Gfx.text(self, Vector2(TEXT_X + 10.0, TEXT_Y), "OPENING THE MICROPHONE" + dots, Gfx.TEAL6, true)
+			Gfx.text_raw(self, Vector2(TEXT_X + 10.0, TEXT_Y), Lang.t("OPENING THE MICROPHONE") + dots, Gfx.TEAL6, true)
 			Gfx.text(self, Vector2(TEXT_X, TEXT_Y + TEXT_PITCH), "Speak when it says LISTENING.", Gfx.TEAL5)
 		"transcribing":
 			var dots := ".".repeat(1 + int(_t * 3.0) % 3)
-			Gfx.text(self, Vector2(TEXT_X, TEXT_Y), "WRITING DOWN WHAT YOU SAID" + dots, Gfx.TEAL6)
+			Gfx.text_raw(self, Vector2(TEXT_X, TEXT_Y), Lang.t("WRITING DOWN WHAT YOU SAID") + dots, Gfx.TEAL6)
 		_:
-			if input_text == "":
+			# what an input method is still putting together sits at the caret, underlined
+			var shown := input_text
+			var rows: Array = _rows
+			var caret := input_caret
+			var ime_end := input_caret + input_ime.length()
+			if input_ime != "":
+				shown = _with_ime()
+				rows = _break_rows(shown)
+				caret = input_caret + input_ime_at
+			if shown == "":
 				Gfx.text(self, Vector2(TEXT_X + 4.0, TEXT_Y), "Say it in your own words.", Gfx.TEAL4)
-			for i in _rows.size():
-				var r: Vector2i = _rows[i]
-				Gfx.text(self, Vector2(TEXT_X, TEXT_Y + TEXT_PITCH * float(i)), input_text.substr(r.x, r.y - r.x), Gfx.TEAL7)
+			for i in rows.size():
+				var r: Vector2i = rows[i]
+				var y := TEXT_Y + TEXT_PITCH * float(i)
+				Gfx.text_raw(self, Vector2(TEXT_X, y), shown.substr(r.x, r.y - r.x), Gfx.TEAL7)
+				var from := maxi(r.x, input_caret)
+				var to := mini(r.y, ime_end)
+				if input_ime != "" and to > from:
+					var x0 := Gfx.text_w_raw(shown.substr(r.x, from - r.x))
+					var x1 := Gfx.text_w_raw(shown.substr(r.x, to - r.x))
+					draw_rect(Rect2(TEXT_X + x0, y + 10.0, x1 - x0, 1), Gfx.CYAN2)
 			if fmod(_t - _caret_t, 1.0) < 0.6:
-				var at := _caret_place()
+				var at := _place(shown, rows, caret)
 				draw_rect(Rect2(TEXT_X + at.x, TEXT_Y + TEXT_PITCH * at.y + 1.0, 1, 9), Gfx.CYAN2)
 			var room := input_room()
 			if room <= 30:
-				Gfx.text_right(self, 388.0, NAME_Y, "%d left" % room, Gfx.TEAL5 if room > 0 else Gfx.RED3)
+				Gfx.text_right(self, 388.0, NAME_Y, Lang.tf("%d left", [room]), Gfx.TEAL5 if room > 0 else Gfx.RED3)

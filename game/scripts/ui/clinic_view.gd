@@ -16,6 +16,7 @@ extends Node2D
 ## the director decides when they come; nothing about them is decided by the patient model.
 
 const Gfx = preload("res://scripts/ui/gfx.gd")
+const Lang = preload("res://scripts/core/lang.gd")
 const ScopeView = preload("res://scripts/ui/scope_view.gd")
 
 signal shutter_landed
@@ -252,6 +253,17 @@ func _ready() -> void:
 
 # ------------------------------------------------------------------ controls
 ## Brackets round a part of the patient. `rect` is in view space (PatientRig.zone_rect).
+## The pictures with words painted into them (EXIT over the door, CLOSED on the shutter, HALL CAM
+## under the monitor) have a twin for each language (Gfx.tex). They are set once, when the view
+## is built, so a switch on the title card puts them up again in the new language.
+func apply_language() -> void:
+	if _hall == null:
+		return
+	_hall.texture = Gfx.tex("clinic/hall.png")
+	_shutter.texture = Gfx.tex("clinic/shutter.png")
+	_wall.texture = Gfx.tex("clinic/booth.png")
+
+
 func set_zone(rect: Rect2, label: String) -> void:
 	_zone_rect = Gfx.rect_to_screen(rect)
 	_zone_label = label
@@ -897,10 +909,10 @@ func _draw_meter() -> void:
 	var x := m.position.x + 4.0
 	var y := m.position.y
 	Gfx.text(_hud, Vector2(x, y + 2.0), "TILL", Gfx.GRN3)
-	Gfx.text_right(_hud, m.end.x - 4.0, y + 2.0, "HOUR %d/%d" % [mini(queue_index + 1, queue_count), queue_count], Gfx.GRN3)
+	Gfx.text_right(_hud, m.end.x - 4.0, y + 2.0, Lang.tf("HOUR %d/%d", [mini(queue_index + 1, queue_count), queue_count]), Gfx.GRN3)
 	var shown := int(roundf(_till_shown))
 	Gfx.big(_hud, Vector2(x, y + 12.0), str(shown), Gfx.GRN5 if shown >= 0 else Gfx.RED3)
-	Gfx.text(_hud, Vector2(x, y + 36.0), "LINE %d" % line, Gfx.RED3 if line_under else Gfx.GRN3)
+	Gfx.text(_hud, Vector2(x, y + 36.0), Lang.tf("LINE %d", [line]), Gfx.RED3 if line_under else Gfx.GRN3)
 	var n := results.size()
 	for i in n:
 		var ok := bool(results[i])

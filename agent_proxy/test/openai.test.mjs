@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { AUDIO_RATE, PROTOCOL, createHandler } from "../src/core.mjs";
-import { TRANSCRIBE_PROMPT, createOpenAIProvider, providerFromSettings } from "../src/providers.mjs";
+import { TRANSCRIBE_PROMPT, TRANSCRIBE_PROMPTS, createOpenAIProvider, providerFromSettings } from "../src/providers.mjs";
 import { loadGameData } from "../src/dev_server.mjs";
 
 const { cases, rules } = loadGameData();
@@ -166,6 +166,16 @@ test("a push-to-talk clip goes up as a WAV file to the transcription endpoint, a
 	const other = createOpenAIProvider({ model: "m", sttModel: "gpt-transcribe", apiKey: KEY, fetchImpl });
 	await handler(other).hear(clip());
 	assert.equal(calls[1].form.get("model"), "gpt-transcribe");
+	// a clip from a game played in Chinese is heard as Mandarin, with a prompt in Simplified Chinese
+	const chinese = clip();
+	chinese.language = "zh";
+	assert.equal((await handler(provider).hear(chinese)).status, 200);
+	assert.equal(calls[2].form.get("language"), "zh");
+	assert.equal(calls[2].form.get("prompt"), TRANSCRIBE_PROMPTS.zh);
+	const unknown = clip();
+	unknown.language = "fr";
+	assert.equal((await handler(provider).hear(unknown)).body.error.message, "language");
+	assert.equal(calls.length, 3, "a language the game does not have is refused before any call");
 	const silent = handler(createOpenAIProvider({ model: "m", apiKey: KEY, fetchImpl: async () => ({ ok: true, json: async () => ({ text: "  " }) }) }));
 	assert.equal((await silent.hear(clip())).body.error.code, "no_speech");
 	const odd = handler(createOpenAIProvider({ model: "m", apiKey: KEY, fetchImpl: async () => ({ ok: true, json: async () => ({ words: "hello" }) }) }));

@@ -1,0 +1,19 @@
+{
+	"note": "Chinese for rules.json: the end-of-night titles and the meter line. Keyed by the exact English; tools/check_lang.py keeps it in step with the game.",
+	"keep": [],
+	"strings": {
+		"Under the line at closing. Harrow Credit sends two quiet people to collect on the debt. They start with the hands.": "收工时低于红线。哈罗信贷派了两个沉默的人来收债。他们先从这双手下手。",
+		"STEADY HANDS": "一双稳手",
+		"Five patients, five right calls. The sheet goes back on its nail. You open again tomorrow.": "五个病人，五次判断全对。参照表挂回钉子上。明天照常开门。",
+		"RIGHT THE HARD WAY": "对得辛苦",
+		"Every call was right, and one of them still reached you. Reading people is half the job. The shutter is the other half.": "每次判断都对，可还是有一个够到了你。看人是这份工作的一半。卷闸是另一半。",
+		"A GOOD NIGHT'S WORK": "干得不错",
+		"One visit went wrong. Most nights are like that. The rest went the way they should.": "有一次出了错。大多数夜晚都是这样。其余的都按该有的样子走完了。",
+		"OPEN, BARELY": "勉强开张",
+		"You were right more often than not. In this trade that is not the same as safe.": "你对的时候比错的多。但在这行，这不等于安全。",
+		"ON NOTICE": "被盯上了",
+		"The line held, and that is the kindest thing to say. The Lanterns noticed the rest. The sheet was on the wall the whole time.": "红线守住了，这已是最客气的说法。其余的，灯笼帮都看在眼里。参照表一直挂在墙上。",
+		"Meter: OVER THE LINE. The debt waits another night.": "计费表：高于红线。债务再缓一夜。",
+		"Meter: UNDER THE LINE. The debt is called in.": "计费表：低于红线。债务被催收。"
+	}
+}

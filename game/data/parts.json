@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "note": "The spec binder (2026-11-18, after the student asked for reference sheets that differ by implant model rather than by character). Story: the doctor kept Kessler's spec binder when they were fired, and it holds the factory normal of every model Kessler built, licensed or copied on the street. A patient is a set of parts, one model per slot (cases/<id>.json parts): eye_l, eye_r, hands, port, voice. The reference sheet is assembled from the models a patient wears (scripts/core/case_db.gd sheet_for), so two patients with the same models get the same sheet and a new patient only needs models from this file. baseline is the body the sheet shows between patients. tag: what is printed under the row's label; a code name (KITE, VX-9) stays in English in every language, and a tag that describes (NATURAL, STREET, MIL-SPEC) is translated (data/lang/<code>/parts.json). eyes: kind is which close-up art family draws it (natural, optic, combat, display); pupil is what light should do to it: tightens (a natural pupil), shutter (a combat shutter that snaps tight) or none (nothing to tighten); both is the eyes row when both eyes are this model and fine what is ordinary for them; one and fine_one are this model's part of eyes_mixed when the two eyes differ (tag_l or tag_r names the implant beside a natural eye, tag_two stands for two different implants). Every eye model follows the light. hands: limit_ms is how long a steady hand of this model may take to let go of the grip bar (the sheet's hands normal, the close-up's LIMIT mark, case_db's check of rows.hands). Any model may give a normal of its own in place of the sheet's. Nobody has playtested any of it.",
+  "baseline": {"eye_l": "natural", "eye_r": "natural", "hands": "natural", "port": "street", "voice": "natural"},
+  "eyes": {
+    "natural": {"tag": "NATURAL", "kind": "natural", "pupil": "tightens",
+      "both": "Pupils tighten in light. Both follow it.", "fine": "Red rims, flash burns.",
+      "one": "tightens", "fine_one": "red rims"},
+    "kite": {"tag": "KITE", "kind": "optic", "pupil": "none",
+      "both": "No pupils, nothing tightens. Both follow.", "fine": "Scuffs, a cracked lens.",
+      "one": "no pupil", "fine_one": "scuffs, cracks"},
+    "iris": {"tag": "IRIS", "kind": "display", "pupil": "none",
+      "both": "Screens, no pupils. Both follow the light.", "fine": "Flickering glyphs, a bright screen.",
+      "one": "no pupil", "fine_one": "glyphs flicker"},
+    "talon": {"tag": "TALON", "kind": "combat", "pupil": "shutter",
+      "both": "Shutters snap tight in light. Both follow.", "fine": "No blinking, a faint whine.",
+      "one": "shutter snaps", "fine_one": "no blinking"}
+  },
+  "eyes_mixed": {"normal": "L: {l}. R: {r}. Both follow.", "fine": "L: {l}. R: {r}.",
+    "tag_l": "L {tag}", "tag_r": "R {tag}", "tag_two": "MIXED"},
+  "hands": {
+    "natural": {"tag": "NATURAL", "limit_ms": 1000, "fine": "Shakes, twitches, a weak grip."},
+    "loader": {"tag": "LOADER", "limit_ms": 1500, "fine": "Locks up now and then, twitches."},
+    "deft": {"tag": "DEFT", "limit_ms": 500, "fine": "Quick, tapping, never still."},
+    "reflex": {"tag": "REFLEX", "limit_ms": 300, "fine": "Dead still, a faint hum."},
+    "seam": {"tag": "SEAM", "limit_ms": 800, "fine": "Heat scars, stiff fingers."}
+  },
+  "ports": {
+    "street": {"tag": "STREET", "fine": "Scuffs, burnt pins, cheap cable marks."},
+    "work": {"tag": "WORK", "fine": "Burnt pins, weld burns, scars."},
+    "milspec": {"tag": "MIL-SPEC", "normal": "Calm skin at the plate. No dark threads.",
+      "fine": "A sealed plate, no jacks."}
+  },
+  "voices": {
+    "natural": {"tag": "NATURAL", "fine": "Nerves, rudeness, long pauses."},
+    "vx": {"tag": "VX-9", "fine": "A st-stutter, a skipped word, nerves."}
+  }
+}

@@ -16,16 +16,17 @@
     "Evening, doctor. Sorry to come so late.",
     "My hands keep working after I stop. I thought a tune-up might settle them."
   ],
+  "parts": {"eye_l": "natural", "eye_r": "natural", "hands": "seam", "port": "work", "voice": "natural"},
   "eyes": {
-    "left": {"kind": "natural", "tightens": false, "follows": true},
-    "right": {"kind": "natural", "tightens": true, "follows": true}
+    "left": {"tightens": false, "follows": true},
+    "right": {"tightens": true, "follows": true}
   },
   "grip": {"release_ms": 1700, "tremor": 0},
   "port": {"covered": true},
   "idle": {"hands": "work", "gaze": "soft"},
   "looks": {
     "eyes": "Natural eyes, tired. Old flash burns.",
-    "hands": "Work gloves. Left hand closes on nothing.",
+    "hands": "Gloved SEAM rig. Left closes on nothing.",
     "port": "Glove cuff covers the wrist. Port not visible."
   },
   "checks": {
@@ -85,7 +86,7 @@
   "rows": {
     "eyes": {"ok": false, "text": "Her left pupil never tightened, and it is a natural eye.",
       "evidence": ["check:penlight"]},
-    "hands": {"ok": false, "text": "Held on 1.7 s after 'release'.", "evidence": ["check:grip"]},
+    "hands": {"ok": false, "text": "Held on 1.7 s after 'release'. A SEAM lets go inside 0.8.", "evidence": ["check:grip"]},
     "port": {"ok": true, "text": "Calm skin and an old weld burn. Nothing wrong there.",
       "evidence": ["check:port"]},
     "speech": {"ok": false, "text": "\"The hands finish jobs I don't remember starting.\"",

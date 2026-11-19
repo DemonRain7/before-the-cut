@@ -8,6 +8,8 @@ extends RefCounted
 ##
 ## Used as: const ScriptedBrain = preload("res://scripts/core/scripted_brain.gd")
 
+const Lang = preload("res://scripts/core/lang.gd")
+
 var rng := RandomNumberGenerator.new()
 
 
@@ -91,6 +93,9 @@ func line_for(case_data: Dictionary, move: String, event: Dictionary, state: Dic
 ## so a typed or spoken line is matched to the questions its case knows, through each
 ## topic's "keys" words. Returns the topic id, or "" when nothing fits. Model mode never
 ## comes through here: there the patient reads the doctor's own words.
+## In another language the catalog adds words of its own (data/lang/<code>: "topics", under the
+## topic id for every case and under "<case>:<topic>" for one case). Chinese leaves no spaces
+## between words, so those are looked for anywhere in the sentence.
 static func topic_for_text(case_data: Dictionary, text: String) -> String:
 	var words: Array = []
 	var word := ""
@@ -105,6 +110,8 @@ static func topic_for_text(case_data: Dictionary, text: String) -> String:
 		words.append(word)
 	var best := ""
 	var best_score := 0
+	var case_id := str(case_data.get("id", ""))
+	var lowered := text.to_lower()
 	for t in case_data.get("topics", []):
 		var topic: Dictionary = t
 		var score := 0
@@ -115,6 +122,14 @@ static func topic_for_text(case_data: Dictionary, text: String) -> String:
 				if heard == key or (key.length() >= 4 and heard.begins_with(key)):
 					score += 1
 					break
+		var id := str(topic.get("id", ""))
+		var own: Array = []
+		own.append_array(Lang.topic_keys.get(id, []))
+		own.append_array(Lang.topic_keys.get(case_id + ":" + id, []))
+		for k in own:
+			var key := str(k).to_lower()
+			if key != "" and lowered.contains(key):
+				score += 1
 		if score > best_score:
 			best_score = score
 			best = str(topic.get("id", ""))

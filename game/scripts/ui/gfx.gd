@@ -1,7 +1,15 @@
 extends RefCounted
 ## Shared drawing helpers for the interface: palette, bitmap fonts, textures, word wrap and
 ## the fixed 640 x 360 screen layout.
+##
+## Every word the game draws goes through here, and here it is put into the player's language
+## (scripts/core/lang.gd): text, text_center, text_right, big, big_center, wrap_text, paragraph
+## and fill translate what they are given, and text_w and big_w measure the translation. The
+## *_raw functions draw and measure exactly what they are given: the doctor's own typing, and
+## lines that wrap_text has already translated.
 ## Used as: const Gfx = preload("res://scripts/ui/gfx.gd")
+
+const Lang = preload("res://scripts/core/lang.gd")
 
 # palette (the same values as tools/art/px.py)
 const INK0 := Color("07090c")
@@ -83,7 +91,18 @@ static func rect_to_screen(r: Rect2) -> Rect2:
 	return Rect2(to_screen(r.position), r.size * VIEW_SCALE)
 
 
+## A picture from assets/. A picture with words in it can have a twin for another language,
+## <name>_<code>.png beside it (ui/logo_zh.png for ui/logo.png), drawn by tools/art like the
+## picture itself: in that language the twin is shown instead.
 static func tex(path: String) -> Texture2D:
+	if Lang.code != "en" and path.ends_with(".png"):
+		var twin := _load_tex(path.trim_suffix(".png") + "_" + Lang.code + ".png")
+		if twin != null:
+			return twin
+	return _load_tex(path)
+
+
+static func _load_tex(path: String) -> Texture2D:
 	if not _tex.has(path):
 		var full := "res://assets/" + path
 		var t: Texture2D = null
@@ -100,61 +119,177 @@ static func has_tex(path: String) -> bool:
 static func font(bold: bool = false) -> Font:
 	var key := "counter_bold" if bold else "counter"
 	if not _fonts.has(key):
-		_fonts[key] = load("res://assets/fonts/%s.fnt" % key)
+		_fonts[key] = _with_chinese(load("res://assets/fonts/%s.fnt" % key))
 	return _fonts[key]
 
 
 static func big_font() -> Font:
 	if not _fonts.has("counter_big"):
-		_fonts["counter_big"] = load("res://assets/fonts/counter_big.fnt")
+		_fonts["counter_big"] = _with_chinese(load("res://assets/fonts/counter_big.fnt"))
 	return _fonts["counter_big"]
 
 
+## Counter Sans draws every character it has; the rest (hanzi, CJK punctuation, full-width
+## forms) come from the Chinese pixel font, which shares its line box, so a fallback never moves
+## a line of English (tools/art/font_zh.py). The big font asks for twice the size and gets the
+## same glyphs doubled. The fallback is there in either language: the title screen offers
+## Chinese by its own name.
+static func _with_chinese(f: Font) -> Font:
+	var zh: Font = load("res://assets/fonts/zh.fnt")
+	if f != null and zh != null and not f.fallbacks.has(zh):
+		var list: Array[Font] = []
+		list.append_array(f.fallbacks)
+		list.append(zh)
+		f.fallbacks = list
+	return f
+
+
+## The width of s in the player's language.
 static func text_w(s: String, bold: bool = false) -> float:
+	return text_w_raw(Lang.t(s), bold)
+
+
+## The width of exactly s.
+static func text_w_raw(s: String, bold: bool = false) -> float:
 	return font(bold).get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, FS).x
 
 
 static func big_w(s: String) -> float:
-	return big_font().get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, FS_BIG).x
+	return big_font().get_string_size(Lang.t(s), HORIZONTAL_ALIGNMENT_LEFT, -1, FS_BIG).x
 
 
-## Draws one line with its top-left corner at pos.
+## Draws one line, in the player's language, with its top-left corner at pos.
 static func text(ci: CanvasItem, pos: Vector2, s: String, color: Color, bold: bool = false) -> void:
+	text_raw(ci, pos, Lang.t(s), color, bold)
+
+
+## Draws exactly s, untranslated: what the doctor typed, or a line wrap_text has translated.
+static func text_raw(ci: CanvasItem, pos: Vector2, s: String, color: Color, bold: bool = false) -> void:
 	var f := font(bold)
 	ci.draw_string(f, Vector2(floorf(pos.x), floorf(pos.y) + f.get_ascent(FS)), s, HORIZONTAL_ALIGNMENT_LEFT, -1, FS, color)
 
 
 static func text_center(ci: CanvasItem, cx: float, y: float, s: String, color: Color, bold: bool = false) -> void:
-	text(ci, Vector2(cx - floorf(text_w(s, bold) / 2.0), y), s, color, bold)
+	text_center_raw(ci, cx, y, Lang.t(s), color, bold)
+
+
+## Centres exactly s, untranslated (see text_raw).
+static func text_center_raw(ci: CanvasItem, cx: float, y: float, s: String, color: Color, bold: bool = false) -> void:
+	text_raw(ci, Vector2(cx - floorf(text_w_raw(s, bold) / 2.0), y), s, color, bold)
 
 
 static func text_right(ci: CanvasItem, right: float, y: float, s: String, color: Color, bold: bool = false) -> void:
-	text(ci, Vector2(right - text_w(s, bold), y), s, color, bold)
+	var said := Lang.t(s)
+	text_raw(ci, Vector2(right - text_w_raw(said, bold), y), said, color, bold)
 
 
 static func big(ci: CanvasItem, pos: Vector2, s: String, color: Color) -> void:
 	var f := big_font()
-	ci.draw_string(f, Vector2(floorf(pos.x), floorf(pos.y) + f.get_ascent(FS_BIG)), s, HORIZONTAL_ALIGNMENT_LEFT, -1, FS_BIG, color)
+	ci.draw_string(f, Vector2(floorf(pos.x), floorf(pos.y) + f.get_ascent(FS_BIG)), Lang.t(s), HORIZONTAL_ALIGNMENT_LEFT, -1, FS_BIG, color)
 
 
 static func big_center(ci: CanvasItem, cx: float, y: float, s: String, color: Color) -> void:
 	big(ci, Vector2(cx - floorf(big_w(s) / 2.0), y), s, color)
 
 
-## Greedy word wrap for the bitmap font.
+## Greedy word wrap for the bitmap font, in the player's language. The lines that come back are
+## translated already: draw them with text_raw.
 static func wrap_text(s: String, width: float, bold: bool = false) -> PackedStringArray:
+	return wrap_raw(Lang.t(s), width, bold)
+
+
+## Greedy wrap of exactly s. English breaks at spaces. A paragraph with Chinese in it may also
+## break between any two Chinese characters, but never before closing punctuation (，。！) or
+## after opening punctuation (“《); a run of Latin letters or digits is never split.
+static func wrap_raw(s: String, width: float, bold: bool = false) -> PackedStringArray:
 	var out := PackedStringArray()
 	for para in s.split("\n"):
+		if Lang.has_cjk(para):
+			out.append_array(_wrap_cjk(para, width, bold))
+			continue
 		var line := ""
 		for word in para.split(" ", false):
 			var trial := word if line == "" else line + " " + word
-			if line != "" and text_w(trial, bold) > width:
+			if line != "" and text_w_raw(trial, bold) > width:
 				out.append(line)
 				line = word
 			else:
 				line = trial
 		out.append(line)
 	return out
+
+
+# a line may not start with these, nor end with the openers
+const _NO_START := "，。、；：？！…—）》」』】〕〉”’·%,.;:!?)]}"
+const _NO_END := "（《「『【〔〈“‘([{"
+
+
+## One paragraph with Chinese in it: units are single Chinese characters and runs of anything
+## else; a closing mark joins the unit before it and an opening mark the unit after it.
+static func _wrap_cjk(para: String, width: float, bold: bool) -> PackedStringArray:
+	var units: Array = []      # [text, a space before it]
+	var space := false
+	var i := 0
+	while i < para.length():
+		if para[i] == " ":
+			space = true
+			i += 1
+			continue
+		var j := i + 1
+		if not Lang.is_cjk(para.unicode_at(i)):
+			while j < para.length() and para[j] != " " and not Lang.is_cjk(para.unicode_at(j)):
+				j += 1
+		units.append([para.substr(i, j - i), space])
+		space = false
+		i = j
+	var joined: Array = []
+	var glue := false
+	for u in units:
+		var piece: String = u[0]
+		if not joined.is_empty() and (glue or _NO_START.contains(piece.left(1))):
+			var last: Array = joined[joined.size() - 1]
+			last[0] = str(last[0]) + (" " if bool(u[1]) else "") + piece
+		else:
+			joined.append([piece, bool(u[1])])
+		glue = _NO_END.contains(piece.right(1))
+	var out := PackedStringArray()
+	var line := ""
+	for u in joined:
+		var piece: String = u[0]
+		var trial := piece if line == "" else line + (" " if bool(u[1]) else "") + piece
+		if line != "" and text_w_raw(trial, bold) > width:
+			out.append(line)
+			line = piece
+		else:
+			line = trial
+	out.append(line)
+	return out
+
+
+## wrap_raw for text that starts after something else on its first line: the first line is
+## first_w wide, the lines after it width.
+static func wrap_after(s: String, first_w: float, width: float, bold: bool = false) -> PackedStringArray:
+	var first := wrap_raw(s, first_w, bold)
+	if first.size() <= 1:
+		return first
+	var head: String = first[0]
+	# the rest of s begins past as many characters other than spaces as the first line has
+	var left := head.replace(" ", "").length()
+	var k := 0
+	while k < s.length() and left > 0:
+		if s[k] != " ":
+			left -= 1
+		k += 1
+	var out := PackedStringArray([head])
+	out.append_array(wrap_raw(s.substr(k).strip_edges(), width, bold))
+	return out
+
+
+## Whether the player's language fills a whole line box: a Chinese character takes nine rows
+## where a capital takes seven (tools/art/font_zh.py). Lines set nine rows apart, which English
+## can afford where room is short, touch in Chinese; there they need ten.
+static func tall_lines() -> bool:
+	return Lang.code == "zh"
 
 
 ## Draws wrapped text and returns the y below the last line.
@@ -165,7 +300,7 @@ static func paragraph(ci: CanvasItem, pos: Vector2, s: String, width: float, col
 	for line in wrap_text(s, width, bold):
 		if n >= max_lines:
 			break
-		text(ci, Vector2(pos.x, y), line, color, bold)
+		text_raw(ci, Vector2(pos.x, y), line, color, bold)
 		y += line_h
 		n += 1
 	return y
@@ -175,12 +310,10 @@ static func money(v: int) -> String:
 	return ("+%d" % v) if v > 0 else str(v)
 
 
-## Puts numbers into authored words: every "{key}" in s becomes values[key].
+## Puts numbers into authored words, in the player's language: every "{key}" in the translated
+## s becomes values[key] (scripts/core/lang.gd fill).
 static func fill(s: String, values: Dictionary) -> String:
-	var out := s
-	for key in values:
-		out = out.replace("{%s}" % str(key), str(values[key]))
-	return out
+	return Lang.fill(s, values)
 
 
 ## A one-pixel frame just inside rect, on whole pixels.
@@ -197,15 +330,17 @@ static func outline(ci: CanvasItem, rect: Rect2, color: Color) -> void:
 ## Text that comes from outside the game (the patient model, speech recognition) can use
 ## characters the bitmap font has no glyph for. For display only: typographic quotes and
 ## dashes become plain ones, accents are dropped, and anything else the font cannot draw is
-## left out. The wording itself is never changed.
+## left out. The wording itself is never changed. Chinese keeps its own quotes, dashes and
+## ellipses: the Chinese glyphs have them.
 static func printable(s: String) -> String:
 	var f := font(false)
+	var chinese := Lang.has_cjk(s)
 	var out := ""
 	for i in s.length():
 		var code := s.unicode_at(i)
 		if code >= 32 and code <= 126:
 			out += s[i]
-		elif _PLAIN.has(code):
+		elif _PLAIN.has(code) and not (chinese and code >= 0x2010 and code <= 0x2033 and f.has_char(code)):
 			out += str(_PLAIN[code])
 		else:
 			var k := _ACCENTED.find(s[i])
@@ -218,10 +353,18 @@ static func printable(s: String) -> String:
 	return out.strip_edges()
 
 
+## Whether the typing line takes this character: anything printable that the counter font or its
+## Chinese fallback can draw, hanzi and Chinese punctuation from an input method included.
+static func typeable(code: int) -> bool:
+	if code < 32 or code == 127:
+		return false
+	return code <= 126 or (code >= 0xA0 and font(false).has_char(code))
+
+
 const _PLAIN := {
 	0x2018: "'", 0x2019: "'", 0x201A: "'", 0x2032: "'", 0x00B4: "'",
 	0x201C: "\"", 0x201D: "\"", 0x201E: "\"", 0x2033: "\"", 0x00AB: "\"", 0x00BB: "\"",
-	0x2014: "-", 0x2015: "-", 0x2212: "-", 0x2010: "-", 0x2011: "-",
+	0x2014: "-", 0x2015: "-", 0x2212: "-", 0x2010: "-", 0x2011: "-", 0x2026: "...",
 	0x0009: " ", 0x000A: " ", 0x000D: " ", 0x00A0: " ", 0x2002: " ", 0x2003: " ", 0x2009: " ", 0x202F: " ",
 }
 const _ACCENTED := "àáâãäåçèéêëìíîïñòóôõöùúûüýÿÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝ"

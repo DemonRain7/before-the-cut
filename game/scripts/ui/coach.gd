@@ -43,6 +43,7 @@ var skipped: bool = false
 var reached: int = 0           # how many tips had been passed when the training ended
 
 var _steps: Array = []
+var _numbers: Dictionary = {}    # what "{pay}" and the like stand for: put in as a tip is laid out
 var _index: int = -1           # -1: not running
 var _phase: String = ""
 var _done: Dictionary = {}     # events seen since the training started
@@ -61,13 +62,11 @@ func _init() -> void:
 ## steps: the "training" list of data/intro.json, each {id, phase, until, area, text}.
 ## numbers: what "{pay}" and the like stand for.
 func setup(steps: Array, numbers: Dictionary) -> void:
+	_numbers = numbers
 	_steps = []
 	for s in steps:
-		if not (s is Dictionary):
-			continue
-		var step: Dictionary = (s as Dictionary).duplicate(true)
-		step["text"] = Gfx.fill(str(step.get("text", "")), numbers)
-		_steps.append(step)
+		if s is Dictionary:
+			_steps.append((s as Dictionary).duplicate(true))
 
 
 func has_steps() -> bool:
@@ -190,7 +189,8 @@ func next_rect() -> Rect2:
 func lines_of(i: int) -> PackedStringArray:
 	if i < 0 or i >= _steps.size():
 		return PackedStringArray()
-	return Gfx.wrap_text(str((_steps[i] as Dictionary).get("text", "")), TEXT_W)
+	# fill() puts the numbers into the player's language; wrap_raw() leaves the result as it is
+	return Gfx.wrap_raw(Gfx.fill(str((_steps[i] as Dictionary).get("text", "")), _numbers), TEXT_W)
 
 
 ## How tall the box is for a tip of n lines.
@@ -326,7 +326,7 @@ func _draw() -> void:
 	draw_rect(Rect2(x, y, b.size.x - PAD * 2.0, 1), Color(Gfx.TEAL3, a))
 	y += 6.0
 	for line in _lines:
-		Gfx.text(self, Vector2(x, y), line, Color(Gfx.TEAL7, a))
+		Gfx.text_raw(self, Vector2(x, y), line, Color(Gfx.TEAL7, a))      # lines_of() translated it
 		y += float(Gfx.LINE)
 	_button(skip_rect(), SKIP, hover == "skip", a, false)
 	_button(next_rect(), _next_label(), hover == "next", a, true)

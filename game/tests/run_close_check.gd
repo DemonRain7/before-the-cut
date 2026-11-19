@@ -9,6 +9,7 @@ extends SceneTree
 ## This is an automated check, not a playtest.
 
 const MainScript = preload("res://scripts/ui/main.gd")
+const Lang = preload("res://scripts/core/lang.gd")
 
 var main: MainScript = null
 var passed: int = 0
@@ -18,6 +19,8 @@ var timed_out: bool = false
 
 
 func _initialize() -> void:
+	# English whatever language a player saved: the checks below read English words
+	Lang.pin("en")
 	# If the game never leaves, nothing else would end this run.
 	create_timer(20.0, true, false, true).timeout.connect(_on_watchdog)
 	_run()

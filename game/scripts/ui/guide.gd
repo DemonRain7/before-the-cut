@@ -147,7 +147,8 @@ func lines_of(page_index: int, item_index: int) -> PackedStringArray:
 	if item_index < 0 or item_index >= items.size():
 		return PackedStringArray()
 	var item: Dictionary = items[item_index]
-	return Gfx.wrap_text(Gfx.fill(str(item.get("text", "")), _numbers), text_width(str(p.get("id", ""))))
+	# fill() puts the numbers into the player's language; wrap_raw() leaves the result as it is
+	return Gfx.wrap_raw(Gfx.fill(str(item.get("text", "")), _numbers), text_width(str(p.get("id", ""))))
 
 
 ## The line under a page's list, where it has one, as it is laid out.
@@ -159,7 +160,7 @@ func closing_of(page_index: int) -> PackedStringArray:
 	if said == "":
 		return PackedStringArray()
 	var panel: Rect2 = PANEL.get(str(p.get("id", "")), PANEL["window"])
-	return Gfx.wrap_text(Gfx.fill(said, _numbers), panel.size.x - PAD * 2.0)
+	return Gfx.wrap_raw(Gfx.fill(said, _numbers), panel.size.x - PAD * 2.0)
 
 
 ## Where a page's list is drawn: its place on the screen, as tall as its words need.
@@ -256,13 +257,13 @@ func _draw() -> void:
 		_badge(Vector2(x, y - 1.0), i + 1, a)
 		var lines: PackedStringArray = wrapped[i]
 		for line in lines:
-			Gfx.text(self, Vector2(tx, y), line, Color(Gfx.TEAL7, a))
+			Gfx.text_raw(self, Vector2(tx, y), line, Color(Gfx.TEAL7, a))      # lines_of() translated it
 			y += float(Gfx.LINE)
 		y += ITEM_GAP
 	if not closing.is_empty():
 		y += 3.0
 		for line in closing:
-			Gfx.text(self, Vector2(x, y), line, Color(Gfx.WARM7, a))
+			Gfx.text_raw(self, Vector2(x, y), line, Color(Gfx.WARM7, a))
 			y += float(Gfx.LINE)
 		y += ITEM_GAP
 	y += 4.0

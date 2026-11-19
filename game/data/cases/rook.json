@@ -16,16 +16,17 @@
     "Arm's locking up. Fix it.",
     "Skip the pamphlet. I'm back on the dock at six."
   ],
+  "parts": {"eye_l": "natural", "eye_r": "natural", "hands": "loader", "port": "work", "voice": "natural"},
   "eyes": {
-    "left": {"kind": "natural", "tightens": true, "follows": true, "bloodshot": true},
-    "right": {"kind": "natural", "tightens": true, "follows": true, "bloodshot": true}
+    "left": {"tightens": true, "follows": true, "bloodshot": true},
+    "right": {"tightens": true, "follows": true, "bloodshot": true}
   },
-  "grip": {"release_ms": 500, "tremor": 4},
+  "grip": {"release_ms": 1200, "tremor": 4},
   "port": {"covered": false},
   "idle": {"hands": "spasm", "gaze": "glare"},
   "looks": {
     "eyes": "Natural eyes, red-rimmed. He stares back.",
-    "hands": "Right hand jerks, settles. Raw knuckles.",
+    "hands": "LOADER rig. Jerks, settles. Raw knuckles.",
     "port": "Wrist socket scorched. Two burnt pins, scar."
   },
   "checks": {
@@ -88,7 +89,7 @@
   "rows": {
     "eyes": {"ok": true, "text": "Red and tired, but both pupils tighten and follow.",
       "evidence": ["check:penlight"]},
-    "hands": {"ok": true, "text": "The twitch and the shake are ordinary. He let go on time.",
+    "hands": {"ok": true, "text": "1.2 s: slow for a hand, inside a LOADER's 1.5. The shake is ordinary.",
       "evidence": ["check:grip"]},
     "port": {"ok": true, "text": "Burnt pins and a cable scar are ordinary. No threads.",
       "evidence": ["look:port", "check:port"]},

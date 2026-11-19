@@ -18,6 +18,7 @@ extends Control
 ##   --no-surprises                      no patient snaps or flares mid-exam (tests, captures)
 
 const Gfx = preload("res://scripts/ui/gfx.gd")
+const Lang = preload("res://scripts/core/lang.gd")
 const CaseDB = preload("res://scripts/core/case_db.gd")
 const VisitState = preload("res://scripts/core/visit_state.gd")
 const ShiftState = preload("res://scripts/core/shift_state.gd")
@@ -146,6 +147,7 @@ const STOP_LAST_LINE := "STOPPED, BUT THE GLASS IS GONE"
 const STATUS_AI_VOICE := "Patient AI on: every reply is written live. Hold TAB to speak, or press T to type."
 const STATUS_AI_TYPE := "Patient AI on: every reply is written live. Press T to type your own questions."
 const STATUS_AI_NO_MIC := "Patient AI on: every reply is written live. No microphone found, so press T to type."
+const WINDOW_TITLE := "Before the Cut"      # the window's title bar, in the player's language
 const STATUS_OFFLINE := "Patient AI off: the authored patient answers. Start the patient service to talk freely."
 # the crew is an authored outcome: these lines are fixed, they never come from the patient model
 const DISPATCH_LINE := "Trauma Team dispatch. A unit is rolling to your counter. Keep them there."
@@ -155,7 +157,7 @@ const WAIT_HINT := "Click the hall camera, or press ENTER to buzz them in."
 const CAM_HINT := "Click the screen, or press ENTER, to buzz them in."
 # the things on the booth walls, and the papers once they are down
 const OBJECT_HINT := {
-	"sheet": "NORMAL REFERENCE SHEET [R]: what a steady patient looks like. Click to take it down.",
+	"sheet": "REFERENCE SHEET [R]: what is steady for this patient's models. Click to take it down.",
 	"list": "CONTACT LIST [L]: tonight's contacts, two clues and a code each. Click to take it down.",
 	"card": "INTAKE CARD [N]: your notes on this patient. Click to take it down.",
 	"guide": "COUNTER GUIDE [H]: how this counter works.",
@@ -219,7 +221,9 @@ const CLOSE_HOLD := 0.2           # seconds of real time between the last sound 
 
 var state: int = State.TITLE
 var rules: Dictionary = {}
-var sheet: Dictionary = {}
+var sheet: Dictionary = {}        # sheet.json: what no model changes
+var parts: Dictionary = {}        # parts.json: the spec binder
+var visit_sheet: Dictionary = {}  # the sheet on the wall now: for the patient at the counter (case_db sheet_for)
 var cases: Dictionary = {}
 var meta: Dictionary = {}
 var data_errors: Array = []
@@ -304,6 +308,8 @@ var _mic_held: float = 0.0        # seconds the microphone has been listening (n
 var _mic_wait: float = 0.0        # seconds the key has waited for the device to open
 var _mic_kept: String = ""        # what was typed before the key went down: the words are added to it
 var _mic_opened_line: bool = false   # the speak key opened the typing line itself
+var _ime_on: bool = false         # the window's input method is switched on (the typing line, in Chinese)
+var _ime_at := Vector2i(-1, -1)   # where its list of candidates was last told to open, in window pixels
 var _voice_sound: String = ""
 var _voice_pitch: float = 1.0
 var _voice_db: float = -8.0
@@ -350,9 +356,11 @@ var _boot_rng := RandomNumberGenerator.new()
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	Lang.load_saved()      # before anything puts words together: the sheet is filled as it is hung
 	var db: Dictionary = CaseDB.load_all()
 	rules = db["rules"]
 	sheet = db["sheet"]
+	parts = db.get("parts", {})
 	cases = db["cases"]
 	data_errors = db["errors"]
 	contact_data = db.get("contacts", {})
@@ -369,6 +377,7 @@ func _ready() -> void:
 	_read_launch_options()
 	_build()
 	_start_session()
+	_apply_language()
 	_show_title()
 	get_tree().auto_accept_quit = false      # a close request goes through _close()
 
@@ -422,8 +431,8 @@ func _build() -> void:
 	_world.add_child(_mess)
 	# the papers come down in front of everything else in the booth
 	clipboard = Clipboard.new()
-	clipboard.sheet = sheet
 	_world.add_child(clipboard)
+	_hang_sheet()
 	clinic.less_blood = less_blood
 	gore = GoreLayer.new()
 	gore.less_blood = less_blood
@@ -446,10 +455,9 @@ func _build() -> void:
 	var numbers := {"per_hour": per_hour, "hours": hours, "total": per_hour * hours, "threshold": int(sheet.get("threshold", 0)),
 		"repair_cost": repair_cost, "pay": int(contact_rules.get("pay", 0)), "code_cost": int(contact_rules.get("wrong_cost", 1)),
 		"per_night": int(contact_rules.get("per_night", 0)), "calm_cost": int(calm_rules.get("cost", 0)),
-		"calm_gain": int(calm_rules.get("gain", 1)), "ask_cost": int(costs.get("ask", 1)), "press_cost": int(costs.get("press", 2)),
-		"limit": "%.1f" % _grip_limit_s()}
+		"calm_gain": int(calm_rules.get("gain", 1)), "ask_cost": int(costs.get("ask", 1)), "press_cost": int(costs.get("press", 2))}
 	intro = Intro.new()
-	intro.setup(intro_data.get("cards", []), numbers, cases)
+	intro.setup(intro_data.get("cards", []), numbers)
 	add_child(intro)
 	intro.blip.connect(_on_intro_blip)
 	intro.turned.connect(_on_intro_turned)
@@ -475,7 +483,6 @@ func _build() -> void:
 	mic.filled.connect(act_speak_stop)
 	mic.failed.connect(_on_mic_failed)
 	clinic.scope.audio = audio
-	clinic.scope.limit_s = _grip_limit_s()
 	clinic.scope.completed.connect(_on_scope_completed)
 	dialogue.blip.connect(_on_blip)
 	Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
@@ -503,6 +510,7 @@ func _start_session() -> void:
 		"model_endpoint_set": agent_url != "",
 		"model_requested": use_model,
 		"voice_offered": screens.voice,
+		"language": Lang.code,
 		"engine": str(Engine.get_version_info().get("string", "")),
 	})
 
@@ -516,11 +524,36 @@ func _log(event_type: String, data: Dictionary = {}) -> void:
 	event_log.write(event_type, record)
 
 
+## Switches the language. Only on the title card: nothing is half-said there, so nothing has to
+## be put into the other language halfway. The choice is kept for the next time the game starts.
+func act_language(p_code: String) -> void:
+	if state != State.TITLE or p_code == Lang.code or not Lang.CODES.has(p_code):
+		return
+	Lang.use(p_code)
+	Lang.save()
+	audio.play("click")
+	_apply_language()
+	_log("language", {"language": Lang.code})
+
+
+## What holds words already put into the player's language: the sheet on the wall (filled when
+## it is hung), the window's title, the catalog's own problems and the clinic's pictures with
+## words painted in them. Everything else is translated as it is drawn.
+func _apply_language() -> void:
+	get_window().title = Lang.t(WINDOW_TITLE)
+	var problems: Array = data_errors.duplicate()
+	problems.append_array(Array(Lang.errors))
+	screens.errors = problems
+	clinic.apply_language()
+	_hang_sheet()
+
+
 func _show_title() -> void:
 	state = State.TITLE
 	screens.show_title()
 	clinic.shutter_to(1.0, 0.01)
 	desk.set_all(false)
+	_hang_sheet()
 	clipboard.set_visit(null, "")
 	audio.loop("amb_rain", -15.0)
 	audio.loop("amb_drone", -24.0)
@@ -616,10 +649,12 @@ func _patient_line(text: String, token: int, hold: float = 0.8) -> bool:
 	return ok
 
 
-func _doctor_say(text: String) -> void:
+## raw: text is already what the doctor says (their own words, or a line put in the player's
+## language beforehand); otherwise it is an authored line and is shown in the player's language.
+func _doctor_say(text: String, raw: bool = false) -> void:
 	_patient_talking = false
 	_set_voice("blip", 0.8, -13.0)
-	dialogue.say("YOU", text, Gfx.CYAN2, Gfx.TEAL6, 110.0)
+	dialogue.say("YOU", text, Gfx.CYAN2, Gfx.TEAL6, 110.0, raw)
 
 
 func _doctor_line(text: String, token: int, hold: float = 0.25) -> bool:
@@ -751,7 +786,8 @@ func _sync_visit() -> void:
 	if visit.reassure_left <= 0:
 		desk.badges["calm"] = "x0"
 	elif visit.reassure_cost() > 0:
-		desk.badges["calm"] = "%dcr" % visit.reassure_cost()
+		var price := Lang.tf("%dcr", [visit.reassure_cost()])      # [shown] its price in credits
+		desk.badges["calm"] = price
 	else:
 		desk.badges["calm"] = "x%d" % visit.reassure_left
 	desk.badges["press"] = "-%d" % int(costs.get("press", 2))
@@ -981,7 +1017,7 @@ func _glass_hint() -> String:
 		return GLASS_WHOLE_HINT
 	if not _can_mend():
 		return GLASS_BUSY_HINT
-	return GLASS_HINT % shift.repair_cost()
+	return Lang.tf(GLASS_HINT, [shift.repair_cost()])
 
 
 ## Pays for one layer of the counter glass out of the till (ShiftState.repair_glass()). The
@@ -1005,7 +1041,7 @@ func act_repair_glass() -> void:
 	audio.play("glass_fit")
 	audio.play("cash", 0.8, -8.0)
 	_log("glass_repair", {"cost": cost, "glass_left": left, "glass_max": most, "till": shift.total()})
-	var ok: bool = await _narrate("GLASS", GLASS_LINE % [cost, left, most], token, 1.2)
+	var ok: bool = await _narrate("GLASS", Lang.tf(GLASS_LINE, [cost, left, most]), token, 1.2)
 	# back to who is waiting, unless something else has happened meanwhile
 	if ok and state == State.WAIT and clinic.cam_prompt and shift != null:
 		var c: Dictionary = cases.get(shift.current_id(), {})
@@ -1022,22 +1058,22 @@ func _pad_hint(pad: String) -> String:
 		"penlight", "grip", "port":
 			var status := visit.check_status(pad)
 			if status == "open":
-				return "%s Free now." % str(TOOL_WHAT[pad])
+				return Lang.tf("%s Free now.", [Lang.t(str(TOOL_WHAT[pad]))])
 			if status == "refused":
-				return "%s refused. Insist (costs %d) or CALM them first." % [str(TOOL_LABEL[pad]), visit.check_cost(pad)]
-			return "%s Costs %d patience." % [str(TOOL_WHAT[pad]), visit.check_cost(pad)]
+				return Lang.tf("%s refused. Insist (costs %d) or CALM them first.", [Lang.t(str(TOOL_LABEL[pad])), visit.check_cost(pad)])
+			return Lang.tf("%s Costs %d patience.", [Lang.t(str(TOOL_WHAT[pad])), visit.check_cost(pad)])
 		"ask":
-			return "ASK: pick a question. A new answer costs %d patience." % int(costs.get("ask", 1))
+			return Lang.tf("ASK: pick a question. A new answer costs %d patience.", [int(costs.get("ask", 1))])
 		"calm":
 			var gain := int((rules.get("reassure", {}) as Dictionary).get("gain", 1))
 			var price := visit.reassure_cost()
 			if visit.reassure_left <= 0:
 				return CALM_GONE_HINT
 			if price <= 0:
-				return (CALM_FREE_HOLD_HINT if _leave_said else CALM_FREE_HINT) % [gain, visit.reassure_left]
-			return (CALM_HOLD_HINT if _leave_said else CALM_HINT) % [price, gain, visit.reassure_left]
+				return Lang.tf(CALM_FREE_HOLD_HINT if _leave_said else CALM_FREE_HINT, [gain, visit.reassure_left])
+			return Lang.tf(CALM_HOLD_HINT if _leave_said else CALM_HINT, [price, gain, visit.reassure_left])
 		"press":
-			return "PRESS: say something that stings. Costs %d patience." % int(costs.get("press", 2))
+			return Lang.tf("PRESS: say something that stings. Costs %d patience.", [int(costs.get("press", 2))])
 		"treat":
 			return "TREAT: they are steady. Pick it up and stamp the card."
 		"refer":
@@ -1236,9 +1272,9 @@ func _begin_wait(reading: Dictionary = {}) -> void:
 		_log("meter", {"hour": hour, "till": till, "line": want, "held": held})
 		clinic.line_under = not held
 		audio.play("beep" if held else "beep_low", 1.0, -4.0)
-		var said := METER_OVER_LINE % [hour, shift.count(), till, want]
+		var said := Lang.tf(METER_OVER_LINE, [hour, shift.count(), till, want])
 		if not held:
-			said = METER_UNDER_LINE % [hour, shift.count(), till, want, want - till]
+			said = Lang.tf(METER_UNDER_LINE, [hour, shift.count(), till, want, want - till])
 		var read: bool = await _narrate("METER", said, token, 0.9, Gfx.GRN4 if held else Gfx.RED3)
 		if not read:
 			return
@@ -1333,7 +1369,9 @@ func act_call_next() -> void:
 			next_step = 0.24
 	rig.slide = 0.0
 	clinic.door(false)
-	# a fresh intake card goes on the clipboard on the wall and the exam is open
+	# a fresh intake card goes on the clipboard on the wall, the binder pages for his models
+	# go up as the sheet, and the exam is open
+	_hang_sheet()
 	clipboard.set_visit(visit, "%d/%d" % [shift.index + 1, shift.count()])
 	audio.play("paper")
 	clinic.show_patience = true
@@ -1429,11 +1467,11 @@ func act_tool(tool: String) -> void:
 			if ok:
 				_roll_surprise()      # the close-up is no shelter: they can come at the glass during it
 		"explained":
-			_base_hint = "They gave a reason instead. Insist (costs %d) or CALM them." % visit.check_cost(tool)
+			_base_hint = Lang.tf("They gave a reason instead. Insist (costs %d) or CALM them.", [visit.check_cost(tool)])
 			_roll_surprise()
 			_patient_line(line, token, 1.0)
 		"refused":
-			_base_hint = "They said no. Insist (costs %d) or CALM them first." % visit.check_cost(tool)
+			_base_hint = Lang.tf("They said no. Insist (costs %d) or CALM them first.", [visit.check_cost(tool)])
 			_roll_surprise()
 			_patient_line(line, token, 1.0)
 		"spent":
@@ -1441,13 +1479,17 @@ func act_tool(tool: String) -> void:
 
 
 ## The model receives the doctor's words and conversation. The options are fallback-only.
+## own: ask_line is the doctor's own wording (typed or spoken), sent and shown as it was said;
+## otherwise it is an authored line, and the patient hears it in the player's language.
 ## Returns {} when the action was cancelled meanwhile (the shutter fell).
-func _decide(event: Dictionary, legal: Array, ask_line: String, token: int) -> Dictionary:
+func _decide(event: Dictionary, legal: Array, ask_line: String, token: int, own: bool = false) -> Dictionary:
 	_thinking = true
 	_lock = true
 	_think_t = 0.0
 	_think_quiet = 0.0
-	_doctor_say(ask_line)
+	if not own:
+		ask_line = Lang.t(ask_line)
+	_doctor_say(ask_line, true)
 	event = event.duplicate(true)
 	event["text"] = ask_line
 	var d: Dictionary = await agent.decide(event, visit.snapshot(), legal)
@@ -1564,6 +1606,7 @@ func _open_scope(tool: String) -> void:
 		return
 	var already := visit.seen.has("check:" + tool)
 	clinic.scope.standard = _sheet_normal(str(VisitState.TOOL_ROW.get(tool, "")))      # what the sheet calls steady
+	clinic.scope.limit_s = _grip_limit_s()
 	clinic.scope.open(tool, visit.case_data, already, "Noted on the card." if already else "")
 	clinic.scope.pointer_screen(_mouse)
 	_papers_aside()      # the close-up fills the window
@@ -1627,7 +1670,7 @@ func act_ask_menu() -> void:
 		var id := str(topic.get("id", ""))
 		var known := visit.answered.has(id)
 		options.append({"id": id, "label": str(topic.get("q", "")), "dim": known,
-			"tag": "asked" if known else "-%d" % visit.ask_cost(id)})
+			"tag": "asked" if known else "-%d" % visit.ask_cost(id)})      # [shown] "asked" beside a question
 	dialogue.set_menu("ASK", options)
 	_base_hint = "Pick a question. Right-click closes the list."
 	audio.play("click")
@@ -1646,7 +1689,7 @@ func act_ask(id: String, said: String = "") -> void:
 		return
 	var before := _note_keys()
 	var question := said if said != "" else str(topic.get("q", ""))
-	var d: Dictionary = await _decide({"type": "ask", "id": id}, visit.legal_moves_for_ask(id), question, token)
+	var d: Dictionary = await _decide({"type": "ask", "id": id}, visit.legal_moves_for_ask(id), question, token, said != "")
 	if d.is_empty():
 		return
 	var res: Dictionary
@@ -1758,7 +1801,7 @@ func act_say(text: String) -> void:
 		_spent(token)
 		return
 	var before := _note_keys()
-	var d: Dictionary = await _decide({"type": "say", "id": "free"}, [], text, token)
+	var d: Dictionary = await _decide({"type": "say", "id": "free"}, [], text, token, true)
 	if d.is_empty():
 		return
 	var source := str(d.get("source", ""))
@@ -1781,8 +1824,8 @@ func act_say(text: String) -> void:
 
 func _fallback_hint(reason: String) -> String:
 	if reason == "call_cap":
-		return "The patient AI has used its %d replies for this visit. Scripted lines now." % agent.max_calls
-	return "The patient AI gave no answer (%s). Scripted line, no charge." % reason.left(26)
+		return Lang.tf("The patient AI has used its %d replies for this visit. Scripted lines now.", [agent.max_calls])
+	return Lang.tf("The patient AI gave no answer (%s). Scripted line, no charge.", [reason.left(26)])
 
 
 ## Opens the typing line under the window.
@@ -1805,6 +1848,29 @@ func _close_say() -> void:
 		return
 	dialogue.close_input()
 	_base_hint = ""
+
+
+## The window's input method (pinyin and the like) is on only while the typing line is open, and
+## only in a language that needs one: in English a Chinese input method would turn the doctor's
+## letters into lists of candidates. Its list opens under the caret. What it hands over arrives as
+## key events with no key and one character each (_say_key); what it is still putting together
+## comes with NOTIFICATION_OS_IME_UPDATE. Every frame.
+func _sync_ime() -> void:
+	var want := dialogue.input_open and Lang.code != "en" and DisplayServer.has_feature(DisplayServer.FEATURE_IME)
+	var id := get_window().get_window_id()
+	if want != _ime_on:
+		_ime_on = want
+		_ime_at = Vector2i(-1, -1)
+		DisplayServer.window_set_ime_active(want, id)
+		if not want:
+			dialogue.input_compose("", 0)
+	if not want:
+		return
+	# the strip's own coordinates, then the game's 640x360, then the window's pixels
+	var at := Vector2i((get_viewport().get_final_transform() * (dialogue.get_global_transform_with_canvas() * dialogue.caret_point())).round())
+	if at != _ime_at:
+		_ime_at = at
+		DisplayServer.window_set_ime_position(at, id)
 
 
 ## A key while the typing line is open. Everything printable is text, SPACE included.
@@ -1833,8 +1899,8 @@ func _say_key(keycode: int, unicode: int) -> void:
 		KEY_END:
 			dialogue.input_move(9999)
 		_:
-			if unicode < 32 or unicode > 126:
-				return      # the counter font is plain ASCII
+			if not Gfx.typeable(unicode):
+				return      # a key that types nothing, or a character no font here can draw
 			if dialogue.input_insert(char(unicode)):
 				audio.play("click", 1.7 + _fx_rng.randf_range(-0.08, 0.08), -17.0)
 			else:
@@ -1986,7 +2052,7 @@ func _mic_failure_hint(reason: String) -> String:
 	if reason.ends_with(":budget_exhausted"):
 		return str(MIC_HINTS["budget"])
 	# the short code is enough on the counter; the whole reason is in the event log
-	return "Could not write that down (%s). Try again, or type with T." % reason.get_slice(":", 0).left(24)
+	return Lang.tf("Could not write that down (%s). Try again, or type with T.", [reason.get_slice(":", 0).left(24)])
 
 
 ## The device could not be opened after all (it opens on a worker thread after the key went down).
@@ -2051,11 +2117,11 @@ func act_mark(row: String) -> void:
 	if crossed == before or need <= 0:
 		return
 	if crossed >= need:
-		_base_hint = CROSS_RULE_HINT % crossed
+		_base_hint = Lang.tf(CROSS_RULE_HINT, [crossed])
 		if before < need:
 			audio.play("beep_low", 1.2, -10.0)
 	elif crossed > 0:
-		_base_hint = CROSS_SOME_HINT % [crossed, need]
+		_base_hint = Lang.tf(CROSS_SOME_HINT, [crossed, need])
 	else:
 		_base_hint = ""
 
@@ -2808,9 +2874,9 @@ func act_shutter() -> void:
 		elif shift.glass <= 0:
 			clinic.bar_stop(STOP_LAST_LINE, Gfx.RED3)
 		elif visit.blows_taken == 1:
-			clinic.bar_stop(STOP_BLOW_LINE % visit.blows_taken, Gfx.AMBER)
+			clinic.bar_stop(Lang.tf(STOP_BLOW_LINE, [visit.blows_taken]), Gfx.AMBER)
 		else:
-			clinic.bar_stop(STOP_BLOWS_LINE % visit.blows_taken, Gfx.AMBER)
+			clinic.bar_stop(Lang.tf(STOP_BLOWS_LINE, [visit.blows_taken]), Gfx.AMBER)
 	else:
 		clinic.bar_clear()
 	_desk_off()
@@ -2839,7 +2905,7 @@ func act_shutter() -> void:
 			if str(attack.get("line", "")) != "":
 				_patient_talking = false
 				_set_voice("blip", 0.6, -16.0)
-				dialogue.say(_patient_name() + " (through the shutter)", str(attack.get("line", "")), Gfx.TEAL5, Gfx.TEAL6, 30.0)
+				dialogue.say(Lang.tf("%s (through the shutter)", [_patient_name()]), str(attack.get("line", "")), Gfx.TEAL5, Gfx.TEAL6, 30.0)
 				await _run_line(token, 0.8)
 			if visit.attack_cause == "refer":
 				# the crew that was already on its way gets there
@@ -2943,6 +3009,7 @@ func act_continue() -> void:
 	shift.advance()
 	_remove_rig()
 	visit = null
+	_hang_sheet()
 	clipboard.set_visit(null, "")
 	desk.badges.clear()
 	desk.warn.clear()
@@ -3006,6 +3073,8 @@ func _input(event: InputEvent) -> void:
 
 
 func _notification(what: int) -> void:
+	if what == NOTIFICATION_OS_IME_UPDATE and _ime_on:
+		dialogue.input_compose(DisplayServer.ime_get_text(), DisplayServer.ime_get_selection().x)
 	# the window lost the keyboard, so the key-up will never arrive: the microphone closes now
 	if (what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT) and _mic_state == "listening":
 		act_speak_cancel()
@@ -3086,7 +3155,11 @@ func _pointer_press(pos: Vector2, button: int) -> void:
 		return
 	match state:
 		State.TITLE:
-			act_start()
+			var code := screens.language_at(pos)
+			if code != "":
+				act_language(code)
+			else:
+				act_start()
 		State.REPORT:
 			act_restart()
 		State.SLIP:
@@ -3394,6 +3467,7 @@ func _click_pad(pad: String) -> void:
 
 func _process(delta: float) -> void:
 	_t += delta
+	_sync_ime()
 	if rig != null:
 		rig.talking = _patient_talking and dialogue.is_revealing()
 		# while the answer is being written the patient is seen thinking it over, each in their
@@ -3462,7 +3536,7 @@ func _process(delta: float) -> void:
 			label = "OFFLINE FALLBACK"
 		elif bool(agent.last.get("meta", {}).get("mock", false)):
 			label = "MOCK TRANSPORT"
-		clinic.corner_text = "%s  %d/%d calls" % [label, agent.calls_this_visit, agent.max_calls]
+		clinic.corner_text = Lang.tf("%s  %d/%d calls", [Lang.t(label), agent.calls_this_visit, agent.max_calls])
 	_sync_panels(delta)
 	_sync_coach()
 	_update_hover()
@@ -3485,6 +3559,10 @@ func _update_hover() -> void:
 	dialogue.menu_hover = -1
 	dialogue.chip_hover = ""
 	clipboard.say_hover = ""
+	screens.hover_language = screens.language_at(pos)      # "" off the title card
+	if screens.hover_language != "":
+		_cursor_kind = "hand"
+		return
 	if _coach_hover(pos):
 		return
 	if _wall_hover(pos):
@@ -3587,7 +3665,7 @@ func _hover_exam(pos: Vector2) -> void:
 			clipboard.say_hover = entry
 			if _can_act():
 				_cursor_kind = "hand"
-			_hover_hint = SAY_CODE_HINT % visit.code_cost()
+			_hover_hint = Lang.tf(SAY_CODE_HINT, [visit.code_cost()])
 			return
 	if _held != "":
 		_cursor_kind = "none"
@@ -3712,7 +3790,7 @@ func _draw_slip() -> void:
 	var mid := 101.0
 	var ok := bool(s.get("correct", false))
 	var outcome := str(s.get("outcome", ""))
-	Gfx.text(_slip, Vector2(x0, 17), "INTAKE SLIP %d/%d" % [_slip_index, shift.count() if shift != null else 0], Gfx.PRINT)
+	Gfx.text(_slip, Vector2(x0, 17), Lang.tf("INTAKE SLIP %d/%d", [_slip_index, shift.count() if shift != null else 0]), Gfx.PRINT)
 	Gfx.text_right(_slip, x1, 17, str(s.get("name", "")), Gfx.PRINT)
 	var title := str(s.get("title", ""))
 	if Gfx.big_w(title) <= w:
@@ -3722,7 +3800,7 @@ func _draw_slip() -> void:
 	Gfx.paragraph(_slip, Vector2(x0, 50), str(s.get("text", "")), w, Gfx.INKT, false, SLIP_LINES)
 	_slip.draw_rect(Rect2(x0, 102, w, 1), Gfx.PAPER1)
 	var steady := str(s.get("truth", "")) == "stable"
-	_fit(_slip, x0, 105, "%s was %s." % [str(s.get("name", "")), "STEADY" if steady else "DRIFTING"], w, Gfx.INKT)
+	_fit(_slip, x0, 105, Lang.tf("%s was %s.", [str(s.get("name", "")), Lang.t("STEADY" if steady else "DRIFTING")]), w, Gfx.INKT)
 	var call := "RIGHT CALL" if ok else "WRONG CALL"
 	if outcome == "walkout" or outcome == "gave_up" or (outcome == "hit" and not ok):
 		call = "NO CALL"
@@ -3730,7 +3808,7 @@ func _draw_slip() -> void:
 		call = "RIGHT CALL, HURT"      # the crew was the right answer; the shutter came too late
 	# what the call itself earned; a courier's package and the calm-patches go on the line below
 	var credits := int(s.get("outcome_credits", s.get("credits", 0)))
-	var paid := "%s credits" % Gfx.money(credits)
+	var paid := Lang.tf("%s credits", [Gfx.money(credits)])
 	# the call and the money share one line: the call gives way before it touches the figure
 	_fit(_slip, x0, 116, call, w - Gfx.text_w(paid, true) - SLIP_GAP, Gfx.GRN2 if ok else Gfx.RED1)
 	Gfx.text_right(_slip, x1, 116, paid, Gfx.INKT if credits >= 0 else Gfx.RED1, true)
@@ -3753,15 +3831,24 @@ func _till_now() -> int:
 	return shift.total()
 
 
-## rules.json grip.limit_ms: how long a steady hand may take to let go of the grip bar.
+## How long a steady hand of the patient's model may take to let go of the grip bar (the hands
+## model's limit_ms in parts.json; the baseline's when nobody is at the counter).
 func _grip_limit_s() -> float:
-	return float((rules.get("grip", {}) as Dictionary).get("limit_ms", 1000)) / 1000.0
+	return float(visit_sheet.get("limit_s", 1.0))
+
+
+## Puts up the sheet for whoever is at the counter: the spec binder's pages for the models they
+## wear, or the baseline body between patients.
+func _hang_sheet() -> void:
+	visit_sheet = CaseDB.sheet_for(visit.case_data if visit != null else {}, sheet, parts)
+	if clipboard != null:
+		clipboard.sheet = visit_sheet
 
 
 func _shift_line() -> String:
 	if shift.contacts.is_empty():
-		return SHIFT_LINE % [shift.count(), shift.line_per_hour()]
-	return SHIFT_LIST_LINE % [shift.count(), shift.contacts.size(), shift.line_per_hour()]
+		return Lang.tf(SHIFT_LINE, [shift.count(), shift.line_per_hour()])
+	return Lang.tf(SHIFT_LIST_LINE, [shift.count(), shift.contacts.size(), shift.line_per_hour()])
 
 
 ## Tonight's list entry with this id, or {}.
@@ -3775,9 +3862,9 @@ func _list_entry(id: String) -> Dictionary:
 	return {}
 
 
-## What the reference sheet calls steady on one row (sheet.json "normal").
+## What the sheet on the wall calls steady on one row, for this patient's model.
 func _sheet_normal(row: String) -> String:
-	for r in sheet.get("rows", []):
+	for r in visit_sheet.get("rows", []):
 		var line: Dictionary = r
 		if str(line.get("id", "")) == row:
 			return str(line.get("normal", ""))
@@ -3789,12 +3876,12 @@ func _sheet_normal(row: String) -> String:
 func _slip_breakdown(s: Dictionary) -> String:
 	var parts := PackedStringArray()
 	if bool(s.get("dropped", false)):
-		parts.append(SLIP_DROP % int(s.get("drop", 0)))
+		parts.append(Lang.tf(SLIP_DROP, [int(s.get("drop", 0))]))
 	elif bool(s.get("contact", false)):
-		parts.append(SLIP_NO_DROP % str(s.get("alias", "")))
+		parts.append(Lang.tf(SLIP_NO_DROP, [str(s.get("alias", ""))]))
 	var calm := int(s.get("calm_spent", 0))
 	if calm > 0:
-		parts.append(SLIP_CALM % calm)
+		parts.append(Lang.tf(SLIP_CALM, [calm]))
 	return "  •  ".join(parts)
 
 
@@ -3840,7 +3927,7 @@ func act_say_code(id: String) -> void:
 			_sync_visit()
 			if coach != null:
 				coach.event("code_said")
-			_base_hint = CODE_BLANK_HINT % int(res.get("cost", 0))
+			_base_hint = Lang.tf(CODE_BLANK_HINT, [int(res.get("cost", 0))])
 			_lock = true
 			ok = await _doctor_line(str(entry.get("say", "")), token, 0.3)
 			if not ok:
@@ -3865,7 +3952,7 @@ func act_say_code(id: String) -> void:
 			if coach == null or not coach.is_running():
 				_coach("drop", DROP_COACH_HINT)
 			_roll_surprise()
-			_narrate("PACKAGE", DROP_LINE % [str(res.get("package", "")), int(res.get("pay", 0))], token, 0.0)
+			_narrate("PACKAGE", Lang.tf(DROP_LINE, [Lang.t(str(res.get("package", ""))), int(res.get("pay", 0))]), token, 0.0)
 		"tried", "done":
 			audio.play("beep_low", 1.2, -10.0)
 

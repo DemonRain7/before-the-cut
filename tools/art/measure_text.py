@@ -1,15 +1,24 @@
-"""Measure authored game text in the Counter Sans bitmap font.
+"""Measure authored game text in the game's bitmap fonts.
 
-Run from tools/art:  python measure_text.py
+Run from tools/art:  python measure_text.py              (English)
+                     python measure_text.py --lang zh    (the same lines, as the player reads them in Chinese)
 Prints every line that is wider than the space the interface gives it, needs more lines than
 its box has, or uses a letter the font does not have.
+
+In another language every line is first put into it the way the game does (scripts/core/lang.gd):
+the catalog line for exactly that English, or, for words with numbers or names filled into them,
+the catalog's template filled with the same values. It is then measured in Counter Sans with the
+Chinese glyphs as its fallback (font_zh.py) and wrapped the way Gfx.wrap_raw wraps it. Lines no
+catalog accounts for are measured in English and listed at the end; names and code names, which
+stay English, are left out of that list.
 """
 import glob
 import json
 import os
 import re
+import sys
 
-from font_data import _G, text_width
+import font_zh
 from px import ROOT
 
 DATA = os.path.join(ROOT, "game", "data")
@@ -44,9 +53,104 @@ STRIP_LINES = 2         # rows of speech on one page of it (dialogue_box.gd: PAG
 SCREEN_H = 360
 LINE = 10               # gfx.gd: LINE
 
+LANG = "en"             # --lang <code>: every line is measured in that language (game/data/lang/<code>)
+_CAT = {}               # English -> that language, from every catalog of it
+_FILLED = []            # (pattern, slots, translation) for catalog lines with {slots} or %-codes
+_KEEP = set()           # Latin words the catalogs keep as they are (names, code names, keys)
+UNMATCHED = {}          # English no catalog line accounts for -> times measured
+RAW = set()             # drawn as they are in every language: a contact's alias (Gfx.text_raw), here and on the opening card
+_SLOT = re.compile(r"\{(\w+)\}|%[-+0-9.]*[dsf]")
+
+
+def use_language(code):
+    """Loads the catalogs of a language the way scripts/core/lang.gd does: they all merge."""
+    global LANG
+    LANG = code
+    if code == "en":
+        return
+    root = os.path.join(DATA, "lang", code)
+    if not os.path.isdir(root):
+        raise SystemExit("no catalogs in game/data/lang/%s" % code)
+    for path in sorted(glob.glob(os.path.join(root, "**", "*.json"), recursive=True)):
+        cat = json.load(open(path, encoding="utf-8"))
+        _CAT.update({k: v for k, v in cat.get("strings", {}).items() if v})
+        _KEEP.update(w.lower() for w in cat.get("keep", []))
+    contacts = json.load(open(os.path.join(DATA, "contacts.json"), encoding="utf-8"))
+    RAW.update(str(e.get("alias", "")) for e in contacts.get("pool", []))
+    for card in json.load(open(os.path.join(DATA, "intro.json"), encoding="utf-8")).get("cards", []):
+        RAW.update(str(e.get("alias", "")) for e in card.get("labels", {}).get("entries", []))
+    for en, said in _CAT.items():
+        slots = [m.group(0) for m in _SLOT.finditer(en)]
+        if not slots:
+            continue
+        pattern = ""
+        pos = 0
+        for m in _SLOT.finditer(en):
+            pattern += re.escape(en[pos:m.start()]) + (r"([-+]?\d+(?:\.\d+)?)" if m.group(0)[-1] in "df" else "(.+?)")
+            pos = m.end()
+        pattern += re.escape(en[pos:])
+        _FILLED.append((re.compile(pattern + r"\Z", re.S), slots, said, len(_SLOT.sub("", en))))
+    _FILLED.sort(key=lambda f: -f[3])        # the most particular template first
+
+
+def has_cjk(s):
+    """scripts/core/lang.gd: has_cjk."""
+    return any(0x2E80 <= ord(c) <= 0x9FFF or 0xF900 <= ord(c) <= 0xFAFF or 0xFF00 <= ord(c) <= 0xFFEF for c in s)
+
+
+def tr(text):
+    """text as the player reads it: in English, itself; in another language, the catalog's line
+    for it, or the catalog's template with the same values put back in (Lang.fill, Lang.tf: a
+    value that is words is translated too). A line with Chinese in it is already translated."""
+    if LANG == "en" or not text or has_cjk(text) or text in RAW:
+        return text
+    hit = _CAT.get(text)
+    if hit is not None:
+        return hit
+    for pattern, slots, said, _ in _FILLED:
+        m = pattern.match(text)
+        if m is None:
+            continue
+        values = {}
+        codes = []
+        for slot, v in zip(slots, m.groups()):
+            v = _CAT.get(v, v)
+            if slot.startswith("{"):
+                values.setdefault(slot, v)
+            else:
+                codes.append(v)
+        out = said
+        for slot, v in values.items():
+            out = out.replace(slot, v)
+        it = iter(codes)
+        return _SLOT.sub(lambda c: c.group(0) if c.group(0).startswith("{") else next(it, c.group(0)), out)
+    # what the game puts around a translated piece: a bullet, quotes
+    for a, b in (("• ", ""), ('"', '"')):
+        if len(text) > len(a) + len(b) and text.startswith(a) and text.endswith(b):
+            inner = tr(text[len(a):len(text) - len(b)])
+            if has_cjk(inner):
+                return a + inner + b
+    UNMATCHED[text] = UNMATCHED.get(text, 0) + 1
+    return text
+
+
+def text_width(s, bold=False, scale=1):
+    """The width of exactly s (Counter Sans, Chinese from font_zh: the same as the game)."""
+    return font_zh.text_width(s, bold, scale)
+
+
+def tw(s, bold=False, scale=1):
+    """The width of s as the player reads it (tr)."""
+    return text_width(tr(s), bold, scale)
+
+
+def missing_glyphs(text):
+    return sorted({ch for ch in text if not font_zh.has(ch)})
+
 
 def check(kind, where, text, bold=False, scale=1, limit=None):
-    missing = sorted({ch for ch in text if ch not in _G})
+    text = tr(text)
+    missing = missing_glyphs(text)
     w = text_width(text, bold, scale)
     most = LIMITS.get(kind) if limit is None else limit
     flag = ""
@@ -58,9 +162,13 @@ def check(kind, where, text, bold=False, scale=1, limit=None):
 
 
 def wrap(text, width, bold=False):
-    """The same greedy word wrap as Gfx.wrap_text in the game."""
+    """The same greedy wrap as Gfx.wrap_raw in the game: at spaces, and in a paragraph with
+    Chinese in it also between Chinese characters (wrap_cjk)."""
     out = []
     for para in text.split("\n"):
+        if has_cjk(para):
+            out += wrap_cjk(para, width, bold)
+            continue
         line = ""
         for word in para.split(" "):
             if word == "":
@@ -75,9 +183,53 @@ def wrap(text, width, bold=False):
     return out
 
 
+NO_START = "，。、；：？！…—）》」』】〕〉”’·%,.;:!?)]}"     # gfx.gd: _NO_START
+NO_END = "（《「『【〔〈“‘([{"                                 # gfx.gd: _NO_END
+
+
+def wrap_cjk(para, width, bold=False):
+    """gfx.gd _wrap_cjk: units are single Chinese characters and runs of anything else; a closing
+    mark joins the unit before it and an opening mark the unit after it."""
+    units = []
+    space = False
+    i = 0
+    while i < len(para):
+        if para[i] == " ":
+            space = True
+            i += 1
+            continue
+        j = i + 1
+        if not has_cjk(para[i]):
+            while j < len(para) and para[j] != " " and not has_cjk(para[j]):
+                j += 1
+        units.append([para[i:j], space])
+        space = False
+        i = j
+    joined = []
+    glue = False
+    for piece, sp in units:
+        if joined and (glue or piece[:1] in NO_START):
+            joined[-1][0] += (" " if sp else "") + piece
+        else:
+            joined.append([piece, sp])
+        glue = piece[-1:] in NO_END
+    out = []
+    line = ""
+    for piece, sp in joined:
+        trial = piece if line == "" else line + (" " if sp else "") + piece
+        if line != "" and text_width(trial, bold) > width:
+            out.append(line)
+            line = piece
+        else:
+            line = trial
+    out.append(line)
+    return out
+
+
 def check_lines(kind, where, text, width, most):
     """A wrapped paragraph: reported by its line count, flagged when it needs more lines than there are."""
-    missing = sorted({ch for ch in text if ch not in _G})
+    text = tr(text)
+    missing = missing_glyphs(text)
     lines = wrap(text, width)
     n = len(lines)
     flag = ""
@@ -88,6 +240,50 @@ def check_lines(kind, where, text, width, most):
     if any(text_width(line) > width for line in lines):
         flag += " A WORD IS WIDER THAN THE COLUMN (%d px)" % width
     return (kind, where, n, text, flag)
+
+
+REC_TEXT_X = 448        # clipboard.gd: the record card's text column
+REC_TEXT_W = 186
+REC_NOTE_RIGHT = 632    # clipboard.gd: where "you did not check" ends, at the right of the label's line
+LABEL_GAP = 6           # clipboard.gd: LABEL_GAP
+TALL_LINES = ("zh",)    # gfx.gd tall_lines: the languages whose lines fill their box
+
+
+def wrap_after(text, first_w, width):
+    """gfx.gd wrap_after: a first line first_w wide, the lines after it width."""
+    first = wrap(text, first_w)
+    if len(first) <= 1:
+        return first
+    head = first[0]
+    left = len(head.replace(" ", ""))
+    k = 0
+    while k < len(text) and left > 0:
+        if text[k] != " ":
+            left -= 1
+        k += 1
+    return [head] + wrap(text[k:].strip(), width)
+
+
+def check_finding(where, text, ok):
+    """A case's row text on the record card after the call (clipboard.gd _draw_findings), which
+    has room for two lines: under the label, or, in a language whose lines fill their box, one
+    after the label and one under it (_finding_after), with "you did not check" at the right end
+    of the label's line (measured as if it always were). The game's own widths count the gap
+    after the last letter, one pixel more than text_width."""
+    text = tr(text)
+    missing = missing_glyphs(text)
+    if LANG in TALL_LINES:
+        x = REC_TEXT_X + text_width(tr("NORMAL" if ok else "BROKEN LINE"), True) + 1 + LABEL_GAP
+        right = REC_NOTE_RIGHT - (text_width(tr("you did not check")) + 1) - LABEL_GAP
+        lines = wrap_after(text, right - x, REC_TEXT_W)
+    else:
+        lines = wrap(text, REC_TEXT_W)
+    flag = ""
+    if missing:
+        flag += " MISSING GLYPHS %r" % "".join(missing)
+    if len(lines) > 2:
+        flag += " TOO MANY LINES (%d, room for 2)" % len(lines)
+    return ("finding", where, len(lines), text, flag)
 
 
 def money(v):
@@ -191,23 +387,51 @@ def intro_rows(intro, numbers):
         cid = "intro." + str(c.get("id", "?"))
         rows.append(check_lines("card_text", cid + ".text", fill(c.get("text", ""), numbers), text_w, text_lines))
         rows.append(check("card_title", cid + ".title", c.get("title", ""), bold=True,
-                          limit=text_w - text_width(counter) - 8))
+                          limit=text_w - tw(counter) - 8))
         labels = c.get("labels", {})
         art = c.get("art", "")
-        if art == "lease":
-            # the paper is 212 px wide with 12 px margins; the lender's mark takes 30 px of the head
-            rows.append(check("card_label", cid + ".head", labels.get("head", ""), bold=True, limit=212 - 24 - 30 - 4))
-            rows.append(check("card_label", cid + ".sub", labels.get("sub", ""), limit=212 - 24 - 30 - 4))
+        if art == "fired":
+            panel_w = number(INTRO_GD, "PANEL_W")
+            tab_w = number(INTRO_GD, "TAB_W")
+            # the company's name sits on the door's 40 px plate, and in bold on the binder's 58 px one
+            rows.append(check("card_label", cid + ".company@door", labels.get("company", ""), limit=40 - 4))
+            rows.append(check("card_label", cid + ".company@binder", labels.get("company", ""), bold=True, limit=58 - 6))
+            rows.append(check("card_label", cid + ".binder", labels.get("binder", ""), limit=58 - 6))
+            # the floor's caption box starts 3 px in and has 4 px of padding each side
+            rows.append(check("card_label", cid + ".floor", labels.get("floor", ""), limit=panel_w - 3 - 8 - 3))
+            rows.append(check("card_label", cid + ".denied", labels.get("denied", ""), limit=40 - 4))   # the reader's screen
+            for i, tab in enumerate(labels.get("tabs", [])[:4]):
+                rows.append(check("card_label", cid + ".tabs%d" % i, tab, limit=tab_w - 3 - 2))
+        elif art == "debt":
+            file_w = number(INTRO_GD, "FILE_W")
+            rest = number(INTRO_GD, "FILE_REST")
+            lease_x = number(INTRO_GD, "LEASE_X")
+            lease_w = number(INTRO_GD, "LEASE_W")
+            # once the lease is over Kessler's file only its left side shows, from FILE_REST to LEASE_X,
+            # and the file's words start 8 px in; the head shares its band with a 16 px mark
+            seen = lease_x - rest - 8 - 4
+            rows.append(check("card_label", cid + ".file_head", labels.get("file_head", ""), bold=True,
+                              limit=min(file_w - 8 - 16 - 4, seen)))
+            rows.append(check("card_label", cid + ".file_sub", labels.get("file_sub", ""), limit=seen))
+            for i, item in enumerate(labels.get("file_items", [])):
+                rows.append(check("card_label", cid + ".file_items%d" % i, item, limit=seen))
+            # the SOLD stamp is the word plus 16 px, 10 px in from the file's edge
+            rows.append(check("card_label", cid + ".sold", labels.get("sold", ""), bold=True,
+                              limit=lease_x - rest - 10 - 16 - 2))
+            # the lease has 12 px margins; the lender's mark takes 30 px of the head and the sub
+            rows.append(check("card_label", cid + ".head", labels.get("head", ""), bold=True, limit=lease_w - 24 - 30 - 4))
+            rows.append(check("card_label", cid + ".sub", labels.get("sub", ""), limit=lease_w - 24 - 30 - 4))
+            rows.append(check("card_label", cid + ".from", labels.get("from", ""), limit=lease_w - 24))
             for i, item in enumerate(labels.get("items", [])):
-                rows.append(check("card_label", cid + ".items%d" % i, item, limit=212 - 24 - 15))
-            rows.append(check("card_label", cid + ".foot", labels.get("foot", ""), limit=212 - 24))
+                rows.append(check("card_label", cid + ".items%d" % i, item, limit=lease_w - 24 - 15))
+            rows.append(check("card_label", cid + ".foot", labels.get("foot", ""), limit=lease_w - 24))
             rows.append(check("card_label", cid + ".stamp", labels.get("stamp", ""), bold=True, limit=74 - 8))
         elif art == "lanterns":
             # the list is 196 px wide with 12 px margins; SAY is a button at least 30 px wide at the
             # right of each alias, and the PICKED UP stamp takes its place on the first entry
             col = 196 - 24
             say = labels.get("say", "")
-            say_w = max(30, text_width(say, True) + 10)
+            say_w = max(30, tw(say, True) + 10)
             rows.append(check("card_label", cid + ".head", labels.get("head", ""), bold=True, limit=col))
             rows.append(check("card_label", cid + ".say", say, bold=True, limit=30 - 4))
             for i, e in enumerate(labels.get("entries", [])[:2]):
@@ -218,14 +442,22 @@ def intro_rows(intro, numbers):
                 rows.append(check("card_label", cid + ".code%d" % i, '"%s"' % e.get("code", ""), limit=col))
                 if i == 0:
                     rows.append(check("card_label", cid + ".picked", labels.get("picked", ""), bold=True,
-                                      limit=col - text_width(alias, True) - 6 - 6))
+                                      limit=col - tw(alias, True) - 6 - 6))
             # the figure rises over the package, between the list and the courier
             rows.append(check("card_label", cid + ".drop", fill(labels.get("drop", ""), numbers), bold=True, limit=56))
+            # two tags on the counter's edge: PATIENT (then CONTACT) under the courier at TAG_X, and
+            # PACKAGE under the package. A tag is the word plus 6 px; the two keep 2 px apart.
+            tag_x = number(INTRO_GD, "TAG_X")
+            pkg_x = number(INTRO_GD, "PACKAGE_X") + 16
+            for key in ("patient", "contact"):
+                rows.append(check("card_label", cid + "." + key, labels.get(key, ""), limit=2 * (360 - tag_x - 2) - 6))
+            both = tr(labels.get("contact", "")) + tr(labels.get("package", ""))
+            rows.append(check("card_label", cid + ".contact+package", both, limit=2 * (tag_x - pkg_x) - 12 - 4))
         elif art == "line":
             hours = int(numbers.get("hours", 5))
             per_hour = int(numbers.get("per_hour", 0))
             rows.append(check("card_label", cid + ".hour", labels.get("hour", ""), limit=38 - 8 - 2))
-            head = "%s %d   %s %d" % (labels.get("hour", ""), hours, labels.get("line", ""), hours * per_hour)
+            head = "%s %d   %s %d" % (tr(labels.get("hour", "")), hours, tr(labels.get("line", "")), hours * per_hour)
             rows.append(check("card_label", cid + ".header", head, limit=360 - 44 - 18))
             step_w = 290 // max(1, hours)
             rows.append(check("card_label", cid + ".over", labels.get("over", ""), bold=True, limit=step_w * hours - 20))
@@ -235,8 +467,13 @@ def intro_rows(intro, numbers):
                               limit=2 * (360 - centre) - 12))
             rows.append(check("card_label", cid + ".step", str(hours * per_hour), limit=step_w - 4))
         elif art == "drift":
-            both = labels.get("list", "") + labels.get("ask", "")
-            rows.append(check("card_label", cid + ".list+ask", both, bold=True, limit=360 - 16 - 12))
+            side = number(INTRO_GD, "CRATE_SIDE")
+            # stencilled on the crate's front (x 14 to CRATE_SIDE - 16), between its 6 px corner posts
+            rows.append(check("card_label", cid + ".surplus", labels.get("surplus", ""), bold=True,
+                              limit=side - 14 - 16 - 2 * 6 - 4))
+            # over the clinic glass, which is the rest of the picture less 8 px each side
+            rows.append(check("card_label", cid + ".ask", labels.get("ask", ""), bold=True,
+                              limit=360 - side - 16 - 8))
         elif art == "counter":
             for key in ("treat", "team", "shutter"):
                 rows.append(check("card_label", cid + "." + key, labels.get(key, ""), bold=True, limit=100 - 6))
@@ -268,7 +505,7 @@ def guide_rows(intro, numbers):
         px, py, pw, _ph = panels[pid]
         item_w = int(pw - pad * 2 - badge - 5)
         rows.append(check("guide_title", where + ".title", p.get("title", ""), bold=True,
-                          limit=pw - pad * 2 - text_width(counter) - 6))
+                          limit=pw - pad * 2 - tw(counter) - 6))
         height = pad + 12 + 7
         for it in p.get("items", []):
             key = str(it.get("key", "?"))
@@ -314,6 +551,63 @@ TRAINING_AREAS = {"list", "sheet", "card", "marks", "guide", "cam", "code", "too
                   "patience", "meter", "shutter"}
 
 
+def eyes_row(left, right, parts):
+    """The eyes row of an assembled sheet (case_db.gd: _eyes_row): (tag, normal, fine)."""
+    l, r = parts["eyes"][left], parts["eyes"][right]
+    if left == right:
+        return l["tag"], l["both"], l["fine"]
+    mixed = parts["eyes_mixed"]
+    normal = mixed["normal"].replace("{l}", l["one"]).replace("{r}", r["one"])
+    fine = mixed["fine"].replace("{l}", l["fine_one"]).replace("{r}", r["fine_one"])
+    if r["kind"] == "natural":
+        tag = mixed["tag_l"].replace("{tag}", l["tag"])
+    elif l["kind"] == "natural":
+        tag = mixed["tag_r"].replace("{tag}", r["tag"])
+    else:
+        tag = mixed["tag_two"]
+    return tag, normal, fine
+
+
+def sheet_rows(sheet, parts):
+    """Every line a reference sheet can be assembled with (case_db.gd: sheet_for): each pair of eye
+    models, each model of the other slots, and the title for each patient. On the paper
+    (clipboard.gd: _draw_sheet_paper) the tag sits under the label, in the label column, and the
+    fine line follows SHEET_FINE on the second line of the text column."""
+    rows = []
+    fine_lead = tw(tr(dict(consts(CLIPBOARD_GD, r"^SHEET_FINE$")).get("SHEET_FINE", "fine:")) + " ")
+    room = LIMITS["sheet"]
+    label_room = int(number(CLIPBOARD_GD, "SHEET_TEXT_X")) - 408 - 3
+    base = {r["id"]: r for r in sheet["rows"]}
+    for r in sheet["rows"]:
+        rows.append(check("sheet_label", "sheet." + r["id"] + ".label", r["label"], bold=True, limit=label_room))
+    for left in parts["eyes"]:
+        for right in parts["eyes"]:
+            tag, normal, fine = eyes_row(left, right, parts)
+            where = "parts.eyes.%s+%s" % (left, right)
+            rows.append(check("sheet", where + ".normal", normal))
+            rows.append(check("sheet", where + ".fine", fine, limit=room - fine_lead))
+            rows.append(check("sheet_tag", where + ".tag", tag, limit=label_room))
+    for row_id, group in (("hands", "hands"), ("port", "ports"), ("speech", "voices")):
+        for mid, m in parts[group].items():
+            where = "parts.%s.%s" % (group, mid)
+            normal = m.get("normal", base[row_id].get("normal", ""))
+            if group == "hands":
+                normal = normal.replace("{limit}", "%.1f" % (m["limit_ms"] / 1000.0))
+            rows.append(check("sheet", where + ".normal", normal))
+            rows.append(check("sheet", where + ".fine", m["fine"], limit=room - fine_lead))
+            rows.append(check("sheet_tag", where + ".tag", m["tag"], limit=label_room))
+    temper = base.get("temper", {})
+    rows.append(check("sheet", "sheet.temper.normal", temper.get("normal", "")))
+    rows.append(check("sheet", "sheet.temper.ordinary", temper.get("ordinary", ""), limit=room - fine_lead))
+    rows.append(check("footer", "sheet.title_none", sheet.get("title_none", ""), bold=True))
+    for path in sorted(glob.glob(os.path.join(DATA, "cases", "*.json"))):
+        c = json.load(open(path, encoding="utf-8"))
+        rows.append(check("footer", c["id"] + ".sheet_title", sheet["title"].replace("{name}", c["name"].upper()), bold=True))
+    for i, f in enumerate(sheet["footer"]):
+        rows.append(check("footer", "sheet.footer%d" % i, f))
+    return rows
+
+
 def training_rows(intro, numbers):
     """The first-night training (coach.gd): each tip wrapped to the box, and the box's own words."""
     rows = []
@@ -328,12 +622,12 @@ def training_rows(intro, numbers):
     phases = set(re.findall(r'"(\w+)"', source(COACH_GD)[source(COACH_GD).index("const PHASES"):].split("\n")[0]))
     counter = "%d/%d" % (len(steps), len(steps))
     named = dict(consts(COACH_GD, r"^(TITLE|NEXT|DONE|SKIP)$"))
-    title_w = text_width(named.get("TITLE", ""), True) + 6 + text_width(counter)
+    title_w = tw(named.get("TITLE", ""), True) + 6 + tw(counter)
     rows.append(("training_label", "coach.gd:TITLE+counter", title_w, named.get("TITLE", ""),
                  " TOO WIDE (room %d px)" % text_w if title_w > text_w else ""))
     # SKIP ALL on the left and NEXT (or DONE) on the right of the bottom row, with room between
     for last in ("NEXT", "DONE"):
-        both = text_width(named.get("SKIP", ""), True) + 10 + 12 + text_width(named.get(last, ""), True) + 8
+        both = tw(named.get("SKIP", ""), True) + 10 + 12 + tw(named.get(last, ""), True) + 8
         rows.append(("training_label", "coach.gd:SKIP+" + last, both, named.get(last, ""),
                      " THE BUTTONS MEET (room %d px)" % text_w if both > text_w else ""))
     seen = set()
@@ -360,13 +654,18 @@ def training_rows(intro, numbers):
 
 
 def main():
+    args = sys.argv[1:]
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    for i, a in enumerate(args):
+        if a.startswith("--lang="):
+            use_language(a[len("--lang="):])
+        elif a == "--lang" and i + 1 < len(args):
+            use_language(args[i + 1])
     rows = []
     sheet = json.load(open(os.path.join(DATA, "sheet.json"), encoding="utf-8"))
-    for r in sheet["rows"]:
-        rows.append(check("sheet", "sheet." + r["id"] + ".normal", r["normal"]))
-        rows.append(check("sheet", "sheet." + r["id"] + ".ordinary", r["ordinary"]))
-    for i, f in enumerate(sheet["footer"]):
-        rows.append(check("footer", "sheet.footer%d" % i, f))
+    parts = json.load(open(os.path.join(DATA, "parts.json"), encoding="utf-8"))
+    rows.extend(sheet_rows(sheet, parts))
     fees = set()
     for path in sorted(glob.glob(os.path.join(DATA, "cases", "*.json"))):
         c = json.load(open(path, encoding="utf-8"))
@@ -388,7 +687,7 @@ def main():
                 rows.append(check("note", cid + ".press%d.note" % i, p["note"]))
             rows.append(check("line", cid + ".press%d.line" % i, p["line"]))
         for r, row in c["rows"].items():
-            rows.append(check("rowtext", cid + ".rows." + r, row["text"]))
+            rows.append(check_finding(cid + ".rows." + r, row["text"], bool(row.get("ok", True))))
         for k, o in c["outcomes"].items():
             rows.append(check("outcome", cid + ".outcomes." + k, o["text"]))
             rows.append(check_lines("slip_text", cid + ".outcomes." + k + ".lines", o["text"], SLIP_WIDTH, SLIP_LINES))
@@ -403,15 +702,15 @@ def main():
     # the slip's last line: the call on the left, the money on the right, both bold when there is room
     rules = json.load(open(os.path.join(DATA, "rules.json"), encoding="utf-8"))
     figures = sorted(fees | set(int(v) for v in rules["scoring"].values()) | {0})
-    widest = max(text_width("%s credits" % money(v), True) for v in figures)
+    widest = max(tw("%s credits" % money(v), True) for v in figures)
     calls = slip_calls()
     if not calls:
         rows.append(("slip_call", "main.gd:_draw_slip", 0, "", " NO CALL LABELS FOUND"))
     for label in calls:
         room = SLIP_WIDTH - widest - SLIP_GAP
-        w = text_width(label, True)
+        w = tw(label, True)
         flag = ""
-        if text_width(label) > room:
+        if tw(label) > room:
             flag = " TOUCHES THE MONEY (room %d px)" % room
         elif w > room:
             flag = " NOT BOLD (bold needs %d px, room %d px)" % (w, room)
@@ -431,13 +730,12 @@ def main():
                "repair_cost": repair_cost, "pay": int(contacts.get("pay", 0)), "code_cost": int(contacts.get("wrong_cost", 0)),
                "per_night": int(contacts.get("per_night", 0)), "calm_cost": int(reassure.get("cost", 0)),
                "calm_gain": int(reassure.get("gain", 0)), "ask_cost": int(costs.get("ask", 0)),
-               "press_cost": int(costs.get("press", 0)),
-               "limit": "%.1f" % (float(rules.get("grip", {}).get("limit_ms", 1000)) / 1000.0)}
+               "press_cost": int(costs.get("press", 0))}
     contact_data = json.load(open(os.path.join(DATA, "contacts.json"), encoding="utf-8"))
     packages = [str(e.get("package", "")) for e in contact_data.get("pool", [])]
-    longest_package = max(packages, key=lambda t: text_width(t)) if packages else ""
+    longest_package = max(packages, key=lambda t: tw(t)) if packages else ""
     aliases = [str(e.get("alias", "")) for e in contact_data.get("pool", [])]
-    longest_alias = max(aliases, key=lambda t: text_width(t, True)) if aliases else ""
+    longest_alias = max(aliases, key=lambda t: tw(t, True)) if aliases else ""
     best = sum(sorted(fees | {int(rules["scoring"].get("refer_drifting", 0))}, reverse=True)[:1]) * hours
     worst = min(int(v) for v in rules["scoring"].values()) * hours
     line_total = per_hour * hours
@@ -453,7 +751,9 @@ def main():
     for name, text in consts(SCREENS_GD, r"_ROW$"):
         values = [repair_most] if name == "TILL_GLASS_ROW" else [hours, per_hour]
         rows.append(check("report_row", "screens.gd:" + name, worst_numbers(text, values), bold=name in ("OVER_ROW", "UNDER_ROW")))
-    tally = "Right calls: %d of %d   •   Hours under the line: %d   •   Times you were hurt: %d" % (hours, hours, hours, hours)
+    tally_words = dict(consts(SCREENS_GD, r"^TALLY_"))
+    tally = tally_words.get("TALLY_GAP", "   •   ").join(
+        tr(worst_numbers(tally_words.get(k, k), [hours, hours])) for k in ("TALLY_CALLS", "TALLY_UNDER", "TALLY_HURT"))
     rows.append(check("report_tally", "screens.gd:_draw_report tally", tally))
     for name, text in consts(SCREENS_GD, r"^DROPS_TALLY$"):
         per_night = int(contacts.get("per_night", 0))
@@ -468,12 +768,12 @@ def main():
         rows.append(("report_row", "screens.gd:_draw_report", 0, "", " NO VISIT LINE WORDS FOUND"))
     else:
         calm_most = int(reassure.get("cost", 0)) * int(reassure.get("uses", 0))
-        extra = "   ".join([max(worst_numbers(small["VISIT_DROP"], [int(contacts.get("pay", 0))]), small["VISIT_NO_DROP"],
-                                key=text_width), worst_numbers(small["VISIT_CALM"], [calm_most])])
-        call = max(said_calls, key=text_width)
-        room = REPORT_VISIT_ROOM - text_width(call) - SLIP_GAP
-        rows.append(("report_row", "screens.gd:_visit_extra", text_width(extra), extra,
-                     " RUNS INTO '%s' (room %d px)" % (call, room) if text_width(extra) > room else ""))
+        extra = "   ".join([tr(max(worst_numbers(small["VISIT_DROP"], [int(contacts.get("pay", 0))]), small["VISIT_NO_DROP"],
+                                   key=tw)), tr(worst_numbers(small["VISIT_CALM"], [calm_most]))])
+        call = max(said_calls, key=tw)
+        room = REPORT_VISIT_ROOM - tw(call) - SLIP_GAP
+        rows.append(("report_row", "screens.gd:_visit_extra", tw(extra), extra,
+                     " RUNS INTO '%s' (room %d px)" % (call, room) if tw(extra) > room else ""))
     # the title card
     for name, text in consts(SCREENS_GD, r"^HELP"):
         rows.append(check("screen", "screens.gd:" + name, text))
@@ -539,22 +839,30 @@ def main():
     if len(named) < 3:
         rows.append(("slip_call", "main.gd:SLIP_*", 0, "", " NO BREAKDOWN WORDS FOUND"))
     else:
-        worst = "  •  ".join([max(worst_numbers(named["SLIP_DROP"], [numbers["pay"]]),
-                                  named["SLIP_NO_DROP"].replace("%s", longest_alias), key=text_width),
-                             worst_numbers(named["SLIP_CALM"], [numbers["calm_cost"] * calm_uses])])
-        rows.append(("slip_call", "main.gd:_slip_breakdown", text_width(worst), worst,
-                     " WIDER THAN THE SLIP (%d px)" % SLIP_WIDTH if text_width(worst) > SLIP_WIDTH else ""))
+        worst = "  •  ".join([tr(max(worst_numbers(named["SLIP_DROP"], [numbers["pay"]]),
+                                     named["SLIP_NO_DROP"].replace("%s", longest_alias), key=tw)),
+                             tr(worst_numbers(named["SLIP_CALM"], [numbers["calm_cost"] * calm_uses]))])
+        rows.append(("slip_call", "main.gd:_slip_breakdown", tw(worst), worst,
+                     " WIDER THAN THE SLIP (%d px)" % SLIP_WIDTH if tw(worst) > SLIP_WIDTH else ""))
     bad = [r for r in rows if r[4]]
     by_kind = {}
     for kind, where, w, text, flag in rows:
         by_kind.setdefault(kind, []).append(w)
     for kind, ws in sorted(by_kind.items()):
-        unit = "lines" if kind in ("slip_text", "report_text", "strip_text", "card_text", "guide_item", "training") else "px"
+        unit = "lines" if kind in ("slip_text", "report_text", "strip_text", "card_text", "guide_item", "training",
+                                   "finding") else "px"
         print("%-12s n=%-3d max=%d %s" % (kind, len(ws), max(ws), unit))
     for kind, where, w, text, flag in bad:
         print("!! %s %s (%d)%s: %s" % (kind, where, w, flag, text))
+    if LANG != "en":
+        word = re.compile(r"[A-Za-z][A-Za-z'-]+")
+        left = sorted(t for t in UNMATCHED if any(m.group(0).lower().rstrip("-'") not in _KEEP for m in word.finditer(t)))
+        for t in left:
+            print("?? measured in English (no %s line accounts for it): %s" % (LANG, t))
+        print("in %s: %d lines measured in English" % (LANG, len(left)))
     print("%d lines measured, %d problems" % (len(rows), len(bad)))
+    return 1 if bad else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

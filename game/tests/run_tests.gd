@@ -1,11 +1,13 @@
 extends SceneTree
-## Headless rule tests for the reference-sheet loop (case data version 2, rules version 6,
-## sheet version 3, contacts version 1). The second decision is a call to Trauma Team; in the
-## rules and the data its id is "refer". Rules version 4 added the hourly line, the patient who
-## leaves when patience runs out, and the counter glass that remembers every blow for the rest
-## of the shift. Rules version 5 lets the doctor pay, between patients, to have a layer of that
-## glass refitted. Rules version 6 adds tonight's contacts and their codes, a CALM that costs
-## credits, a line that right calls alone no longer hold, and the patient who snaps or flares.
+## Headless rule tests for the reference-sheet loop (case data version 2, rules version 7,
+## sheet version 4, parts version 1, contacts version 1). The second decision is a call to
+## Trauma Team; in the rules and the data its id is "refer". Rules version 4 added the hourly
+## line, the patient who leaves when patience runs out, and the counter glass that remembers
+## every blow for the rest of the shift. Rules version 5 lets the doctor pay, between patients,
+## to have a layer of that glass refitted. Rules version 6 adds tonight's contacts and their
+## codes, a CALM that costs credits, a line that right calls alone no longer hold, and the
+## patient who snaps or flares. Rules version 7 moves the grip limit into the spec binder
+## (data/parts.json): a patient is a set of parts, and the sheet is pulled for their models.
 ## Run from the repository root:  godot --headless --path game --script res://tests/run_tests.gd
 ## These check program rules only. They are not a playtest and say nothing about fun.
 
@@ -17,13 +19,19 @@ const PatientAgent = preload("res://scripts/core/patient_agent.gd")
 const MoveValidator = preload("res://scripts/core/move_validator.gd")
 const VoiceClip = preload("res://scripts/core/voice_clip.gd")
 const VoiceInput = preload("res://scripts/core/voice_input.gd")
+const Gfx = preload("res://scripts/ui/gfx.gd")
+const Lang = preload("res://scripts/core/lang.gd")
+const Clipboard = preload("res://scripts/ui/clipboard.gd")
 
 const NOTE_MAX_PX := 186   # width of the note column on the patient record
+const SHEET_TEXT_ROOM := 182.0    # the sheet's text column (tools/art/measure_text.py "sheet")
+const SHEET_TITLE_ROOM := 220.0   # the rule under the sheet's title
 
 var passed := 0
 var failed := 0
 var rules: Dictionary = {}
 var sheet: Dictionary = {}
+var parts: Dictionary = {}
 var cases: Dictionary = {}
 var contacts_data: Dictionary = {}
 
@@ -86,13 +94,17 @@ func brain_move(v: VisitState, kind: String, id: String, brain: ScriptedBrain = 
 
 
 func _initialize() -> void:
+	# English whatever language a player saved: the checks below read English words
+	Lang.pin("en")
 	var db: Dictionary = CaseDB.load_all()
 	eq(db["errors"], [], "shipped data validates")
 	rules = db["rules"]
 	sheet = db["sheet"]
+	parts = db["parts"]
 	cases = db["cases"]
 	contacts_data = db["contacts"]
 	test_data()
+	test_parts()
 	test_verdict_any_time()
 	test_looks()
 	test_checks()
@@ -153,6 +165,172 @@ func test_data() -> void:
 		for text in texts:
 			var w: float = font.get_string_size(str(text), HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x
 			ok(w <= NOTE_MAX_PX, "%s note fits one record line (%d px): %s" % [id, int(w), str(text)])
+
+
+## The spec binder (rules version 7, data/parts.json): a patient is a set of parts, one model
+## per slot, and the reference sheet on the wall is pulled from the binder for those models.
+func test_parts() -> void:
+	eq(CaseDB.validate_parts(parts), [], "the shipped spec binder validates")
+	# between patients: the baseline body
+	var s: Dictionary = CaseDB.sheet_for({}, sheet, parts)
+	eq(s["title"], sheet["title_none"], "with nobody at the counter the sheet is headed as the baseline")
+	eq([sheet_row(s, "eyes")["tag"], sheet_row(s, "hands")["tag"], sheet_row(s, "port")["tag"]], ["NATURAL", "NATURAL", "STREET"],
+		"the baseline body: natural eyes and hands, a street port")
+	ok(is_equal_approx(float(s["limit_s"]), 1.0), "and a natural hand's 1 s limit")
+	eq(sheet_row(s, "hands")["normal"], "Lets go on 'release' inside 1.0 s.", "the hands normal is filled with that limit")
+	eq(sheet_row(s, "temper")["fine"], "Anger, swearing, walking out.", "temper has no part: its line is the sheet's own")
+	eq(int(s["threshold"]), int(sheet["threshold"]), "the house rule comes along")
+	# each patient's sheet
+	s = CaseDB.sheet_for(cases["kip"], sheet, parts)
+	eq(s["title"], "REFERENCE SHEET: KIP MARLOW", "a patient's sheet is headed with their name")
+	eq(sheet_row(s, "eyes")["tag"], "L KITE", "Kip: a KITE optic in the left eye, a natural right")
+	eq(sheet_row(s, "eyes")["normal"], "L: no pupil. R: tightens. Both follow.", "two different eyes: each one's part")
+	eq(sheet_row(s, "eyes")["fine"], "L: scuffs, cracks. R: red rims.", "and each one's ordinary")
+	s = CaseDB.sheet_for(cases["rook"], sheet, parts)
+	eq([sheet_row(s, "hands")["tag"], sheet_row(s, "hands")["normal"]], ["LOADER", "Lets go on 'release' inside 1.5 s."],
+		"Rook's LOADER rig is allowed 1.5 s")
+	ok(is_equal_approx(float(s["limit_s"]), 1.5), "and the close-up's LIMIT mark goes with it")
+	eq(sheet_row(s, "port")["tag"], "WORK", "a work port")
+	s = CaseDB.sheet_for(cases["vale"], sheet, parts)
+	eq([sheet_row(s, "eyes")["tag"], sheet_row(s, "eyes")["normal"]], ["TALON", "Shutters snap tight in light. Both follow."],
+		"Vale: both eyes TALON, so the model's own line")
+	eq(sheet_row(s, "port")["normal"], "Calm skin at the plate. No dark threads.", "a MIL-SPEC port gives a normal of its own")
+	ok(is_equal_approx(float(s["limit_s"]), 0.3), "REFLEX hands: 0.3 s")
+	s = CaseDB.sheet_for(cases["juno"], sheet, parts)
+	eq([sheet_row(s, "eyes")["tag"], sheet_row(s, "hands")["tag"], sheet_row(s, "speech")["tag"]], ["IRIS", "DEFT", "VX-9"],
+		"Juno: IRIS eyes, DEFT hands, a VX-9 voice box")
+	eq(sheet_row(s, "speech")["fine"], "A st-stutter, a skipped word, nerves.", "the voice box's stutter is ordinary for its model")
+	ok(is_equal_approx(float(CaseDB.sheet_for(cases["maren"], sheet, parts)["limit_s"]), 0.8), "Maren: SEAM hands, 0.8 s")
+	# the sheet follows the parts, not the person
+	var other := {"name": "Somebody Else", "parts": (cases["kip"]["parts"] as Dictionary).duplicate()}
+	eq(CaseDB.sheet_for(other, sheet, parts)["rows"], CaseDB.sheet_for(cases["kip"], sheet, parts)["rows"],
+		"two patients with the same models get the same rows")
+	eq([eyes_tag("natural", "talon"), eyes_tag("iris", "natural"), eyes_tag("kite", "iris")], ["R TALON", "L IRIS", "MIXED"],
+		"an implant beside a natural eye is named by its side; two different implants are MIXED")
+	# loading writes what the models mean into each case
+	var vale_l: Dictionary = cases["vale"]["eyes"]["left"]
+	eq([vale_l["model"], vale_l["kind"], vale_l["pupil"], vale_l["tag"]], ["talon", "combat", "shutter", "TALON"],
+		"each eye gets its model, art family, pupil and tag")
+	eq([cases["kip"]["eyes"]["left"]["kind"], cases["kip"]["eyes"]["right"]["kind"]], ["optic", "natural"], "Kip's KITE is drawn as an optic")
+	eq([cases["rook"]["grip"]["tag"], int(cases["rook"]["grip"]["limit_ms"])], ["LOADER", 1500], "and the grip gets its hands model's limit")
+	# cases checked against the binder
+	var c: Dictionary = (cases["kip"] as Dictionary).duplicate(true)
+	ok(has_error(CaseDB.validate_case(c, rules, sheet), "no spec binder"), "a case is never passed without the binder")
+	c["parts"]["eye_l"] = "hawk"
+	ok(has_error(CaseDB.validate_case(c, rules, sheet, parts), "'hawk', which parts.json eyes does not have"), "a model the binder does not have is caught")
+	c = (cases["kip"] as Dictionary).duplicate(true)
+	c["parts"].erase("voice")
+	ok(has_error(CaseDB.validate_case(c, rules, sheet, parts), "parts.voice is missing"), "so is an empty slot")
+	c = (cases["juno"] as Dictionary).duplicate(true)
+	c["eyes"]["left"]["tightens"] = true
+	ok(has_error(CaseDB.validate_case(c, rules, sheet, parts), "cannot tighten"), "an IRIS screen has no pupil to tighten")
+	c = (cases["vale"] as Dictionary).duplicate(true)
+	for side in ["left", "right"]:
+		c["eyes"][side]["tightens"] = true
+		c["eyes"][side]["follows"] = true
+	ok(has_error(CaseDB.validate_case(c, rules, sheet, parts), "rows.eyes.ok"), "TALON shutters that snap and follow are steady eyes, so the row must say so")
+	c = (cases["rook"] as Dictionary).duplicate(true)
+	c["parts"]["hands"] = "natural"
+	ok(has_error(CaseDB.validate_case(c, rules, sheet, parts), "hands model's limit (1000 ms)"), "Rook's 1.2 s is too slow for natural hands: that row would break")
+	c = (cases["maren"] as Dictionary).duplicate(true)
+	c["parts"]["hands"] = "loader"
+	ok(not has_error(CaseDB.validate_case(c, rules, sheet, parts), "rows.hands.ok"), "Maren's 1.7 s is too slow even for a LOADER")
+	# a bad binder
+	var bad: Dictionary = parts.duplicate(true)
+	bad["eyes"]["kite"].erase("pupil")
+	ok(has_error(CaseDB.validate_parts(bad), "eyes.kite.pupil"), "an eye model must say what light does to it")
+	bad = parts.duplicate(true)
+	bad["eyes"]["iris"]["kind"] = "laser"
+	ok(has_error(CaseDB.validate_parts(bad), "eyes.iris.kind"), "and which close-up draws it")
+	bad = parts.duplicate(true)
+	bad["eyes"]["talon"].erase("fine_one")
+	ok(has_error(CaseDB.validate_parts(bad), "eyes.talon needs 'fine_one'"), "and its part of a mixed pair")
+	bad = parts.duplicate(true)
+	bad["hands"]["deft"].erase("limit_ms")
+	ok(has_error(CaseDB.validate_parts(bad), "hands.deft.limit_ms"), "a hands model needs its limit")
+	bad = parts.duplicate(true)
+	bad["ports"]["street"].erase("tag")
+	ok(has_error(CaseDB.validate_parts(bad), "ports.street needs 'tag'"), "every model has a code name")
+	bad = parts.duplicate(true)
+	bad["ports"] = {}
+	ok(has_error(CaseDB.validate_parts(bad), "'ports' must list"), "a group with no models is caught")
+	bad = parts.duplicate(true)
+	bad.erase("eyes_mixed")
+	ok(has_error(CaseDB.validate_parts(bad), "eyes_mixed"), "so is a binder that cannot print two different eyes")
+	bad = parts.duplicate(true)
+	bad["baseline"]["voice"] = "choir"
+	ok(has_error(CaseDB.validate_parts(bad), "baseline.voice is 'choir'"), "the baseline body is made of the binder's own models")
+	# a bad sheet
+	var bad_sheet: Dictionary = sheet.duplicate(true)
+	bad_sheet["rows"][1]["normal"] = "Lets go on 'release' quickly."
+	ok(has_error(CaseDB.validate_sheet(bad_sheet), "{limit}"), "the hands normal must carry the model's limit")
+	bad_sheet = sheet.duplicate(true)
+	bad_sheet["title"] = "REFERENCE SHEET"
+	ok(has_error(CaseDB.validate_sheet(bad_sheet), "{name}"), "a patient's sheet is headed with their name")
+	bad_sheet = sheet.duplicate(true)
+	bad_sheet.erase("title_none")
+	ok(has_error(CaseDB.validate_sheet(bad_sheet), "title_none"), "and the sheet between patients has a heading of its own")
+	bad_sheet = sheet.duplicate(true)
+	bad_sheet["rows"][4].erase("ordinary")
+	ok(has_error(CaseDB.validate_sheet(bad_sheet), "'temper' needs 'ordinary'"), "temper has no model, so the sheet gives its fine line")
+	# every line the binder can put on the sheet fits the paper, in the font the game draws
+	var label_room := Clipboard.SHEET_TEXT_X - 408.0 - 3.0
+	var fine_x := Gfx.text_w(Clipboard.SHEET_FINE + " ")
+	var too_wide: Array = []
+	var count := 0
+	for each in every_sheet():
+		var one: Dictionary = each
+		count += 1
+		if Gfx.text_w(str(one["title"]), true) > SHEET_TITLE_ROOM:
+			too_wide.append(str(one["title"]))
+		for r in one["rows"]:
+			var row: Dictionary = r
+			if Gfx.text_w(str(row["label"]), true) > label_room or Gfx.text_w(str(row["tag"])) > label_room:
+				too_wide.append("%s / %s" % [str(row["label"]), str(row["tag"])])
+			if Gfx.text_w(str(row["normal"])) > SHEET_TEXT_ROOM:
+				too_wide.append(str(row["normal"]))
+			if fine_x + Gfx.text_w(str(row["fine"])) > SHEET_TEXT_ROOM:
+				too_wide.append("%s %s" % [Clipboard.SHEET_FINE, str(row["fine"])])
+	ok(count >= 1 + cases.size() + 16, "the width check covers the baseline, every patient and every pair of eyes (%d sheets)" % count)
+	eq(too_wide, [], "every line the binder can print fits the sheet")
+
+
+## One row of an assembled sheet (CaseDB.sheet_for), or {}.
+func sheet_row(s: Dictionary, id: String) -> Dictionary:
+	for r in s.get("rows", []):
+		if str(r.get("id", "")) == id:
+			return r
+	return {}
+
+
+## The eyes row's tag for a patient with these two eye models and the baseline otherwise.
+func eyes_tag(left: String, right: String) -> String:
+	var picks: Dictionary = (parts["baseline"] as Dictionary).duplicate()
+	picks["eye_l"] = left
+	picks["eye_r"] = right
+	return str(sheet_row(CaseDB.sheet_for({"name": "x", "parts": picks}, sheet, parts), "eyes").get("tag", ""))
+
+
+## Every sheet the binder can print for one change from the baseline body: the baseline, each
+## patient, every pair of eye models, and each model of the other slots.
+func every_sheet() -> Array:
+	var out: Array = [CaseDB.sheet_for({}, sheet, parts)]
+	for id in cases.keys():
+		out.append(CaseDB.sheet_for(cases[id], sheet, parts))
+	var base: Dictionary = parts["baseline"]
+	var eye_ids: Array = (parts["eyes"] as Dictionary).keys()
+	for l in eye_ids:
+		for r in eye_ids:
+			var picks: Dictionary = base.duplicate()
+			picks["eye_l"] = l
+			picks["eye_r"] = r
+			out.append(CaseDB.sheet_for({"name": "Somebody Else", "parts": picks}, sheet, parts))
+	for slot in ["hands", "port", "voice"]:
+		for m in (parts[CaseDB.SLOTS[slot]] as Dictionary).keys():
+			var picks: Dictionary = base.duplicate()
+			picks[slot] = m
+			out.append(CaseDB.sheet_for({"name": "Somebody Else", "parts": picks}, sheet, parts))
+	return out
 
 
 func test_verdict_any_time() -> void:
@@ -905,7 +1083,7 @@ func test_contacts() -> void:
 	ok(pair_ok, "every entry's two clues together point at its own visitor only")
 	for id in cases.keys():
 		ok(int(per_case.get(id, 0)) >= 2, "%s can be a courier under two different entries" % id)
-	eq(CaseDB.clue_matches({"eyes": "chrome_both"}, cases), ["juno", "vale"], "chrome in both eyes: Juno and Vale (Kip keeps one natural eye)")
+	eq(CaseDB.clue_matches({"eyes": "implants_both"}, cases), ["juno", "vale"], "implants in both eyes: Juno and Vale (Kip keeps one natural eye)")
 	eq(CaseDB.clue_matches({"request_starts": "Swap"}, cases), ["juno", "kip"], "the swaps: Juno and Kip")
 	# bad lists are caught
 	var bad: Dictionary = contacts_data.duplicate(true)
@@ -1248,6 +1426,22 @@ func test_conversation() -> void:
 	d3 = await agent.decide({"type": "say", "id": "free", "text": "Go on."}, v.snapshot(), [])
 	eq(d3.fallback_reason, "invalid:reply_too_long", "a reply the strip cannot show falls back")
 	eq(agent.max_reply_chars, int(rules.agent.max_reply_chars), "display bound comes from the rules")
+	# in Chinese the request names the language and asks for Chinese lengths, and a reply is held
+	# to what the strip shows of Chinese
+	Lang.pin("zh")
+	var zh := agent.build_payload({"type": "say", "id": "free", "text": "还疼吗？"}, v.snapshot())
+	eq(str(zh.get("language", "")), "zh", "a game in Chinese says so to the proxy")
+	eq(int(zh.limits.max_line_chars), int(rules.agent.languages.zh.max_line_chars), "and asks for a Chinese line's length")
+	eq(agent.reply_chars(), int(rules.agent.languages.zh.max_reply_chars), "a Chinese reply has the Chinese bound")
+	eq(str(agent.build_voice_payload(PackedByteArray([0, 0, 0, 0])).get("language", "")), "zh", "a clip says which language it is spoken in")
+	client.reply = {"ok": true, "data": {"reply": "好".repeat(agent.reply_chars() + 1), "reaction": ""}}
+	d3 = await agent.decide({"type": "say", "id": "free", "text": "说下去。"}, v.snapshot(), [])
+	eq(d3.fallback_reason, "invalid:reply_too_long", "a Chinese reply the strip cannot show falls back")
+	Lang.pin("en")
+	var en := agent.build_payload({"type": "say", "id": "free", "text": "Go on."}, v.snapshot())
+	eq(str(en.get("language", "")), "en", "English says so too")
+	eq(int(en.limits.max_line_chars), agent.max_line_chars, "with the English length")
+	eq(agent.reply_chars(), agent.max_reply_chars, "and the English bound")
 
 
 ## Offline only: a sentence in the doctor's own words finds the question the script knows.
@@ -1270,6 +1464,29 @@ func test_offline_say() -> void:
 		eq(ScriptedBrain.topic_for_text(c, "Nice weather tonight."), "", id + ": small talk matches nothing")
 		eq(ScriptedBrain.topic_for_text(c, ""), "", id + ": silence matches nothing")
 		eq(ScriptedBrain.topic_for_text(c, "?!... 123"), "", id + ": no words, no match")
+	# in Chinese the catalogs add words of their own (data/lang/zh: topics.json for every patient,
+	# a case catalog's "<case>:<topic>" for one): the doctor's own Chinese finds the same questions,
+	# and so does each authored question's translation
+	Lang.pin("zh")
+	var said_zh := {
+		"kip": {"你的镜片是怎么裂的？": "why", "最近睡得好吗？": "sleep", "这东西会自己乱动吗？": "implant"},
+		"rook": {"胳膊什么时候开始卡的？": "why", "你为什么这么生气？": "mood", "它会不会不听使唤？": "implant"},
+		"vale": {"为什么想拆掉它？": "why", "你会不会断片？": "lapses", "你每天睡多久？": "sleep"},
+		"juno": {"你的声音出了什么事？": "why", "这些改装有没有故障？": "chrome", "晚上能睡着吗？": "sleep"},
+		"maren": {"它们停不下来是什么意思？": "why", "你害怕它们吗？": "fear", "最近累不累？": "sleep"},
+	}
+	for id in said_zh.keys():
+		var c: Dictionary = cases[id]
+		var lines: Dictionary = said_zh[id]
+		for line in lines.keys():
+			eq(ScriptedBrain.topic_for_text(c, str(line)), str(lines[line]), "zh %s: \"%s\"" % [id, line])
+		for t in c.topics:
+			var q := Lang.t(str(t.q))
+			ok(Lang.has_cjk(q), "zh %s/%s: the question is translated" % [id, t.id])
+			eq(ScriptedBrain.topic_for_text(c, q), str(t.id), "zh %s: its own question \"%s\" finds its topic" % [id, q])
+		for line in ["今晚天气不错。", "你叫什么名字？", "我们开始吧。"]:
+			eq(ScriptedBrain.topic_for_text(c, line), "", "zh %s: small talk \"%s\" matches nothing" % [id, line])
+	Lang.pin("en")
 	# the offline patient declines a sentence it has no answer for, in its own voice
 	for id in cases.keys():
 		var v := visit(id)
@@ -1446,7 +1663,8 @@ func test_voice() -> void:
 	var sent: Dictionary = client.last
 	var keys: Array = sent.keys()
 	keys.sort()
-	eq(keys, ["audio", "client", "protocol", "session_id", "visit_id"], "a clip travels with its session and visit: no case, state or history")
+	eq(keys, ["audio", "client", "language", "protocol", "session_id", "visit_id"],
+		"a clip travels with its session, visit and language: no case, state or history")
 	eq([sent.protocol, sent.session_id, sent.visit_id, sent.audio.mime], ["3", "test-session", "voice-visit", "audio/wav"], "in protocol 3, as a WAV")
 	eq(Marshalls.base64_to_raw(str(sent.audio.data)), said, "the samples arrive as they were")
 	eq([agent.calls_this_visit, agent.conversation_history.size()], [0, history], "words written down are not a line said: no dialogue call, nothing remembered")
@@ -1534,50 +1752,52 @@ func has_error(errors: Array, fragment: String) -> bool:
 func test_bad_data() -> void:
 	var c: Dictionary = (cases["kip"] as Dictionary).duplicate(true)
 	c["rows"]["port"]["ok"] = false
-	ok(has_error(CaseDB.validate_case(c, rules), "stable patient must have no broken"), "stable + broken line is caught")
+	ok(has_error(CaseDB.validate_case(c, rules, {}, parts), "stable patient must have no broken"), "stable + broken line is caught")
 	c = (cases["kip"] as Dictionary).duplicate(true)
 	c["press"][1]["end"] = "attack"
-	ok(has_error(CaseDB.validate_case(c, rules), "must never attack"), "stable attacker is caught")
+	ok(has_error(CaseDB.validate_case(c, rules, {}, parts), "must never attack"), "stable attacker is caught")
 	c = (cases["vale"] as Dictionary).duplicate(true)
 	for row in ["eyes", "speech", "temper"]:
 		c["rows"][row]["ok"] = true
-	c["eyes"]["left"]["follows"] = true
-	ok(has_error(CaseDB.validate_case(c, rules), "impossible to refuse"), "all-refusable drift evidence is caught")
+	for side in ["left", "right"]:
+		c["eyes"][side]["follows"] = true
+		c["eyes"][side]["tightens"] = true
+	ok(has_error(CaseDB.validate_case(c, rules, {}, parts), "impossible to refuse"), "all-refusable drift evidence is caught")
 	c = (cases["vale"] as Dictionary).duplicate(true)
 	c["checks"]["penlight"]["first"] = ["explain:ghost"]
-	ok(has_error(CaseDB.validate_case(c, rules), "unknown claim"), "unknown claim is caught")
+	ok(has_error(CaseDB.validate_case(c, rules, {}, parts), "unknown claim"), "unknown claim is caught")
 	c = (cases["maren"] as Dictionary).duplicate(true)
 	c["grip"]["release_ms"] = 400
-	ok(has_error(CaseDB.validate_case(c, rules), "rows.hands.ok"), "grip data and sheet row must agree")
+	ok(has_error(CaseDB.validate_case(c, rules, {}, parts), "rows.hands.ok"), "grip data and sheet row must agree")
 	c = (cases["maren"] as Dictionary).duplicate(true)
 	c["eyes"]["left"]["tightens"] = true
-	ok(has_error(CaseDB.validate_case(c, rules), "rows.eyes.ok"), "eye data and sheet row must agree")
+	ok(has_error(CaseDB.validate_case(c, rules, {}, parts), "rows.eyes.ok"), "eye data and sheet row must agree")
 	c = (cases["juno"] as Dictionary).duplicate(true)
 	c["outcomes"].erase("false_alarm")
-	ok(has_error(CaseDB.validate_case(c, rules), "outcomes.false_alarm"), "missing outcome text is caught")
-	# rules version 4 and later, sheet version 3
+	ok(has_error(CaseDB.validate_case(c, rules, {}, parts), "outcomes.false_alarm"), "missing outcome text is caught")
+	# rules version 4 and later, sheet version 3 and later
 	for id in cases.keys():
-		eq(CaseDB.validate_case(cases[id], rules, sheet), [], "%s validates against the sheet's house rule" % id)
+		eq(CaseDB.validate_case(cases[id], rules, sheet, parts), [], "%s validates against the sheet's house rule" % id)
 	c = (cases["rook"] as Dictionary).duplicate(true)
 	c["outcomes"].erase("gave_up")
-	ok(has_error(CaseDB.validate_case(c, rules), "outcomes.gave_up"), "every patient needs a slip for leaving unanswered")
+	ok(has_error(CaseDB.validate_case(c, rules, {}, parts), "outcomes.gave_up"), "every patient needs a slip for leaving unanswered")
 	c = (cases["maren"] as Dictionary).duplicate(true)
 	c["exit"].erase("gave_up")
-	ok(has_error(CaseDB.validate_case(c, rules), "exit.gave_up"), "and a parting line")
+	ok(has_error(CaseDB.validate_case(c, rules, {}, parts), "exit.gave_up"), "and a parting line")
 	c = (cases["vale"] as Dictionary).duplicate(true)
 	for row in ["port", "speech", "temper"]:
 		c["rows"][row]["ok"] = true
-	ok(has_error(CaseDB.validate_case(c, rules, sheet), "broken sheet lines"), "a drifting patient with fewer broken lines than the house rule is caught")
-	ok(not has_error(CaseDB.validate_case(c, rules), "broken sheet lines"), "without a sheet, one broken line is all that is asked")
+	ok(has_error(CaseDB.validate_case(c, rules, sheet, parts), "broken sheet lines"), "a drifting patient with fewer broken lines than the house rule is caught")
+	ok(not has_error(CaseDB.validate_case(c, rules, {}, parts), "broken sheet lines"), "without a sheet, one broken line is all that is asked")
 	c = (cases["juno"] as Dictionary).duplicate(true)
 	c["lines"].erase("code")
-	ok(has_error(CaseDB.validate_case(c, rules), "lines.code"), "every visitor needs a reply to a wrong code")
+	ok(has_error(CaseDB.validate_case(c, rules, {}, parts), "lines.code"), "every visitor needs a reply to a wrong code")
 	c = (cases["rook"] as Dictionary).duplicate(true)
 	c.erase("flare")
-	ok(has_error(CaseDB.validate_case(c, rules), "flare must be"), "and a flare")
+	ok(has_error(CaseDB.validate_case(c, rules, {}, parts), "flare must be"), "and a flare")
 	c = (cases["maren"] as Dictionary).duplicate(true)
 	c["attack"]["line"] = ""
-	ok(has_error(CaseDB.validate_case(c, rules), "can snap"), "a drifting patient who can snap needs an attack line")
+	ok(has_error(CaseDB.validate_case(c, rules, {}, parts), "can snap"), "a drifting patient who can snap needs an attack line")
 	eq(CaseDB.validate_rules(rules), [], "the shipped rules validate")
 	eq(CaseDB.validate_sheet(sheet), [], "the shipped sheet validates")
 	var bad_odds := rules.duplicate(true)

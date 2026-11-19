@@ -11,14 +11,19 @@ Screen layout (640 x 360):
   left wall     0,0    100 x 300   pinboard (reference sheet, contact list), lender's meter, hall monitor
   right wall  540,0    100 x 300   pinboard (intake card, counter guide), control plate with four pads
   desk          0,300  640 x 60    tool mat, transcript (drawn by the game), talk mat
+
+The words painted here (HALL CAM, the headers of the four things) are in words.py: each picture
+with words in it is written in every language, the twin as <name>_<code>.png (booth_zh.png).
 """
 import os
 
 import numpy as np
 
+import font_zh
 from font_data import draw_text, text_width
 from gen_ui import pad, shadow
 from px import ASSETS, OUT, Canvas, from_image
+from words import LANGS, say, twin
 
 WIN = (100, 0, 440, 300)
 METER = (6, 172, 88, 48)          # the lender's meter: the lit face the game writes on
@@ -90,14 +95,14 @@ def meter(c):
             c.px(sx, sy, "steel3")
 
 
-def thumb(c):
+def thumb(c, lang="en"):
     x, y, w, h = THUMB
     hous = c.rrect(2, y - 6, 97, y + h + 19, 4)
     c.shade(hous, "steel_dark", light=(0.7, 0.5), contrast=0.8, round_px=5, round_amt=0.5, bias=-0.06)
     c.outline("ink0", hous)
     c.fill(c.rrect(x - 3, y - 3, x + w + 2, y + h + 2, 2), "ink0")
     c.fill(c.rect(x, y, x + w - 1, y + h - 1), "grn0")
-    draw_text(c, 7, y + h + 5, "HALL CAM", "steel3")
+    font_zh.draw_label(c, 7, y + h + 5, say("hall_cam", lang), "steel3")
     c.fill(c.ell(80, y + h + 11, 2.2, 2.2), "steel2")
     c.px(80, y + h + 10, "steel4")
     c.px(89, y + h + 11, "grn4")
@@ -172,13 +177,13 @@ def lamp(c):
         c.fill(c.rect(124 + i * 9, 236 + i * 3, 125 + i * 9, 250 + i * 4), "warm0")
 
 
-def booth():
+def booth(lang="en"):
     c = Canvas(640, 360)
     walls(c)
     pinboard(c, 4, 4, 91, 164, 120)
     pinboard(c, 548, 4, 623, 184, 520)
     meter(c)
-    thumb(c)
+    thumb(c, lang)
     controls(c)
     desk(c)
     lamp(c)
@@ -190,7 +195,7 @@ def booth():
 
 
 # ------------------------------------------------------------------ things that open
-def obj_sheet():
+def obj_sheet(lang="en"):
     """The reference sheet as it hangs on the board: small, but plainly a printed form."""
     c = Canvas(80, 92)
     yy, xx = c.grid()
@@ -202,7 +207,8 @@ def obj_sheet():
     c.fill(c.rect(75, 3, 75, 88), "paper1")
     c.fill(c.rect(2, 3, 75, 14), "teal4")
     c.fill(c.rect(2, 14, 75, 14), "teal2")
-    draw_text(c, 39 - text_width("NORMAL", True) // 2, 4, "NORMAL", "paper4", bold=True)
+    word = say("sheet", lang)
+    font_zh.draw_label(c, 39 - font_zh.text_width(word, True) // 2, 4, word, "paper4", bold=True)
     eye = c.ell(19, 28, 11, 6)
     c.fill(eye, "paper4")
     c.outline("inkt", eye)
@@ -223,7 +229,7 @@ def obj_sheet():
     return c
 
 
-def obj_card():
+def obj_card(lang="en"):
     """The intake card on its clipboard, hung by the clip."""
     c = Canvas(80, 104)
     yy, xx = c.grid()
@@ -239,7 +245,7 @@ def obj_card():
     c.dither(p, "manila2", np.clip(xx / 80.0 * 0.4 + yy / 104.0 * 0.3 - 0.15, 0, 0.55))
     c.fill(c.rect(8, 95, 70, 95), "manila1")
     c.fill(c.rect(70, 16, 70, 95), "manila1")
-    draw_text(c, 11, 18, "INTAKE", "inkt", bold=True)
+    font_zh.draw_label(c, 11, 18, say("card", lang), "inkt", bold=True)
     c.fill(c.rect(11, 29, 44, 29), "inks")
     # the decision box, still empty
     box = c.rect(49, 19, 67, 30)
@@ -263,7 +269,7 @@ def obj_card():
     return c
 
 
-def obj_guide():
+def obj_guide(lang="en"):
     """The counter guide: a thin booklet on a string."""
     c = Canvas(80, 46)
     c.line([(40, 0), (22, 9)], "paper1", 1)
@@ -277,8 +283,9 @@ def obj_guide():
     c.outline("ink0", cover)
     c.fill(c.rect(74, 11, 75, 43), "paper2")
     c.fill(c.rect(8, 43, 75, 44), "paper1")
-    draw_text(c, 17, 13, "COUNTER", "paper3", bold=True)
-    draw_text(c, 17, 25, "GUIDE", "paper3", bold=True)
+    top, bottom = say("guide", lang)
+    font_zh.draw_label(c, 17, 13, top, "paper3", bold=True)
+    font_zh.draw_label(c, 17, 25, bottom, "paper3", bold=True)
     q = c.ell(62, 29, 7, 7)
     c.fill(q, "amber")
     c.outline("ink0", q)
@@ -286,7 +293,7 @@ def obj_guide():
     return c
 
 
-def obj_list():
+def obj_list(lang="en"):
     """Tonight's contacts: a strip of tractor-feed printout under a red tack, the Lanterns'
     paper lantern stamped in the corner. The handler pins a fresh one up every night."""
     c = Canvas(80, 46)
@@ -305,9 +312,10 @@ def obj_list():
     # the header in lantern red
     c.fill(c.rect(12, 5, 67, 16), "red1")
     c.fill(c.rect(12, 17, 67, 17), "red0")
-    tw = text_width("CONTACTS", True)
+    word = say("list", lang)
+    tw = font_zh.text_width(word, True)
     assert tw <= 54, "list header too wide (%d)" % tw
-    draw_text(c, 40 - tw // 2, 6, "CONTACTS", "paper4", bold=True)
+    font_zh.draw_label(c, 40 - tw // 2, 6, word, "paper4", bold=True)
     # two printed entries: an alias, then its lines
     for i, y in enumerate((21, 32)):
         c.fill(c.rect(14, y, 14 + (24, 30)[i], y + 1), "inkt")
@@ -377,6 +385,11 @@ def main():
               "pad_w": pad(40, 54), "pad_w_hot": pad(40, 54, hot=True)}
     for name, canvas in things.items():
         canvas.save("ui/%s.png" % name)
+    worded = {"obj_sheet": obj_sheet, "obj_card": obj_card, "obj_guide": obj_guide, "obj_list": obj_list}
+    for lang in LANGS[1:]:                  # the pictures with words in them, in each other language
+        booth(lang).save(twin("clinic/booth.png", lang))
+        for name, make in worded.items():
+            make(lang).save(twin("ui/%s.png" % name, lang))
 
     # review composite: the empty counter with everything hung where the game hangs it
     comp = Canvas(640, 360, "ink0")

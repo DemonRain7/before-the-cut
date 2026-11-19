@@ -17,6 +17,7 @@ extends Node2D
 ## meter) is lettered over it in screen pixels.
 
 const Gfx = preload("res://scripts/ui/gfx.gd")
+const Lang = preload("res://scripts/core/lang.gd")
 
 signal completed(tool: String)
 
@@ -44,7 +45,7 @@ var caption: String = ""
 var result: String = ""
 var done: bool = false
 var standard: String = ""         # the sheet's normal line for this tool (set before open)
-var limit_s: float = 1.0          # rules.json grip.limit_ms: the release the sheet allows
+var limit_s: float = 1.0          # the release the sheet allows: the hands model's limit (set before open)
 
 var _case: Dictionary = {}
 var _pid: String = ""
@@ -201,13 +202,18 @@ func _build_eyes() -> void:
 		var spec: Dictionary = eyes.get(side, {})
 		var pos: Vector2 = EYE_R if side == "right" else EYE_L
 		var kind := str(spec.get("kind", "natural"))
+		# what light should do to this model (case_db resolve_parts): a natural pupil, a combat
+		# shutter, or nothing to tighten
+		var react := str(spec.get("pupil", "tightens" if kind == "natural" else "none"))
+		var tightens := bool(spec.get("tightens", react != "none"))
 		var iris := _layer("scope/%s/iris_%s.png" % [_pid, "r" if side == "right" else "l"], pos - Vector2(24, 24))
 		var pupil: Sprite2D = null
-		if kind == "natural":
+		# a shutter that never snaps is drawn as the optic itself, the way its art has it
+		if react == "tightens" or (react == "shutter" and tightens):
 			pupil = _layer("scope/pupil_9.png", pos - Vector2(12, 12))
 		_eyes.append({
-			"pos": pos, "kind": kind,
-			"tightens": bool(spec.get("tightens", true)), "follows": bool(spec.get("follows", true)),
+			"pos": pos, "kind": kind, "react": react, "tag": str(spec.get("tag", "")),
+			"tightens": tightens, "follows": bool(spec.get("follows", true)),
 			"off": Vector2.ZERO, "size": PUPIL_WIDE, "lit": 0.0, "iris": iris, "pupil": pupil,
 		})
 	_layer("scope/%s/eyes_front.png" % _pid)
@@ -375,8 +381,10 @@ func _draw_hud() -> void:
 		Gfx.text(_hud, sp.position + Vector2(10.0 + Gfx.text_w("SHEET", true), 1), standard, Gfx.TEAL7)
 
 
-## Under each eye, once it has had the light long enough: did the pupil tighten (an implant
-## has none), and did the eye follow. The patient's right eye is on the left of the screen.
+## Under each eye, once it has had the light long enough: which model it is, what its pupil or
+## shutter did (some models have neither), and did the eye follow. It reports and never
+## judges: the sheet says what this model should do. The patient's right eye is on the left of
+## the screen.
 func _draw_eye_readouts() -> void:
 	for e in _eyes:
 		var eye: Dictionary = e
@@ -385,14 +393,26 @@ func _draw_eye_readouts() -> void:
 		var pos: Vector2 = eye["pos"]
 		var at := ORIGIN + pos * SCALE + Vector2(0, 54)
 		var head := "RIGHT EYE" if pos == EYE_R else "LEFT EYE"
-		var what := "IMPLANT"
-		if str(eye["kind"]) == "natural":
-			what = "TIGHTENS" if bool(eye["tightens"]) else "STAYS WIDE"
-		what += ", FOLLOWS" if bool(eye["follows"]) else ", DOESN'T FOLLOW"
-		var w := maxf(Gfx.text_w(head, true), Gfx.text_w(what)) + 10.0
+		var tag := str(eye["tag"])
+		var what := ""
+		match str(eye["react"]):
+			"none":
+				what = "NO PUPIL"
+			"shutter":
+				what = "SHUTTER SNAPS" if bool(eye["tightens"]) else "SHUTTER OPEN"
+			_:
+				what = "TIGHTENS" if bool(eye["tightens"]) else "STAYS WIDE"
+		# each piece in the player's language: the catalogs have the pieces, not every pairing
+		what = Lang.t(what) + Lang.t(", FOLLOWS" if bool(eye["follows"]) else ", DOESN'T FOLLOW")
+		var head_w := Gfx.text_w(head, true)
+		var tag_w := (Gfx.text_w(tag, true) + 5.0) if tag != "" else 0.0
+		var w := maxf(head_w + tag_w, Gfx.text_w(what)) + 10.0
 		var r := Rect2(roundf(at.x - w / 2.0), at.y, w, 23)
 		_hud.draw_rect(r, PLATE)
-		Gfx.text_center(_hud, at.x, r.position.y + 1.0, head, Gfx.TEAL5, true)
+		var x := roundf(at.x - (head_w + tag_w) / 2.0)
+		Gfx.text(_hud, Vector2(x, r.position.y + 1.0), head, Gfx.TEAL5, true)
+		if tag != "":
+			Gfx.text(_hud, Vector2(x + head_w + 5.0, r.position.y + 1.0), tag, Gfx.AMBER, true)
 		Gfx.text_center(_hud, at.x, r.position.y + 11.0, what, Gfx.WARM7)
 
 
@@ -436,6 +456,6 @@ func _draw_grip_readout() -> void:
 	# the mark carries its own value and the far end of the scale has none, so the one number
 	# printed on the scale is the limit ("LIMIT 2s" at the end once read as a two-second limit)
 	Gfx.text(_hud, Vector2(x0, r.position.y + 33.0), "0", Gfx.TEAL5)
-	var tag := "LIMIT %ss" % ("%.1f" % limit_s).trim_suffix(".0")
+	var tag := Lang.tf("LIMIT %ss", [("%.1f" % limit_s).trim_suffix(".0")])
 	var half := Gfx.text_w(tag) * 0.5
 	Gfx.text_center(_hud, clampf(x0 + at, x0 + 6.0 + half, x0 + w - half), r.position.y + 33.0, tag, Gfx.AMBER)

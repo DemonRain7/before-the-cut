@@ -16,16 +16,17 @@
     "H-hey, doc. Don't mind the st-static.",
     "My voice box skips. I sing for rent. Can you swap it tonight?"
   ],
+  "parts": {"eye_l": "iris", "eye_r": "iris", "hands": "deft", "port": "street", "voice": "vx"},
   "eyes": {
-    "left": {"kind": "display", "tightens": false, "follows": true},
-    "right": {"kind": "display", "tightens": false, "follows": true}
+    "left": {"tightens": false, "follows": true},
+    "right": {"tightens": false, "follows": true}
   },
   "grip": {"release_ms": 400, "tremor": 0},
   "port": {"covered": false},
   "idle": {"hands": "tap", "gaze": "wander"},
   "looks": {
-    "eyes": "Display eyes: small screens, glyphs flicker.",
-    "hands": "Chrome fingers tap a beat, always in time.",
+    "eyes": "IRIS display eyes. Glyphs flicker.",
+    "hands": "DEFT implant fingers tap a beat, in time.",
     "port": "Neck port: scars, four jacks, a cable burn."
   },
   "checks": {
@@ -82,9 +83,9 @@
     "gave_up": "T-time's up, doc. I've got a set."
   },
   "rows": {
-    "eyes": {"ok": true, "text": "Display eyes never tighten: they are implants. Both followed the light.",
+    "eyes": {"ok": true, "text": "IRIS screens have no pupils. Both followed the light.",
       "evidence": ["check:penlight"]},
-    "hands": {"ok": true, "text": "Chrome, quick and clean.", "evidence": ["check:grip"]},
+    "hands": {"ok": true, "text": "Let go in 0.4 s, inside the DEFT limit of 0.5.", "evidence": ["check:grip"]},
     "port": {"ok": true, "text": "Scars and a cable burn are ordinary. No threads.",
       "evidence": ["look:port", "check:port"]},
     "speech": {"ok": true, "text": "The stutter is the voice box. Every line is 'I' and 'my'.",

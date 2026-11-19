@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { DEFAULT_LIMITS, PROTOCOL, buildPrompt, createHandler, validateResponse, validateRequest } from "../src/core.mjs";
-import { createGoogleProvider, createMockProvider } from "../src/providers.mjs";
+import { MOCK_TRANSCRIPT_ZH, createGoogleProvider, createMockProvider } from "../src/providers.mjs";
 import { loadGameData, startServer } from "../src/dev_server.mjs";
 const { cases, rules } = loadGameData();
 let serial = 0;
@@ -18,6 +18,33 @@ test("five current cases and matching game limits",()=>{
  assert.equal(DEFAULT_LIMITS.maxLineChars,rules.agent.max_line_chars); assert.ok(DEFAULT_LIMITS.upstreamTimeoutMs<rules.agent.timeout_ms);
  assert.equal(DEFAULT_LIMITS.maxReplyChars,rules.agent.max_reply_chars); assert.ok(DEFAULT_LIMITS.maxReplyChars>=DEFAULT_LIMITS.maxLineChars);
  assert.ok(DEFAULT_LIMITS.maxCallsPerSession>=DEFAULT_LIMITS.maxCallsPerVisit*rules.shift_order.length);
+});
+test("Chinese: the game's own smaller numbers, a prompt asking for Chinese, and no language the game lacks",async()=>{
+ const zhRules=rules.agent.languages.zh, zhLim=DEFAULT_LIMITS.languages.zh;
+ assert.equal(zhLim.maxLineChars,zhRules.max_line_chars); assert.equal(zhLim.maxReplyChars,zhRules.max_reply_chars);
+ assert.ok(zhLim.maxReplyChars>=zhLim.maxLineChars);
+ const en=validateRequest(body(),cases).req; assert.equal(en.language,"en","a request that names no language is English");
+ const ep=buildPrompt(cases.kip,rules,en,110).system;
+ assert.ok(ep.includes("Reply in English. Write original")&&ep.includes("reply: 1-110 characters; reaction: 0-110 characters"));
+ const zb=body(); zb.language="zh"; zb.limits.max_line_chars=zhRules.max_line_chars;
+ const zr=validateRequest(zb,cases).req; assert.equal(zr.language,"zh");
+ const zp=buildPrompt(cases.kip,rules,zr,zhRules.max_line_chars).system;
+ assert.ok(zp.includes("Reply in Simplified Chinese")&&!zp.includes("Reply in English"));
+ assert.ok(zp.includes(`reply: 1-${zhRules.max_line_chars} characters; reaction: 0-${zhRules.max_line_chars} characters`));
+ for(const v of ["fr","ZH","",7,null,["zh"]]){const b=body();b.language=v;assert.equal(validateRequest(b,cases).ok,false,`language ${JSON.stringify(v)}`);}
+ // a reply the strip shows whole in English is too long for it in Chinese
+ const long="好".repeat(zhLim.maxReplyChars+1);
+ const {post,logs}=handler(fixture({reply:long,reaction:""}));
+ const zh=body(); zh.language="zh"; const refused=await post(zh);
+ assert.equal(refused.status,422); assert.equal(refused.body.error.message,"reply_too_long");
+ assert.equal((await post(body())).status,200);
+ assert.equal(logs[0].language,"zh"); assert.equal(logs[1].language,"en");
+ // the mock answers a Chinese request in Chinese, and writes a Chinese clip down in Chinese
+ const mock=handler(createMockProvider());
+ const said=await mock.post(zh); assert.equal(said.status,200); assert.ok(/[\u4e00-\u9fff]/.test(said.body.reply));
+ assert.ok(!/[\u4e00-\u9fff]/.test((await mock.post(body())).body.reply));
+ const clip=await createMockProvider().transcribe({language:"zh"},new AbortController().signal);
+ assert.equal(clip.text,MOCK_TRANSCRIPT_ZH);
 });
 test("a whole visit of conversation fits: history up to the cap is accepted, one more turn is not",()=>{
  const full=body();full.conversation_history=new Array(DEFAULT_LIMITS.maxHistoryTurns).fill({role:"patient",text:"Hi"});

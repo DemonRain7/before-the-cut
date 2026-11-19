@@ -4,6 +4,7 @@ extends RefCounted
 
 const ScriptedBrain = preload("res://scripts/core/scripted_brain.gd")
 const ResponseValidator = preload("res://scripts/core/move_validator.gd")
+const Lang = preload("res://scripts/core/lang.gd")
 const GAME_VERSION := "0.3.0"
 const MAX_HISTORY := 48          # turns kept for the model: a whole visit at the call cap
 
@@ -17,6 +18,7 @@ var scripted: ScriptedBrain
 var max_calls: int = 16
 var max_line_chars: int = 110    # what the patient model is asked to keep a reply within
 var max_reply_chars: int = 220   # what the strip can show (two pages); only longer is a failed reply
+var languages: Dictionary = {}   # rules.json agent.languages: other numbers in another language
 var calls_this_visit: int = 0
 var fallbacks_this_visit: int = 0
 var max_voice_clips: int = 24    # push-to-talk clips sent for their words, per visit
@@ -33,9 +35,27 @@ func _init(p_rules: Dictionary = {}, p_client: Variant = null, p_seed: int = 0) 
 	max_calls = int(limits.get("max_model_calls_per_visit", 16))
 	max_line_chars = int(limits.get("max_line_chars", 110))
 	max_reply_chars = maxi(max_line_chars, int(limits.get("max_reply_chars", 220)))
+	var own: Variant = limits.get("languages", {})
+	languages = own if typeof(own) == TYPE_DICTIONARY else {}
 	var voice: Dictionary = limits.get("voice", {})
 	max_voice_clips = int(voice.get("max_clips_per_visit", 24))
 	scripted = ScriptedBrain.new(p_seed)
+
+
+## The two lengths in the player's language. A hanzi takes the room of two letters on the strip,
+## so Chinese has smaller numbers of its own (rules.json agent.languages, and the same numbers in
+## agent_proxy DEFAULT_LIMITS.languages).
+func line_chars() -> int:
+	return int(_own_limits().get("max_line_chars", max_line_chars))
+
+
+func reply_chars() -> int:
+	return maxi(line_chars(), int(_own_limits().get("max_reply_chars", max_reply_chars)))
+
+
+func _own_limits() -> Dictionary:
+	var v: Variant = languages.get(Lang.code, {})
+	return v if typeof(v) == TYPE_DICTIONARY else {}
 
 
 func set_mode(p_mode: String) -> void:
@@ -51,8 +71,9 @@ func begin_visit(p_case: Dictionary, p_visit_id: String, p_seed: int) -> void:
 	voice_clips_this_visit = 0
 	last = {}
 	conversation_history = []
+	# the history is what the doctor saw: the authored lines in the player's language
 	for line in case_data.get("opening", []):
-		conversation_history.append({"role": "patient", "text": str(line)})
+		conversation_history.append({"role": "patient", "text": Lang.t(str(line))})
 	scripted.reseed(p_seed)
 
 
@@ -76,7 +97,7 @@ func decide(event: Dictionary, state: Dictionary, fallback_options: Array = []) 
 		base["fallback_reason"] = str(resp.get("error", "error"))
 		return _with_script(base, event, state, fallback_options, true)
 	var data: Variant = resp.get("data")
-	var checked := ResponseValidator.validate(data, max_reply_chars, str(event.get("type")) == "check")
+	var checked := ResponseValidator.validate(data, reply_chars(), str(event.get("type")) == "check")
 	if not bool(checked.get("ok", false)):
 		base["fallback_reason"] = "invalid:" + str(checked.get("reason"))
 		return _with_script(base, event, state, fallback_options, true)
@@ -126,10 +147,11 @@ func remember_exchange(event: Dictionary, response: Dictionary) -> void:
 	var text := str(event.get("text", "")).strip_edges()
 	if text != "":
 		conversation_history.append({"role": "doctor", "text": text})
+	# a scripted line was shown in the player's language; a model's words are kept as they came
 	if str(response.get("reaction", "")) != "":
-		conversation_history.append({"role": "reaction", "text": str(response.reaction)})
+		conversation_history.append({"role": "reaction", "text": Lang.t(str(response.reaction))})
 	if str(response.get("reply", "")) != "":
-		conversation_history.append({"role": "patient", "text": str(response.reply)})
+		conversation_history.append({"role": "patient", "text": Lang.t(str(response.reply))})
 	while conversation_history.size() > MAX_HISTORY:
 		conversation_history.pop_front()
 
@@ -161,7 +183,7 @@ func transcribe(wav: PackedByteArray) -> Dictionary:
 
 
 func build_voice_payload(wav: PackedByteArray) -> Dictionary:
-	return {"protocol": "3", "session_id": session_id, "visit_id": visit_id,
+	return {"protocol": "3", "session_id": session_id, "visit_id": visit_id, "language": Lang.code,
 		"audio": {"mime": "audio/wav", "data": Marshalls.raw_to_base64(wav)},
 		"client": {"game": "before-the-cut", "version": GAME_VERSION}}
 
@@ -171,5 +193,6 @@ func build_payload(event: Dictionary, state: Dictionary) -> Dictionary:
 		"case_id": str(case_data.get("id", "")), "case_version": int(case_data.get("version", 2)),
 		"event": event.duplicate(true), "state": state.duplicate(true),
 		"conversation_history": conversation_history.duplicate(true),
-		"limits": {"max_line_chars": max_line_chars},
+		"language": Lang.code,
+		"limits": {"max_line_chars": line_chars()},
 		"client": {"game": "before-the-cut", "version": GAME_VERSION}}

@@ -3,6 +3,8 @@ the two responders who come in through the hall door.
 
 Run from tools/art:  python gen_team.py
 
+The imprint's words are in words.py: it is written in every language (ink_refer_zh.png).
+
 The crew is our own design: dark armour, an amber visor bar and a teal pulse-line badge,
 seen against the street light of the open door. No emblem or outfit is taken from another
 game, and the medical cross is deliberately not used.
@@ -11,11 +13,12 @@ import os
 
 import numpy as np
 
-from font_data import text_width
+import font_zh
 from gen_clinic import HOLE, hall, hall_door_open, text_mask
 from gen_ui import IH, IW, OUTLINE, shadow
 from people import grow, smooth, stroke
 from px import OUT, Canvas, bayer, contact_sheet
+from words import LANGS, say, twin
 
 PULSE = [(0, 4), (4, 4), (6, 0), (9, 8), (11, 2), (13, 4), (18, 4)]     # the badge: one heartbeat
 TEAM_POS = (104, 26)             # where team.png sits inside the window opening when they are in
@@ -67,7 +70,7 @@ def call_box(armed=False):
     return c
 
 
-def ink_team(color="c8281c", w=76, h=24, seed=5):
+def ink_team(color="c8281c", w=76, h=24, seed=5, lang="en"):
     """The dispatch imprint that lands on the intake card when the call goes out."""
     c = Canvas(w, h)
     frame = c.rrect(0, 0, w - 1, h - 1, 3) & ~c.rrect(2, 2, w - 3, h - 3, 2)
@@ -75,8 +78,11 @@ def ink_team(color="c8281c", w=76, h=24, seed=5):
     beat = c.seg(pulse_pts(6, 8, 0.84, 0.9), 1)
     beat |= np.roll(beat, 1, axis=0)
     tx = 27
-    words = text_mask(w, h, tx, 2, "TRAUMA", bold=True) | text_mask(w, h, tx, 12, "TEAM", bold=True)
-    rule = c.rect(tx + text_width("TEAM", True) + 4, 15, w - 6, 16) | c.rect(tx + text_width("TEAM", True) + 4, 19, w - 12, 19)
+    top, bottom = say("team", lang)
+    ty = 2 if lang == "en" else 3           # a hanzi is two rows taller: clear of the frame
+    words = text_mask(w, h, tx, ty, top, bold=True) | text_mask(w, h, tx, ty + 10, bottom, bold=True)
+    rx = tx + font_zh.text_width(bottom, True) + 4
+    rule = c.rect(rx, 15, w - 6, 16) | c.rect(rx, 19, w - 12, 19)
     m = frame | ring | (beat & c.ell(13.5, 11.5, 6.9, 6.9)) | words | rule
     rng = np.random.default_rng(seed)
     noise = rng.random((h, w))
@@ -191,6 +197,8 @@ def main():
     cba.save("ui/call_team_armed.png")
     ink = ink_team()
     ink.save("ui/ink_refer.png")
+    for lang in LANGS[1:]:                  # its words in each other language
+        ink_team(lang=lang).save(twin("ui/ink_refer.png", lang))
     body, lights, red, blue = team()
     body.save("clinic/team.png")
     lights.save("clinic/team_lights.png")

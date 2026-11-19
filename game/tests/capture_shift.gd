@@ -63,6 +63,7 @@ const VisitState = preload("res://scripts/core/visit_state.gd")
 const ShiftState = preload("res://scripts/core/shift_state.gd")
 const PlayDriver = preload("res://tests/play_driver.gd")
 const Gfx = preload("res://scripts/ui/gfx.gd")
+const Lang = preload("res://scripts/core/lang.gd")
 
 const REST := Vector2(200, 262)    # a place for the pointer where it rests on nothing: the hall, left of the visitor
 const REST_RIGHT := Vector2(470, 262)   # the same on the other side, for when the big screen is on
@@ -97,11 +98,14 @@ class StandInClient:
 
 	func request_transcript(_payload: Dictionary) -> Dictionary:
 		await released
-		return {"ok": true, "http_code": 200, "data": {"text": "This is a mock transcript. No speech service heard you.",
-			"meta": {"mock": true, "provider": "stand-in"}}}
+		# what the doctor "said", so in the doctor's language (agent_proxy providers.mjs: MOCK_TRANSCRIPT, _ZH)
+		var said := "这是模拟转写，没有语音服务听到你说话。" if Lang.code == "zh" else "This is a mock transcript. No speech service heard you."
+		return {"ok": true, "http_code": 200, "data": {"text": said, "meta": {"mock": true, "provider": "stand-in"}}}
 
 
 func _initialize() -> void:
+	# English, unless --lang=<code> asks for another language; a saved choice never reaches a run
+	Lang.pin(Lang.asked("en"))
 	output_dir = ProjectSettings.globalize_path("res://../validation/captures")
 	for arg in OS.get_cmdline_user_args():
 		var a := str(arg)
@@ -740,7 +744,7 @@ func kip() -> void:
 	await close_scope()
 	d.move(d.pad_pos("calm"))
 	await d.seconds(0.45)
-	reached(main.coach.is_showing() and main.coach.current() == "talk" and str(main.desk.badges.get("calm", "")) == "30cr",
+	reached(main.coach.is_showing() and main.coach.current() == "talk" and str(main.desk.badges.get("calm", "")) == Lang.tf("%dcr", [30]),
 		"kip: the tip about talking, and CALM's price on its pad")
 	await shot("training-11-talk")
 	d.click(main.coach.next_rect().get_center())
@@ -919,7 +923,7 @@ func juno() -> void:
 	rest()
 	await d.seconds(0.3)
 	reached(main.visit != null and main.visit.codes_wrong == 1 and main.visit.patience == before - 1 and not main.visit.dropped
-		and main._base_hint == MainScript.CODE_BLANK_HINT % 1, "juno: Maren's code gets a blank look and costs a lamp")
+		and main._base_hint == Lang.tf(MainScript.CODE_BLANK_HINT, [1]), "juno: Maren's code gets a blank look and costs a lamp")
 	await shot("juno-wrong-code")
 	d.hang_list()
 	d.hang_card()

@@ -6,6 +6,10 @@ extends SceneTree
 ## is: the contact list and the paid CALM, the snaps and flares, and the first-night training.
 ## Run from the repository root:
 ##   godot --headless --path game --script res://tests/run_ui_smoke.gd
+##   godot --headless --path game --script res://tests/run_ui_smoke.gd -- --lang=zh   (in Chinese)
+## Words are compared as the player reads them: the English line through Lang.t, Lang.tf or
+## Lang.fill, the way the game shows it. In another language the run plays the same nine
+## shifts in it and fails on any English that reached the screen untranslated.
 ## Exit code 0 = all passed, 1 = at least one check failed, 2 = the run did not finish.
 ## This is an automated run. It is not a playtest, and its log says so.
 
@@ -14,6 +18,7 @@ const VisitState = preload("res://scripts/core/visit_state.gd")
 const ShiftState = preload("res://scripts/core/shift_state.gd")
 const PlayDriver = preload("res://tests/play_driver.gd")
 const Gfx = preload("res://scripts/ui/gfx.gd")
+const Lang = preload("res://scripts/core/lang.gd")
 
 const SPEED := 4.0
 
@@ -38,6 +43,9 @@ class SlowClient:
 
 
 func _initialize() -> void:
+	# English, unless --lang=<code> asks for another language; a saved choice never reaches a run
+	Lang.pin(Lang.asked("en"))
+	Lang.record = Lang.code != "en"      # in another language: note the words that reach the screen untranslated
 	# If a script error stops the run, nothing would ever call quit(). This makes sure something does.
 	create_timer(900.0, true, false, true).timeout.connect(_on_watchdog)
 	_run()
@@ -91,6 +99,7 @@ func _run() -> void:
 	voice_words()
 	counter_words()
 	check_log(six)
+	untranslated_words()
 	print("")
 	print("RESULT: %d passed, %d failed" % [passed, failed])
 	await d.leave()
@@ -117,6 +126,34 @@ func note_count(v: VisitState, row: String) -> int:
 	return list.size()
 
 
+## The language buttons in the title card's corner: a click on the other language puts the
+## game in it, the clinic's painted words with it, and a click on the first one puts it back.
+## Nothing is saved: the run's language is pinned (Lang.pin), and Lang.save leaves it alone.
+func languages() -> void:
+	var first := Lang.code
+	var other := "zh" if first == "en" else "en"
+	var rects: Dictionary = main.screens.language_rects()
+	check(rects.has("en") and rects.has("zh"), "the title card offers English and Chinese")
+	d.click((rects[other] as Rect2).get_center())
+	check(Lang.code == other and main.state == MainScript.State.TITLE, "a click on the other language switches to it on the title card")
+	check(art(main.clinic._wall) == twin("booth", other) and art(main.clinic._hall) == twin("hall", other)
+		and art(main.clinic._shutter) == twin("shutter", other), "the booth, the hall door and the shutter show their words in it")
+	d.click((rects[first] as Rect2).get_center())
+	check(Lang.code == first and art(main.clinic._wall) == twin("booth", first) and art(main.clinic._shutter) == twin("shutter", first),
+		"a click on the first language puts everything back")
+
+
+## The picture a painted name has in a language: booth in English, booth_zh in Chinese.
+func twin(name: String, code: String) -> String:
+	return name if code == "en" else name + "_" + code
+
+
+## True when the strip shows exactly these words as the player reads them: the English line's
+## translation in another language, broken into the strip's lines the way the strip breaks it.
+func strip_says(box: Variant, text: String) -> bool:
+	return box.lines == Gfx.wrap_text(text, box.TEXT_W)
+
+
 func has_note_text(v: VisitState, row: String, part: String) -> bool:
 	var list: Array = v.notes.get(row, [])
 	for n in list:
@@ -124,6 +161,15 @@ func has_note_text(v: VisitState, row: String, part: String) -> bool:
 		if str(note.get("text", "")).contains(part):
 			return true
 	return false
+
+
+## One row of the sheet on the wall now (case_db sheet_for), or {}.
+func wall_row(id: String) -> Dictionary:
+	for row in main.clipboard.sheet.get("rows", []):
+		var r: Dictionary = row
+		if str(r.get("id", "")) == id:
+			return r
+	return {}
 
 
 func last_record() -> Dictionary:
@@ -419,6 +465,7 @@ func shift_careful() -> void:
 	check(main.state == MainScript.State.TITLE and main.screens.mode == "title", "the game starts on the title card")
 	check(main.data_errors.is_empty(), "the case data loaded without problems")
 	check(main.screens.status_line == main.STATUS_OFFLINE, "the title card says who answers tonight: the authored patient")
+	languages()
 	await the_opening()
 
 	section("Hall camera")
@@ -429,6 +476,8 @@ func shift_careful() -> void:
 	check(main.clinic.line == 120 and not main.clinic.line_under, "the meter shows what the first hour has to bring in")
 	check(main.clinic.glass_left == 3 and main.clinic.glass_max == 3 and main.shift.glass == 3, "the glass is whole at the start of the night")
 	check(int(main.sheet.get("threshold", 0)) == 2, "the reference sheet carries the house rule: two broken lines")
+	check(str(main.clipboard.sheet.get("title", "")) == str(main.sheet.get("title_none", "")) and str(wall_row("eyes").get("tag", "")) == "NATURAL"
+		and is_equal_approx(main._grip_limit_s(), 1.0), "with nobody at the counter the sheet on the wall is the binder's baseline body")
 	check(not d.cam_on() and not d.sheet_down() and not d.card_down(), "nothing hangs in front of the window: the papers and the big screen are on the walls")
 	check(main._base_hint == main.WAIT_HINT, "the hint says how to let the first one in")
 	d.move(d.thumb_pos())
@@ -457,6 +506,9 @@ func shift_careful() -> void:
 	check(main.desk.is_enabled("treat") and main.desk.is_enabled("refer") and main.desk.is_enabled("shutter"),
 		"the stamp, the call box and the shutter are available before anything has been checked")
 	check(main.clipboard.mode == "exam" and main.clinic.show_patience, "the intake card and the patience lamps are showing")
+	check(str(main.clipboard.sheet.get("title", "")) == Lang.fill("REFERENCE SHEET: {name}", {"name": "KIP MARLOW"})
+		and str(wall_row("eyes").get("tag", "")) == Lang.fill("L {tag}", {"tag": "KITE"}) and str(wall_row("port").get("tag", "")) == "STREET",
+		"the sheet on the wall is pulled for his models: a KITE beside a natural eye, a street port")
 	d.move(d.zone_pos("eyes"))
 	await process_frame
 	await process_frame
@@ -473,6 +525,9 @@ func shift_careful() -> void:
 	check(v.seen.has("look:hands") and v.seen.has("look:port"), "hands and port can be looked at the same way")
 	var status: String = await d.request_tool("penlight")
 	check(status == "open", "the penlight close-up opens when he agrees")
+	check(main.clinic.scope.standard == str(wall_row("eyes").get("normal", ""))
+		and main.clinic.scope.standard == Lang.fill("L: {l}. R: {r}. Both follow.", {"l": "no pupil", "r": "tightens"}),
+		"the close-up holds up the sheet's line for his two eyes")
 	check(v.patience == v.patience_max - 1, "a first test costs one patience")
 	check(not v.seen.has("check:penlight"), "agreeing is not evidence: nothing is written until the light is used")
 	var done: bool = await d.sweep_eyes()
@@ -481,9 +536,11 @@ func shift_careful() -> void:
 	check(not main.clinic.scope.is_open() and main.desk.active == "", "right-click puts the tool away")
 	status = await d.request_tool("grip")
 	check(status == "open", "the grip bar opens")
+	check(is_equal_approx(main.clinic.scope.limit_s, 1.0), "a natural hand: the LIMIT mark is at 1 s")
 	done = await d.squeeze_and_release()
 	check(done, "hold and release writes the hand result")
-	check(has_note_text(v, "hands", "0.3 s"), "the grip note carries the time the game measured")
+	check(has_note_text(v, "hands", Lang.fill(str(v.case_data["checks"]["grip"]["note"]), {"t": "0.3"})),
+		"the grip note carries the time the game measured")
 	status = await d.request_tool("port")
 	check(status == "open", "an uncovered port can be checked without asking")
 	done = await d.watch_port()
@@ -512,7 +569,7 @@ func shift_careful() -> void:
 	check(int(v.marks.get("eyes", 0)) == 1 and v.ticked() == 1 and v.crossed() == 0, "clicking a mark box ticks it")
 	d.mark("eyes")
 	check(int(v.marks.get("eyes", 0)) == 2 and v.crossed() == 1, "a second click makes it a cross")
-	check(main._base_hint == main.CROSS_SOME_HINT % [1, 2], "the hint counts the doctor's crosses against the house rule")
+	check(main._base_hint == Lang.tf(main.CROSS_SOME_HINT, [1, 2]), "the hint counts the doctor's crosses against the house rule")
 	d.mark("eyes")
 	check(int(v.marks.get("eyes", 0)) == 0 and main._base_hint == "", "the mark cycles back to blank, and the count goes with it")
 	check(v.in_exam() and v.patience == v.patience_max - 4, "marking the record costs nothing and decides nothing")
@@ -544,6 +601,8 @@ func shift_careful() -> void:
 	await d.settle()
 	status = await d.request_tool("grip")
 	check(status == "open", "asked again, he agrees")
+	check(is_equal_approx(main.clinic.scope.limit_s, 1.5) and str(wall_row("hands").get("tag", "")) == "LOADER",
+		"his LOADER rig has its own limit on the sheet and on the close-up: 1.5 s")
 	done = await d.squeeze_and_release()
 	check(done, "his grip result is written")
 	var before: int = v.patience
@@ -599,7 +658,7 @@ func shift_careful() -> void:
 	check(v.outcome == "caught", "one press of SPACE drops the shutter in time")
 	check(v.shutter_grade() == "cracked" and v.blows_taken == 2, "two blows got in first: the stop is graded as cracked")
 	check(main.shift.glass == 1 and main.clinic.glass_left == 1, "each blow cost the glass: one is left for the rest of the night")
-	check(main.clinic.bar_on and main.clinic.bar_text == main.STOP_BLOWS_LINE % 2, "the bar now says how the stop went")
+	check(main.clinic.bar_on and main.clinic.bar_text == Lang.tf(main.STOP_BLOWS_LINE, 2), "the bar now says how the stop went")
 	await process_frame
 	await process_frame
 	check(main._coached.has("glass") and main.dialogue.hint == main.GLASS_COACH_HINT,
@@ -907,13 +966,14 @@ func shift_line_and_glass() -> void:
 		"both decisions, the shutter and CALM still work")
 	check(not main._leave_said and main.clinic.leaving < 0.0, "he finishes his answer first")
 	var said: bool = await d.until(func() -> bool: return main._leave_said, 8.0)
-	check(said and " ".join(main.dialogue.lines) == str(v.case_data["lines"]["spent"]), "then he says he has to go")
+	check(said and strip_says(main.dialogue, str(v.case_data["lines"]["spent"])), "then he says he has to go")
 	await process_frame
 	await process_frame
 	check(main.clinic.leaving > 0.0 and main.clinic.leaving <= 1.0, "the lamps turn into the time that is left")
 	check(main.dialogue.hint == (main.LEAVING_HINT if v.reassure_cost() > 0 else main.LEAVING_FREE_HINT), "the hint says what can still be done")
 	var calm_hint: String = main._pad_hint("calm")
-	check(calm_hint.begins_with("CALM:") and calm_hint.contains("keeps them at the counter") and Gfx.text_w(calm_hint) <= main.dialogue.TEXT_W,
+	check(calm_hint == Lang.tf(main.CALM_FREE_HOLD_HINT, [1, 2]) and calm_hint.begins_with(Lang.t("CALM"))
+		and Gfx.text_w(calm_hint) <= main.dialogue.TEXT_W,
 		"CALM says that it would hold him, under the name printed on the pad, in words that fit the hint row")
 	check(main.LEAVING_HINT.contains("CALM") and main.LEAVING_FREE_HINT.contains("CALM") and main.SHORT_HINT.contains("CALM"),
 		"the hints that send the player to that pad call it by the name printed on it")
@@ -936,7 +996,7 @@ func shift_line_and_glass() -> void:
 	said = await d.until(func() -> bool: return main._leave_said, 8.0)
 	check(said, "he says it again")
 	calm_hint = main._pad_hint("calm")
-	check(calm_hint.ends_with("1 left.") and Gfx.text_w(calm_hint) <= main.dialogue.TEXT_W, "one reassurance is left")
+	check(calm_hint == Lang.tf(main.CALM_FREE_HOLD_HINT, [1, 1]) and Gfx.text_w(calm_hint) <= main.dialogue.TEXT_W, "one reassurance is left")
 	var gone: bool = await d.until(func() -> bool: return v.outcome == "gave_up", 14.0)
 	check(gone and v.verdict_kind == "", "left alone for the whole wait, he walks out, and nobody decided anything")
 	await finish_visit("Kip")
@@ -953,11 +1013,11 @@ func shift_line_and_glass() -> void:
 	await d.settle()
 	d.mark("eyes")
 	d.mark("eyes")
-	check(v.crossed() == 1 and main._base_hint == main.CROSS_SOME_HINT % [1, 2], "one cross: the hint says one alone can be ordinary")
+	check(v.crossed() == 1 and main._base_hint == Lang.tf(main.CROSS_SOME_HINT, [1, 2]), "one cross: the hint says one alone can be ordinary")
 	d.mark("hands")
-	check(v.ticked() == 1 and v.crossed() == 1 and main._base_hint == main.CROSS_SOME_HINT % [1, 2], "a tick on another row does not change the count")
+	check(v.ticked() == 1 and v.crossed() == 1 and main._base_hint == Lang.tf(main.CROSS_SOME_HINT, [1, 2]), "a tick on another row does not change the count")
 	d.mark("hands")
-	check(v.crossed() == 2 and main._base_hint == main.CROSS_RULE_HINT % 2, "two crosses: the hint names the house rule")
+	check(v.crossed() == 2 and main._base_hint == Lang.tf(main.CROSS_RULE_HINT, 2), "two crosses: the hint names the house rule")
 	check(v.in_exam() and main.desk.is_enabled("treat") and v.patience == v.patience_max, "the rule is advice: nothing is decided, locked or paid for")
 	await d.stamp("treat")
 	check(v.outcome == "treated_ok", "TREAT against his own marks")
@@ -976,7 +1036,7 @@ func shift_line_and_glass() -> void:
 	check(struck, "the first blow lands")
 	d.shutter_key()
 	check(v.outcome == "caught" and v.shutter_grade() == "cracked" and v.blows_taken == 1, "stopped after one blow")
-	check(main.clinic.bar_text == main.STOP_BLOW_LINE % 1, "the bar counts it")
+	check(main.clinic.bar_text == Lang.tf(main.STOP_BLOW_LINE, 1), "the bar counts it")
 	check(main.shift.glass == 2 and main.clinic.glass_left == 2 and not main.shift.glass_out, "the glass is down to two")
 	await finish_visit("Vale")
 	check(int(last_record().get("credits", 0)) == 120 and str(last_record().get("grade", "")) == "cracked", "the slip keeps the grade of the stop")
@@ -1310,14 +1370,14 @@ func shift_walls_and_glass() -> void:
 	d.move(d.pad_pos("glass"))
 	await process_frame
 	await process_frame
-	check(main.desk.hover == "glass" and main._cursor_kind == "hand" and main._hover_hint == main.GLASS_HINT % 40,
+	check(main.desk.hover == "glass" and main._cursor_kind == "hand" and main._hover_hint == Lang.tf(main.GLASS_HINT, 40),
 		"pointing at it says what a layer costs and what it buys")
 	d.pad("glass")
 	check(main.shift.glass == 1 and not main.shift.glass_out and main.clinic.glass_left == 1, "a click buys one layer: there is a pane in the frame again")
 	check(main.clinic.glass_state == 2, "it shows the cracks of the two layers still missing")
 	check(main.shift.total() == 630 and main.clinic.till == 630, "40 credits are off the till")
 	check(plan_is([540], 990), "and the next patient who turns has to break it first: 0.99 s")
-	check(main.dialogue.speaker == "GLASS" and " ".join(main.dialogue.lines) == main.GLASS_LINE % [40, 1, 3], "the strip says what was done and what it cost")
+	check(main.dialogue.speaker == "GLASS" and strip_says(main.dialogue, Lang.tf(main.GLASS_LINE, [40, 1, 3])), "the strip says what was done and what it cost")
 	d.key(KEY_G)
 	check(main.shift.glass == 2 and main.clinic.glass_state == 1 and main.shift.total() == 590 and plan_is([540, 990], 1440),
 		"G buys the next one at once: two layers, 590 in the till, 1.44 s")
@@ -1423,7 +1483,7 @@ func shift_couriers() -> void:
 	check(main.shift.contacts.size() == 2 and main.clipboard.contacts.size() == 2 and kip_id != "" and maren_id != "",
 		"two couriers are on tonight's list, Kip's entry and Maren's, and the list on the wall has both")
 	check(main.clinic.line == 240 and main.shift.line_per_hour() == 240, "the meter wants 240 an hour")
-	check(main._shift_line() == main.SHIFT_LIST_LINE % [5, 2, 240], "the night opens by saying how many visitors are on the list")
+	check(main._shift_line() == Lang.tf(main.SHIFT_LIST_LINE, [5, 2, 240]), "the night opens by saying how many visitors are on the list")
 	var lists: Array = logged("contacts")
 	var listed: Dictionary = lists[lists.size() - 1]
 	check(int(listed.get("entries", 0)) == 2 and (listed.get("ids", []) as Array).has(kip_id) and not bool(listed.get("training", true)),
@@ -1458,13 +1518,13 @@ func shift_couriers() -> void:
 	d.move(d.say_pos(maren_id))
 	await process_frame
 	await process_frame
-	check(main.clipboard.say_hover == maren_id and main._hover_hint == main.SAY_CODE_HINT % 1, "the SAY button beside an entry says what a code does")
+	check(main.clipboard.say_hover == maren_id and main._hover_hint == Lang.tf(main.SAY_CODE_HINT, 1), "the SAY button beside an entry says what a code does")
 	var codes_before: int = logged("code").size()
 	await d.say_code(maren_id)
 	var codes: Array = logged("code")
 	check(codes.size() == codes_before + 1 and str(codes[codes.size() - 1].get("result", "")) == "blank", "the log has the code: a blank")
 	check(v.patience == v.patience_max - 1 and v.codes_wrong == 1 and not v.dropped and v.in_exam(), "Maren's code to Kip: a blank look, one patience")
-	check(main._base_hint == main.CODE_BLANK_HINT % 1, "the hint says a wrong code says nothing about the patient")
+	check(main._base_hint == Lang.tf(main.CODE_BLANK_HINT, 1), "the hint says a wrong code says nothing about the patient")
 	await d.settle()
 	d.click(d.say_pos(maren_id))
 	await process_frame
@@ -1478,7 +1538,7 @@ func shift_couriers() -> void:
 	check(shown and main._base_hint == main.DROP_COACH_HINT, "the strip says what came over the counter, and a tip says it changes nothing about the exam")
 	check(main.clipboard.entry_mark(kip_id) == "picked" and not main.clipboard.can_say(maren_id), "his entry is ticked off, and no more codes are said this visit")
 	await d.settle()
-	check(str(main.desk.badges.get("calm", "")) == "30cr" and main._pad_hint("calm") == main.CALM_HINT % [30, 1, 2],
+	check(str(main.desk.badges.get("calm", "")) == Lang.tf("%dcr", [30]) and main._pad_hint("calm") == Lang.tf(main.CALM_HINT, [30, 1, 2]),
 		"the CALM pad shows its price: a calm-patch is 30 credits")
 	await d.reassure()
 	var calms: Array = logged("reassure")
@@ -1491,7 +1551,7 @@ func shift_couriers() -> void:
 	check(printed, "Kip: the result slip prints")
 	var s: Dictionary = main._slip_data
 	check(int(s.get("outcome_credits", 0)) == 250 and int(s.get("credits", 0)) == 520, "the call earns the fee; with the drop and less the patch, 520")
-	check(main._slip_breakdown(s) == main.SLIP_DROP % 300 + "  •  " + main.SLIP_CALM % 30, "under the call the slip says what the drop brought and what CALM cost")
+	check(main._slip_breakdown(s) == Lang.tf(main.SLIP_DROP, 300) + "  •  " + Lang.tf(main.SLIP_CALM, 30), "under the call the slip says what the drop brought and what CALM cost")
 	check(main.clinic.till == main.shift.total() and main.shift.total() == 520, "the till matches: 520")
 	var moved: bool = await d.take_slip()
 	check(moved and main.clipboard.entry_mark(kip_id) == "picked", "Kip: taking the slip moves on, and his entry stays ticked off")
@@ -1520,7 +1580,7 @@ func shift_couriers() -> void:
 	await d.call_team()
 	check(v.outcome == "referred_drifting", "the call hands her over without a fight")
 	printed = await d.wait_for_slip(40.0)
-	check(printed and main._slip_breakdown(main._slip_data) == main.SLIP_NO_DROP % maren_alias, "the slip says her package never came over the counter")
+	check(printed and main._slip_breakdown(main._slip_data) == Lang.tf(main.SLIP_NO_DROP, maren_alias), "the slip says her package never came over the counter")
 	moved = await d.take_slip()
 	check(moved and main.clipboard.entry_mark(maren_id) == "missed", "her entry is marked missed")
 
@@ -1818,11 +1878,24 @@ func typing_line(v: VisitState) -> void:
 	check(box.input_text == "Sleep" and box.input_caret == 0, "the caret moves, and DELETE removes what is under it")
 	d.key(KEY_END)
 	check(box.input_caret == 5, "END goes to the end")
-	d.key(KEY_UNKNOWN, 0x4E2D)
-	d.key(KEY_UNKNOWN, 0xE9)
+	d.key(KEY_UNKNOWN, 0x1F600)
+	d.key(KEY_UNKNOWN, 0x0E01)
 	d.key(KEY_SHIFT)
 	d.key(KEY_F5)
-	check(box.input_text == "Sleep", "keys the counter font cannot draw type nothing")
+	check(box.input_text == "Sleep", "keys no font here can draw type nothing")
+	# what an input method hands over: no key, one character each, drawn by the Chinese font
+	d.key(KEY_NONE, 0x4E2D)
+	d.key(KEY_NONE, 0xFF1F)
+	check(box.input_text == "Sleep中？" and box.input_caret == 7, "characters an input method hands over are typed")
+	box.input_compose("wen", 1)
+	await d.seconds(0.05)
+	check(box.input_text == "Sleep中？" and box.input_ime == "wen", "what it is still putting together is shown, not typed")
+	var foot: Vector2 = box.caret_point()
+	check(foot.y >= box.TEXT_Y + box.TEXT_PITCH and foot.x > box.TEXT_X + 20.0, "its list of candidates opens under the caret")
+	box.input_compose("", 0)
+	d.key(KEY_BACKSPACE)
+	d.key(KEY_BACKSPACE)
+	check(box.input_text == "Sleep" and box.input_ime == "", "and they are taken back like letters")
 	d.type_text("?".repeat(200))
 	check(box.input_text.length() <= box.INPUT_MAX and box._rows.size() <= box.INPUT_LINES, "the line stops when it is full")
 	check(main._base_hint == main.SAY_FULL_HINT, "and the hint says so")
@@ -1853,7 +1926,7 @@ func typing_line(v: VisitState) -> void:
 	var notes_before: int = note_count(v, "speech") + note_count(v, "temper")
 	await d.say("Nice weather tonight.")
 	var dodged: bool = await d.until(func() -> bool: return box.speaker != "YOU" and not main._thinking, 12.0)
-	check(dodged and " ".join(box.lines) == "Uh. Can we skip that one?", "small talk gets his own way of declining")
+	check(dodged and strip_says(box, "Uh. Can we skip that one?"), "small talk gets his own way of declining")
 	check(v.patience == patience - 1 and int(v.asked.get("free", 0)) == 0, "an unanswered sentence costs nothing")
 	check(note_count(v, "speech") + note_count(v, "temper") == notes_before, "and writes nothing on the card")
 	check(main._base_hint == main.SAY_OFFLINE_HINT, "the hint explains that the offline patient only knows its script")
@@ -1872,15 +1945,18 @@ func typing_line(v: VisitState) -> void:
 	check(not box.input_open and main._held == "treat", "so does picking up the stamp")
 	d.right_click()
 	check(main._held == "" and v.in_exam() and v.patience == patience - 1, "none of that cost anything")
-	# a spoken line too long for the strip turns its pages, by itself and by a click
-	var long_line: String = "One two three four five six seven eight nine ten."
+	# a spoken line too long for the strip turns its pages, by itself and by a click. The line is
+	# made up here, in the run's language: Chinese breaks between characters, with no space lost.
+	var sentence: String = "一二三四五六七八九十。" if Lang.code == "zh" else "One two three four five six seven eight nine ten."
+	var gap: String = "" if Lang.code == "zh" else " "
+	var long_line: String = sentence
 	while Gfx.wrap_text(long_line, box.TEXT_W).size() <= 2 * box.PAGE_LINES:      # three pages or more
-		long_line += " One two three four five six seven eight nine ten."
+		long_line += gap + sentence
 	var quiet_spot := Gfx.DIALOGUE.position + Vector2(200, 38)      # on the strip, on nothing that can be pressed
 	main._patient_line(long_line, main._begin_action(), 0.0)
 	await process_frame
 	check(box.lines.size() > 2 * box.PAGE_LINES and box.more and box.typing, "a line too long for the strip is paged")
-	check(" ".join(box.lines) == long_line, "and no word of it is lost in the breaking")
+	check(gap.join(box.lines) == long_line, "and no word of it is lost in the breaking")
 	d.click(quiet_spot)
 	await process_frame
 	await process_frame
@@ -1911,8 +1987,8 @@ func voice_words() -> void:
 		hints.append(main._mic_failure_hint(reason))
 	var fits := 0
 	for h in hints:
-		var text := str(h)
-		if text != "" and Gfx.printable(text) == text and Gfx.text_w(text) <= main.dialogue.TEXT_W:
+		var text := Lang.t(str(h))
+		if text != "" and Gfx.printable(text) == text and Gfx.text_w_raw(text) <= main.dialogue.TEXT_W:
 			fits += 1
 		else:
 			print("  too wide or unprintable: ", text)
@@ -1925,7 +2001,7 @@ func voice_words() -> void:
 	check(main._mic_failure_hint("http_429:budget_exhausted") == main.MIC_HINTS["budget"], "a spent budget is told as that")
 	check(main._mic_failure_hint("http_501:transcription_unavailable") == main.MIC_DEAF_HINT, "a service that cannot hear is told as that")
 	var other: String = main._mic_failure_hint("http_502:provider_error")
-	check(other.contains("(http_502)") and not other.contains("provider_error"), "any other failure shows its short code")
+	check(other.contains("http_502") and not other.contains("provider_error"), "any other failure shows its short code")
 	check(Gfx.text_w(main.screens.HELP) <= 620.0 and Gfx.text_w(main.screens.HELP_VOICE) <= 620.0, "both title help lines fit the screen")
 	var speak_w: float = Gfx.text_w("TAB", true) + Gfx.text_w("SPEAK") + 11.0
 	var type_w: float = Gfx.text_w("T", true) + Gfx.text_w("TYPE") + 11.0
@@ -1942,29 +2018,29 @@ func counter_words() -> void:
 	section("The counter's words fit where they are drawn")
 	var hints: Array = [main.FIRST_HINT, main.SHORT_HINT, main.LEAVING_HINT, main.LEAVING_LAST_HINT, main.NOTE_COACH_HINT,
 		main.NOTE_OPEN_COACH_HINT, main.LAMP_COACH_HINT, main.GLASS_COACH_HINT, main.WAIT_HINT, main.CAM_HINT, main.CAM_PEEK_HINT,
-		main.CAM_OFF_HINT, main.THINK_HINT, main.GLASS_HINT % 40, main.GLASS_HINT % 999, main.GLASS_BUSY_HINT, main.GLASS_WHOLE_HINT,
-		main.GLASS_OFF_HINT, main.CROSS_SOME_HINT % [1, 2], main.CROSS_SOME_HINT % [4, 5], main.CROSS_RULE_HINT % 2, main.CROSS_RULE_HINT % 5]
+		main.CAM_OFF_HINT, main.THINK_HINT, Lang.tf(main.GLASS_HINT, 40), Lang.tf(main.GLASS_HINT, 999), main.GLASS_BUSY_HINT, main.GLASS_WHOLE_HINT,
+		main.GLASS_OFF_HINT, Lang.tf(main.CROSS_SOME_HINT, [1, 2]), Lang.tf(main.CROSS_SOME_HINT, [4, 5]), Lang.tf(main.CROSS_RULE_HINT, 2), Lang.tf(main.CROSS_RULE_HINT, 5)]
 	hints.append_array(main.OBJECT_HINT.values())
 	hints.append_array(main.TAB_HINT.values())
 	# tonight's list, the paid CALM, the surprises and the training
-	hints.append_array([main.LEAVING_FREE_HINT, main.CALM_HINT % [30, 1, 2], main.CALM_HOLD_HINT % [30, 1, 2], main.CALM_GONE_HINT,
-		main.CALM_FREE_HINT % [1, 2], main.CALM_FREE_HOLD_HINT % [1, 2], main.SAY_CODE_HINT % 1, main.CODE_BLANK_HINT % 1,
+	hints.append_array([main.LEAVING_FREE_HINT, Lang.tf(main.CALM_HINT, [30, 1, 2]), Lang.tf(main.CALM_HOLD_HINT, [30, 1, 2]), main.CALM_GONE_HINT,
+		Lang.tf(main.CALM_FREE_HINT, [1, 2]), Lang.tf(main.CALM_FREE_HOLD_HINT, [1, 2]), Lang.tf(main.SAY_CODE_HINT, 1), Lang.tf(main.CODE_BLANK_HINT, 1),
 		main.DROP_COACH_HINT, main.FLARE_COACH_HINT, main.TRAINING_SKIP_HINT, main.TRAINING_NEXT_HINT, main.SWAP_LIST_HINT,
 		main.SWAP_SHEET_HINT])
 	var fits := 0
 	for h in hints:
-		var text := str(h)
-		if text != "" and Gfx.printable(text) == text and Gfx.text_w(text) <= main.dialogue.TEXT_W:
+		var text := Lang.t(str(h))
+		if text != "" and Gfx.printable(text) == text and Gfx.text_w_raw(text) <= main.dialogue.TEXT_W:
 			fits += 1
 		else:
 			print("  too wide or unprintable: ", text)
 	check(fits == hints.size() and fits >= 43, "all %d hints about patience, marks, the walls, the list, CALM and the training fit the hint row" % hints.size())
-	var plates: Array = [main.STOP_CLEAN_LINE, main.STOP_BARE_LINE, main.STOP_LAST_LINE, main.STOP_BLOW_LINE % 1, main.STOP_BLOWS_LINE % 2,
-		main.STOP_BLOWS_LINE % 3]
+	var plates: Array = [main.STOP_CLEAN_LINE, main.STOP_BARE_LINE, main.STOP_LAST_LINE, Lang.tf(main.STOP_BLOW_LINE, 1), Lang.tf(main.STOP_BLOWS_LINE, 2),
+		Lang.tf(main.STOP_BLOWS_LINE, 3)]
 	fits = 0
 	for p in plates:
-		var text := str(p)
-		if Gfx.printable(text) == text and Gfx.text_w(text, true) <= main.clinic.SLOT.size.x - 4.0:
+		var text := Lang.t(str(p))
+		if Gfx.printable(text) == text and Gfx.text_w_raw(text, true) <= main.clinic.SLOT.size.x - 4.0:
 			fits += 1
 		else:
 			print("  too wide for the bar: ", text)
@@ -1973,8 +2049,8 @@ func counter_words() -> void:
 	title.append_array(main.screens.TITLE_LINES)
 	fits = 0
 	for t in title:
-		var text := str(t)
-		if Gfx.printable(text) == text and Gfx.text_w(text) <= 620.0:
+		var text := Lang.t(str(t))
+		if Gfx.printable(text) == text and Gfx.text_w_raw(text) <= 620.0:
 			fits += 1
 		else:
 			print("  too wide for the title card: ", text)
@@ -1985,29 +2061,45 @@ func counter_words() -> void:
 		if Gfx.text_w(main.guide.FOOT) <= main.guide.box_of(i).size.x - main.guide.PAD * 2.0:
 			narrow += 1
 	check(narrow == main.guide.count(), "the guide's key line fits every page's list")
-	var worst_over: String = main.METER_OVER_LINE % [5, 5, 1140, 600]
-	var worst_under: String = main.METER_UNDER_LINE % [5, 5, -950, 600, 1550]
+	var worst_over: String = Lang.tf(main.METER_OVER_LINE, [5, 5, 1140, 600])
+	var worst_under: String = Lang.tf(main.METER_UNDER_LINE, [5, 5, -950, 600, 1550])
 	check(Gfx.wrap_text(worst_over, main.dialogue.TEXT_W).size() <= main.dialogue.PAGE_LINES
 		and Gfx.wrap_text(worst_under, main.dialogue.TEXT_W).size() <= main.dialogue.PAGE_LINES
-		and Gfx.wrap_text(main.SHIFT_LINE % [5, 120], main.dialogue.TEXT_W).size() <= main.dialogue.PAGE_LINES,
+		and Gfx.wrap_text(Lang.tf(main.SHIFT_LINE, [5, 120]), main.dialogue.TEXT_W).size() <= main.dialogue.PAGE_LINES,
 		"the meter's readings and the shift's first line each fit one page of the strip")
-	check(Gfx.wrap_text(main.SHIFT_LIST_LINE % [5, 2, 240], main.dialogue.TEXT_W).size() <= main.dialogue.PAGE_LINES,
+	check(Gfx.wrap_text(Lang.tf(main.SHIFT_LIST_LINE, [5, 2, 240]), main.dialogue.TEXT_W).size() <= main.dialogue.PAGE_LINES,
 		"the first line of a night with a contact list fits one page of the strip")
 	var packages := 0
 	var pool: Array = main.contact_data.get("pool", [])
 	for e in pool:
-		var line: String = main.DROP_LINE % [str((e as Dictionary).get("package", "")), 300]
+		var line: String = Lang.tf(main.DROP_LINE, [Lang.t(str((e as Dictionary).get("package", ""))), 300])
 		if Gfx.printable(line) == line and Gfx.wrap_text(line, main.dialogue.TEXT_W).size() <= main.dialogue.PAGE_LINES:
 			packages += 1
 		else:
 			print("  a package that does not fit one page: ", line)
 	check(pool.size() == 10 and packages == pool.size(), "what each of the ten couriers hands over fits one page of the strip")
-	check(Gfx.wrap_text(main.GLASS_LINE % [40, 3, 3], main.dialogue.TEXT_W).size() <= main.dialogue.PAGE_LINES
-		and Gfx.wrap_text(main.GLASS_LINE % [999, 3, 3], main.dialogue.TEXT_W).size() <= main.dialogue.PAGE_LINES,
+	check(Gfx.wrap_text(Lang.tf(main.GLASS_LINE, [40, 3, 3]), main.dialogue.TEXT_W).size() <= main.dialogue.PAGE_LINES
+		and Gfx.wrap_text(Lang.tf(main.GLASS_LINE, [999, 3, 3]), main.dialogue.TEXT_W).size() <= main.dialogue.PAGE_LINES,
 		"what the glass fitter did fits one page of the strip")
-	var glass_row: String = main.screens.TILL_GLASS_ROW % 9999
+	var glass_row: String = Lang.tf(main.screens.TILL_GLASS_ROW, 9999)
 	check(Gfx.printable(glass_row) == glass_row and Gfx.text_w(glass_row) + Gfx.text_w("-99999") + 8.0 <= 352.0,
 		"the report's till row has room to say what the glass cost")
+
+
+# ================================================================ the other language
+
+## In a language other than English (--lang=zh): every English line that reached the screen
+## with no catalog line for it, and how often it was drawn. Each one fails the run: the player
+## would read English in the middle of the other language. Names, code names and keys stay
+## English on purpose and are not counted (scripts/core/lang.gd, _note_miss).
+func untranslated_words() -> void:
+	if Lang.code == "en":
+		return
+	section("Every line on the screen is in '%s'" % Lang.code)
+	var left: Array = Lang.miss_list()
+	for m in left:
+		print("  shown in English (%d times): %s" % [int(m[1]), str(m[0])])
+	check(left.is_empty(), "no English line reached the screen untranslated (%d did)" % left.size())
 
 
 # ================================================================ log

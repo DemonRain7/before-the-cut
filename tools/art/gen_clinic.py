@@ -6,26 +6,32 @@ Scene layout (640 x 360 screen):
   dialogue   0,224 400 x 60
   desk       0,284 400 x 76
   clipboard  400,0 240 x 360     reference sheet on top, patient record below
+
+EXIT over the hall door and CLOSED on the shutter are in words.py: those two pictures are
+written in every language, the twin as <name>_<code>.png (hall_zh.png).
 """
 import os
 
 import numpy as np
 
-from font_data import draw_text, text_width
+import font_zh
+from font_data import draw_text
 from px import ASSETS, OUT, Canvas, bayer, col, contact_sheet
+from words import LANGS, say, twin
 
 HOLE = (170, 14, 220, 186)
 SCREEN = (18, 22, 132, 94)       # monitor glass inside the wall image
 
 
 def text_mask(w, h, x, y, s, bold=False, scale=1):
+    """The pixels of s with the capitals' top-left at (x, y), in any language (font_zh.draw_label)."""
     t = Canvas(w, h)
-    draw_text(t, x, y, s, "white", bold=bold, scale=scale)
+    font_zh.draw_label(t, x, y, s, "white", bold=bold, scale=scale)
     return t.alpha()
 
 
 # ------------------------------------------------------------------ hall
-def hall():
+def hall(lang="en"):
     W, H = HOLE[2], HOLE[3]
     c = Canvas(W, H, "teal2")
     A = c.all()
@@ -85,7 +91,11 @@ def hall():
     # exit light above the door
     c.fill(c.rect(dx0 + 12, dy0 - 15, dx0 + 43, dy0 - 5), "ink1")
     c.fill(c.rect(dx0 + 13, dy0 - 14, dx0 + 42, dy0 - 6), "grn1")
-    draw_text(c, dx0 + 17, dy0 - 15, "EXIT", "grn4")
+    word = say("exit", lang)
+    if lang == "en":
+        draw_text(c, dx0 + 17, dy0 - 15, word, "grn4")
+    else:                                   # centred in the lit face
+        font_zh.draw_label(c, dx0 + 13 + (30 - font_zh.text_width(word)) // 2, dy0 - 13, word, "grn4")
     c.glow(wall & (c.a[:, :, 1] < 100), "grn1", dx0 + 27, dy0 - 10, 26, amt=0.5, ry=14)
 
     # screening poster, left
@@ -357,7 +367,7 @@ def glass():
 
 
 # ------------------------------------------------------------------ shutter
-def shutter():
+def shutter(lang="en"):
     W, H = HOLE[2], HOLE[3] + 4
     c = Canvas(W, H, "steel2")
     yy, xx = c.grid()
@@ -373,7 +383,11 @@ def shutter():
         c.fill(c.rect(x0, 0, x0 + 3, H - 1), "steel0")
         c.fill(c.rect(x0 + (3 if x0 == 0 else 0), 0, x0 + (3 if x0 == 0 else 0), H - 1), "ink1")
     # worn stencil
-    tm = text_mask(W, H, (W - text_width("CLOSED", True, 3)) // 2, 60, "CLOSED", bold=True, scale=3)
+    # a hanzi's one-pixel strokes need a size up to come through the stencil's wear
+    word = say("closed", lang)
+    scale = 3 if lang == "en" else 4
+    tm = text_mask(W, H, (W - font_zh.text_width(word, True, scale)) // 2, 70 - (7 * scale - 1) // 2, word,
+                   bold=True, scale=scale)
     c.fill(tm & (bayer(H, W) < 0.8) & ((yy % 8) != 7), "red1")
     c.fill(tm & (bayer(H, W) < 0.3) & ((yy % 8) < 2), "red2")
     c.speckle(A & ~tm, "warm2", 0.006, seed=9)
@@ -589,6 +603,9 @@ def main():
     g.save(d + "/glass.png")
     sh = shutter()
     sh.save(d + "/shutter.png")
+    for lang in LANGS[1:]:                  # the pictures with words in them, in each other language
+        hall(lang).save(twin(d + "/hall.png", lang))
+        shutter(lang).save(twin(d + "/shutter.png", lang))
     sd = shutter_dents()
     sd.save(d + "/shutter_dents.png")
     crt = crt_overlay()

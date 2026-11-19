@@ -1,17 +1,26 @@
 extends RefCounted
-## Loads rules.json, sheet.json, the case files and contacts.json, and checks them before the
-## game uses them.
+## Loads rules.json, sheet.json, parts.json (the spec binder), the case files and contacts.json,
+## and checks them before the game uses them. It also assembles each patient's reference sheet
+## from the models they wear (sheet_for).
 ## A data mistake is reported as a readable list instead of a broken visit.
 ## Used as: const CaseDB = preload("res://scripts/core/case_db.gd")
+
+const Lang = preload("res://scripts/core/lang.gd")
 
 const DATA_DIR := "res://data"
 const ROWS := ["eyes", "hands", "port", "speech", "temper"]
 const ZONES := ["eyes", "hands", "port"]
 const TOOLS := ["penlight", "grip", "port"]
-const EYE_KINDS := ["natural", "optic", "combat", "display"]
+# a patient's parts: one model per slot, from this group of parts.json
+const SLOTS := {"eye_l": "eyes", "eye_r": "eyes", "hands": "hands", "port": "ports", "voice": "voices"}
+const EYE_SLOT := {"left": "eye_l", "right": "eye_r"}
+# the sheet rows one slot's model fills; the eyes row takes both eye slots, and temper has no part
+const ROW_SLOT := {"hands": "hands", "port": "port", "speech": "voice"}
+const EYE_KINDS := ["natural", "optic", "combat", "display"]   # the close-up's art families
+const PUPILS := ["tightens", "shutter", "none"]               # what light should do to an eye model
 # what a contact clue may test: data/contacts.json "clues"
 const CLUE_TESTS := ["age_min", "age_max", "fee_min", "fee_max", "eyes", "request_starts"]
-const EYE_CLUES := ["chrome_both", "natural_any"]
+const EYE_CLUES := ["implants_both", "natural_any"]
 
 
 static func load_json(path: String) -> Variant:
@@ -24,9 +33,10 @@ static func load_json(path: String) -> Variant:
 	return json.data
 
 
-## Returns {"rules", "sheet", "cases": {id: case}, "contacts", "errors": [String]}.
+## Returns {"rules", "sheet", "parts", "cases": {id: case}, "contacts", "errors": [String]}.
+## Each case comes back with its models resolved (resolve_parts).
 static func load_all(dir: String = DATA_DIR) -> Dictionary:
-	var out := {"rules": {}, "sheet": {}, "cases": {}, "contacts": {}, "errors": []}
+	var out := {"rules": {}, "sheet": {}, "parts": {}, "cases": {}, "contacts": {}, "errors": []}
 	var errors: Array = out["errors"]
 	var rules: Variant = load_json(dir + "/rules.json")
 	if typeof(rules) != TYPE_DICTIONARY:
@@ -40,14 +50,21 @@ static func load_all(dir: String = DATA_DIR) -> Dictionary:
 	else:
 		out["sheet"] = sheet
 		errors.append_array(validate_sheet(sheet))
+	var parts: Variant = load_json(dir + "/parts.json")
+	if typeof(parts) != TYPE_DICTIONARY:
+		errors.append("parts.json is missing or is not valid JSON.")
+	else:
+		out["parts"] = parts
+		errors.append_array(validate_parts(parts))
 	for id in rules.get("shift_order", []):
 		var path := "%s/cases/%s.json" % [dir, str(id)]
 		var c: Variant = load_json(path)
 		if typeof(c) != TYPE_DICTIONARY:
 			errors.append("cases/%s.json is missing or is not valid JSON." % str(id))
 			continue
-		for e in validate_case(c, rules, out["sheet"]):
+		for e in validate_case(c, rules, out["sheet"], out["parts"]):
 			errors.append("%s: %s" % [str(id), str(e)])
+		resolve_parts(c, out["parts"])
 		out["cases"][str(id)] = c
 	var contacts: Variant = load_json(dir + "/contacts.json")
 	if typeof(contacts) != TYPE_DICTIONARY:
@@ -63,7 +80,8 @@ static func validate_rules(rules: Dictionary) -> Array:
 	var order: Variant = rules.get("shift_order")
 	if typeof(order) != TYPE_ARRAY or (order as Array).is_empty():
 		errors.append("rules.json: shift_order must list at least one case id.")
-	for group in ["costs", "reassure", "attack", "scoring", "grip", "line", "patience"]:
+	# the grip limit is no longer a rule: each hands model has its own (parts.json limit_ms)
+	for group in ["costs", "reassure", "attack", "scoring", "line", "patience"]:
 		if typeof(rules.get(group)) != TYPE_DICTIONARY:
 			errors.append("rules.json: '%s' must be an object." % group)
 	if typeof(rules.get("attack")) == TYPE_DICTIONARY:
@@ -151,6 +169,9 @@ static func _validate_attack(attack: Dictionary) -> Array:
 	return errors
 
 
+## sheet.json holds only what no model changes: the labels, the normals a model may replace,
+## the temper row (it has no part, so its fine line lives here as "ordinary"), the titles, the
+## house rule and the footer. The eyes row is all models.
 static func validate_sheet(sheet: Dictionary) -> Array:
 	var errors: Array = []
 	var rows: Variant = sheet.get("rows")
@@ -158,16 +179,180 @@ static func validate_sheet(sheet: Dictionary) -> Array:
 		return ["sheet.json: rows must be a list."]
 	var ids: Array = []
 	for r in rows:
-		ids.append(str(r.get("id", "")))
-		for key in ["label", "normal", "ordinary"]:
+		var id := str(r.get("id", ""))
+		ids.append(id)
+		var need: Array = ["label"]
+		if id != "eyes":
+			need.append("normal")
+		if id != "eyes" and not ROW_SLOT.has(id):
+			need.append("ordinary")
+		for key in need:
 			if str(r.get(key, "")) == "":
-				errors.append("sheet.json: row '%s' needs '%s'." % [str(r.get("id", "?")), key])
+				errors.append("sheet.json: row '%s' needs '%s'." % [id if id != "" else "?", key])
+		if id == "hands" and not str(r.get("normal", "")).contains("{limit}"):
+			errors.append("sheet.json: the hands normal must say the model's {limit}.")
 	if ids != ROWS:
 		errors.append("sheet.json: rows must be exactly %s, in that order." % str(ROWS))
+	if not str(sheet.get("title", "")).contains("{name}"):
+		errors.append("sheet.json: title must name the patient ({name}).")
+	if str(sheet.get("title_none", "")) == "":
+		errors.append("sheet.json: title_none (the sheet between patients) is missing.")
 	var threshold := int(sheet.get("threshold", 0))
 	if threshold < 1 or threshold > ROWS.size():
 		errors.append("sheet.json: threshold must be between 1 and %d." % ROWS.size())
 	return errors
+
+
+## The spec binder (data/parts.json): every model of every slot, the pieces a sheet with two
+## different eyes is made of, and the baseline body the sheet shows between patients.
+static func validate_parts(parts: Dictionary) -> Array:
+	var errors: Array = []
+	for group in ["eyes", "hands", "ports", "voices"]:
+		var models: Variant = parts.get(group)
+		if typeof(models) != TYPE_DICTIONARY or (models as Dictionary).is_empty():
+			errors.append("parts.json: '%s' must list at least one model." % group)
+			continue
+		for id in (models as Dictionary).keys():
+			var m: Variant = models[id]
+			var where := "parts.json: %s.%s" % [group, str(id)]
+			if typeof(m) != TYPE_DICTIONARY:
+				errors.append(where + " must be an object.")
+				continue
+			var need: Array = ["tag", "fine"]
+			if group == "eyes":
+				need.append_array(["both", "one", "fine_one"])
+				if not EYE_KINDS.has(str(m.get("kind", ""))):
+					errors.append("%s.kind must be one of %s." % [where, str(EYE_KINDS)])
+				if not PUPILS.has(str(m.get("pupil", ""))):
+					errors.append("%s.pupil must be one of %s." % [where, str(PUPILS)])
+			if group == "hands" and int(m.get("limit_ms", 0)) <= 0:
+				errors.append(where + ".limit_ms must be positive.")
+			for key in need:
+				if str(m.get(key, "")) == "":
+					errors.append("%s needs '%s'." % [where, key])
+	var mixed: Variant = parts.get("eyes_mixed")
+	if typeof(mixed) != TYPE_DICTIONARY:
+		errors.append("parts.json: eyes_mixed must be an object.")
+	else:
+		for key in ["normal", "fine", "tag_l", "tag_r", "tag_two"]:
+			if str(mixed.get(key, "")) == "":
+				errors.append("parts.json: eyes_mixed needs '%s'." % key)
+	if typeof(parts.get("baseline")) != TYPE_DICTIONARY:
+		errors.append("parts.json: baseline must name a model for every slot.")
+	else:
+		errors.append_array(_check_slots(parts["baseline"], parts, "parts.json: baseline"))
+	return errors
+
+
+## Every slot names a model the binder has.
+static func _check_slots(picks: Dictionary, parts: Dictionary, where: String) -> Array:
+	var errors: Array = []
+	for slot in SLOTS.keys():
+		var model := str(picks.get(slot, ""))
+		if model == "":
+			errors.append("%s.%s is missing." % [where, slot])
+		elif _model(parts, SLOTS[slot], model).is_empty():
+			errors.append("%s.%s is '%s', which parts.json %s does not have." % [where, slot, model, SLOTS[slot]])
+	return errors
+
+
+## One model of one group of the binder, or {}.
+static func _model(parts: Dictionary, group: String, id: String) -> Dictionary:
+	var models: Variant = parts.get(group)
+	if typeof(models) != TYPE_DICTIONARY or typeof(models.get(id)) != TYPE_DICTIONARY:
+		return {}
+	return models[id]
+
+
+## Writes what the patient's models mean into the case, for the parts of the game that draw or
+## time them: each eye gets its model, art kind, pupil and tag, and the grip its model, tag and
+## limit_ms. load_all calls it once a case has been checked.
+static func resolve_parts(c: Dictionary, parts: Dictionary) -> void:
+	var picks: Dictionary = c.get("parts", {}) if typeof(c.get("parts")) == TYPE_DICTIONARY else {}
+	var eyes: Dictionary = c.get("eyes", {}) if typeof(c.get("eyes")) == TYPE_DICTIONARY else {}
+	for side in EYE_SLOT.keys():
+		if typeof(eyes.get(side)) != TYPE_DICTIONARY:
+			continue
+		var id := str(picks.get(EYE_SLOT[side], ""))
+		var m := _model(parts, "eyes", id)
+		var eye: Dictionary = eyes[side]
+		eye["model"] = id
+		eye["kind"] = str(m.get("kind", "natural"))
+		eye["pupil"] = str(m.get("pupil", "tightens"))
+		eye["tag"] = str(m.get("tag", ""))
+	if typeof(c.get("grip")) == TYPE_DICTIONARY:
+		var id := str(picks.get("hands", ""))
+		var h := _model(parts, "hands", id)
+		var grip: Dictionary = c["grip"]
+		grip["model"] = id
+		grip["tag"] = str(h.get("tag", ""))
+		grip["limit_ms"] = int(h.get("limit_ms", 1000))
+
+
+## The reference sheet for one patient, pulled from the spec binder for the models they wear:
+## {"title", "rows": [{id, label, tag, normal, fine}], "threshold", "footer", "limit_s"}.
+## With no patient (an empty case) it is the binder's baseline body under title_none.
+## limit_s is the hands model's limit, in seconds.
+static func sheet_for(c: Dictionary, sheet: Dictionary, parts: Dictionary) -> Dictionary:
+	var picks: Dictionary = parts.get("baseline", {}) if typeof(parts.get("baseline")) == TYPE_DICTIONARY else {}
+	var title := str(sheet.get("title_none", ""))
+	if typeof(c.get("parts")) == TYPE_DICTIONARY:
+		picks = c["parts"]
+		title = _fill(str(sheet.get("title", "")), {"name": str(c.get("name", "")).to_upper()})
+	var limit_ms := int(_model(parts, "hands", str(picks.get("hands", ""))).get("limit_ms", 1000))
+	var rows: Array = []
+	for r in sheet.get("rows", []):
+		var base: Dictionary = r
+		var id := str(base.get("id", ""))
+		var row := {"id": id, "label": str(base.get("label", "")), "tag": "",
+			"normal": str(base.get("normal", "")), "fine": str(base.get("ordinary", ""))}
+		if id == "eyes":
+			_eyes_row(row, picks, parts)
+		elif ROW_SLOT.has(id):
+			var slot: String = ROW_SLOT[id]
+			var m := _model(parts, SLOTS[slot], str(picks.get(slot, "")))
+			row["tag"] = str(m.get("tag", ""))
+			row["fine"] = str(m.get("fine", ""))
+			if str(m.get("normal", "")) != "":
+				row["normal"] = str(m["normal"])
+		row["normal"] = _fill(str(row["normal"]), {"limit": seconds(limit_ms)})
+		rows.append(row)
+	return {"title": title, "rows": rows, "threshold": int(sheet.get("threshold", 0)),
+		"footer": sheet.get("footer", []), "limit_s": float(limit_ms) / 1000.0}
+
+
+## The eyes row: one model's own lines when both eyes are that model, otherwise eyes_mixed
+## filled with each eye's part (L is the patient's left eye).
+static func _eyes_row(row: Dictionary, picks: Dictionary, parts: Dictionary) -> void:
+	var l_id := str(picks.get("eye_l", ""))
+	var r_id := str(picks.get("eye_r", ""))
+	var l := _model(parts, "eyes", l_id)
+	var r := _model(parts, "eyes", r_id)
+	if l_id == r_id:
+		row["tag"] = str(l.get("tag", ""))
+		row["normal"] = str(l.get("both", ""))
+		row["fine"] = str(l.get("fine", ""))
+		return
+	var mixed: Dictionary = parts.get("eyes_mixed", {}) if typeof(parts.get("eyes_mixed")) == TYPE_DICTIONARY else {}
+	row["normal"] = _fill(str(mixed.get("normal", "")), {"l": str(l.get("one", "")), "r": str(r.get("one", ""))})
+	row["fine"] = _fill(str(mixed.get("fine", "")), {"l": str(l.get("fine_one", "")), "r": str(r.get("fine_one", ""))})
+	if str(r.get("kind", "")) == "natural":
+		row["tag"] = _fill(str(mixed.get("tag_l", "")), {"tag": str(l.get("tag", ""))})
+	elif str(l.get("kind", "")) == "natural":
+		row["tag"] = _fill(str(mixed.get("tag_r", "")), {"tag": str(r.get("tag", ""))})
+	else:
+		row["tag"] = str(mixed.get("tag_two", ""))
+
+
+## A limit as the sheet prints it: 1500 is "1.5".
+static func seconds(ms: int) -> String:
+	return "%.1f" % (float(ms) / 1000.0)
+
+
+## The sheet's words with the patient's values put in, in the player's language: a sheet is
+## pulled when a visit starts, and the language only changes on the title card.
+static func _fill(text: String, values: Dictionary) -> String:
+	return Lang.fill(text, values)
 
 
 static func _need_text(c: Dictionary, key: String, errors: Array) -> void:
@@ -176,7 +361,8 @@ static func _need_text(c: Dictionary, key: String, errors: Array) -> void:
 
 
 ## `sheet` is only needed for its threshold: how many broken lines the house rule asks for.
-static func validate_case(c: Dictionary, rules: Dictionary, sheet: Dictionary = {}) -> Array:
+## `parts` is the spec binder (data/parts.json) the patient's models come from.
+static func validate_case(c: Dictionary, rules: Dictionary, sheet: Dictionary = {}, parts: Dictionary = {}) -> Array:
 	var errors: Array = []
 	for key in ["id", "name", "role", "request", "sprite", "teaser"]:
 		_need_text(c, key, errors)
@@ -191,25 +377,37 @@ static func validate_case(c: Dictionary, rules: Dictionary, sheet: Dictionary = 
 	if typeof(c.get("opening")) != TYPE_ARRAY or (c["opening"] as Array).is_empty():
 		errors.append("opening must list at least one line.")
 
-	# eyes, grip, port
+	# parts: one model per slot, all from the binder
+	var picks: Dictionary = c.get("parts", {}) if typeof(c.get("parts")) == TYPE_DICTIONARY else {}
+	if parts.is_empty():
+		errors.append("there is no spec binder (parts.json) to check the parts against.")
+	elif typeof(c.get("parts")) != TYPE_DICTIONARY:
+		errors.append("parts must name a model for each of %s." % str(SLOTS.keys()))
+	else:
+		errors.append_array(_check_slots(picks, parts, "parts"))
+
+	# eyes, grip, port: what the patient's own parts do, against what their models should
 	var eyes: Dictionary = c.get("eyes", {}) if typeof(c.get("eyes")) == TYPE_DICTIONARY else {}
 	var eyes_ok := true
-	for side in ["left", "right"]:
+	for side in EYE_SLOT.keys():
 		var eye: Variant = eyes.get(side)
 		if typeof(eye) != TYPE_DICTIONARY:
 			errors.append("eyes.%s is missing." % side)
 			continue
-		if not EYE_KINDS.has(str(eye.get("kind", ""))):
-			errors.append("eyes.%s.kind must be one of %s." % [side, str(EYE_KINDS)])
+		var model := _model(parts, "eyes", str(picks.get(EYE_SLOT[side], "")))
+		var pupil := str(model.get("pupil", "tightens"))
+		var tightens := bool(eye.get("tightens", pupil != "none"))
+		if pupil == "none" and tightens:
+			errors.append("eyes.%s cannot tighten: a %s has no pupil." % [side, str(model.get("tag", "?"))])
 		if not bool(eye.get("follows", true)):
 			eyes_ok = false
-		if str(eye.get("kind", "")) == "natural" and not bool(eye.get("tightens", true)):
+		if pupil != "none" and not tightens:
 			eyes_ok = false
 	var grip: Dictionary = c.get("grip", {}) if typeof(c.get("grip")) == TYPE_DICTIONARY else {}
 	var release := int(grip.get("release_ms", 0))
 	if release <= 0:
 		errors.append("grip.release_ms must be positive.")
-	var limit := int((rules.get("grip", {}) as Dictionary).get("limit_ms", 1000))
+	var limit := int(_model(parts, "hands", str(picks.get("hands", ""))).get("limit_ms", 0))
 	if typeof(c.get("port")) != TYPE_DICTIONARY:
 		errors.append("port must be an object with 'covered'.")
 
@@ -374,8 +572,8 @@ static func validate_case(c: Dictionary, rules: Dictionary, sheet: Dictionary = 
 		errors.append("at least one broken line must be impossible to refuse for good.")
 	if rows.has("eyes") and bool(rows["eyes"].get("ok", true)) != eyes_ok:
 		errors.append("rows.eyes.ok does not match the eye data.")
-	if rows.has("hands") and release > 0 and bool(rows["hands"].get("ok", true)) != (release <= limit):
-		errors.append("rows.hands.ok does not match grip.release_ms.")
+	if rows.has("hands") and release > 0 and limit > 0 and bool(rows["hands"].get("ok", true)) != (release <= limit):
+		errors.append("rows.hands.ok does not match grip.release_ms and the hands model's limit (%d ms)." % limit)
 
 	# outcome texts
 	var outcomes: Dictionary = c.get("outcomes", {}) if typeof(c.get("outcomes")) == TYPE_DICTIONARY else {}
@@ -401,6 +599,7 @@ static func validate_case(c: Dictionary, rules: Dictionary, sheet: Dictionary = 
 
 # ------------------------------------------------------------------ contacts
 ## Whether one clue of data/contacts.json fits one case. Every test a clue names must hold.
+## The eye tests read the eyes' kinds as resolve_parts wrote them.
 static func clue_fits(clue: Dictionary, c: Dictionary) -> bool:
 	var age := int(c.get("age", 0))
 	var fee := int(c.get("fee", 0))
@@ -422,7 +621,7 @@ static func clue_fits(clue: Dictionary, c: Dictionary) -> bool:
 			if typeof(eye) == TYPE_DICTIONARY and str(eye.get("kind", "")) == "natural":
 				natural += 1
 		match str(clue["eyes"]):
-			"chrome_both":
+			"implants_both":
 				if natural > 0:
 					return false
 			"natural_any":

@@ -1,15 +1,19 @@
 """Desk objects, stamps, cursors, the result slip and the title sign.
 
-Everything is written to game/assets/ui. Labels and numbers are drawn by the game.
+Everything is written to game/assets/ui. Labels and numbers are drawn by the game. A picture with
+words in it gets a twin for each other language, <name>_<code>.png (logo_zh.png), which the game
+shows in that language (gfx.gd tex()).
 """
 import os
 
 import numpy as np
 
+import font_zh
 from font_data import draw_text, text_width
 from gen_clinic import paper, text_mask
 from people import CLOTH, grow, smooth, stroke
 from px import OUT, Canvas, bayer, contact_sheet
+from words import LANGS, say
 
 IW, IH = 36, 38
 OUTLINE = "ink0"
@@ -201,7 +205,9 @@ def ink(text, color, w=76, h=24, seed=1):
     c = Canvas(w, h)
     yy, xx = c.grid()
     frame = c.rrect(0, 0, w - 1, h - 1, 3) & ~c.rrect(2, 2, w - 3, h - 3, 2)
-    tm = text_mask(w, h, (w - text_width(text, True, 2)) // 2, (h - 14) // 2 - 1, text, bold=True, scale=2)
+    tm = text_mask(w, h, (w - font_zh.text_width(text, True, 2)) // 2, (h - 14) // 2 - 1, text, bold=True, scale=2)
+    if any(font_zh.is_wide(ch) for ch in text):
+        tm |= np.roll(tm, 1, axis=1)        # Chinese has no bold: the stamp's strokes get a pixel more
     m = frame | tm
     rng = np.random.default_rng(seed)
     noise = rng.random((h, w))
@@ -295,10 +301,20 @@ def slip(w=200, h=150):
 
 
 def neon(text, scale, tube, core, glow, pad_px=10):
-    w = text_width(text, True, scale) + pad_px * 2
+    """A word in neon tube. Chinese is drawn by font_zh: a hanzi fills the same nine rows."""
+    chinese = any(font_zh.is_wide(ch) for ch in text)
+    w = (font_zh.text_width(text, True, scale) if chinese else text_width(text, True, scale)) + pad_px * 2
     h = 9 * scale + pad_px * 2
     c = Canvas(w, h)
-    tm = text_mask(w, h, pad_px, pad_px, text, bold=True, scale=scale)
+    if chinese:
+        tm = np.zeros((h, w), dtype=bool)
+        small = Canvas(w // scale + 2, 11)
+        font_zh.draw_text(small, 0, 0, text, "white", bold=True)
+        big = bridged(small.alpha(), scale)
+        bh, bw = min(big.shape[0], h - pad_px), min(big.shape[1], w - pad_px)
+        tm[pad_px:pad_px + bh, pad_px:pad_px + bw] = big[:bh, :bw]
+    else:
+        tm = text_mask(w, h, pad_px, pad_px, text, bold=True, scale=scale)
     halo = grow(tm, 5)
     yy, xx = c.grid()
     for n, a in ((6, 0.25), (4, 0.45), (2, 0.75)):
@@ -312,11 +328,52 @@ def neon(text, scale, tube, core, glow, pad_px=10):
     return c
 
 
+def bridged(mask, n):
+    """mask scaled up n times, with each diagonal step of a stroke joined by a band as wide as a
+    stroke. A small glyph draws a slanted stroke as a staircase of corners; scaled up for a sign,
+    the tube would follow it as a string of beads."""
+    h, w = mask.shape
+    out = np.repeat(np.repeat(mask, n, axis=0), n, axis=1)
+    yy, xx = np.mgrid[0:h * n, 0:w * n]
+    cx, cy = xx + 0.5, yy + 0.5
+    for y in range(h - 1):
+        for x in range(w):
+            for x2 in (x - 1, x + 1):
+                if not (0 <= x2 < w) or not (mask[y, x] and mask[y + 1, x2]):
+                    continue
+                if mask[y, x2] or mask[y + 1, x]:
+                    continue      # already joined along the square
+                ax, ay = (x + 0.5) * n, (y + 0.5) * n
+                vx, vy = float(x2 - x) * n, float(n)
+                t = np.clip(((cx - ax) * vx + (cy - ay) * vy) / (vx * vx + vy * vy), 0.0, 1.0)
+                out |= (cx - ax - t * vx) ** 2 + (cy - ay - t * vy) ** 2 <= (n / 2.0) ** 2
+    return out
+
+
+TEAL_TUBE = ("5ee6e0", "e8fffb", "14686f")
+RED_TUBE = ("ff4f8a", "ffe0ea", "7a1c44")
+
+
 def logo():
-    a = neon("BEFORE THE", 3, "5ee6e0", "e8fffb", "14686f")
-    b = neon("CUT", 6, "ff4f8a", "ffe0ea", "7a1c44")
-    w = max(a.w, b.w) + 8
-    c = Canvas(w, a.h + b.h - 12)
+    return sign(neon("BEFORE THE", 3, *TEAL_TUBE), neon("CUT", 6, *RED_TUBE))
+
+
+def logo_zh():
+    """The sign in Chinese, 先别下刀 ("don't cut yet"), set the way the English one is set: the
+    first words small in teal over the cut, big in red, a scalpel line through it, and under it
+    the game's English name, small, so the two signs read as one game."""
+    c = sign(neon("先别", 3, *TEAL_TUBE), neon("下刀", 5, *RED_TUBE), reach=34, foot=11)
+    name = "BEFORE THE CUT"
+    draw_text(c, (c.w - text_width(name, True)) // 2, c.h - 11, name, TEAL_TUBE[0], bold=True)
+    return c
+
+
+def sign(a, b, reach=0, foot=0):
+    """Two neon lines, the second (the cut) under the first, with a scalpel line through the
+    second out to the sign's edges. reach: room for the line beside a short cut. foot: clear
+    rows under the sign."""
+    w = max(a.w, b.w + 2 * reach) + 8
+    c = Canvas(w, a.h + b.h - 12 + foot)
     c.blit(a, (w - a.w) // 2, 0)
     c.blit(b, (w - b.w) // 2, a.h - 12)
     # a scalpel line through the sign
@@ -374,9 +431,12 @@ def main():
     put("pad40_hot", pad(40, hot=True))
     put("pad36", pad(36))
     put("pad36_hot", pad(36, hot=True))
-    put("ink_treat", ink("TREAT", "2f8f4a", seed=2))
-    # grey, so that it cannot be mistaken for the red TRAUMA TEAM imprint (ink_refer, gen_team.py)
-    put("ink_void", ink("VOID", "5a4e52", seed=4))
+    # the imprints' words, in every language (words.py): ink_treat.png, ink_treat_zh.png, ...
+    for lang in LANGS:
+        sfx = "" if lang == LANGS[0] else "_" + lang
+        put("ink_treat" + sfx, ink(say("treat", lang), "2f8f4a", seed=2))
+        # grey, so that it cannot be mistaken for the red TRAUMA TEAM imprint (ink_refer, gen_team.py)
+        put("ink_void" + sfx, ink(say("void", lang), "5a4e52", seed=4))
     put("pip_on", pip(True))
     put("pip_off", pip(False))
     put("mark_blank", mark("blank"))
@@ -391,9 +451,12 @@ def main():
     s.save(d + "/slip.png")
     lg = logo()
     lg.save(d + "/logo.png")
+    lz = logo_zh()
+    lz.save(d + "/logo_zh.png")
     cr = crack()
     cr.save(d + "/crack.png")
-    contact_sheet([("slip", s), ("logo", lg), ("crack", cr)], os.path.join(OUT, "ui_big.png"), scale=2, per_row=3, bg="ink0")
+    contact_sheet([("slip", s), ("logo", lg), ("logo_zh", lz), ("crack", cr)], os.path.join(OUT, "ui_big.png"), scale=2,
+                  per_row=4, bg="ink0")
     print("ui art written")
 
 

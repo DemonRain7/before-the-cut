@@ -8,6 +8,7 @@ const PlayDriver = preload("res://tests/play_driver.gd")
 const MainScript = preload("res://scripts/ui/main.gd")
 const VoiceClip = preload("res://scripts/core/voice_clip.gd")
 const Gfx = preload("res://scripts/ui/gfx.gd")
+const Lang = preload("res://scripts/core/lang.gd")
 const NOVEL := "Before we go on, will you explain what this means for my night shift?"
 # what the proxy's synthetic speech service "hears" in every clip (agent_proxy/src/providers.mjs)
 const MOCK_TRANSCRIPT := "This is a mock transcript. No speech service heard you."
@@ -19,6 +20,8 @@ var rules: Dictionary
 var client: ModelClient
 
 func _initialize() -> void:
+	# English whatever language a player saved: the checks below read English words
+	Lang.pin("en")
 	for arg in OS.get_cmdline_user_args():
 		var parts := arg.trim_prefix("--").split("=", true, 1)
 		if parts.size() == 2:

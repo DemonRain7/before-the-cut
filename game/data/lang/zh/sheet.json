@@ -1,0 +1,18 @@
+{
+	"note": "Chinese for sheet.json: the reference sheet's fixed rows. Keyed by the exact English; tools/check_lang.py keeps it in step with the game.",
+	"keep": [],
+	"strings": {
+		"REFERENCE SHEET: {name}": "参照表：{name}",
+		"NORMAL REFERENCE SHEET": "标准参照表",
+		"Lets go on 'release' inside {limit} s.": "喊‘松开’后 {limit} 秒内放手。",
+		"PORT": "接口",
+		"Calm skin at the socket. No dark threads.": "接口处皮肤正常。没有黑色纹路。",
+		"SPEECH": "言语",
+		"Says 'I' and 'my'. Remembers what they did.": "说‘我’和‘我的’。记得做过的事。",
+		"TEMPER": "脾气",
+		"Pushed, face and voice react together.": "受逼时，脸和声音同时反应。",
+		"Anger, swearing, walking out.": "发火、骂人、甩手走人。",
+		"Two broken lines = drifting: call TRAUMA TEAM.": "两项异常 = 失控：叫创伤小组。",
+		"Strange is not sick. A refusal is not a sign.": "古怪不等于有病。拒绝不算征兆。"
+	}
+}

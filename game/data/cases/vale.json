@@ -16,21 +16,22 @@
     "Good evening. Adrian Vale, Kessler Security.",
     "I'd like the limiter taken off my reflex rig. I pay double for discretion."
   ],
+  "parts": {"eye_l": "talon", "eye_r": "talon", "hands": "reflex", "port": "milspec", "voice": "natural"},
   "eyes": {
-    "left": {"kind": "combat", "tightens": false, "follows": false},
-    "right": {"kind": "combat", "tightens": false, "follows": true}
+    "left": {"tightens": false, "follows": false},
+    "right": {"tightens": false, "follows": true}
   },
-  "grip": {"release_ms": 600, "tremor": 0},
+  "grip": {"release_ms": 200, "tremor": 0},
   "port": {"covered": true},
   "idle": {"hands": "still", "gaze": "fixed"},
   "looks": {
-    "eyes": "Combat optics, both eyes. Hasn't blinked.",
+    "eyes": "TALON combat optics. Hasn't blinked.",
     "hands": "Hands folded. Perfectly still.",
     "port": "Collar buttoned to the jaw. Port not visible."
   },
   "checks": {
     "penlight": {"first": ["explain:idle", "comply"], "insist": "comply",
-      "note": "Light: fixed optics. R follows, L does not."},
+      "note": "Light: shutters never snap. L won't follow."},
     "grip": {"first": ["comply"], "insist": "comply",
       "note": "Grip: exact. Let go {t} s after 'release'."},
     "port": {"first": ["stall"], "insist": "refuse",
@@ -88,9 +89,9 @@
     "gave_up": "Another time, doctor."
   },
   "rows": {
-    "eyes": {"ok": false, "text": "Optics not tightening is ordinary. The left one never followed the light.",
+    "eyes": {"ok": false, "text": "TALON shutters snap in light. His never did, and the left never followed.",
       "evidence": ["check:penlight"]},
-    "hands": {"ok": true, "text": "Exact grip, released on time.", "evidence": ["check:grip"]},
+    "hands": {"ok": true, "text": "Let go in 0.2 s, inside the REFLEX limit of 0.3.", "evidence": ["check:grip"]},
     "port": {"ok": false, "text": "Dark threads under the buttoned collar.", "evidence": ["check:port"]},
     "speech": {"ok": false, "text": "\"It doesn't need much sleep.\" It, not I.", "evidence": ["ask:sleep"]},
     "temper": {"ok": false, "text": "Calm face and level voice while the fist closed.", "evidence": ["press"]}

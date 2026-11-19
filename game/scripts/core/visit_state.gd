@@ -20,13 +20,17 @@ extends RefCounted
 ## AI supplies original dialogue and decides exam cooperation. The offline script alone
 ## uses authored move choices. Physical test readings, scoring and attack timing stay here.
 ##
+## Notes are written in the player's language as they are taken (scripts/core/lang.gd): the
+## words a reading or a reply is filled into are translated first.
 ## Used as: const VisitState = preload("res://scripts/core/visit_state.gd")
+
+const Lang = preload("res://scripts/core/lang.gd")
 
 const ROWS := ["eyes", "hands", "port", "speech", "temper"]
 const ZONES := ["eyes", "hands", "port"]
 const TOOLS := ["penlight", "grip", "port"]
 const TOOL_ROW := {"penlight": "eyes", "grip": "hands", "port": "port"}
-const TOOL_NAME := {"penlight": "penlight", "grip": "grip bar", "port": "port check"}
+const TOOL_NAME := {"penlight": "penlight", "grip": "grip bar", "port": "port check"}   # [shown] in "Declined the %s."
 const MAX_NOTES_PER_ROW := 3
 
 enum Phase { EXAM, ATTACK, DONE }
@@ -299,7 +303,7 @@ func apply_check(tool: String, move: String, autonomous: bool = false) -> Dictio
 		res["claim"] = cid
 	else:
 		refusals[tool] = int(refusals.get(tool, 0)) + 1
-		add_note(str(TOOL_ROW[tool]), "refuse:" + tool, "Declined the %s." % str(TOOL_NAME[tool]))
+		add_note(str(TOOL_ROW[tool]), "refuse:" + tool, Lang.tf("Declined the %s.", [Lang.t(str(TOOL_NAME[tool]))]))
 		res["result"] = "refused"
 	_note("check:%s:%s" % [tool, move.get_slice(":", 0)])
 	return res
@@ -313,7 +317,7 @@ func complete_check(tool: String) -> Dictionary:
 	var spec: Dictionary = case_data.get("checks", {}).get(tool, {})
 	var text := str(spec.get("note", ""))
 	if text.contains("{t}"):
-		text = text.replace("{t}", "%.1f" % (release_ms() / 1000.0))
+		text = Lang.fill(text, {"t": "%.1f" % (release_ms() / 1000.0)})
 	var key := "check:" + tool
 	seen[key] = true
 	if tool == "port":
@@ -345,9 +349,9 @@ func apply_dialogue(topic_id: String, reply: String, reaction: String = "") -> D
 	has_generated_speech = true
 	last_recorded_speech = reply
 	var key := "dialogue:%s:%d" % [topic_id, int(asked[topic_id])]
-	add_note("speech", key, "Says: " + reply)
+	add_note("speech", key, Lang.tf("Says: %s", [Lang.t(reply)]))
 	if reaction != "":
-		add_note("temper", key, "Reaction: " + reaction)
+		add_note("temper", key, Lang.tf("Reaction: %s", [reaction]))
 	_note("ask:%s:dialogue" % topic_id)
 	return {"result": "answered", "line": reply, "move": "dialogue", "cost": cost}
 

@@ -1,22 +1,33 @@
 {
-  "version": 4,
-  "note": "Words for the opening cards (scripts/ui/intro.gd), the counter guide (scripts/ui/guide.gd) and the first-night training (scripts/ui/coach.gd). First written by the assistant on 2026-11-15 after the student's eleven notes. Version 2 (2026-11-16) is the guide for the counter-first screen: four pages, one each for the window, the left wall, the right wall and the desk. Version 3 (2026-11-17) adds the contact list and the paid calm-patch to the guide and the training: one tip at a time on the first night, each pointing at one thing. A tip has an id, the phases of a visit it belongs to (wait, exam, slip; a comma-separated list), the event that completes it (until; \"next\" for a tip that is only read), the area it points at (main.gd: _coach_focus) and its text, which must fit four lines of the box. Every tip also has NEXT, and SKIP ALL [K] ends the training; nothing in it is a step the player has to take. Version 4 (2026-11-17) tells the student's story in six cards: fired from Kessler, the debt Kessler sold to Harrow Credit, the Lanterns' back-street clinic and its contacts, Harrow's line, the drift (illegal street chrome) and the counter. The Lanterns card's picture is a list with two made-up entries: their aliases and codes are not in data/contacts.json, and each pair of clues fits none of the five visitors, so the picture cannot be taken for a real night's list. Nobody has playtested any of it. {per_hour}, {hours}, {total}, {threshold}, {repair_cost}, {pay}, {code_cost}, {calm_cost}, {calm_gain}, {ask_cost}, {press_cost}, {per_night} and {limit} are filled in from rules.json and sheet.json; a rule set with no repair_cost leaves the \"mend\" item out. The pictures and the positions of the guide's numbers are drawn in code; only the words live here, so tools/art/measure_text.py can check that they fit.",
+  "version": 5,
+  "note": "Words for the opening cards (scripts/ui/intro.gd), the counter guide (scripts/ui/guide.gd) and the first-night training (scripts/ui/coach.gd). First written by the assistant on 2026-11-15 after the student's eleven notes. Version 2 (2026-11-16) is the guide for the counter-first screen: four pages, one each for the window, the left wall, the right wall and the desk. Version 3 (2026-11-17) adds the contact list and the paid calm-patch to the guide and the training: one tip at a time on the first night, each pointing at one thing. A tip has an id, the phases of a visit it belongs to (wait, exam, slip; a comma-separated list), the event that completes it (until; \"next\" for a tip that is only read), the area it points at (main.gd: _coach_focus) and its text, which must fit four lines of the box. Every tip also has NEXT, and SKIP ALL [K] ends the training; nothing in it is a step the player has to take. Version 4 (2026-11-17) tells the student's story in six cards: fired from Kessler, the debt Kessler sold to Harrow Credit, the Lanterns' back-street clinic and its contacts, Harrow's line, the drift (illegal street chrome) and the counter. The Lanterns card's picture is a list with two made-up entries: their aliases and codes are not in data/contacts.json, and each pair of clues fits none of the five visitors, so the picture cannot be taken for a real night's list. Version 5 (2026-11-18) redraws the pictures for that story after the student noticed the opening still showed the old one: FIRED is a strip of three panels (the badge refused on Kessler's floor 88, which is TOP_FLOOR in intro.gd; the lift down between two guards; outside in the rain, still holding Kessler's spec binder, tabbed EYES, HANDS, PORTS and VOICE); THE DEBT is Kessler's staff debt file stamped SOLD TO HARROW, with Harrow's lease slid over it; THE LANTERNS tags the matched patient CONTACT and the parcel PACKAGE; THE DRIFT is a crate of military surplus with its serials filed off and, through the glass, a visitor whose eye implant glitches before they crack the pane. The binder is why the reference sheet is drawn per implant model (data/parts.json): Kessler's spec pages for the parts this patient carries. No picture shows a member of tonight's cast. The word \"chrome\" left the rule text; it says \"implant\". Nobody has playtested any of it. {per_hour}, {hours}, {total}, {threshold}, {repair_cost}, {pay}, {code_cost}, {calm_cost}, {calm_gain}, {ask_cost}, {press_cost}, {per_night} and {limit} are filled in from rules.json and sheet.json; a rule set with no repair_cost leaves the \"mend\" item out. The pictures and the positions of the guide's numbers are drawn in code; only the words live here, so tools/art/measure_text.py can check that they fit.",
   "cards": [
     {
       "id": "fired",
-      "art": "towers",
+      "art": "fired",
       "title": "FIRED",
-      "text": "Twelve years at Kessler, up in the towers, fitting chrome to people who could pay for it. Then one night your badge stopped opening doors, and security walked you all the way down.",
-      "labels": {}
+      "text": "Twelve years at Kessler, up in the towers, fitting implants to people who could pay. Then one night your badge stopped opening doors, and security walked you all the way down. You kept one thing: Kessler's spec binder.",
+      "labels": {
+        "company": "KESSLER",
+        "floor": "FLOOR 88",
+        "denied": "REVOKED",
+        "binder": "SPEC BINDER",
+        "tabs": ["EYES", "HANDS", "PORTS", "VOICE"]
+      }
     },
     {
       "id": "debt",
-      "art": "lease",
+      "art": "debt",
       "title": "THE DEBT",
       "text": "Kessler sold everything you owed to Harrow Credit: the flat, the licence, the loan on your own two hands. Now the chair, the tools and the hands are on lease.",
       "labels": {
+        "file_head": "KESSLER",
+        "file_sub": "STAFF DEBT FILE",
+        "file_items": ["Flat, tower 3", "Surgeon's licence", "Loan: 2 hands"],
+        "sold": "SOLD TO HARROW",
         "head": "HARROW CREDIT",
         "sub": "EQUIPMENT LEASE",
+        "from": "Debt bought from Kessler.",
         "items": ["1 surgical chair", "1 instrument tray", "2 hands, left and right"],
         "stamp": "ON LEASE",
         "foot": "Metered hourly. Shortfall recovered in kind."
@@ -26,16 +37,19 @@
       "id": "lanterns",
       "art": "lanterns",
       "title": "THE LANTERNS",
-      "text": "One counter would still take you: a back-street clinic the Lanterns run. Their contacts come in as patients, carrying smuggled military chrome. Tonight's list says who to look for. The right code, and the crew pays {pay}.",
+      "text": "One counter still takes you: a back-street clinic run by the Lanterns, a street gang. Some patients are really their contacts, smuggling military implants. Tonight's list says who to look for. Say the code to the one who fits, and the gang pays {pay} for the package.",
       "labels": {
         "head": "TONIGHT'S CONTACTS",
         "entries": [
           {"alias": "KESTREL", "clues": ["Under thirty.", "Fee 400 or more."], "code": "Is the ferry late again?"},
-          {"alias": "COPPER", "clues": ["Over forty.", "Chrome in both eyes."], "code": "Is the market open Sunday?"}
+          {"alias": "COPPER", "clues": ["Over forty.", "Implants in both eyes."], "code": "Is the market open Sunday?"}
         ],
         "say": "SAY",
         "picked": "PICKED UP",
-        "drop": "+{pay}"
+        "drop": "+{pay}",
+        "patient": "PATIENT",
+        "contact": "CONTACT",
+        "package": "PACKAGE"
       }
     },
     {
@@ -49,14 +63,14 @@
       "id": "drift",
       "art": "drift",
       "title": "THE DRIFT",
-      "text": "Street chrome is illegal chrome: cheap, unlicensed, sometimes torn out of a soldier. Some who wear it start to drift, and a drifting one can turn on you without warning. Most are only tired, scared or angry.",
-      "labels": {"list": "TONIGHT'S VISITORS", "ask": "STEADY OR DRIFTING?"}
+      "text": "Street implants are illegal: cheap, unlicensed, sometimes torn out of a soldier. Some who wear them start to drift, and a drifting one can turn on you without warning. Most are only tired, scared or angry.",
+      "labels": {"surplus": "MIL SURPLUS", "ask": "STEADY OR DRIFTING?"}
     },
     {
       "id": "counter",
       "art": "counter",
       "title": "BEFORE THE CUT",
-      "text": "So you check them first. TREAT the steady and the fee is yours. Call TRAUMA TEAM on the drifting. If one turns on you, drop the SHUTTER before the glass gives.",
+      "text": "So you check them first, against the binder. TREAT the steady and the fee is yours. Call TRAUMA TEAM on the drifting. If one turns on you, drop the SHUTTER before the glass gives.",
       "labels": {"treat": "TREAT", "treat_sub": "the steady", "team": "TRAUMA TEAM", "team_sub": "the drifting", "shutter": "SHUTTER", "shutter_sub": "if one turns"}
     }
   ],
@@ -74,7 +88,7 @@
       "id": "left",
       "title": "THE LEFT WALL",
       "items": [
-        {"key": "sheet", "text": "REFERENCE SHEET [R]. What a steady patient looks like, and what is merely odd. Click it to take it down. It never decides for you."},
+        {"key": "sheet", "text": "REFERENCE SHEET [R]. Kessler's spec pages for this patient's models: what steady looks like, and what is merely odd. Click it to take it down. It never decides for you."},
         {"key": "list", "text": "CONTACT LIST [L]. Tonight's contacts: an alias, two clues and a code each. SAY the code to the one visitor who fits both clues: a package, +{pay}. Anyone else: -{code_cost} patience."},
         {"key": "till", "text": "TILL and HOUR. One patient is one hour. The meter reads the till each hour: stay over the line."},
         {"key": "camera", "text": "HALL CAMERA [C]. Who is next. Click it, then the big screen, to buzz them in. ENTER does it at once."}
@@ -151,21 +165,21 @@
       "phase": "exam",
       "until": "sheet_open",
       "area": "sheet",
-      "text": "Now the exam. The REFERENCE SHEET [R] says what a steady patient does. It comes down where the list does."
+      "text": "Now the exam. The REFERENCE SHEET [R]: Kessler's specs for this patient's models, what steady looks like. It comes down where the list does."
     },
     {
       "id": "light",
       "phase": "exam",
       "until": "check:penlight",
       "area": "pad:penlight",
-      "text": "PENLIGHT: move the light onto each eye. A natural pupil tightens, chrome does not. Both eyes should follow it."
+      "text": "PENLIGHT: move the light onto each eye. The readout says what each did; the sheet, what its model should."
     },
     {
       "id": "grip",
       "phase": "exam",
       "until": "check:grip",
       "area": "pad:grip",
-      "text": "GRIP: hold the mouse till the force gauge fills, then let go to say RELEASE. Steady lets go before the LIMIT mark, {limit} s."
+      "text": "GRIP: hold the mouse till the force gauge fills, then let go to say RELEASE. Steady lets go before the LIMIT mark."
     },
     {
       "id": "port",

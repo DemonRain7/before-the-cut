@@ -16,21 +16,22 @@
     "Hey. Hi. Sorry, I'm on the clock.",
     "Left eye's cracked. I just need the lens swapped before my night run."
   ],
+  "parts": {"eye_l": "kite", "eye_r": "natural", "hands": "natural", "port": "street", "voice": "natural"},
   "eyes": {
-    "left": {"kind": "optic", "tightens": false, "follows": true, "cracked": true},
-    "right": {"kind": "natural", "tightens": true, "follows": true}
+    "left": {"tightens": false, "follows": true, "cracked": true},
+    "right": {"tightens": true, "follows": true}
   },
   "grip": {"release_ms": 300, "tremor": 2},
   "port": {"covered": false},
   "idle": {"hands": "drum", "gaze": "dart"},
   "looks": {
-    "eyes": "Left: cheap optic, cracked. Right: natural.",
+    "eyes": "Left: a KITE optic, cracked. Right: natural.",
     "hands": "Drumming the counter. Chewed nails.",
     "port": "Wrist socket, scuffed rim. Calm skin."
   },
   "checks": {
     "penlight": {"first": ["comply"], "insist": "comply",
-      "note": "Light: R tightens, L optic fixed. Both follow."},
+      "note": "Light: R tightens, L no pupil. Both follow."},
     "grip": {"first": ["comply"], "insist": "comply",
       "note": "Grip: jittery. Let go {t} s after 'release'."},
     "port": {"first": ["comply"], "insist": "comply",
@@ -79,7 +80,7 @@
     "gave_up": "I can't wait any more. Sorry, doc."
   },
   "rows": {
-    "eyes": {"ok": true, "text": "The cracked optic never tightens: it is an implant. Both eyes follow.",
+    "eyes": {"ok": true, "text": "A KITE has no pupil to tighten. The right one did. Both follow.",
       "evidence": ["check:penlight"]},
     "hands": {"ok": true, "text": "Shaky, but he lets go at once.", "evidence": ["check:grip"]},
     "port": {"ok": true, "text": "Scuffed rim, calm skin.", "evidence": ["look:port", "check:port"]},

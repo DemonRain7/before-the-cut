@@ -1,0 +1,17 @@
+[remap]
+
+importer="font_data_bmfont"
+type="FontFile"
+uid="uid://coqfu6lslq5xc"
+path="res://.godot/imported/zh.fnt-2aa2d304c87dda686bc9fc229b43c6c9.fontdata"
+
+[deps]
+
+source_file="res://assets/fonts/zh.fnt"
+dest_files=["res://.godot/imported/zh.fnt-2aa2d304c87dda686bc9fc229b43c6c9.fontdata"]
+
+[params]
+
+fallbacks=[]
+compress=true
+scaling_mode=2
