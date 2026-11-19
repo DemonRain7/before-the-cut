@@ -13,8 +13,8 @@ function handler(provider=fixture(),limits={}) {
  const logs=[]; const handle=createHandler({cases,rules,provider,limits,log:e=>logs.push(e)});
  return {handle,logs,post:b=>handle({method:"POST",path:"/v1/patient-dialogue",bodyText:JSON.stringify(b)})};
 }
-test("five current cases and matching game limits",()=>{
- assert.equal(Object.keys(cases).length,5); assert.equal(DEFAULT_LIMITS.maxCallsPerVisit,rules.agent.max_model_calls_per_visit);
+test("ten current cases and matching game limits",()=>{
+ assert.equal(Object.keys(cases).length,10); assert.equal(DEFAULT_LIMITS.maxCallsPerVisit,rules.agent.max_model_calls_per_visit);
  assert.equal(DEFAULT_LIMITS.maxLineChars,rules.agent.max_line_chars); assert.ok(DEFAULT_LIMITS.upstreamTimeoutMs<rules.agent.timeout_ms);
  assert.equal(DEFAULT_LIMITS.maxReplyChars,rules.agent.max_reply_chars); assert.ok(DEFAULT_LIMITS.maxReplyChars>=DEFAULT_LIMITS.maxLineChars);
  assert.ok(DEFAULT_LIMITS.maxCallsPerSession>=DEFAULT_LIMITS.maxCallsPerVisit*rules.shift_order.length);
@@ -174,10 +174,10 @@ test("real HTTP server returns protocol 3 response with mock label",async()=>{
  const data=await res.json();assert.equal(res.status,200);assert.equal(data.meta.mock,true);assert.ok(data.reply.length);
  }finally{await server.close();}
 });
-test("Worker entry imports the current five cases and serves the same contract in Node",async()=>{
+test("Worker entry imports the current ten cases and serves the same contract in Node",async()=>{
  const worker=(await import("../src/worker.mjs")).default;
  const health=await worker.fetch(new Request("https://local.test/healthz"),{BTC_PROVIDER:"mock"});
- const data=await health.json();assert.equal(data.protocol,"3");assert.equal(data.cases.length,5);
+ const data=await health.json();assert.equal(data.protocol,"3");assert.equal(data.cases.length,10);
  const res=await worker.fetch(new Request("https://local.test/v1/patient-dialogue",{method:"POST",body:JSON.stringify(body())}),{BTC_PROVIDER:"mock"});
  const reply=await res.json();assert.equal(res.status,200);assert.equal(reply.meta.mock,true);
 });

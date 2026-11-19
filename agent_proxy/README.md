@@ -29,7 +29,7 @@ Then from the project root:
 ```
 
 Both the proxy and the game must speak protocol 3; a protocol 2 client gets `409 protocol_mismatch`.
-`GET /healthz` reports protocol 3, the provider, five cases and `speech_to_text: true|false`.
+`GET /healthz` reports protocol 3, the provider, ten cases and `speech_to_text: true|false`.
 
 Checked on November 14 and again on November 15 with the mock provider on a spare port, using
 the command that `npm run dev` runs: the server started, `/healthz` answered 200 with

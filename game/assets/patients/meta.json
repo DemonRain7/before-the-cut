@@ -1,4 +1,190 @@
 {
+ "bo": {
+  "attack": {
+   "face": [
+    80,
+    80
+   ],
+   "hand": [
+    138,
+    108
+   ],
+   "head": [
+    80,
+    54
+   ],
+   "style": "spike",
+   "tool": [
+    32,
+    114
+   ]
+  },
+  "blink": [
+   2.0,
+   4.5
+  ],
+  "face": {
+   "brows": "neutral",
+   "mouth": "closed"
+  },
+  "gestures": {
+   "fist": "hands_fist",
+   "raise": "hands_react",
+   "slam": "hands_slam"
+  },
+  "layers": [
+   "attack",
+   "attack_b",
+   "attack_s1",
+   "attack_s1_b",
+   "attack_s1_b_clean",
+   "attack_s1_clean",
+   "attack_s2",
+   "attack_s2_b",
+   "attack_s2_b_clean",
+   "attack_s2_clean",
+   "body",
+   "brows_angry",
+   "brows_neutral",
+   "brows_worried",
+   "hands_a",
+   "hands_a_t",
+   "hands_b",
+   "hands_b_t",
+   "hands_fist",
+   "hands_fist_t",
+   "hands_react",
+   "hands_react_t",
+   "hands_slam",
+   "hands_slam_t",
+   "head",
+   "lids",
+   "mouth_a",
+   "mouth_angry",
+   "mouth_b",
+   "mouth_closed",
+   "mouth_turn",
+   "mouth_turn_b",
+   "mouth_turn_b_clean",
+   "mouth_turn_clean",
+   "mouth_upset",
+   "pupils",
+   "turn",
+   "turn_clean"
+  ],
+  "mouth_y": 93,
+  "zones": {
+   "eyes": [
+    54,
+    63,
+    52,
+    18
+   ],
+   "hands": [
+    32,
+    150,
+    96,
+    22
+   ],
+   "port": [
+    42,
+    127,
+    22,
+    16
+   ]
+  }
+ },
+ "dana": {
+  "attack": {
+   "face": [
+    80,
+    82
+   ],
+   "hand": [
+    138,
+    108
+   ],
+   "head": [
+    80,
+    56
+   ],
+   "style": "baton",
+   "tool": [
+    32,
+    112
+   ]
+  },
+  "blink": [
+   3.0,
+   6.0
+  ],
+  "face": {
+   "brows": "neutral",
+   "mouth": "closed"
+  },
+  "gestures": {
+   "fist": "hands_fist",
+   "point": "hands_point",
+   "slam": "hands_slam"
+  },
+  "layers": [
+   "attack",
+   "attack_b",
+   "attack_s1",
+   "attack_s1_b",
+   "attack_s1_b_clean",
+   "attack_s1_clean",
+   "attack_s2",
+   "attack_s2_b",
+   "attack_s2_b_clean",
+   "attack_s2_clean",
+   "body",
+   "brows_angry",
+   "brows_neutral",
+   "brows_worried",
+   "hands_a",
+   "hands_b",
+   "hands_fist",
+   "hands_point",
+   "hands_react",
+   "hands_slam",
+   "head",
+   "lids",
+   "mouth_a",
+   "mouth_angry",
+   "mouth_b",
+   "mouth_closed",
+   "mouth_turn",
+   "mouth_turn_b",
+   "mouth_turn_b_clean",
+   "mouth_turn_clean",
+   "mouth_upset",
+   "pupils",
+   "turn",
+   "turn_clean"
+  ],
+  "mouth_y": 95,
+  "zones": {
+   "eyes": [
+    56,
+    65,
+    48,
+    18
+   ],
+   "hands": [
+    38,
+    150,
+    84,
+    22
+   ],
+   "port": [
+    66,
+    98,
+    28,
+    26
+   ]
+  }
+ },
  "juno": {
   "attack": {
    "face": [
@@ -185,6 +371,100 @@
    ]
   }
  },
+ "lux": {
+  "attack": {
+   "face": [
+    80,
+    86
+   ],
+   "hand": [
+    138,
+    108
+   ],
+   "head": [
+    80,
+    60
+   ],
+   "style": "arc",
+   "tool": [
+    32,
+    114
+   ]
+  },
+  "blink": [
+   2.5,
+   5.0
+  ],
+  "face": {
+   "brows": "neutral",
+   "mouth": "closed"
+  },
+  "gestures": {
+   "fist": "hands_fist",
+   "point": "hands_point",
+   "slam": "hands_slam"
+  },
+  "layers": [
+   "attack",
+   "attack_b",
+   "attack_s1",
+   "attack_s1_b",
+   "attack_s1_b_clean",
+   "attack_s1_clean",
+   "attack_s2",
+   "attack_s2_b",
+   "attack_s2_b_clean",
+   "attack_s2_clean",
+   "body",
+   "brows_angry",
+   "brows_neutral",
+   "brows_worried",
+   "hands_a",
+   "hands_b",
+   "hands_fist",
+   "hands_point",
+   "hands_react",
+   "hands_slam",
+   "head",
+   "head_t",
+   "lids",
+   "mouth_a",
+   "mouth_angry",
+   "mouth_b",
+   "mouth_closed",
+   "mouth_turn",
+   "mouth_turn_b",
+   "mouth_turn_b_clean",
+   "mouth_turn_clean",
+   "mouth_upset",
+   "pupils",
+   "pupils_b",
+   "pupils_react",
+   "turn",
+   "turn_clean"
+  ],
+  "mouth_y": 97,
+  "zones": {
+   "eyes": [
+    56,
+    69,
+    48,
+    18
+   ],
+   "hands": [
+    42,
+    150,
+    76,
+    22
+   ],
+   "port": [
+    55,
+    53,
+    16,
+    13
+   ]
+  }
+ },
  "maren": {
   "attack": {
    "face": [
@@ -271,6 +551,191 @@
     141,
     24,
     16
+   ]
+  }
+ },
+ "ozzie": {
+  "attack": {
+   "face": [
+    80,
+    88
+   ],
+   "hand": [
+    138,
+    108
+   ],
+   "head": [
+    80,
+    56
+   ],
+   "style": "cleaver",
+   "tool": [
+    32,
+    118
+   ]
+  },
+  "blink": [
+   2.5,
+   5.0
+  ],
+  "face": {
+   "brows": "neutral",
+   "mouth": "closed"
+  },
+  "gestures": {
+   "fist": "hands_fist",
+   "raise": "hands_react",
+   "slam": "hands_slam"
+  },
+  "layers": [
+   "attack",
+   "attack_b",
+   "attack_s1",
+   "attack_s1_b",
+   "attack_s1_b_clean",
+   "attack_s1_clean",
+   "attack_s2",
+   "attack_s2_b",
+   "attack_s2_b_clean",
+   "attack_s2_clean",
+   "body",
+   "brows_angry",
+   "brows_neutral",
+   "brows_worried",
+   "hands_a",
+   "hands_a_t",
+   "hands_b",
+   "hands_b_t",
+   "hands_fist",
+   "hands_fist_t",
+   "hands_react",
+   "hands_react_t",
+   "hands_slam",
+   "hands_slam_t",
+   "head",
+   "lids",
+   "mouth_a",
+   "mouth_angry",
+   "mouth_b",
+   "mouth_closed",
+   "mouth_turn",
+   "mouth_turn_b",
+   "mouth_turn_b_clean",
+   "mouth_turn_clean",
+   "mouth_upset",
+   "pupils",
+   "turn",
+   "turn_clean"
+  ],
+  "mouth_y": 101,
+  "zones": {
+   "eyes": [
+    56,
+    73,
+    48,
+    14
+   ],
+   "hands": [
+    34,
+    156,
+    92,
+    17
+   ],
+   "port": [
+    99,
+    141,
+    22,
+    15
+   ]
+  }
+ },
+ "priya": {
+  "attack": {
+   "face": [
+    80,
+    84
+   ],
+   "hand": [
+    138,
+    108
+   ],
+   "head": [
+    80,
+    58
+   ],
+   "style": "laser",
+   "tool": [
+    32,
+    114
+   ]
+  },
+  "blink": [
+   2.5,
+   5.0
+  ],
+  "face": {
+   "brows": "neutral",
+   "mouth": "closed"
+  },
+  "gestures": {
+   "point": "hands_point",
+   "raise": "hands_react",
+   "slam": "hands_slam"
+  },
+  "layers": [
+   "attack",
+   "attack_b",
+   "attack_s1",
+   "attack_s1_b",
+   "attack_s1_b_clean",
+   "attack_s1_clean",
+   "attack_s2",
+   "attack_s2_b",
+   "attack_s2_b_clean",
+   "attack_s2_clean",
+   "body",
+   "brows_angry",
+   "brows_neutral",
+   "brows_worried",
+   "hands_a",
+   "hands_b",
+   "hands_point",
+   "hands_react",
+   "hands_slam",
+   "head",
+   "lids",
+   "mouth_a",
+   "mouth_angry",
+   "mouth_b",
+   "mouth_closed",
+   "mouth_turn",
+   "mouth_turn_b",
+   "mouth_turn_b_clean",
+   "mouth_turn_clean",
+   "mouth_upset",
+   "pupils",
+   "turn",
+   "turn_clean"
+  ],
+  "mouth_y": 96,
+  "zones": {
+   "eyes": [
+    56,
+    67,
+    48,
+    18
+   ],
+   "hands": [
+    50,
+    150,
+    60,
+    22
+   ],
+   "port": [
+    86,
+    136,
+    32,
+    14
    ]
   }
  },

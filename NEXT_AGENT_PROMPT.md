@@ -13,11 +13,35 @@ English and Chinese: a change to its English is a change to its Chinese in the s
 Git: both rounds of November 16 are in commit 822e8d7. The work of November 17 is in e7f94d7,
 made and pushed to origin/main on November 18 when the student asked. The language work of
 November 18 is in 3f1fcbd, pushed; the work of late November 18 is in a487cea, pushed. The
-data and the code of random signs are in 5b64d87, pushed; the model's night signs are
-committed after it, together with this file. Run git status -sb and git log -3 --oneline:
+data and the code of random signs are in 5b64d87, the model's night signs in 484ff85 and
+every part's art in 813b9d0, all pushed; the five new characters are committed after 813b9d0,
+together with this file. Run git status -sb and git log -3 --oneline:
 anything uncommitted is newer than this file.
 
-Latest checkpoint (November 19): the data and the code of random signs, then the model's
+Latest checkpoint (November 19, afternoon): every character's art for each part (813b9d0)
+and five new characters, built by Claude (Opus 5.5) and checked; nobody has played it. Every
+sign a template can draw has its picture (a _t twin with dark threads of every hands layer
+where the bust shows the port, a hands layer for each temper gesture, close-ups of both eyes,
+the grip and the port with and without threads), and every patient turns with a weapon of
+their own. The cast is ten (rules.json roster): Kip, Rook, Vale, Juno and Maren, and Priya Nair
+(night-ward nurse; SCAN eye, LANCET hands; a laser), Ozzie Brandt (noodle-cart cook; CHOP hand;
+a cleaver), Lux Ferreira (net diver; IRIS and KITE eyes, DIVER temple jack; an arc), Dana
+Kirsch (off-duty police sergeant; TALON eye, MIL-SPEC neck plate; a stun baton) and Bo Kowalski
+(pit fighter; PISTON fist; a spike). Each night draws five whose fees come to 1,700 to 1,999.
+data/nights.json has test nights A to H (C to G new); together they show every character
+steady and drifting and every sign, and run_tests.gd fails otherwise (case_db.gd
+night_coverage). OPEN, BARELY can now be reached on some nights (test nights D and F); ON
+NOTICE never can (two right calls and both drops make 1,750 at most, under 2,000): for the
+student to decide. The opening card's made-up KESTREL entry fitted Lux; its clue changed and a
+rule test guards it. Not fixed: Vale's port close-up shows a round socket where the binder and
+Dana's close-up show a plate (Vale's port is never examined in play). The scene tests play only
+nights A and B; the newer five reach the real scene only in the capture's weapon nights (C to
+F). Checks, all passed: run_tests 1179; the scene test 1079, 1080 in Chinese, 1079 with less
+blood; the window close 5; the proxy 40; over HTTP 199 and 16 wire checks; measure_text 1513
+lines in each language; dry captures 439, 439, 334 and 235; the weapon nights drawn on a hidden
+desktop, 235 frames, none missed. Mock calls only; nothing paid.
+
+Previous checkpoint (November 19, early): the data and the code of random signs, then the model's
 night signs, built by Claude (Opus 5.5) and checked; nobody has played it. The five characters stay as they are; each night draws
 from its seed who of them drift (one to three) and which sign each sheet row shows (two to four
 broken rows on a drifting visitor, at least two of them rows the doctor can test whatever the
@@ -37,7 +61,7 @@ Chinese, 1001 with less blood; the window close 5; the proxy 40; over HTTP 199 a
 checks; measure_text 908 lines in each language; dry captures 204, 204, 99 and 99 (run before
 the night signs, which changed no drawing).
 
-Previous checkpoint (November 18, late evening): the student's five requests of that evening,
+Earlier checkpoint (November 18, late evening): the student's five requests of that evening,
 paraphrased: say whether a call succeeded only at the end, so the player is less sure, and go
 over the whole logic for holes; what is 黑丝 (answered in chat: the assistant's shorthand for the
 dark threads that spread from a port, 黑色纹路 in the game; the glossary now warns that 黑丝
@@ -263,25 +287,17 @@ Next three tasks (first run git status -sb and git log -3 --oneline):
    the student has picked two G1 pitches with fewer than two replies: specific, moment-based
    notes in English for the student's review, never sent unasked. G1 is submitted; leave its
    snapshots, slides and narration alone.
-2. Every character's art for each part (the rest of request 3), from tools/art/ only: the
-   port clean and with dark threads for every character (the portrait's <layer>_t twins where
-   the port shows, the close-up's port_threads.png), and attack art for Kip, Rook and Juno with
-   the attack drawing made general. English and Chinese together.
-3. Five new characters with all their assets: case files with every sign of every row (a
-   sentence for the model on each speech and temper sign), contacts' clues, Chinese, the
-   proxy's imports and backgrounds that hold on any night, every part's art and an attack,
-   test nights that show their signs (and Rook's broken eyes and temper and Maren's dark
-   threads), and a coverage check that fails on a sign no test night shows. HANDOFF.md has the
-   working sketch (a nurse, a noodle cook, a net diver, an off-duty police officer, a pit
-   fighter).
-Once they are built, the student plays and reads (.\run-game.ps1, with headphones): a night in
-Chinese from a fresh start and a night in English, reading every card, tip, sheet, slip and
-report page and typing with a real Chinese input method; then settles the proposals in
-HANDOFF.md under "For the student to decide". An agent operating the window, or the scene
-test, is not a substitute.
+2. The student plays and reads (.\run-game.ps1, with headphones): a drawn night in Chinese from
+   a fresh start and a night in English, reading every card, tip, sheet, slip and report page
+   and typing with a real Chinese input method; then the test nights with the newer five
+   (godot --path game -- --test-night=C, and D to G likewise); then settles the proposals in
+   HANDOFF.md under "For the student to decide" (ON NOTICE, and the five themselves). An agent
+   operating the window, or the scene test, is not a substitute.
+3. Small fixes from that play, and Vale's port close-up (draw the MIL-SPEC plate in
+   tools/art/gen_scopes.py); English and Chinese together.
 After these: a short live run in both languages (the model's Chinese inside 55 and 110
-characters, the student's real voice through TAB in both languages, the new moments with real
-latency), which is paid and needs the student's explicit yes first; a code is never passed to
+characters, the night's signs and the newer five's voices, the student's real voice through TAB
+in both languages, the new moments with real latency), which is paid and needs the student's explicit yes first; a code is never passed to
 the model, so the patient AI does not know one was said. Then the visual check of the PATIENT
 SAID row, paste support for the typing line, and the fresh-import crash (another Godot version
 on a copy, or an upstream report with the logs; a public report is a post and needs the

@@ -18,11 +18,16 @@ import caseB from "../../game/data/cases/rook.json" with { type: "json" };
 import caseC from "../../game/data/cases/vale.json" with { type: "json" };
 import caseD from "../../game/data/cases/juno.json" with { type: "json" };
 import caseE from "../../game/data/cases/maren.json" with { type: "json" };
+import caseF from "../../game/data/cases/priya.json" with { type: "json" };
+import caseG from "../../game/data/cases/ozzie.json" with { type: "json" };
+import caseH from "../../game/data/cases/lux.json" with { type: "json" };
+import caseI from "../../game/data/cases/dana.json" with { type: "json" };
+import caseJ from "../../game/data/cases/bo.json" with { type: "json" };
 
 import { createHandler, DEFAULT_LIMITS } from "./core.mjs";
 import { providerFromSettings } from "./providers.mjs";
 
-const cases = { [caseA.id]: caseA, [caseB.id]: caseB, [caseC.id]: caseC, [caseD.id]: caseD, [caseE.id]: caseE };
+const cases = Object.fromEntries([caseA, caseB, caseC, caseD, caseE, caseF, caseG, caseH, caseI, caseJ].map((c) => [c.id, c]));
 let handle = null;
 
 export default {

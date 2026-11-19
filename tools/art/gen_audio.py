@@ -546,6 +546,105 @@ def scrape():
     return lp(out, 9000) * fade(np.ones(len(out)), 0.005, 0.1)
 
 
+def laser_loop():
+    """Priya's LANCET fingers run up to a cutting beam: a thin whine beating against itself,
+    the mains hum under it and a faint sizzle. Whole cycles in the half second, so it loops
+    clean."""
+    sec = 0.5
+    x = t(sec)
+    whine = np.sin(2 * np.pi * 1480 * x) * 0.45 + np.sin(2 * np.pi * 1486 * x) * 0.3 + np.sin(2 * np.pi * 2960 * x) * 0.12
+    hum = np.sin(2 * np.pi * 120 * x) * 0.18 + np.sign(np.sin(2 * np.pi * 60 * x)) * 0.04
+    sizzle = loop_noise(sec, lambda f: ((f > 4000) & (f < 9000)) * 1.0) * 0.18
+    return whine + hum + sizzle
+
+
+def laser_burst():
+    """The beam meeting glass or steel: a bright crack, the sizzle of it biting, and the whine
+    bending down as it cuts out."""
+    sec = 0.8
+    crack = hp(noise(0.02), 2500) * env(int(SR * 0.02), 0.0005, 0.005)
+    bend = sweep(1900, 1100, 0.5, 0.6) * env(int(SR * 0.5), 0.003, 0.2) * 0.5
+    sizzle = hp(noise(sec), 3500) * env(int(SR * sec), 0.01, 0.25) * (0.6 + 0.4 * square(37, sec)) * 0.7
+    pops = at(sec, *[(rng.random() * 0.6, lp(noise(0.006), 7000) * 0.7) for _ in range(18)])
+    return at(0.9, (0.0, crack * 0.8), (0.0, bend), (0.01, sizzle), (0.03, pops * 0.5))
+
+
+def chop():
+    """Ozzie's cleaver landing: the edge biting in with the hand's weight behind it, a short
+    ring off the blade, and the grit of what it split."""
+    knock = lp(noise(0.05), 5000) * env(int(SR * 0.05), 0.0005, 0.01)
+    thud = sweep(150, 55, 0.2) * env(int(SR * 0.2), 0.001, 0.05)
+    ring = sum(sine(f, 0.5) * a for f, a in ((1870, 1.0), (2950, 0.5), (4410, 0.3))) * env(int(SR * 0.5), 0.001, 0.07)
+    split = bp(noise(0.12), 1500, 6000) * env(int(SR * 0.12), 0.002, 0.03) * 0.6
+    return at(0.6, (0.0, knock), (0.0, thud * 0.9), (0.002, ring * 0.35), (0.005, split))
+
+
+def arc_loop():
+    """Lux's torn-out deck cable, still live: a mains buzz that will not hold steady, and
+    spits. Built from parts that fit the half second, so it loops clean."""
+    sec = 0.5
+    x = t(sec)
+    buzz = np.sign(np.sin(2 * np.pi * 120 * x)) * 0.22 + np.sin(2 * np.pi * 240 * x) * 0.2 + np.sin(2 * np.pi * 360 * x + 0.7) * 0.1
+    gate = loop_noise(sec, lambda f: ((f > 2) & (f < 30)) * 1.0)
+    spit = loop_noise(sec, lambda f: ((f > 2500) & (f < 9500)) * 1.0) * np.clip(gate * 2.5 - 0.6, 0, 1)
+    return buzz * (0.6 + 0.4 * np.clip(gate + 0.5, 0, 1)) + spit * 0.8
+
+
+def zap():
+    """The arc finding something to earth through: a sharp crack, a burst of buzz, and the
+    crackle dying away."""
+    sec = 0.6
+    crack = hp(noise(0.015), 3000) * env(int(SR * 0.015), 0.0003, 0.004)
+    x = t(0.35)
+    buzz = (np.sign(np.sin(2 * np.pi * 180 * x)) * 0.5 + bp(noise(0.35), 1200, 7000) * 0.6) * env(len(x), 0.002, 0.09)
+    drop = sweep(2200, 300, 0.25, 0.5) * env(int(SR * 0.25), 0.001, 0.06) * 0.4
+    crackle = at(sec, *[(0.05 + rng.random() * 0.45, hp(noise(0.005), 4000) * 0.5 * (1.0 - i / 14.0)) for i in range(14)])
+    return at(0.7, (0.0, crack), (0.0, buzz), (0.0, drop), (0.02, crackle))
+
+
+def baton_hit():
+    """Dana's stun baton: a hard rod's crack, and the charge going into whatever it hit."""
+    knock = lp(noise(0.03), 4500) * env(int(SR * 0.03), 0.0005, 0.007)
+    thud = sweep(240, 90, 0.12) * env(int(SR * 0.12), 0.001, 0.03)
+    x = t(0.22)
+    bzz = (np.sign(np.sin(2 * np.pi * 95 * x)) * 0.4 + bp(noise(0.22), 900, 6000) * 0.5) * env(len(x), 0.004, 0.08)
+    bzz = bzz * (0.55 + 0.45 * square(30, 0.22))
+    return at(0.5, (0.0, knock), (0.0, thud * 0.8), (0.015, bzz * 0.7))
+
+
+def stun_loop():
+    """The baton held charged: a tight, even buzz with a tick in it. Whole cycles in the
+    0.4 seconds, so it loops clean."""
+    sec = 0.4
+    x = t(sec)
+    buzz = np.sign(np.sin(2 * np.pi * 95 * x)) * 0.18 + np.sin(2 * np.pi * 190 * x) * 0.22 + np.sin(2 * np.pi * 2850 * x) * 0.05
+    hiss = loop_noise(sec, lambda f: ((f > 3000) & (f < 8000)) * 1.0) * 0.12
+    tick = 0.75 + 0.25 * (np.sin(2 * np.pi * 10 * x) > 0.85)
+    return (buzz + hiss) * tick
+
+
+def piston_loop():
+    """Bo's PISTON cocked: the compressor's hum, and the piston chuffing as it holds pressure
+    against the catch. Every part fits the 0.8 seconds, so it loops clean."""
+    sec = 0.8
+    x = t(sec)
+    hum = np.sin(2 * np.pi * 55 * x) * 0.35 + np.sign(np.sin(2 * np.pi * 110 * x)) * 0.06
+    chuff = loop_noise(sec, lambda f: ((f > 1200) & (f < 6500)) * 1.0) * np.sin(np.pi * x / 0.4) ** 8
+    knock = np.sin(2 * np.pi * 40 * x) * np.sin(np.pi * x / 0.4) ** 30 * 0.3
+    return hum + chuff * 0.6 + knock
+
+
+def spike():
+    """Bo's spike driven home: the piston's crack, the point going through with a steel
+    shriek, then the arm's weight and the vent."""
+    crack = hp(noise(0.025), 1800) * env(int(SR * 0.025), 0.0005, 0.005)
+    boom = sweep(110, 40, 0.35) * env(int(SR * 0.35), 0.001, 0.1)
+    shriek = sweep(4300, 2500, 0.12) * env(int(SR * 0.12), 0.0005, 0.035) * 0.45
+    tear = bp(noise(0.08), 2000, 7000) * env(int(SR * 0.08), 0.0005, 0.02) * 0.5
+    vent = bp(noise(0.45), 2500, 7000) * env(int(SR * 0.45), 0.04, 0.11) * 0.22
+    return at(0.8, (0.0, crack * 0.7), (0.0, boom), (0.003, shriek), (0.003, tear), (0.14, vent))
+
+
 def tinnitus():
     """What is left in your ears afterwards."""
     sec = 2.8
@@ -645,11 +744,15 @@ SOUNDS = {
     "glass_fit": (glass_fit, 0.6),
     "clang": (clang, 0.75), "punch": (punch, 0.9), "servo_loop": (servo_loop, 0.35), "hum_loop": (hum_loop, 0.3),
     "scrape": (scrape, 0.6),
+    "laser_loop": (laser_loop, 0.3), "laser_burst": (laser_burst, 0.7), "chop": (chop, 0.85),
+    "arc_loop": (arc_loop, 0.3), "zap": (zap, 0.75), "baton_hit": (baton_hit, 0.8), "stun_loop": (stun_loop, 0.25),
+    "piston_loop": (piston_loop, 0.35), "spike": (spike, 0.9),
 }
 # The sounds of the first build share one random stream, in the order above. Every sound added
 # since starts from a fresh stream instead: adding one changes no other file, and writing it
 # alone gives the same file as a full build. Add new sounds here as well as above.
-FRESH = {"radio", "siren", "glass_fit", "clang", "punch", "servo_loop", "hum_loop", "scrape"}
+FRESH = {"radio", "siren", "glass_fit", "clang", "punch", "servo_loop", "hum_loop", "scrape",
+         "laser_loop", "laser_burst", "chop", "arc_loop", "zap", "baton_hit", "stun_loop", "piston_loop", "spike"}
 
 
 def main(only=None):

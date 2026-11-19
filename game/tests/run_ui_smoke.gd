@@ -569,7 +569,8 @@ func guide_layout() -> void:
 				held += 1
 			else:
 				print("  %s's %s is outside the guide's frame for the visitor: %s" % [str(who), str(zone), str(spot)])
-	check(parts == 15 and held == parts, "the frame round the visitor holds the eyes, the hands and the port of all five")
+	check(main.meta.size() == 10 and parts == 3 * main.meta.size() and held == parts,
+		"the frame round the visitor holds the eyes, the hands and the port of all ten")
 
 
 # ================================================================ shift 1
@@ -2313,7 +2314,7 @@ func counter_words() -> void:
 			packages += 1
 		else:
 			print("  a package that does not fit one page: ", line)
-	check(pool.size() == 10 and packages == pool.size(), "what each of the ten couriers hands over fits one page of the strip")
+	check(pool.size() == 20 and packages == pool.size(), "what each of the twenty couriers hands over fits one page of the strip")
 	check(Gfx.wrap_text(Lang.tf(main.GLASS_LINE, [40, 3, 3]), main.dialogue.TEXT_W).size() <= main.dialogue.PAGE_LINES
 		and Gfx.wrap_text(Lang.tf(main.GLASS_LINE, [999, 3, 3]), main.dialogue.TEXT_W).size() <= main.dialogue.PAGE_LINES,
 		"what the glass fitter did fits one page of the strip")

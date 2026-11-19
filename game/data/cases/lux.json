@@ -1,0 +1,300 @@
+{
+  "id": "lux",
+  "version": 3,
+  "name": "Lux Ferreira",
+  "role": "Net diver",
+  "age": 19,
+  "request": "Swap burnt deck jack",
+  "fee": 500,
+  "patience": 5,
+  "sprite": "lux",
+  "voice": {"pitch": 1.35, "rate": 1.15},
+  "teaser": "A thin kid in a baggy hoodie, one eye a screen and one a lens. Her temple smells burnt.",
+  "brief": "You are Lux Ferreira, 19, a net diver: people pay you to run their data through the deck jack in your temple. You are sharp, sarcastic and impatient with anyone slow, and you hide being scared behind jokes. Your jack burnt out mid-dive last night and you need a new one before a paying job at dawn. You hate being treated like a kid, and you do not want anybody asking what you saw on that dive.",
+  "opening": [
+    "Hi. Yes, I'm old enough. Can we skip that bit?",
+    "My deck jack burnt out mid-dive. I need a new one before a job at dawn."
+  ],
+  "parts": {
+    "eye_l": "iris",
+    "eye_r": "kite",
+    "hands": "natural",
+    "port": "diver",
+    "voice": "natural"
+  },
+  "eyes": {"left": {}, "right": {}},
+  "port": {"covered": false},
+  "idle": {"hands": "tap", "gaze": "dart"},
+  "looks": {
+    "eyes": "Left: an IRIS screen. Right: a KITE lens.",
+    "hands": "Natural hands, bitten nails. Typing on air."
+  },
+  "checks": {
+    "penlight": {"first": ["comply"], "insist": "comply"},
+    "grip": {"first": ["comply"], "insist": "comply"},
+    "port": {"first": ["stall", "comply"], "insist": "comply"}
+  },
+  "claims": {},
+  "topics": [
+    {
+      "id": "why",
+      "q": "What happened to the jack?",
+      "keys": [
+        "wrong", "problem", "happen", "reason", "trouble", "brings", "bring", "matter", "here", "came",
+        "come", "jack", "deck", "burn", "burnt", "burned", "fried", "temple", "head", "smoke", "crash"
+      ],
+      "first": ["answer"]
+    },
+    {
+      "id": "sleep",
+      "q": "How are you sleeping?",
+      "keys": [
+        "sleep", "slept", "rest", "tired", "awake", "night", "bed", "dream", "insomnia", "exhaust",
+        "nap"
+      ],
+      "first": ["answer"]
+    },
+    {
+      "id": "dive",
+      "q": "What did you see on the dive?",
+      "keys": [
+        "see", "saw", "seen", "dive", "diving", "net", "inside", "found", "there", "data", "deep",
+        "down", "met", "something"
+      ],
+      "deflect": "Nothing. Data. Boring. Next question.",
+      "first": ["deflect", "answer"]
+    }
+  ],
+  "script": [
+    {"on": "check:port", "move": "stall"},
+    {"on": "ask:dive", "move": "deflect"}
+  ],
+  "lines": {
+    "comply": ["Fine.", "Sure, whatever."],
+    "comply:penlight": "Go on. Two different eyes, I know.",
+    "comply:grip": "Hand-holding. Wow. Okay.",
+    "comply:port": "Fine. Don't make a face.",
+    "stall": ["Do you have to?"],
+    "stall:port": "It's gross, okay? It's all burnt.",
+    "refuse": "No. Hard no.",
+    "deflect": ["Skip."],
+    "reassure": ["...Okay. Thanks. Nobody's nice at four in the morning."],
+    "spent": "I've got a job at dawn. Yes or no, doc?",
+    "code": "Is that a handle? I don't know you."
+  },
+  "press_end": {
+    "walkout": "Wow. Okay. I'll find a back-alley jack. Bye.",
+    "attack": "You're so slow. Let me show you fast."
+  },
+  "attack": {
+    "on_refer": false,
+    "telegraph": "Her IRIS goes white. She rips the cable out of her temple and it spits violet sparks.",
+    "line": "Jacking in. Hold still."
+  },
+  "exit": {
+    "treat": "Oh, that's clean. That's so clean. Thanks, doc.",
+    "refer": "Trauma Team? You think I'm cooked? I'm nineteen!",
+    "taken": "Let go! I'm fine! I'm just tired!",
+    "gave_up": "Forget it. I'll dive on the burnt one."
+  },
+  "signs": {
+    "eyes": {
+      "normal": [
+        {
+          "id": "steady",
+          "text": "Neither eye has a pupil to tighten. Both followed the light.",
+          "note": "Light: no pupils. Both follow.",
+          "eyes": {
+            "left": {"tightens": false, "follows": true},
+            "right": {"tightens": false, "follows": true}
+          }
+        }
+      ],
+      "broken": [
+        {
+          "id": "stray",
+          "text": "Neither has a pupil, but both should follow. The left never did.",
+          "note": "Light: no pupils. L won't follow.",
+          "eyes": {
+            "left": {"tightens": false, "follows": false},
+            "right": {"tightens": false, "follows": true}
+          }
+        }
+      ]
+    },
+    "hands": {
+      "normal": [
+        {
+          "id": "lets_go",
+          "text": "Let go in 0.4 s. A natural hand lets go inside 1.0.",
+          "note": "Grip: quick. Let go {t} s after 'release'.",
+          "grip": {"release_ms": 400, "tremor": 1},
+          "after": "Done? Cool."
+        }
+      ],
+      "broken": [
+        {
+          "id": "holds",
+          "text": "Held on 1.6 s after 'release'. A natural hand lets go inside 1.0.",
+          "note": "Grip: quick. Held on {t} s after 'release'.",
+          "grip": {"release_ms": 1600, "tremor": 1},
+          "after": "Huh. Lag."
+        }
+      ]
+    },
+    "port": {
+      "normal": [
+        {
+          "id": "calm",
+          "text": "Burnt, but the skin round the jack is calm.",
+          "note": "Temple jack, burnt rim. Calm skin.",
+          "look": "Temple jack, burnt rim. Calm skin."
+        }
+      ],
+      "broken": [
+        {
+          "id": "threads",
+          "text": "Dark threads spread out from the temple jack.",
+          "note": "Burnt temple jack. Dark threads under skin.",
+          "look": "Burnt temple jack. Dark threads under skin.",
+          "threads": true
+        }
+      ]
+    },
+    "speech": {
+      "normal": [
+        {
+          "id": "own",
+          "text": "Sarcastic and fast, but it is all 'I' and 'my'.",
+          "answers": {
+            "why": {
+              "a": "The dive went long. The jack got hot, then it got smoke. I pulled out. I'm fine. The jack isn't.",
+              "note": "\"I pulled out. I'm fine.\""
+            },
+            "sleep": {
+              "a": "Like, three hours? Dawn job, night job. I'll sleep when I'm rich.",
+              "note": "\"I'll sleep when I'm rich.\""
+            },
+            "dive": {
+              "a": "Okay. Something big was down there, and I ran. That's it. I ran.",
+              "note": "\"Something big was down there. I ran.\""
+            }
+          },
+          "model": "Tonight you talk about yourself in the first person. On the dive you met something huge in the net and pulled out, and you are scared and hide it with jokes."
+        }
+      ],
+      "broken": [
+        {
+          "id": "we",
+          "text": "\"We came back up together.\" Something rode out with her.",
+          "answers": {
+            "why": {
+              "a": "The dive went long. The jack got hot, then it got smoke. I pulled out. I'm fine. The jack isn't.",
+              "note": "\"I pulled out. I'm fine.\""
+            },
+            "sleep": {
+              "a": "We don't really sleep. We just sort of idle. It's nice, actually.",
+              "note": "\"We don't sleep. We idle.\""
+            },
+            "dive": {
+              "a": "We came back up together. It wanted out, and I had a door.",
+              "note": "\"We came back up together.\""
+            }
+          },
+          "evidence": ["sleep", "dive"],
+          "model": "Tonight you say 'we' instead of 'I', as if something came back up from the dive with you and shares your head, and you find that cosy rather than frightening."
+        }
+      ]
+    },
+    "temper": {
+      "normal": [
+        {
+          "id": "together",
+          "text": "Pushed, she snaps back, and her face and voice agree.",
+          "press": {
+            "line": "Wow. Okay. You think I'm fried? Say it to my face.",
+            "face": "angry",
+            "hands": "point",
+            "note": "Snapped back, pointing. All at once."
+          },
+          "flare": {
+            "line": "Oh my god, just DO it! ...Sorry. Sorry. No sleep.",
+            "face": "upset",
+            "hands": "slam",
+            "note": "Slapped the glass, then said sorry."
+          },
+          "model": "When provoked you snap back with sarcasm, face and voice together, and then mumble an apology."
+        }
+      ],
+      "broken": [
+        {
+          "id": "polite",
+          "text": "Pushed, the sarcastic kid went smooth and polite. Her fist did not.",
+          "press": {
+            "line": "Of course, doctor. Whatever you need.",
+            "face": "flat",
+            "hands": "fist",
+            "note": "Went polite. Her hand closed tight."
+          },
+          "flare": {
+            "line": "Faster.",
+            "face": "blank",
+            "hands": "slam",
+            "note": "Hit the glass, face empty. No sorry."
+          },
+          "model": "When provoked tonight you turn smooth and polite, like a help-desk voice, with none of your usual sarcasm."
+        }
+      ]
+    }
+  },
+  "outcomes": {
+    "stable": {
+      "treat": {
+        "title": "JACK SWAPPED",
+        "text": "Lux plugs a test cable into the new jack, grins for the first time tonight and is gone."
+      },
+      "refer": {
+        "title": "FALSE CALL",
+        "text": "Trauma Team walks a steady nineteen-year-old out in front of the whole hall. She misses her job at dawn. Trauma Team takes the fee back and bills you for the call-out."
+      },
+      "walkout": {
+        "title": "WALKED OUT",
+        "text": "Lux leaves to find a back-alley jack. Nobody gets paid."
+      },
+      "false_alarm": {
+        "title": "FALSE ALARM",
+        "text": "The shutter slams in a net diver's face. By morning it is on every board she reads. That costs you."
+      },
+      "gave_up": {
+        "title": "OUT OF PATIENCE",
+        "text": "Lux had a job at dawn and you were still deciding. She goes with the jack still burnt. No fee, no bill."
+      }
+    },
+    "drifting": {
+      "treat": {
+        "title": "JACK SWAPPED",
+        "text": "The new jack runs cool, and whatever came up with her likes it. At 05:00 the district's traffic lights all turn green at once. Your stamp is on her card."
+      },
+      "refer": {
+        "title": "TAKEN IN",
+        "text": "Lux hums to herself all the way to the van, in two voices at once."
+      },
+      "caught": {
+        "title": "SHUTTER HELD",
+        "text": "Violet sparks crawl over the slats, then die. \"Next time,\" from the other side, in two voices. Trauma Team takes her quietly."
+      },
+      "hit": {
+        "title": "TOO SLOW",
+        "text": "The live cable came through before the shutter did. Trauma Team finds you on the floor. Lux is online somewhere, and not alone."
+      },
+      "locked_out": {
+        "title": "LOCKED OUT",
+        "text": "You dropped the shutter on a sarcastic kid. At 05:00 the district's traffic lights all turn green at once. You were right. Nobody pays for that."
+      },
+      "gave_up": {
+        "title": "OUT OF PATIENCE",
+        "text": "Lux walks off typing on air, in a hurry to dive. You made no call. Nobody is paid for that."
+      }
+    }
+  }
+}

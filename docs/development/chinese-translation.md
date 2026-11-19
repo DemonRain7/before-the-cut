@@ -19,9 +19,9 @@ languages are kept in step; none of it has been reviewed.
 - Yes to downloading Fusion Pixel Font for the Chinese glyphs.
 
 What else stays English is the assistant's choice: the binder's model names (KITE, IRIS, TALON,
-LOADER, DEFT, REFLEX, SEAM, VX-9), key names (ENTER, ESC, TAB, SPACE and the letters in
-brackets), AI and REC. The descriptive model words are translated: NATURAL 原生, STREET 街货,
-WORK 工用, MIL-SPEC 军规, MIXED 混装.
+SCAN, LOADER, DEFT, REFLEX, LANCET, CHOP, PISTON, SEAM, VX-9), key names (ENTER, ESC, TAB, SPACE
+and the letters in brackets), AI and REC. The descriptive model words are translated: NATURAL
+原生, STREET 街货, WORK 工用, MIL-SPEC 军规, DIVER 潜网, MIXED 混装.
 
 ## Glossary
 
@@ -75,6 +75,11 @@ that uses it, in the same commit.
 | FALSE CALL; TAKEN IN | 错误呼叫; 移交收治 | a Trauma Team call on the report page |
 | LIGHTS OUT | 熄灯 | the title of a night that ended with the doctor killed |
 | never came in | 没等到接诊 | on that report, the visitors still in the hall |
+| Ninth; Fifth | 第九街; 第五街 | the streets Kip and Bo name |
+| precinct; sergeant | 分局; 警长 | Dana's |
+| net diver; dive; deck jack | 潜网者; 潜网; 潜网插口 | Lux's trade and her temple socket. Not "netrunner" in either language |
+| overlay; grid | 叠加层; 网格 | the target overlay in Dana's TALON |
+| scrubs | 刷手服 | Priya's |
 
 ## The patients' voices
 
@@ -90,6 +95,14 @@ voice:
   repeated syllable with a hyphen, as in the English (付-付过钱的, 总-总算, 杂-杂音).
 - **Maren Holt**, 54, a night-shift welder: gentle and apologetic; she says 你, and her "dear"
   is 孩子 (谢谢你，孩子。).
+- **Priya Nair**, 45, a night-ward nurse: brisk, warm and professional; she says 你 and 医生,
+  never 您 (请吧，医生。).
+- **Ozzie Brandt**, 63, a noodle-cart cook: chatty and rambling; his "chief" is 老板
+  (好嘞，老板。).
+- **Lux Ferreira**, 19, a net diver: fast and sarcastic (行吧，随便。哇哦。).
+- **Dana Kirsch**, 47, an off-duty police sergeant: dry, clipped, used to asking the questions
+  (请便。不许反抗。).
+- **Bo Kowalski**, 29, a pit fighter: loud and cheerful; his "pal" is 哥们 (没问题，哥们。).
 
 ## How it works
 
@@ -165,7 +178,8 @@ Run these before a commit that touches any words (`AGENTS.md`, Languages):
   that reached the screen untranslated (`run_ui_smoke.gd` `untranslated_words()`).
 
 On November 18 all three passed: 0 problems, 616 lines that fit in each language, 954 scene
-checks. That shows that every line has a translation and fits, not that the translation is good.
+checks; on November 19, with the five new characters, 0 problems, 1513 lines in each language
+and 1080 scene checks. That shows that every line has a translation and fits, not that the translation is good.
 
 ## Adding a language
 

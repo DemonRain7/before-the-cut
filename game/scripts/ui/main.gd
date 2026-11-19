@@ -86,7 +86,10 @@ const DESK_MARKS := [
 	["splat_s0", Vector2(300, 302)], ["splat_s1", Vector2(121, 332)], ["splat_s2", Vector2(40, 341)],
 	["splat_s1", Vector2(519, 318)], ["splat_s0", Vector2(600, 342)],
 ]
-const CUT_AT := {"saw": Vector2(34, 96), "torch": Vector2(92, 58), "picks": Vector2(58, 84)}      # where the weapon comes through it
+const CUT_AT := {      # where the weapon comes through it
+	"saw": Vector2(34, 96), "torch": Vector2(92, 58), "picks": Vector2(58, 84),
+	"laser": Vector2(28, 74), "arc": Vector2(100, 96), "chop": Vector2(36, 100), "spike": Vector2(70, 92),
+}
 ## How each kind of weapon sounds and what it leaves. A patient's style is in patients/meta.json
 ## ("attack" > "style"); one missing here plays as the saw. Its pictures are drawn by tools/art.
 ##   loop   - the sound it makes while it is out ("": none)
@@ -95,7 +98,8 @@ const CUT_AT := {"saw": Vector2(34, 96), "torch": Vector2(92, 58), "picks": Vect
 ##   pitch  - the scream sample's pitch: down is a roar, up a scream
 ##   hot    - the sparks it throws
 ##   glow   - the light it carries from the moment they turn (alpha 0: none)
-##   mark   - what it leaves on the pane (fx/<mark>.png)
+##   mark   - what it leaves on the pane (fx/<mark>.png; a weapon that burns also has
+##            fx/<mark>_hot.png, the same mark still glowing)
 ##   cut    - what comes through the closed shutter ("": nothing does, only the dents)
 ##   deep   - its dents go deep enough to see from the hall
 ##   strike - what lands on the player's eyes when it gets through: slash, burn, claw or smash
@@ -110,6 +114,21 @@ const ATTACK_STYLES := {
 		"glow": Color(0, 0, 0, 0), "mark": "smash_1", "cut": "", "deep": true, "strike": "smash"},
 	"picks": {"loop": "hum_loop", "bite": "scrape", "knock": "bang", "pitch": 1.24, "hot": Color("c8f4ff"),
 		"glow": Color(0, 0, 0, 0), "mark": "slit_0", "cut": "picks", "deep": false, "strike": "claw"},
+	# Priya's LANCET fingers, run up to a cutting beam
+	"laser": {"loop": "laser_loop", "bite": "laser_burst", "knock": "bang", "pitch": 1.16, "hot": Color("ffd0c8"),
+		"glow": Color("ff4a4a"), "mark": "scorch_laser", "cut": "laser", "deep": false, "strike": "burn"},
+	# Ozzie's CHOP hand: the cleaver folded into it
+	"cleaver": {"loop": "", "bite": "chop", "knock": "chop", "pitch": 0.68, "hot": Color("fbe9b5"),
+		"glow": Color(0, 0, 0, 0), "mark": "chop_0", "cut": "chop", "deep": false, "strike": "slash"},
+	# Lux's deck cable, torn out of her temple and still live
+	"arc": {"loop": "arc_loop", "bite": "zap", "knock": "bang", "pitch": 1.34, "hot": Color("d8d0ff"),
+		"glow": Color("8a7cff"), "mark": "scorch_arc", "cut": "arc", "deep": false, "strike": "burn"},
+	# Dana's stun baton, out of her sleeve
+	"baton": {"loop": "stun_loop", "bite": "baton_hit", "knock": "baton_hit", "pitch": 1.0, "hot": Color("dce8ff"),
+		"glow": Color(0, 0, 0, 0), "mark": "zap_0", "cut": "", "deep": false, "strike": "smash"},
+	# Bo's PISTON fist, a steel spike out between the knuckles
+	"spike": {"loop": "piston_loop", "bite": "spike", "knock": "punch", "pitch": 0.72, "hot": Color("ffd89a"),
+		"glow": Color(0, 0, 0, 0), "mark": "pierce_0", "cut": "spike", "deep": true, "strike": "smash"},
 }
 const HOTSPOT := {"point": Vector2(1, 1), "look": Vector2(6, 6), "hand": Vector2(6, 2), "talk": Vector2(3, 12)}
 const ZONE_LABEL := {"eyes": "LOOK: EYES", "hands": "LOOK: HANDS", "port": "LOOK: PORT"}
@@ -2624,25 +2643,27 @@ func _weapon_on_glass(pane: bool) -> void:
 	var style := _style()
 	var at := Gfx.HOLE.position + ClinicView.HIT_TOOL
 	var hot: Color = style["hot"]
+	var glow: Color = style["glow"]
 	var mark := "fx/%s.png" % str(style["mark"])
+	var bite := str(style["bite"])
 	match _attack_style():
-		"torch":
-			audio.play("torch_burst")
+		"torch", "laser", "arc":      # it burns: the mark glows, then cools
+			audio.play(bite)
 			if pane:
 				clinic.add_decal(mark, ClinicView.HIT_TOOL)
-				clinic.add_decal("fx/scorch_hot.png", ClinicView.HIT_TOOL, true, 2.6)
+				clinic.add_decal("fx/%s_hot.png" % str(style["mark"]), ClinicView.HIT_TOOL, true, 2.6)
 			gore.sparks(at, 24, Vector2(0.0, -1.0), PI, 60.0, 210.0, hot)
-			gore.flare_follow(rig, "tool", 8.0, style["glow"])          # full flame
-			_flash_now(Color(0.75, 1.0, 1.0), 0.3, 0.2)
-		"lock":
-			audio.play("clang")
+			gore.flare_follow(rig, "tool", 8.0, glow)          # at full strength
+			_flash_now(glow.lerp(Color.WHITE, 0.6), 0.3, 0.2)
+		"lock", "baton":
+			audio.play(bite)
 			audio.play("bang", 1.4, -6.0)
 			if pane:
 				clinic.add_decal(mark, ClinicView.HIT_TOOL)
 				gore.chips(at, 4)
-			gore.sparks(at, 14, Vector2(0.3, -0.9), 1.4, 70.0, 220.0, hot)      # steel on glass
-		"fist":
-			audio.play("punch")
+			gore.sparks(at, 14, Vector2(0.3, -0.9), 1.4, 70.0, 220.0, hot)      # steel on glass, or the charge
+		"fist", "spike":
+			audio.play(bite)
 			audio.play("bang", 0.7, -2.0)
 			if pane:
 				clinic.add_decal(mark, ClinicView.HIT_TOOL)
@@ -2654,8 +2675,8 @@ func _weapon_on_glass(pane: bool) -> void:
 				clinic.add_decal(mark, ClinicView.HIT_TOOL + Vector2(6, 4))
 				gore.sparks(at, 18, Vector2(0.7, -0.6), 0.8, 60.0, 200.0, hot)
 			gore.flare_follow(rig, "tool", 2.0, hot)      # the chrome catching the lamp
-		_:
-			audio.play("saw_grind")
+		_:      # an edge: the saw, the cleaver
+			audio.play(bite)
 			if pane:
 				clinic.add_decal(mark, ClinicView.HIT_TOOL + Vector2(8, -6))
 				if not less_blood:
@@ -2682,11 +2703,19 @@ func _attack_fx(delta: float) -> void:
 				gore.sparks(p, 3, Vector2(0.55, -0.8), 0.9, 50.0, 170.0, hot)
 		"torch":
 			gore.sparks(p, 2, Vector2(0.0, 1.0), 1.5, 25.0, 110.0, hot)
+		"laser":
+			gore.sparks(p, 1, Vector2(0.0, 1.0), 1.0, 20.0, 80.0, hot)      # a beam drips less than a flame
+		"arc":
+			if _fx_rng.randf() < 0.5:      # a live cable spits; it does not flow
+				gore.sparks(p, 3, Vector2(0.0, 1.0), PI, 30.0, 170.0, hot)
+		"baton":
+			if _fx_rng.randf() < 0.12:      # the charged tip crackles now and then
+				gore.sparks(p, 2, Vector2(0.0, -1.0), PI, 20.0, 90.0, hot)
 		"picks":
 			if clinic.glass_state < 4:      # ten points dragged over the glass
 				gore.sparks(p, 1, Vector2(0.8, -0.4), 1.0, 30.0, 120.0, hot)
 		_:
-			pass      # a lock or a fist throws sparks only where it lands
+			pass      # a lock, a fist, a cleaver or a spike throws sparks only where it lands
 
 
 ## Too slow. The pane goes and they come through it at the player: glass, the weapon across
@@ -2816,19 +2845,21 @@ func _hit() -> void:
 	_resolve()      # the dark stays: the night is over (_lights_out)
 
 
-## What reaches the player's eyes, blow by blow (0, 1, 2): the saw across them, the torch in
-## them, ten picks raked over them, or something heavy straight into them. `face` is the
-## middle of the view, where the third one lands.
+## What reaches the player's eyes, blow by blow (0, 1, 2): an edge across them (the saw, the
+## cleaver), a flame, beam or arc in them, ten picks raked over them, or something heavy
+## straight into them. `face` is the middle of the view, where the third one lands.
 func _strike(kind: String, i: int, face: Vector2) -> void:
-	var cyan := Color("5ee6e0")
+	var style := _style()
+	var bite := str(style["bite"])
 	match kind:
 		"burn":
+			var glow: Color = style["glow"]
 			var at: Vector2 = [Vector2(258, 194), Vector2(392, 166), face][i]
-			audio.play("torch_burst", [0.8, 0.7, 0.6][i], [2.0, 1.0, 3.0][i])
-			gore.bloom(at, cyan, [230.0, 260.0, 330.0][i], [0.55, 0.5, 0.4][i])
+			audio.play(bite, [0.8, 0.7, 0.6][i], [2.0, 1.0, 3.0][i])
+			gore.bloom(at, glow, [230.0, 260.0, 330.0][i], [0.55, 0.5, 0.4][i])
 			gore.afterimage(at, [70.0, 88.0, 124.0][i])
 			if i < 2:
-				_flash_now(Color(0.8 + 0.05 * float(i), 1.0, 1.0), 0.58 + 0.02 * float(i), 0.2)
+				_flash_now(glow.lerp(Color.WHITE, 0.62 + 0.05 * float(i)), 0.58 + 0.02 * float(i), 0.2)
 		"claw":
 			# five points of one hand, raked across together, the middle one leading
 			var ends: Array = [[Vector2(548, 26), Vector2(132, 330)], [Vector2(82, 54), Vector2(580, 296)], [Vector2(352, 2), Vector2(310, 356)]][i]
@@ -2844,7 +2875,6 @@ func _strike(kind: String, i: int, face: Vector2) -> void:
 				gore.gash(a + off, b + off, 0.06 + 0.015 * float(k), 0.34)
 		"smash":
 			var at: Vector2 = [Vector2(250, 186), Vector2(404, 160), face][i]
-			var bite := str(_style()["bite"])
 			audio.play(bite, [1.0, 0.92, 0.82][i], [2.0, 2.0, 3.0][i])
 			audio.play("crunch", [1.15, 1.0, 0.9][i], [-2.0, 0.0, 1.0][i])
 			gore.impact(at, [130.0, 160.0, 210.0][i], 0.5)
@@ -2855,7 +2885,7 @@ func _strike(kind: String, i: int, face: Vector2) -> void:
 			var gash_ends: Array = [[Vector2(548, 32), Vector2(128, 324)], [Vector2(84, 68), Vector2(576, 292)], [Vector2(344, 12), Vector2(318, 350)]][i]
 			audio.play("slash", [1.0, 0.9, 0.75][i], [0.0, 0.0, 2.0][i])
 			if i < 2:
-				audio.play("saw_grind", [1.25, 1.1][i], [1.0, 0.0][i])
+				audio.play(bite, [1.25, 1.1][i], [1.0, 0.0][i])
 			gore.slash(ends[0], ends[1])
 			gore.gash(gash_ends[0], gash_ends[1], [0.09, 0.09, 0.06][i])
 
@@ -2949,25 +2979,32 @@ func _caught(token: int) -> void:
 	if cut != "":
 		if _weapon_loop != "":
 			audio.set_loop_volume(_weapon_loop, -7.0)
-		audio.play(str(style["bite"]), 1.0, 2.0)
-		var picks := cut == "picks"
-		clinic.shutter_cut(cut, CUT_AT[cut], 1.1 if picks else 0.8)
-		if cut == "torch":
+		var points := cut == "picks" or cut == "spike"      # points, not an edge: slower, and fewer sparks
+		var edge := cut == "saw" or cut == "chop"
+		var glow: Color = style["glow"]
+		clinic.shutter_cut(cut, CUT_AT[cut], 1.1 if points else 0.8)
+		if glow.a > 0.0:      # its light shows under the shutter while it works
+			clinic.under_color = glow
 			clinic.under_glow = 1.0
 		var spark_in := 0.0
+		var biting := false
 		while clinic.cut_active() and token == _seq:
 			await get_tree().process_frame
 			spark_in -= get_process_delta_time()
-			if spark_in <= 0.0:
+			if clinic.cut_biting() and not biting:      # it bites (a cleaver or a spike, once for each hack or hole)
+				audio.play(str(style["bite"]), 1.0, 2.0)
+				_shake(4.0 if points else 3.0, 0.12)
+			biting = clinic.cut_biting()
+			if spark_in <= 0.0 and biting:
 				spark_in = 0.03
-				gore.sparks(clinic.cut_point(), 2 if picks else 4, Vector2(0.2, 1.0) if cut == "saw" else Vector2(0.0, 1.0), 1.6, 40.0, 220.0, hot)
-				_shake(1.0 if picks else 2.0, 0.08)
+				gore.sparks(clinic.cut_point(), 2 if points else 4, Vector2(0.2, 1.0) if edge else Vector2(0.0, 1.0), 1.6, 40.0, 220.0, hot)
+				_shake(1.0 if points else 2.0, 0.08)
 	else:
 		await _wait(0.2, token)      # nothing gets through: the third blow is the last
 	await _wait(0.45, token)
 	_stop_attack_audio()
 	clinic.flicker = 0.0
-	clinic.under_glow = 0.45 if cut == "torch" else 0.0
+	clinic.under_glow = 0.45 if cut == "torch" else 0.0      # the torch stays lit; a beam or an arc cuts out
 	clinic.seep(4)
 	audio.play("drip")
 	await _wait(0.35, token)

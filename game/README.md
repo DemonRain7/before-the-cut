@@ -2,8 +2,8 @@
 
 Version 0.3.0, Godot 4.7.2 (GL Compatibility), 640 x 360 pixel art shown at whole multiples
 (the window opens at 1280 x 720). One night at the counter of a back-street implant clinic:
-five visitors, one decision each, and two of them carrying something for the gang that runs
-the place.
+five visitors drawn from a cast of ten, one decision each, and two of them carrying something
+for the gang that runs the place.
 
 Kessler fired you after twelve years of fitting implants in its towers and sold your debt to
 Harrow Credit; you kept its spec binder. The one counter that would still take you belongs to
@@ -42,16 +42,19 @@ The game is in English or Chinese (中文): the switch is on the title card.
 > the opening, the guide, the counter-first screen, glass repair), of November 17, which
 > answer the student's five notes: clearer readings, a CALM that costs money, a first-night
 > training, sudden rage, and the new story with its contact list
-> ([note](../docs/development/story-and-clarity-2026-11-17.md)), and of November 18: the
-> language switch with the whole game in Chinese, the opening redrawn for the new story, and
-> reference sheets that follow the patient's implant models. The November 18 build has been
-> checked by the automated tests below and by frames drawn by the real renderer on a hidden
-> Windows desktop, in English and in Chinese (Screenshots), with authored dialogue, a simulated
-> microphone and a stand-in voice service. No paid service was called for it, and the patient
-> model has never been asked to answer in Chinese. These are automated checks, not a human
+> ([note](../docs/development/story-and-clarity-2026-11-17.md)), of November 18: the
+> language switch with the whole game in Chinese, the opening redrawn for the new story,
+> reference sheets that follow the patient's implant models, right or wrong told only at
+> closing and a night that ends with the doctor, and of November 19: drawn nights, the art of
+> every part of every patient, and five new characters. The November 19 build has been checked
+> by the automated tests below, with authored dialogue, a simulated microphone and a stand-in
+> voice service, and its weapon nights by frames drawn by the real renderer on a hidden Windows
+> desktop (Screenshots). Its other screens were last drawn that way late on November 18; since
+> then only dry runs have walked them. No paid service was called for it, and the patient model
+> has never been asked to answer in Chinese. These are automated checks, not a human
 > microphone, listening or playtest result. No play session by a person is recorded in this
 > repository. Nobody has read the Chinese in play, typed it with a real input method or
-> reviewed the translation, and the student has not reviewed the changes of November 17 and 18
+> reviewed the translation, and the student has not reviewed the changes of November 17 to 19
 > beyond the opening of the November 17 build.
 
 ## Launch
@@ -79,7 +82,7 @@ in the editor once.
 | `-AgentUrl http://127.0.0.1:8787 -Model` | patients speak through the proxy in `../agent_proxy` (start it first: `npm run dev`) |
 | `-LessBlood` | the attack scenes without blood: no splatter, pools or stains, and a clean face, hand, shutter cut and broken glass. The red flash and the red edge of the screen stay |
 | `-Mute` | start with sound off (M toggles it in the game) |
-| `-Seed 123` | fixed seed for the small random timings, the order of the visitors and the night's contact list |
+| `-Seed 123` | fixed seed for the night (who comes, who of them drifts and which signs they show), the order of the visitors, the night's contact list and the small random timings |
 
 Without the script, import once (`godot --headless --path game --import`, again if it stops
 with an error), then: `godot --path game -- --agent-url=http://127.0.0.1:8787 --model --less-blood --mute --seed=123`
@@ -88,7 +91,8 @@ address. These have no script option:
 
 | Game option | Effect |
 | --- | --- |
-| `--authored-order` | the visitors come in the order `rules.json` lists them (the tests and the capture script use it) |
+| `--test-night=C` | that test night of `data/nights.json` (A to H) every shift, instead of a drawn night (The patients, below) |
+| `--authored-order` | test night A every shift, the night as written (the tests and the capture script use it) |
 | `--no-intro` | no opening cards, no first-night training and no counter guide opening by itself |
 | `--no-training` | the opening cards, but no training: the counter guide opens by itself at the first patient instead, as before November 17 |
 | `--no-surprises` | no snaps and no flares (the tests and the capture script use it and cue the ones they need) |
@@ -98,8 +102,8 @@ On November 15 the script was run once by an agent (offline, title screen, close
 window's close message): the game started and left cleanly. That was the build before the
 changes of November 16 and 17. On November 18 the script started the November 17 build
 (commit e7f94d7) in a visible window for the student, whose screenshot of the third opening
-card led to that day's changes; the game exited with code 0 when it was closed. The November
-18 build has run only headlessly and on the real renderer on a hidden desktop. The
+card led to that day's changes; the game exited with code 0 when it was closed. The builds of
+November 18 and 19 have run only headlessly and on the real renderer on a hidden desktop. The
 script's import step was tried on November 17 with `-ImportOnly` on a copy of the repository
 with no cache (imported, 664 cache files, 6 s), on the same copy again (nothing to do), with
 three files taken out of the cache (imported again), with a stand-in engine whose first import
@@ -176,8 +180,9 @@ holding the binder, tabbed EYES, HANDS, PORTS and VOICE. THE DEBT is Kessler's s
 stamped SOLD TO HARROW, with Harrow's lease slid over it. THE LANTERNS tags the matched patient
 CONTACT and the parcel PACKAGE. THE DRIFT is a crate of military surplus with its serials filed
 off and, through the glass, a visitor whose eye implant glitches before they crack the pane. No
-picture shows one of the five visitors, and the list on the Lanterns card has two made-up
-entries that fit none of them, so it cannot be taken for a real night's list.
+picture shows a member of the cast, and the list on the Lanterns card has two made-up entries
+whose clues fit nobody in it (a rule test checks them), so it cannot be taken for a real
+night's list.
 
 **The first-night training.** [Student, November 17: the grip and the eye test are confusing;
 the opening guidance should be clearer, ideally walking through everything once.] On the first
@@ -335,14 +340,15 @@ street port, under the title NORMAL REFERENCE SHEET.
 
 | Row | Normal, by model |
 | --- | --- |
-| EYES | NATURAL: "Pupils tighten in light. Both follow it." KITE (an optic) and IRIS (a display): no pupils, nothing tightens. TALON (a combat eye): shutters snap tight in light. Every model follows the light. Two different eyes print both halves, left first: "L: no pupil. R: tightens. Both follow.", tagged L KITE (or MIXED for two different implants) |
-| HANDS | "Lets go on 'release' inside {limit} s.", with the model's limit: NATURAL 1.0, LOADER 1.5, SEAM 0.8, DEFT 0.5, REFLEX 0.3 |
-| PORT | STREET and WORK: "Calm skin at the socket. No dark threads." MIL-SPEC: "Calm skin at the plate. No dark threads." |
+| EYES | NATURAL: "Pupils tighten in light. Both follow it." KITE and SCAN (optics) and IRIS (a display): no pupils, nothing tightens. TALON (a combat eye): shutters snap tight in light. Every model follows the light. Two different eyes print both halves, left first: "L: no pupil. R: tightens. Both follow.", tagged L KITE (or MIXED for two different implants) |
+| HANDS | "Lets go on 'release' inside {limit} s.", with the model's limit: NATURAL 1.0, LOADER 1.5, SEAM 0.8, DEFT 0.5, REFLEX 0.3, LANCET 0.4, CHOP 0.9, PISTON 1.2 |
+| PORT | STREET, WORK and DIVER: "Calm skin at the socket. No dark threads." MIL-SPEC: "Calm skin at the plate. No dark threads." |
 | SPEECH | NATURAL and VX-9: "Says 'I' and 'my'. Remembers what they did." |
 | TEMPER | the same for every body: "Pushed, face and voice react together." |
 
 Each model also has its own line of what is ordinary and not a sign (a cracked lens for KITE,
-locking up now and then for LOADER, a st-stutter for VX-9), so what looks odd but is harmless
+a red glow and a faint tick for SCAN, locking up now and then for LOADER, a hiss and a jerk
+for PISTON, burnt rims for DIVER, a st-stutter for VX-9), so what looks odd but is harmless
 changes with the body as well.
 
 | Patient | Eyes, left / right | Hands | Port | Voice |
@@ -352,6 +358,11 @@ changes with the body as well.
 | Vale | TALON | REFLEX | MIL-SPEC | natural |
 | Juno | IRIS | DEFT | street | VX-9 |
 | Maren | natural | SEAM | work | natural |
+| Priya | SCAN / natural | LANCET | work | natural |
+| Ozzie | natural | CHOP | street | natural |
+| Lux | IRIS / KITE | natural | DIVER | natural |
+| Dana | natural / TALON | natural | MIL-SPEC | natural |
+| Bo | natural | PISTON | work | natural |
 
 Footer, the house rule: "Two broken lines = drifting: call TRAUMA TEAM." and "Strange is not
 sick. A refusal is not a sign." The sheet's own words are `data/sheet.json`; the two is its
@@ -384,14 +395,16 @@ code.]
 
 - **The list.** Each night two entries (`contacts.per_night`) are drawn from the pool in
   `data/contacts.json`, each for a different visitor who comes that night, with a generator
-  seeded from the shift seed. The pool has two entries per visitor, ten in all, each with its
-  own alias, clue pair, code line, counter-line and package. The list is not in arrival order.
+  seeded from the shift seed. The pool has two entries per character, twenty in all, each with
+  its own alias, clue pair, code line, counter-line and package. The list is not in arrival
+  order.
 - **The clues** use only what the player can see: the intake card (age, fee, request) and a
   look at the eyes (implants in both, or at least one natural eye). When the data loads,
-  `scripts/core/case_db.gd` checks every clue against the five cases: each clue alone fits at
-  least two visitors, and an entry's two clues together fit exactly one, its own. A data file
-  that breaks this does not load. So the list never names anyone, and one clue alone never
-  gives anyone away.
+  `scripts/core/case_db.gd` refuses a clue that fits fewer than two of the ten characters. Each
+  night an entry may go on the list only if, among tonight's five visitors, each of its clues
+  fits at least two and the two together fit exactly one, its own (`fair_contacts`); a night
+  with too few such entries is drawn again. So the list never names anyone, and one clue alone
+  never gives anyone away.
 - **SAY.** During the exam each open entry on the list has a SAY button. The right contact
   answers with the entry's counter-line and hands a package over: the narrator says what it is,
   and 300 credits go into the till at once, whatever you decide. Anyone else, or a contact
@@ -442,7 +455,7 @@ closing. During the night the doctor learns what was done, never whether it was 
 
 | What happened | At the counter | At closing | In all | Counts as a right call |
 | --- | --- | --- | --- | --- |
-| Treated a steady patient | their fee (250 to 600) | 0 | the fee | yes |
+| Treated a steady patient | their fee (220 to 600) | 0 | the fee | yes |
 | Treated a drifting patient | their fee | -(fee + 400) | -400 | no |
 | Trauma Team took a drifting patient | their fee, on account | 0 (the fee is the bounty) | the fee | yes |
 | The patient turned and the shutter came down in time | their fee, on account | 0 | the fee | yes |
@@ -456,11 +469,11 @@ closing. During the night the doctor learns what was done, never whether it was 
 | CALM | -30 a use | | | not a call |
 
 Two things are not hidden, by their nature. A patient who turns on a call shows by turning
-that they were drifting (a drifting Vale or Rook does that, on a call to Trauma Team). And a
-quiet hand-over is not proof of a steady patient: a drifting Kip, Juno or Maren goes with the
-crew without a fight. The
-readings during the night can mislead: a night of treatments reads well at the counter and may
-still close under the line when the bills come in.
+that they were drifting (a drifting Vale, Rook or Dana does that, on a call to Trauma Team).
+And a quiet hand-over is not proof of a steady patient: a drifting Kip, Juno, Maren, Priya,
+Ozzie, Lux or Bo goes with the crew without a fight. The readings during the night can mislead:
+a night of treatments reads well at the counter and may still close under the line when the
+bills come in.
 
 **The lender's line.** The meter wants 400 more in the till every hour (`line.per_hour`), so
 hour n needs n x 400 and the night needs 2,000. After each slip the meter reads the till
@@ -482,10 +495,20 @@ with both drops, 1,100: still the cut. A drawn night works the same way, because
 under 2,000 but within one drop of it. These totals are asserted by the rule tests, and so is
 that on night A every one of the 1,024 combinations of calls, with no drop and with two, ends
 in a titled report, that THE CUT is given exactly to the nights that end under the line, and
-that none holds the line with fewer than four right calls. So with these five, OPEN, BARELY
-(three right calls) and ON NOTICE cannot be reached; whether to change them is the student's to
-decide. The till can be spent on two things: CALM and new counter glass (below). All numbers
-are first-pass values in `data/rules.json` that no player has tuned.
+that none holds the line with fewer than four right calls.
+
+A night of dearer visitors leaves room for one more mistake. On test night D (Dana, Priya,
+Ozzie, Lux and Kip; fees 1,970) Dana treated and Priya and Lux handed over make 1,500, and with
+both drops 2,100: three right calls hold the line there, OPEN, BARELY. The rule tests play all
+2 x 1,024 combinations of night D as well: each ends in a titled report, THE CUT exactly under
+the line, and three right calls can hold it but two never do. Three right calls hold the line
+when the night's three dearest fees come to 1,400 or more. Of the 252 sets of five the cast
+can make, 112 have fees that fit the window (1,700 to 1,999), and 35 of those meet that (test
+nights D and F among them). Two right calls never do: the two dearest fees of the cast (Vale
+600 and Dana 550) and both drops come to 1,750, and the tests assert it. So ON NOTICE (the
+line held with fewer than three right calls) cannot be reached; whether to change it is the
+student's to decide. The till can be spent on two things: CALM and new counter glass (below).
+All numbers are first-pass values in `data/rules.json` that no player has tuned.
 
 **When a patient turns** there is a warning line and a short beat. Then a red bar in the slot
 of the sill fills from the warning to the moment they are through; its notches are the blows
@@ -556,13 +579,14 @@ credits the lender wants. The arm that fits the layer wipes the pane as it goes;
 sill and the booth walls and the damage to the shutter stay until the shift ends. The price,
 the debt and the absence of any other limit are first guesses that nobody has played against.
 
-## The five patients (spoilers)
+## The patients (spoilers)
 
 [Student, November 18: the characters stay as they are, but for randomness any of their parts
-may be the abnormal one.] Who comes in is `rules.json` `roster`: Kip, Rook, Vale, Juno and
-Maren, every night, in an order drawn from the shift seed. Who of them drifts, and which sign
-each of the five sheet rows shows, is drawn from the same seed (`rules.json` `night`,
-`shift_state.gd` `draw_night`), so one seed always gives the same night:
+may be the abnormal one. And: design five more characters, with all their assets.] The cast is
+`rules.json` `roster`: Kip, Rook, Vale, Juno, Maren, Priya, Ozzie, Lux, Dana and Bo. Each night
+five of them come in (`night.visitors`). Which five, their order, who of them drifts, and
+which sign each of the five sheet rows shows are drawn from the shift seed (`rules.json`
+`night`, `shift_state.gd` `draw_night`), so one seed always gives the same night:
 
 - One to three of them drift (weights 1, 2 and 1). A steady visitor shows only normal signs.
 - A drifting visitor shows two to four broken rows (weights 2, 2 and 1), at least two of them
@@ -571,10 +595,10 @@ each of the five sheet rows shows, is drawn from the same seed (`rules.json` `ni
   doctor insists, or the port is uncovered (`case_db.gd` `reachable_rows`). Every other row
   shows one of the character's normal signs, drawn too.
 - The first night of a session opens with a steady visitor who is on the contact list.
-- The night's fees come under the line but within one drop of it (`night.fees_under_line`),
-  and each contact's clues pick out exactly one of tonight's visitors (`case_db.gd`
-  `fair_contacts`); a draw that breaks either is drawn again. Which two are contacts tonight
-  is drawn from the same seed.
+- The five visitors' fees come under the line but within one drop of it, 1,700 to 1,999
+  (`night.fees_under_line`), and each contact's clues pick out exactly one of tonight's
+  visitors (`case_db.gd` `fair_contacts`); a draw that breaks either is drawn again. Which two
+  are contacts tonight is drawn from the same seed.
 
 Each case file in `data/cases/` (version 3) is the character's template: the parts they wear,
 their fee, the authored offline lines (among them the blank look at a wrong code), the flare,
@@ -592,12 +616,18 @@ names no night builds A. Each is a night the draw could make on the first night 
 | --- | --- | --- |
 | A, the night as written before | Kip, Rook, Juno | Vale: eyes, port, speech, temper. Maren: eyes, grip, speech, temper |
 | B, the truths turned round | Maren, Vale | Kip: eyes, grip. Juno: eyes, grip, port, temper. Rook: grip, port, speech |
+| C, the newer five come in | Lux, Kip | Bo, Dana, Ozzie: eyes, grip, port, speech each |
+| D, dearer | Dana, Ozzie | Priya, Lux: eyes, grip, port, speech each. Kip: port, temper |
+| E, few signs | Bo, Priya | Ozzie: eyes, temper. Juno: speech, temper. Maren: eyes, port |
+| F | Vale, Ozzie | Lux: eyes, temper. Rook: eyes, temper. Bo: grip, temper |
+| G, said and shown | Bo, Rook | Priya: speech, temper. Dana: grip, temper. Juno: speech, temper |
 | H, three who drift | Rook, Maren | Vale: grip, speech. Kip: port, speech, temper. Juno: grip, speech |
 
-Together they show every sign of Kip, Juno and Vale. Rook's broken eyes and temper and Maren's
-dark threads wait for the nights with the new visitors.
+Their fees are 1,900 (A, B and H), 1,840 (C), 1,970 (D and G), 1,740 (E) and 1,940 (F). Together
+they show every character steady and drifting and every sign of every row, and the rule tests
+fail on a sign that no test night shows (`case_db.gd` `night_coverage`).
 
-The five in the order of night A, each row as normal / broken:
+The ten, the five of night A first, each row as normal / broken:
 
 - **Kip Marlow**, bike courier, 22, fee 250, wants his cracked left optic swapped. Eyes: the
   right tightens, the left has no pupil, both follow / the left won't follow. Grip: jittery,
@@ -625,17 +655,48 @@ The five in the order of night A, each row as normal / broken:
   socket by an old weld burn / dark threads past the burn. Speech: worried, all "I" and "my",
   and she remembers her work / "The hands finish jobs I don't remember starting." Temper:
   pushed, she looks hurt, face and voice agreeing / she goes still, no face, no voice.
+- **Priya Nair**, night-ward nurse, 45, fee 450, wants her scanner eye tuned. Eyes: the left
+  SCAN has no pupil, the right tightens, both follow / the right never tightens. Grip: precise,
+  lets go inside the LANCET's 0.4 s / holds on. Port: a clean, capped wrist socket under her
+  scrub sleeve, shown when asked / dark threads under the sleeve. Speech: brisk and kind, all
+  "I" and "my" / "It counts them for me now." Temper: she bristles, face and voice agreeing /
+  she goes cool and clinical, and one finger does not.
+- **Ozzie Brandt**, noodle-cart cook, 63, fee 220, wants his slipping cleaver hand fixed. Eyes:
+  milky rims, both tighten and follow / the left won't follow. Grip: heavy, lets go inside the
+  CHOP's 0.9 s / holds on. Port: a greasy wrist socket among old burns / dark threads up the
+  arm. Speech: rambling, all "I" and "my", and he knows his regulars / "It chops on its own,
+  faster than me." Temper: the old man huffs, all of him agreeing / he goes quiet and the blade
+  hand clenches.
+- **Lux Ferreira**, net diver, 19, fee 500, wants her burnt deck jack swapped. Eyes: IRIS and
+  KITE, no pupils, both follow / the left won't follow. Grip: quick, lets go / holds on. Port: a
+  burnt temple jack on calm skin / dark threads out from the jack. Speech: sarcastic and fast,
+  all "I" and "my" / "We came back up together." Temper: she snaps back, face and voice
+  agreeing / she goes smooth and polite, and her fist does not.
+- **Dana Kirsch**, off-duty cop, 47, fee 550, wants her stuck target overlay fixed. Eyes: the
+  left tightens, the right TALON snaps, both follow / the TALON never snaps. Grip: firm, lets go
+  / holds on. Port: a neck plate under a department seal, calm skin, shown after a moment's
+  stalling / dark threads from under the seal. Speech: clipped and careful, all "I" and "my" /
+  "It sorts them for me now." Temper: she gets sharp, face and voice agreeing / she goes still
+  and formal, and her hand goes to her belt.
+- **Bo Kowalski**, pit fighter, 29, fee 320, wants his misfiring piston fist tuned. Eyes: a cut
+  over one eye, both tighten and follow / the right won't follow. Grip: crushing, 1.0 s inside
+  the PISTON's 1.2 / holds on. Port: scars at the chrome seam, calm skin / dark threads up the
+  arm. Speech: loud and cheerful, all "I" and "my" / "It wants a fight." Temper: he puffs up and
+  laughs it off / he goes quiet and the piston cocks.
 
-A drifting patient turns when pressed twice and may snap; a drifting Vale or Rook also turns
-when Trauma Team is called, and the others go with the crew. Each turns with their own hardware,
-drawn and heard as their own: Vale's saw and Maren's torch come through a closed shutter; Kip's
-bike lock and Rook's loader fist only dent it, the fist deep enough to see from the hall; Juno's
-ten picks score it. What gets through lands differently too: the saw slashes, the torch burns,
-the picks claw and the lock and the fist smash. Any row of anyone can be the broken one, so every
-patient has the pictures for all of them: dark threads at the port in the bust wherever the bust
-shows the port (Kip's and Rook's wrists in every picture of the hands, Juno's neck) and in every
-port close-up, and a picture for each gesture the temper signs use (`tools/art/gen_patients.py`;
-`run_tests.gd` `test_art()` checks that none is missing).
+A drifting patient turns when pressed twice and may snap; a drifting Vale, Rook or Dana also
+turns when Trauma Team is called, and the others go with the crew. Each turns with their own
+hardware, drawn and heard as their own: Vale's saw, Maren's torch, Priya's laser, Ozzie's
+cleaver and Lux's arc come through a closed shutter, and Bo's spike punches holes in it; Kip's
+bike lock, Rook's loader fist and Dana's stun baton only dent it, the fist deep enough to see
+from the hall; and Juno's ten picks score it. What gets through lands
+differently too: the saw and the cleaver slash, the torch, the laser and the arc burn, the picks
+claw, and the lock, the fist, the baton and the spike smash. Any row of anyone can be the broken
+one, so every patient has the pictures for all of them: dark threads at the port in the bust
+wherever the bust shows the port (the wrists of Kip, Rook, Ozzie and Bo in every picture of the
+hands, Juno's neck, Lux's temple) and in every port close-up, and a picture for each gesture
+the temper signs use (`tools/art/gen_patients.py`; `run_tests.gd` `test_art()` checks that none
+is missing).
 
 ## Saying it in your own words
 
@@ -717,40 +778,40 @@ $GODOT = "$env:LOCALAPPDATA\CodexTools\Godot\4.7.2\Godot_v4.7.2-stable_win64_con
 None of these opens a window, plays sound or opens a microphone. In Git Bash, write
 `"$GODOT"` in place of `& $GODOT`.
 
-| Check | Command | Result late on November 18, in this checkout |
+| Check | Command | Result on November 19, in this checkout |
 | --- | --- | --- |
-| Rules | `& $GODOT --headless --audio-driver Dummy --path game --script res://tests/run_tests.gd` | 970 passed, 0 failed |
-| Scene, offline | `& $GODOT --headless --audio-driver Dummy --fixed-fps 60 --path game --script res://tests/run_ui_smoke.gd` | 1001 passed, 0 failed |
-| Scene, in Chinese | the same, with ` -- --lang=zh` at the end | 1002 passed, 0 failed |
-| Scene, less blood | the same, with ` -- --less-blood` at the end | 1001 passed, 0 failed |
+| Rules | `& $GODOT --headless --audio-driver Dummy --path game --script res://tests/run_tests.gd` | 1179 passed, 0 failed |
+| Scene, offline | `& $GODOT --headless --audio-driver Dummy --fixed-fps 60 --path game --script res://tests/run_ui_smoke.gd` | 1079 passed, 0 failed |
+| Scene, in Chinese | the same, with ` -- --lang=zh` at the end | 1080 passed, 0 failed |
+| Scene, less blood | the same, with ` -- --less-blood` at the end | 1079 passed, 0 failed |
 | Window close | `& $GODOT --headless --audio-driver Dummy --verbose --path game --script res://tests/run_close_check.gd` (run it without `--fixed-fps`, which makes it fail) | 5 passed, 0 failed; no leak line in the verbose exit report |
-| Proxy | `npm test` in `agent_proxy` (no install needed) | 39 passed, 0 failed |
-| Game and proxy over HTTP | `node tools/run_proxy_integration.mjs $GODOT validation/2026-11-18/http-integration` | 199 passed, 0 failed; wire checks 15 passed, 0 failed |
+| Proxy | `npm test` in `agent_proxy` (no install needed) | 40 passed, 0 failed |
+| Game and proxy over HTTP | `node tools/run_proxy_integration.mjs $GODOT validation/2026-11-19/http-integration` | 199 passed, 0 failed; wire checks 16 passed, 0 failed |
 | Translations | `python tools/check_lang.py` | 0 problems |
-| Text fits | `python measure_text.py`, run inside `tools/art` | 682 lines, 0 problems |
-| Text fits, in Chinese | `python measure_text.py --lang zh`, inside `tools/art` | 682 lines, 0 problems, none of them left in English |
+| Text fits | `python measure_text.py`, run inside `tools/art` | 1513 lines, 0 problems |
+| Text fits, in Chinese | `python measure_text.py --lang zh`, inside `tools/art` | 1513 lines, 0 problems, none of them left in English |
 | Rough lint | `python tools/gd_static_check.py` | 31 scripts, no findings |
-| Capture script, dry | `& $GODOT --headless --audio-driver Dummy --fixed-fps 60 --path game --script res://tests/capture_shift.gd` | 204 frames named, 0 missed |
-| Capture script, dry, in Chinese | the same, with ` -- --lang=zh` at the end | 204 frames named, 0 missed |
-| Capture script, dry, attacks | the same, with ` -- --attacks-only --less-blood` at the end | 99 frames named, 0 missed |
+| Capture script, dry | `& $GODOT --headless --audio-driver Dummy --fixed-fps 60 --path game --script res://tests/capture_shift.gd` | 439 frames named, 0 missed |
+| Capture script, dry, in Chinese | the same, with ` -- --lang=zh` at the end | 439 frames named, 0 missed |
+| Capture script, dry, attacks | the same, with ` -- --attacks-only --less-blood` at the end | 334 frames named, 0 missed |
+| Capture script, dry, weapons | the same, with ` -- --weapons-only` at the end | 235 frames named, 0 missed |
 
-Every row ran late on November 18 and exited 0 (logs in the local
-`../validation/2026-11-18/checks-closing/`, with the runners `chain.sh` and `chain2.sh` beside
-them; each log holds standard error together with the output). no line in them is an error, and the only warnings are the `ObjectDB instances were leaked` lines that `--quit-after` causes in the three boots. The first run of
-the HTTP row failed one check of 196: in it Vale turns on a call to Trauma Team, and his blow
-landed, which now ends the night with no slip (A blow that lands ends the night). The check now
-drops the shutter in time and looks for the slip; the run after that passed 199 (three checks
-more). That change to `tests/run_proxy_integration.gd` came after the other rows had run once;
-the rule and scene rows and the window close were run again after it, with the commands
-exactly as the table gives them, and the dry captures do not read that file. The same runs
-imported with the existing cache (exit 0) and booted the main scene for 240 frames, offline and
+Every row ran on November 19 on the final working tree and exited 0 (logs in the local
+`../validation/2026-11-19/step7/final/`; `chain2.sh` beside them ran the whole table after the
+last change to the game, a clue on the Lanterns card, and `chain.sh` an earlier pass; each log
+holds standard error together with the output). No line in them is an error. The same day a
+copy of `game/` without its `.godot/` folder (so the checkout's cache is not touched) was
+imported from an empty cache, with the five new characters' pictures and sounds in it: exit 0
+in 12 s, nothing on standard error, 1354 files in the cache, and 1178 rule checks passed on the
+copy (the Lanterns card's check came after). The main scene booted for 240 frames, offline and
 in model mode with no service behind the address (exit 0, with only the `ObjectDB instances
-were leaked` warning that `--quit-after` causes), and for 420 frames on the real renderer on a
-hidden desktop (exit 0 in 4.5 s on OpenGL 3.3, with the same warning; no window on the student's desktop). The import from an empty cache was not repeated late on
-November 18: no picture, sound or font changed. These are automated checks with the dummy
-audio driver, a simulated microphone and the mock provider; no paid service was called.
+were leaked` warning that `--quit-after` causes; `boot_import.sh` and its output). The real
+renderer was not booted on its own: the weapon frames under Screenshots were drawn on it. These
+are automated checks with the dummy audio driver, a simulated microphone and the mock provider;
+no paid service was called. The checks of late November 18 are in
+`../validation/2026-11-18/checks-closing/`.
 
-The scene test in Chinese plays the same nine shifts in Chinese and fails on any English that
+The scene test in Chinese plays the same ten shifts in Chinese and fails on any English that
 reached the screen untranslated, outside names, code names and key names; it also switches the
 language on the title card and back. The rule tests check the request the game builds in
 Chinese (it names the language and asks for the Chinese lengths), and the proxy's own tests
@@ -791,22 +852,26 @@ passed on it. That is why `run-game.ps1` now imports before the first run and tr
 on the tree committed as `3f1fcbd`, the import of a copy with no cache exited 0 in 10 s, with
 nothing on standard error and 754 files in the cache, and the rule and scene checks passed on
 the copy (934 and 953); one clean import says little about a crash that came twice in twenty
-tries.
+tries. The import of November 19 (above) was clean too.
 
-The scene test plays nine shifts through the real scene with the same input functions a player
+The scene test plays ten shifts through the real scene with the same input functions a player
 uses (`tests/play_driver.gd`). The first six check the counter itself with a few rules held
 still (no contacts, a free CALM, the old line, no snaps or flares, no training): a careful
 night, a reckless one, the typing line and the odd cases, the hourly line with a patient who
-leaves, the glass down to nothing, and the booth walls with the glass mended. The last three
+leaves, the glass down to nothing, and the booth walls with the glass mended. The next three
 play the night as it is: the contact list and the paid CALM at 400 an hour; a flare and a snap,
-each cued by pinning its rules for one action; and the first-night training. It proves the flow
+each cued by pinning its rules for one action; and the first-night training. The tenth plays
+test night B, where Kip, Juno and Rook turn with the bike lock, the picks and the loader fist.
+No scene test plays test nights C to H or a drawn night: the rule tests compose and check
+those, and the newer five meet the real scene only in the capture script's weapon nights
+(Screenshots). It proves the flow
 holds together; it does not show that it looks right, sounds right or is fun. It presses the
 shutter within one frame of the moment it chooses, so it says nothing about whether a person
 can make those windows.
 
 ## Screenshots
 
-`tests/capture_shift.gd` plays five shifts on the real renderer and saves 204 frames (with
+`tests/capture_shift.gd` plays fifteen shifts on the real renderer and saves 439 frames (with
 ` --lang=zh` after `--out`, in Chinese): the
 title card, the six opening cards, the first night's training with one frame a tip (the list
 and its clues, the hall camera, Kip's intake card, his code and his package, the sheet, the
@@ -819,9 +884,11 @@ attacks stopped clean, after two blows, with no glass left, after the blow that 
 of the glass, and not stopped, and the fitter putting three layers back into an empty frame;
 two nights that end in the dark when a blow lands (the first with Maren, the second with Vale,
 Juno and Maren never seen), and the report after each night as a player reads it: the first
-visit's page, the last visit's page and the totals, with the line that asks for a click lit.
-Each night's seed is fixed, so the list is the same in every run (Kip and Maren on the first
-night, Rook and Juno afterwards):
+visit's page, the last visit's page and the totals, with the line that asks for a click lit;
+and then every patient's weapon, each stopped once and once getting through: Kip's, Juno's and
+Rook's on test night B (shifts 6 to 9), and the newer five's on test nights C to F (shifts 10
+to 15). Each night's seed is fixed, so the list is the same in every run (Kip and Maren on the
+first night, Rook and Juno afterwards; the weapon nights have no contacts):
 
 ```powershell
 & $GODOT --path game --script res://tests/capture_shift.gd -- --out=validation/captures
@@ -831,8 +898,21 @@ That command opens the game window on your screen. On Windows, `../tools/run_hid
 starts the same run on a separate desktop that is never displayed, so nothing appears on
 screen and nothing takes the keyboard; the full command is in that file's header. Add
 `--audio-driver Dummy` so nothing is played. Add ` --attacks-only --less-blood` after `--out`
-for the attack scenes (the snap among them) and the fitter without the blood (99 frames).
+for the attack scenes (the snap among them), the weapon nights and the fitter without the
+blood (334 frames). ` --weapons-only` draws the weapon nights alone (235 frames).
 
+- `../validation/2026-11-19/step7/weapons/` holds the weapon nights of the November 19 build
+  as drawn with ` --weapons-only` on a hidden desktop: 235 frames, 0 moments missed, exit code 0
+  after 252 seconds, and no window on the user's desktop, with seven contact sheets beside them
+  (`S_bo10`, `S_dana10`, `S_ozzie10`, `S_priya11`, `S_lux11`, `S_bodana` and `S_misc`). Claude
+  looked at the newer five's attacks on those sheets: on the shutter Ozzie's cleaver hacks
+  through, Bo's spike punches holes, Priya's laser and Lux's arc burn into it, and Dana's baton
+  only dents it. `../validation/2026-11-19/captures-weapons/` holds the four weapon nights of test
+  night B as drawn for `813b9d0` (88 frames, 0 missed). The rest of the November 19 build (the
+  first five shifts under its rules, the newer five's close-ups and the Chinese) has not been
+  drawn on the real renderer; the dry runs above only name its frames, and the last full
+  drawing is the one of late November 18 below. These are automated captures of fixed moments,
+  not a playtest.
 - `../validation/2026-11-18/captures-closing-en/`, `captures-closing-zh/` and
   `captures-closing-attacks-less-blood/` hold the late-evening build of November 18 (right or
   wrong at closing, lights out) as drawn that way: 204 frames in English, 204 in Chinese and
@@ -915,15 +995,16 @@ a switch on the title card (`language`). The log is English in both languages.
 ## Files
 
 ```
-data/rules.json, sheet.json, cases/*.json   numbers, the sheet and its house rule, the five cases
+data/rules.json, sheet.json, cases/*.json   numbers, the sheet and its house rule, the ten characters' templates
 data/contacts.json                          the pool of contacts: aliases, clues, codes, counter-lines, packages
 data/intro.json                             the words of the opening cards, the counter guide and the training
 data/parts.json                             the spec binder: every implant model's normal, by slot, and the baseline body
+data/nights.json                            the fixed test nights A to H: who comes, who drifts and which rows break
 data/lang/zh/                               the Chinese catalogs, keyed by the English: one per data file, ui.json, topics.json
 scripts/core/lang.gd                        the player's language: catalogs, t / tf / fill, the saved choice
 scripts/core/visit_state.gd                 every rule of one visit; owns truth, evidence, the marks, codes, snaps and flares
-scripts/core/shift_state.gd                 the five-visit shift, the night's list, the hourly line, the glass, the report
-scripts/core/case_db.gd                     loads and validates the data, the clue logic among it; sheet_for puts a patient's sheet together
+scripts/core/shift_state.gd                 the five-visit shift, the drawn night, the night's list, the hourly line, the glass, the report
+scripts/core/case_db.gd                     loads and validates the data, the clue logic among it; composes a night from the templates; sheet_for puts a patient's sheet together
 scripts/core/patient_agent.gd               offline script or model; call caps; conversation memory
 scripts/core/scripted_brain.gd              the authored offline patient
 scripts/core/model_client.gd                HTTP to the proxy (lines and transcripts)
@@ -959,10 +1040,11 @@ repository; commit them with the assets. (Godot marks the font atlas pictures `s
 ## Known limits
 
 - The only live run is the one of November 15 (30 patient replies, ten transcriptions; see the
-  live report linked at the top). It was made before the changes of November 16, 17 and 18,
-  and no paid service has been called since. The thinking pose, the leaving countdown, the
-  hourly line, the counter-first screen, the codes, the flares and the snaps have therefore
-  never run against a live model, and one run says little about believability. No model has
+  live report linked at the top). It was made before the changes of November 16 to 19, and no
+  paid service has been called since. The thinking pose, the leaving countdown, the hourly line,
+  the counter-first screen, the codes, the flares, the snaps, the drawn nights with the signs the
+  model is told, and the newer five patients have therefore never run against a live model, and
+  one run says little about believability. No model has
   been asked to answer in Chinese, and no Chinese speech has been transcribed: whether the
   patients sound right in Chinese, keep to its lengths and keep names in Latin letters is
   untested.
@@ -983,19 +1065,23 @@ repository; commit them with the assets. (Godot marks the font atlas pictures `s
   side of the window (132 of its 440 pixels in width); whether that is comfortable in play is
   unknown.
 - Every number added from November 16 to 19 is a first guess that nobody has played against:
-  400 an hour for the line, a bounty equal to the patient's fee, the draw's weights, 300 a drop, two contacts a night, 1 patience for a wrong code, 30
+  400 an hour for the line, a bounty equal to the patient's fee, the draw's weights and its
+  window of 1,700 to 1,999 in fees a night, the newer five's fees, 300 a drop, two contacts a night, 1 patience for a wrong code, 30
   credits for CALM, a snap's 3 free actions, 0.08 a step and 0.30 at most, a flare's 0.10, the
   0.35 s between a snap and its attack, eight seconds before a patient with no patience leaves,
   an attack window of 1.8 s with blows at 0.54, 0.99 and 1.44 s, three glass lamps a night,
   0.65 s with none left, 40 credits for a layer, two crosses for the house rule, and the hands
-  limits of the binder (1.5 s for a LOADER, 0.8 for SEAM, 0.5 for DEFT, 0.3 for REFLEX). The tests
+  limits of the binder (1.5 s for a LOADER, 1.2 for PISTON, 0.9 for CHOP, 0.8 for SEAM, 0.5 for
+  DEFT, 0.4 for LANCET, 0.3 for REFLEX). The tests
   press the shutter within one frame, so nobody knows yet whether a person can make those
   windows, a snap's above all, or whether they are too easy.
 - Whether the training says too much or too little, whether the clue pairs are fun to
   cross-reference or a chore, whether anyone still buys CALM, and whether a flare is read as
   temper or panics the player into a false alarm are questions for play.
-- The night cannot be lost before closing: an hour under the line costs nothing by itself, and
-  only the till at the end of the fifth hour decides. The glass is whole again every shift.
+- Apart from a blow that lands, which ends the night at once (A blow that lands ends the
+  night), the night cannot be lost before closing: an hour under the line costs nothing by
+  itself, and only the till at the end of the fifth hour decides. The glass is whole again every
+  shift.
 - The story (Kessler, Harrow Credit, the Lanterns), the opening cards and their pictures, the
   spec binder and its models, the training tips, the guide's wording, the coach hints, the
   hints on the wall objects, the fitter's line, the contacts' aliases, clues, codes and
@@ -1011,11 +1097,23 @@ repository; commit them with the assets. (Godot marks the font atlas pictures `s
 - A typed provocation has no rule effect of its own: only the PRESS pad moves patience and
   can set a patient off. A typed code is not a code either: only SAY on the list says one.
   Exit, attack, leaving, code and Trauma Team lines are authored in both modes.
-- The same five patients come every shift, with the same truths and the same signs; only the
-  order, the two contacts and their entries change with the seed (and the first shift of a
-  session opens with a steady patient). Signs are not recombined at random, and patients do not
-  draw new models. No saved game, no settings screen (the language choice is the one thing
-  kept between runs), no export build.
+- Each night draws five of the ten characters, who of them drift and which sign each of their
+  parts shows; the order, the two contacts and their entries change with the seed too (and the
+  first shift of a session opens with a steady patient). Nobody has played a drawn night, and
+  only the rule tests have drawn them. A character never wears another model, and a part shows
+  only a sign its template lists. No saved game, no settings screen (the language choice is the
+  one thing kept between runs), no export build.
+- The scene tests play only test nights A and B. The newer five go through the real scene only
+  in the capture script's weapon nights (test nights C to F); nights G and H are played by no
+  scene run, only composed and checked by the rule tests.
+- The newer five (Priya, Ozzie, Lux, Dana and Bo), their models in the binder (SCAN, LANCET,
+  CHOP, PISTON and DIVER), their weapons, test nights C to G, and all of it in Chinese were
+  written and drawn by an assistant on November 19; neither the student nor any other person
+  has reviewed them.
+- Vale's port close-up shows a round pinned socket, while the binder's MIL-SPEC line reads
+  "Calm skin at the plate" and Dana's close-up of the same model shows a plate. Vale's port is
+  never examined in play (his coat covers it and the port check is stalled, then refused), so
+  nothing a player sees disagrees, but the picture and the binder do not match. Left as it is.
 - `--less-blood` was judged from the frames captured with it and from five picture checks and
   three blood counts in the scene test. Of the final drawing's 91 frames an assistant looked at
   16, as contact sheets (the strikes, the blood moments, the aftermaths, the stop plates, the
@@ -1029,8 +1127,8 @@ repository; commit them with the assets. (Godot marks the font atlas pictures `s
   `4 ObjectDB instances were leaked at exit` warning. That is checked headlessly with the dummy
   audio driver only. A run that ends the engine another way while the ambience plays, such as
   `--quit-after` (the boot checks above), still prints the warning.
-- Nobody has operated the build of November 18 in a visible window: it has run only headless
-  and on a hidden desktop, driven by scripts. The build of November 17 was opened in a visible
+- Nobody has operated the builds of November 18 and 19 in a visible window: they have run only
+  headless and on a hidden desktop, driven by scripts. The build of November 17 was opened in a visible
   window for the student on November 18, who looked at its opening; there is no record of more
   play. The build of November 15 was operated by an agent, through posted window messages. The sound has been measured, not listened to. No
   sound file was added on November 17: the snap, the flare, the list, the codes and the

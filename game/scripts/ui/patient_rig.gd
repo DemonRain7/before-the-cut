@@ -105,7 +105,7 @@ func setup(p_case: Dictionary, p_meta: Dictionary) -> void:
 	_add(front, "attack")
 	_set_tex("body", _threads_layer("body"))
 	_set_tex("pupils", "pupils")
-	_set_tex("head", "head")
+	_set_tex("head", _threads_layer("head"))      # a port at the temple shows its threads on the head
 	_set_tex("lids", "lids")
 	_set_tex("attack", "attack")
 	(_spr["lids"] as Sprite2D).visible = false

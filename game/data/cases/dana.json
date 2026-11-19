@@ -1,0 +1,298 @@
+{
+  "id": "dana",
+  "version": 3,
+  "name": "Dana Kirsch",
+  "role": "Off-duty cop",
+  "age": 47,
+  "request": "Fix stuck target overlay",
+  "fee": 550,
+  "patience": 5,
+  "sprite": "dana",
+  "voice": {"pitch": 0.85, "rate": 0.95},
+  "teaser": "A woman in a plain raincoat, a badge on her belt. She has already counted the exits.",
+  "brief": "You are Dana Kirsch, 47, a precinct sergeant, off duty tonight and out of uniform. You are dry and controlled and used to asking the questions; you answer in short sentences and keep your hands where people can see them. The TALON in your right eye throws a targeting overlay that has got stuck on, and you want it fixed off the books, because a report would put you behind a desk. You do not like doctors who play detective.",
+  "opening": [
+    "Evening. I'm not here officially.",
+    "The overlay in my right eye is stuck on. I need it off, and I need this off the books."
+  ],
+  "parts": {
+    "eye_l": "natural",
+    "eye_r": "talon",
+    "hands": "natural",
+    "port": "milspec",
+    "voice": "natural"
+  },
+  "eyes": {"left": {}, "right": {}},
+  "port": {"covered": true},
+  "idle": {"hands": "still", "gaze": "glare"},
+  "looks": {
+    "eyes": "Left: natural. Right: a TALON, a red grid in it.",
+    "hands": "Natural hands, flat on the counter. In view.",
+    "port": "Raincoat collar turned up. Port not visible."
+  },
+  "checks": {
+    "penlight": {"first": ["comply"], "insist": "comply"},
+    "grip": {"first": ["comply"], "insist": "comply"},
+    "port": {"first": ["stall", "comply"], "insist": "comply"}
+  },
+  "claims": {},
+  "topics": [
+    {
+      "id": "why",
+      "q": "What's wrong with the overlay?",
+      "keys": [
+        "wrong", "problem", "happen", "reason", "trouble", "brings", "bring", "matter", "here", "came",
+        "come", "overlay", "grid", "target", "targeting", "stuck", "eye", "talon", "red", "see"
+      ],
+      "first": ["answer"]
+    },
+    {
+      "id": "sleep",
+      "q": "How are you sleeping?",
+      "keys": [
+        "sleep", "slept", "rest", "tired", "awake", "night", "bed", "dream", "insomnia", "exhaust",
+        "nap"
+      ],
+      "first": ["answer"]
+    },
+    {
+      "id": "duty",
+      "q": "Have you used it on duty?",
+      "keys": [
+        "duty", "used", "use", "job", "shoot", "shot", "fire", "fired", "gun", "weapon", "arrest",
+        "street", "hurt", "kill", "partner", "precinct"
+      ],
+      "deflect": "Next question, doctor.",
+      "first": ["deflect", "answer"]
+    }
+  ],
+  "script": [
+    {"on": "check:port", "move": "stall"},
+    {"on": "ask:duty", "move": "deflect"}
+  ],
+  "lines": {
+    "comply": ["Go ahead.", "Make it quick."],
+    "comply:penlight": "Go ahead. Mind the red one.",
+    "comply:port": "Fine. Off the record.",
+    "stall": ["I'd rather not."],
+    "stall:port": "The department seals that plate. Opening it means paperwork.",
+    "refuse": "That's a no, doctor.",
+    "deflect": ["Next question."],
+    "reassure": ["...Appreciated. It's been a long year."],
+    "spent": "I've answered enough questions tonight. Your call, doctor.",
+    "code": "If that was a code, I didn't hear it. I'm off duty."
+  },
+  "press_end": {
+    "walkout": "We're done. You never saw me.",
+    "attack": "Hands where I can see them, doctor."
+  },
+  "attack": {
+    "on_refer": true,
+    "telegraph": "The red grid locks on you. A stun baton snaps out of her sleeve.",
+    "line": "Stop resisting."
+  },
+  "exit": {
+    "treat": "Clean. Good work. We never met.",
+    "refer": "Trauma Team? You just ended my career, doctor.",
+    "taken": "Get your hands off me! I'm on the job!",
+    "gave_up": "Forget it. I'll live with the grid."
+  },
+  "signs": {
+    "eyes": {
+      "normal": [
+        {
+          "id": "steady",
+          "text": "The natural pupil tightened and the TALON snapped. Both followed.",
+          "note": "Light: L tightens, R snaps. Both follow.",
+          "eyes": {
+            "left": {"tightens": true, "follows": true},
+            "right": {"tightens": true, "follows": true}
+          }
+        }
+      ],
+      "broken": [
+        {
+          "id": "dead",
+          "text": "A TALON shutter snaps in light. Hers never did.",
+          "note": "Light: L tightens, R won't snap. Both follow.",
+          "eyes": {
+            "left": {"tightens": true, "follows": true},
+            "right": {"tightens": false, "follows": true}
+          }
+        }
+      ]
+    },
+    "hands": {
+      "normal": [
+        {
+          "id": "lets_go",
+          "text": "Let go in 0.5 s. A natural hand lets go inside 1.0.",
+          "note": "Grip: firm. Let go {t} s after 'release'.",
+          "grip": {"release_ms": 500, "tremor": 0},
+          "after": "Firm enough?"
+        }
+      ],
+      "broken": [
+        {
+          "id": "holds",
+          "text": "Held on 1.8 s after 'release'. A natural hand lets go inside 1.0.",
+          "note": "Grip: firm. Held on {t} s after 'release'.",
+          "grip": {"release_ms": 1800, "tremor": 0},
+          "after": "Habit. Never let go first."
+        }
+      ]
+    },
+    "port": {
+      "normal": [
+        {
+          "id": "calm",
+          "text": "A department seal on the plate, and calm skin round it.",
+          "note": "Neck plate, department seal. Calm skin."
+        }
+      ],
+      "broken": [
+        {
+          "id": "threads",
+          "text": "Dark threads run out from under the department seal.",
+          "note": "Sealed neck plate. Dark threads under skin.",
+          "threads": true
+        }
+      ]
+    },
+    "speech": {
+      "normal": [
+        {
+          "id": "own",
+          "text": "Clipped and careful, but it is all 'I' and 'my'.",
+          "answers": {
+            "why": {
+              "a": "Stuck on since a raid last week. I see a grid on everyone. I want it gone.",
+              "note": "\"I see a grid on everyone.\""
+            },
+            "sleep": {
+              "a": "Badly. Twelve-hour shifts. I sleep when the city lets me.",
+              "note": "\"I sleep when the city lets me.\""
+            },
+            "duty": {
+              "a": "Once. I nearly fired at a kid holding a phone. I didn't. That's why I'm here.",
+              "note": "\"I nearly fired at a kid with a phone.\""
+            }
+          },
+          "model": "Tonight you talk about yourself in the first person. The overlay scares you because you nearly fired at a kid holding a phone, and you want it off."
+        }
+      ],
+      "broken": [
+        {
+          "id": "sorts",
+          "text": "\"It sorts them for me now.\" The overlay judges, not her.",
+          "answers": {
+            "why": {
+              "a": "Stuck on since a raid last week. I see a grid on everyone. I want it gone.",
+              "note": "\"I see a grid on everyone.\""
+            },
+            "sleep": {
+              "a": "Fine. It keeps watch. It marks the ones to stop, so I can rest.",
+              "note": "\"It marks the ones to stop.\""
+            },
+            "duty": {
+              "a": "It sorts them for me now. Red, red, clear, red. Faster than me. Never wrong.",
+              "note": "\"Red, red, clear, red.\""
+            }
+          },
+          "evidence": ["sleep", "duty"],
+          "model": "Tonight you talk about the overlay as 'it', something that sorts people into red and clear for you, and you trust it more than your own judgement."
+        }
+      ]
+    },
+    "temper": {
+      "normal": [
+        {
+          "id": "together",
+          "text": "Pushed, she gets sharp, and her face and voice agree.",
+          "press": {
+            "line": "Careful, doctor. I know how interviews work.",
+            "face": "angry",
+            "hands": "point",
+            "note": "Got sharp, pointing. Face and voice agree."
+          },
+          "flare": {
+            "line": "Enough! ...Sorry. That's the job talking.",
+            "face": "angry",
+            "hands": "slam",
+            "note": "Slapped the glass, then said sorry."
+          },
+          "model": "When provoked you get sharp, like an officer in an interview room, face and voice together, and then you catch yourself."
+        }
+      ],
+      "broken": [
+        {
+          "id": "flat",
+          "text": "Pushed, she went still and formal. Her hand went to her belt.",
+          "press": {
+            "line": "Understood.",
+            "face": "flat",
+            "hands": "fist",
+            "note": "Went still. Her hand went to her belt."
+          },
+          "flare": {
+            "line": "Last warning.",
+            "face": "blank",
+            "hands": "slam",
+            "note": "Hit the glass, face empty. No sorry."
+          },
+          "model": "When provoked tonight you go still and formal, one or two words at a time, as if you were reading somebody their rights."
+        }
+      ]
+    }
+  },
+  "outcomes": {
+    "stable": {
+      "treat": {
+        "title": "OVERLAY OFF",
+        "text": "Dana blinks, looks at you with both eyes for once, and leaves a card with no name on it."
+      },
+      "refer": {
+        "title": "FALSE CALL",
+        "text": "Trauma Team walks a steady sergeant out past a patrol car from her own precinct. Trauma Team takes the fee back and bills you for the call-out."
+      },
+      "walkout": {
+        "title": "WALKED OUT",
+        "text": "Dana leaves with the grid still on everyone. Nobody gets paid."
+      },
+      "false_alarm": {
+        "title": "FALSE ALARM",
+        "text": "The shutter slams in a cop's face. Her whole precinct knows your address by morning. That costs you."
+      },
+      "gave_up": {
+        "title": "OUT OF PATIENCE",
+        "text": "Dana had a shift and you were still deciding. She goes with the overlay still on. No fee, no bill."
+      }
+    },
+    "drifting": {
+      "treat": {
+        "title": "OVERLAY OFF",
+        "text": "The grid is off, and the TALON runs quieter for it. At 04:00 a sergeant fires into a crowd it sorted red. Your stamp is on her card."
+      },
+      "refer": {
+        "title": "TAKEN IN",
+        "text": "Dana reads the crew their rights all the way to the van, very calmly."
+      },
+      "caught": {
+        "title": "SHUTTER HELD",
+        "text": "The baton cracks off the slats three times, then a buzz, then nothing. \"Stop resisting,\" from the other side. Trauma Team takes her quietly."
+      },
+      "hit": {
+        "title": "TOO SLOW",
+        "text": "The baton came through before the shutter did. Trauma Team finds you on the floor. Dana signs off her shift on time."
+      },
+      "locked_out": {
+        "title": "LOCKED OUT",
+        "text": "You dropped the shutter on a cop mid-sentence. At 04:00 a sergeant fires into a crowd it sorted red. You were right. Nobody pays for that."
+      },
+      "gave_up": {
+        "title": "OUT OF PATIENCE",
+        "text": "Dana walks back to her car, the grid sorting the street. You made no call. Nobody is paid for that."
+      }
+    }
+  }
+}

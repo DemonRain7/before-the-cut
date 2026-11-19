@@ -30,11 +30,17 @@ const CUT_PATH := [Vector2(4, 30), Vector2(20, 25), Vector2(38, 22), Vector2(55,
 const CUT_SIZE := Vector2(96, 40)
 # what each weapon leaves when it comes through the shutter (main.gd ATTACK_STYLES "cut"): the
 # cut, opened along the path; the blade or points at its end ("tooth"); the glow at the end of a
-# burn ("hot", added light). A kind not listed burns like the torch.
+# burn ("hot", added light). A weapon that bites in places shows its blade only along its "spans"
+# (x from and to) or its point only at its "holes" (x), the same numbers tools/art/gen_gore.py
+# draws them at. A kind not listed burns like the torch.
 const CUT_ART := {
 	"saw": {"cut": "fx/cut_saw.png", "tooth": "fx/saw_tooth.png"},
 	"torch": {"cut": "fx/burn.png", "hot": "fx/burn_hot.png"},
 	"picks": {"cut": "fx/scrape.png", "tooth": "fx/pick_tips.png"},
+	"laser": {"cut": "fx/burn_laser.png", "hot": "fx/burn_laser_hot.png"},
+	"arc": {"cut": "fx/burn_arc.png", "hot": "fx/burn_arc_hot.png"},
+	"chop": {"cut": "fx/cut_chop.png", "tooth": "fx/cleaver_tip.png", "spans": [Vector2(6, 40), Vector2(50, 86)]},
+	"spike": {"cut": "fx/cut_spike.png", "tooth": "fx/spike_tip.png", "holes": [30.0, 70.0]},
 }
 # the foot of the window on the screen, where blood runs out from under the shutter and on
 # over the desk, and how far along it
@@ -93,7 +99,7 @@ var danger: float = 0.0            # 0..1: red light in the window
 var glass_state: int = 0           # 0 whole, 1..3 cracked further with each blow, 4 broken out
 var hall_dark: float = 0.0         # 0..1: the light in the hall fails
 var flicker: float = 0.0           # 0..1: the lamp over the counter stutters
-var under_glow: float = 0.0        # 0..1: torchlight under the closed shutter
+var under_glow: float = 0.0        # 0..1: a flame's, beam's or arc's light under the closed shutter
 var under_color := Color("5ee6e0")
 var less_blood: bool = false
 var strobe: float = 0.0            # 0..1: red and blue light from the street, through the hall
@@ -165,6 +171,8 @@ var _cut_kind: String = ""
 var _cut_k: float = 1.0
 var _cut_time: float = 1.0
 var _cut_hold: float = 0.0
+var _bite_at := Vector2.ZERO      # where along the cut the weapon is through the slats
+var _biting := false              # and whether it is through them at all right now
 var _team_from: float = 1.0
 var _team_to: float = 1.0
 var _team_time: float = 1.0
@@ -479,7 +487,9 @@ func gore_count() -> int:
 
 
 ## A weapon comes through the shutter: "saw" opens a ragged slit, "torch" burns a line,
-## "picks" scores ten grooves as the points find the seams.
+## "picks" scores ten grooves as the points find the seams, "laser" traces a fine line,
+## "arc" crawls along the slats and scorches them, "chop" hacks through twice and "spike"
+## punches two holes.
 ## `local` is the top-left corner of the 96 x 40 cut; it opens over `time` seconds.
 func shutter_cut(kind: String, local: Vector2, time: float) -> void:
 	_cut_kind = kind
@@ -492,8 +502,10 @@ func shutter_cut(kind: String, local: Vector2, time: float) -> void:
 	_cut.region_rect = Rect2(0, 0, 1, CUT_SIZE.y)
 	_cut_hot = null
 	_tooth = null
+	_bite(_path_at(0.0))
 	if art.has("tooth"):         # the blade or the points, where they have got to
 		_tooth = Gfx.sprite(_dmg, _dry(str(art["tooth"])), local)
+		_tooth.visible = _biting
 	if art.has("hot"):
 		_cut_hot = Gfx.sprite(_dmg, str(art["hot"]), local)
 		_cut_hot.material = Gfx.additive()
@@ -514,6 +526,12 @@ func cut_active() -> bool:
 	return _cut != null and _cut_k < 1.0
 
 
+## Whether the weapon is through the slats right now (a cut that bites in places is not,
+## between them).
+func cut_biting() -> bool:
+	return cut_active() and _biting
+
+
 func has_cut() -> bool:
 	return _cut != null
 
@@ -523,7 +541,7 @@ func has_cut() -> bool:
 func cut_point() -> Vector2:
 	if _cut == null:
 		return Vector2.ZERO
-	return _shutter.position + _cut.position + _path_at(_cut_k)
+	return _shutter.position + _cut.position + _bite_at
 
 
 func _path_at(k: float) -> Vector2:
@@ -532,6 +550,37 @@ func _path_at(k: float) -> Vector2:
 	var a: Vector2 = CUT_PATH[i]
 	var b: Vector2 = CUT_PATH[i + 1]
 	return a.lerp(b, f - float(i))
+
+
+## The point on the path above `x`.
+func _path_at_x(x: float) -> Vector2:
+	for i in CUT_PATH.size() - 1:
+		var a: Vector2 = CUT_PATH[i]
+		var b: Vector2 = CUT_PATH[i + 1]
+		if x <= b.x or i == CUT_PATH.size() - 2:
+			return a.lerp(b, clampf((x - a.x) / (b.x - a.x), 0.0, 1.0))
+	return CUT_PATH[0]
+
+
+## Where the weapon is through the slats with the cut opened as far as `tip`: at the tip, or
+## for a weapon that bites in places, the place it is biting, if it is biting anywhere.
+func _bite(tip: Vector2) -> void:
+	var art: Dictionary = CUT_ART.get(_cut_kind, {})
+	_bite_at = tip
+	_biting = true
+	if art.has("holes"):         # the point punches through at each hole and is pulled back between
+		_biting = false
+		for h in art["holes"]:
+			if tip.x >= float(h) and tip.x < float(h) + 26.0:
+				_biting = true
+				_bite_at = _path_at_x(float(h))
+	elif art.has("spans"):       # the blade shows only along its hacks
+		_biting = false
+		for s in art["spans"]:
+			var span: Vector2 = s
+			if tip.x >= span.x and tip.x <= span.y + 10.0:
+				_biting = true
+				_bite_at = _path_at_x(minf(tip.x, span.y))
 
 
 func clear_shutter_damage() -> void:
@@ -737,6 +786,7 @@ func _update_damage(delta: float) -> void:
 	if _cut != null and _cut_k < 1.0:
 		_cut_k = minf(1.0, _cut_k + delta / _cut_time)
 		var tip := _path_at(_cut_k)
+		_bite(tip)
 		var w := ceilf(tip.x + 4.0) if _cut_k < 1.0 else CUT_SIZE.x
 		_cut.region_rect = Rect2(0, 0, w, CUT_SIZE.y)
 		if _cut_hot != null:
@@ -746,7 +796,8 @@ func _update_damage(delta: float) -> void:
 				_cut_hot = null
 		if _tooth != null:
 			var jit := Vector2(float(_rng.randi_range(-1, 1)), float(_rng.randi_range(-1, 1)))
-			_tooth.position = (_cut.position + tip - _tooth.texture.get_size() / 2.0 + jit).round()
+			_tooth.position = (_cut.position + _bite_at - _tooth.texture.get_size() / 2.0 + jit).round()
+			_tooth.visible = _biting
 			_tooth.flip_h = _cut_kind == "saw" and int(_t * 30.0) % 2 == 0      # the disc spinning
 	elif _tooth != null:
 		_cut_hold -= delta

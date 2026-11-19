@@ -1,0 +1,299 @@
+{
+  "id": "ozzie",
+  "version": 3,
+  "name": "Ozzie Brandt",
+  "role": "Noodle-cart cook",
+  "age": 63,
+  "request": "Fix slipping cleaver hand",
+  "fee": 220,
+  "patience": 7,
+  "sprite": "ozzie",
+  "voice": {"pitch": 0.78, "rate": 0.92},
+  "teaser": "An old man in a stained apron smells of broth and rain. One hand is wrapped in a towel.",
+  "brief": "You are Ozzie Brandt, 63, and you have pushed the same noodle cart round the overpass for thirty years. You are chatty, slow and fond of everybody, and you call the doctor 'chief'. Your CHOP hand, a cook's implant with a folding cleaver blade, has started slipping: it closes late, and on Tuesday it nearly took off a finger. You want it fixed so you can open by midnight. You treat the hand like an old knife, something you trust and keep sharp.",
+  "opening": [
+    "Evening, chief. Smells like rain, eh?",
+    "The hand's slipping. Closes late. I need it fixed before the midnight crowd."
+  ],
+  "parts": {
+    "eye_l": "natural",
+    "eye_r": "natural",
+    "hands": "chop",
+    "port": "street",
+    "voice": "natural"
+  },
+  "eyes": {"left": {}, "right": {}},
+  "port": {"covered": false},
+  "idle": {"hands": "work", "gaze": "soft"},
+  "looks": {
+    "eyes": "Natural eyes, milky at the rims. He squints.",
+    "hands": "CHOP hand, the blade folded in. Old burns."
+  },
+  "checks": {
+    "penlight": {"first": ["comply"], "insist": "comply"},
+    "grip": {"first": ["comply"], "insist": "comply"},
+    "port": {"first": ["comply"], "insist": "comply"}
+  },
+  "claims": {},
+  "topics": [
+    {
+      "id": "why",
+      "q": "What's wrong with the hand?",
+      "keys": [
+        "wrong", "problem", "happen", "reason", "trouble", "brings", "bring", "matter", "here", "came",
+        "come", "hand", "slip", "slipping", "close", "closes", "late", "blade", "knife", "cleaver",
+        "chop", "finger"
+      ],
+      "first": ["answer"]
+    },
+    {
+      "id": "sleep",
+      "q": "How are you sleeping?",
+      "keys": [
+        "sleep", "slept", "rest", "tired", "awake", "night", "bed", "dream", "insomnia", "exhaust",
+        "nap"
+      ],
+      "first": ["answer"]
+    },
+    {
+      "id": "alone",
+      "q": "Who looks after you?",
+      "keys": [
+        "alone", "family", "wife", "kids", "children", "home", "help", "friend", "friends", "after",
+        "care", "lonely", "live", "anyone", "somebody"
+      ],
+      "deflect": "Ah, don't you worry about me, chief.",
+      "first": ["deflect", "answer"]
+    }
+  ],
+  "script": [
+    {"on": "ask:alone", "move": "deflect"}
+  ],
+  "lines": {
+    "comply": ["Sure, chief.", "Whatever you say."],
+    "comply:penlight": "Go on. Not much left to see in there.",
+    "comply:grip": "Mind the blade, chief. It's folded.",
+    "comply:port": "Here. Bit greasy, sorry.",
+    "stall": ["Ah, do we have to?"],
+    "refuse": "No, chief. Leave it.",
+    "deflect": ["Ah, never mind that."],
+    "reassure": ["You're a good one, chief. Like my old doctor."],
+    "spent": "Chief, the broth's boiling dry. Yes or no?",
+    "code": "Eh? I only speak noodle, chief."
+  },
+  "press_end": {
+    "walkout": "Fine. I'll fix it with pliers, like always.",
+    "attack": "You talk too much, chief."
+  },
+  "attack": {
+    "on_refer": false,
+    "telegraph": "The towel drops. The CHOP blade swings out of his hand and locks.",
+    "line": "Hold still, chief. Clean cut."
+  },
+  "exit": {
+    "treat": "Ha! Like new. Come by the cart, chief. On the house.",
+    "refer": "Trauma Team? For a cook? Who'll open the cart?",
+    "taken": "I'm fine! Thirty years, I never cut a customer!",
+    "gave_up": "The broth won't wait, chief. Another night."
+  },
+  "signs": {
+    "eyes": {
+      "normal": [
+        {
+          "id": "steady",
+          "text": "Milky rims, but both pupils tighten and follow.",
+          "note": "Light: both pupils tighten. Both follow.",
+          "eyes": {
+            "left": {"tightens": true, "follows": true},
+            "right": {"tightens": true, "follows": true}
+          }
+        }
+      ],
+      "broken": [
+        {
+          "id": "drags",
+          "text": "Both pupils tightened, but his left eye never followed the light.",
+          "note": "Light: both pupils tighten. L won't follow.",
+          "eyes": {
+            "left": {"tightens": true, "follows": false},
+            "right": {"tightens": true, "follows": true}
+          }
+        }
+      ]
+    },
+    "hands": {
+      "normal": [
+        {
+          "id": "lets_go",
+          "text": "Let go in 0.7 s, inside the CHOP limit of 0.9.",
+          "note": "Grip: heavy. Let go {t} s after 'release'.",
+          "grip": {"release_ms": 700, "tremor": 1},
+          "after": "See? Slow, but it lets go."
+        }
+      ],
+      "broken": [
+        {
+          "id": "holds",
+          "text": "Held on 2.1 s after 'release'. A CHOP lets go inside 0.9.",
+          "note": "Grip: heavy. Held on {t} s after 'release'.",
+          "grip": {"release_ms": 2100, "tremor": 1},
+          "after": "Huh. It's never held that long."
+        }
+      ]
+    },
+    "port": {
+      "normal": [
+        {
+          "id": "calm",
+          "text": "Grease and old burns round the socket. Calm skin.",
+          "note": "Wrist socket, greasy. Calm skin.",
+          "look": "Wrist socket, greasy. Calm skin."
+        }
+      ],
+      "broken": [
+        {
+          "id": "threads",
+          "text": "Dark threads spread up the arm from the socket.",
+          "note": "Greasy socket. Dark threads under skin.",
+          "look": "Greasy socket. Dark threads under skin.",
+          "threads": true
+        }
+      ]
+    },
+    "speech": {
+      "normal": [
+        {
+          "id": "own",
+          "text": "Rambling, but it is all 'I' and 'my', and he knows his regulars.",
+          "answers": {
+            "why": {
+              "a": "It closes late, chief. I go to chop, my fingers aren't clear yet. Nearly lost one Tuesday.",
+              "note": "\"Nearly lost one Tuesday.\""
+            },
+            "sleep": {
+              "a": "After the late crowd, four till ten. Like a baby. A loud baby.",
+              "note": "\"Four till ten. Like a baby.\""
+            },
+            "alone": {
+              "a": "My Hanne passed six winters ago. The regulars look after me. They eat, I'm happy.",
+              "note": "\"The regulars look after me.\""
+            }
+          },
+          "model": "Tonight you talk about yourself in the first person, and you remember your regulars and their orders by name."
+        }
+      ],
+      "broken": [
+        {
+          "id": "chops",
+          "text": "\"It chops on its own, faster than me.\" The hand runs the cart.",
+          "answers": {
+            "why": {
+              "a": "It closes late, chief. I go to chop, my fingers aren't clear yet. Nearly lost one Tuesday.",
+              "note": "\"Nearly lost one Tuesday.\""
+            },
+            "sleep": {
+              "a": "Not much. It keeps time on the board all night. Tok, tok, tok.",
+              "note": "\"It keeps time on the board all night.\""
+            },
+            "alone": {
+              "a": "Me and the hand. It chops on its own now, faster than Hanne ever did. It never stops.",
+              "note": "\"It chops on its own now.\""
+            }
+          },
+          "evidence": ["sleep", "alone"],
+          "model": "Tonight you talk about your CHOP hand as 'it', something that chops on the board all night without you, and you are proud of how quick it is."
+        }
+      ]
+    },
+    "temper": {
+      "normal": [
+        {
+          "id": "together",
+          "text": "Pushed, the old man huffs, and all of him agrees.",
+          "press": {
+            "line": "Hey now! I've fed this street thirty years. Watch it, chief.",
+            "face": "upset",
+            "hands": "raise",
+            "note": "Huffed, hands up. All of him at once."
+          },
+          "flare": {
+            "line": "Chief! ...Ah, sorry. Long night at the pot.",
+            "face": "angry",
+            "hands": "slam",
+            "note": "Slapped the glass, then said sorry."
+          },
+          "model": "When provoked you huff and grumble all at once, like an old man in a queue, and you calm down fast."
+        }
+      ],
+      "broken": [
+        {
+          "id": "cold",
+          "text": "Pushed, the chatty old man went quiet. The blade hand clenched.",
+          "press": {
+            "line": "Mm.",
+            "face": "flat",
+            "hands": "fist",
+            "note": "Went quiet. The blade hand clenched."
+          },
+          "flare": {
+            "line": "Shut up, chief.",
+            "face": "blank",
+            "hands": "slam",
+            "note": "Hit the glass, face empty. No sorry."
+          },
+          "model": "When provoked tonight you go quiet and cold: one-word answers, no jokes, none of your usual warmth."
+        }
+      ]
+    }
+  },
+  "outcomes": {
+    "stable": {
+      "treat": {
+        "title": "HAND FIXED",
+        "text": "Ozzie flexes the CHOP hand, folds the blade away and writes you a coupon for a free bowl."
+      },
+      "refer": {
+        "title": "FALSE CALL",
+        "text": "Trauma Team marches a steady old cook out by his apron strings. The cart stays dark tonight. Trauma Team takes the fee back and bills you for the call-out."
+      },
+      "walkout": {
+        "title": "WALKED OUT",
+        "text": "Ozzie goes back to the cart to fix the hand with pliers. Nobody gets paid."
+      },
+      "false_alarm": {
+        "title": "FALSE ALARM",
+        "text": "The shutter slams in an old cook's face. The whole overpass hears it from his regulars. That costs you."
+      },
+      "gave_up": {
+        "title": "OUT OF PATIENCE",
+        "text": "The broth was boiling dry and you were still deciding. Ozzie goes with the hand still slipping. No fee, no bill."
+      }
+    },
+    "drifting": {
+      "treat": {
+        "title": "HAND FIXED",
+        "text": "The CHOP closes clean and fast now. At 02:00 the late queue at the noodle cart scatters, screaming. Your stamp is on his card."
+      },
+      "refer": {
+        "title": "TAKEN IN",
+        "text": "Ozzie asks the crew what they'd like to eat, all the way to the van. The blade hand keeps time on his knee."
+      },
+      "caught": {
+        "title": "SHUTTER HELD",
+        "text": "The blade bites the slats twice and sticks. \"Sorry, chief,\" from the other side. Trauma Team takes him quietly."
+      },
+      "hit": {
+        "title": "TOO SLOW",
+        "text": "The blade came through before the shutter did. Trauma Team finds you on the floor. The cart opens at midnight, as always."
+      },
+      "locked_out": {
+        "title": "LOCKED OUT",
+        "text": "You dropped the shutter on an old man mid-joke. At 02:00 the late queue at his cart scatters, screaming. You were right. Nobody pays for that."
+      },
+      "gave_up": {
+        "title": "OUT OF PATIENCE",
+        "text": "Ozzie shuffles back to the cart, the blade hand tapping time. You made no call. Nobody is paid for that."
+      }
+    }
+  }
+}

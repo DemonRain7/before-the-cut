@@ -14,7 +14,10 @@
       "one": "no pupil", "fine_one": "glyphs flicker"},
     "talon": {"tag": "TALON", "kind": "combat", "pupil": "shutter",
       "both": "Shutters snap tight in light. Both follow.", "fine": "No blinking, a faint whine.",
-      "one": "shutter snaps", "fine_one": "no blinking"}
+      "one": "shutter snaps", "fine_one": "no blinking"},
+    "scan": {"tag": "SCAN", "kind": "optic", "pupil": "none",
+      "both": "Lenses, no pupils. Both follow the light.", "fine": "A red glow, a faint tick.",
+      "one": "no pupil", "fine_one": "red glow"}
   },
   "eyes_mixed": {"normal": "L: {l}. R: {r}. Both follow.", "fine": "L: {l}. R: {r}.",
     "tag_l": "L {tag}", "tag_r": "R {tag}", "tag_two": "MIXED"},
@@ -23,13 +26,17 @@
     "loader": {"tag": "LOADER", "limit_ms": 1500, "fine": "Locks up now and then, twitches."},
     "deft": {"tag": "DEFT", "limit_ms": 500, "fine": "Quick, tapping, never still."},
     "reflex": {"tag": "REFLEX", "limit_ms": 300, "fine": "Dead still, a faint hum."},
-    "seam": {"tag": "SEAM", "limit_ms": 800, "fine": "Heat scars, stiff fingers."}
+    "seam": {"tag": "SEAM", "limit_ms": 800, "fine": "Heat scars, stiff fingers."},
+    "lancet": {"tag": "LANCET", "limit_ms": 400, "fine": "Needle-fine, very still."},
+    "chop": {"tag": "CHOP", "limit_ms": 900, "fine": "Heavy, greasy, a folded blade."},
+    "piston": {"tag": "PISTON", "limit_ms": 1200, "fine": "Hisses, jerks, a crushing grip."}
   },
   "ports": {
     "street": {"tag": "STREET", "fine": "Scuffs, burnt pins, cheap cable marks."},
     "work": {"tag": "WORK", "fine": "Burnt pins, weld burns, scars."},
     "milspec": {"tag": "MIL-SPEC", "normal": "Calm skin at the plate. No dark threads.",
-      "fine": "A sealed plate, no jacks."}
+      "fine": "A sealed plate, no jacks."},
+    "diver": {"tag": "DIVER", "fine": "Burnt rims, heat scars, smoke."}
   },
   "voices": {
     "natural": {"tag": "NATURAL", "fine": "Nerves, rudeness, long pauses."},

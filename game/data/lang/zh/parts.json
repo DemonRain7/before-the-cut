@@ -8,6 +8,10 @@
 		"DEFT",
 		"REFLEX",
 		"SEAM",
+		"SCAN",
+		"LANCET",
+		"CHOP",
+		"PISTON",
 		"VX"
 	],
 	"strings": {
@@ -45,6 +49,14 @@
 		"A st-stutter, a skipped word, nerves.": "结-结巴、漏字、紧张。",
 		"L: {l}. R: {r}.": "左：{l}。右：{r}。",
 		"L {tag}": "左 {tag}",
-		"R {tag}": "右 {tag}"
+		"R {tag}": "右 {tag}",
+		"Lenses, no pupils. Both follow the light.": "镜头，无瞳孔。双眼跟随光。",
+		"A red glow, a faint tick.": "泛红光，轻微嘀嗒声。",
+		"red glow": "泛红光",
+		"Needle-fine, very still.": "细如针，非常稳。",
+		"Heavy, greasy, a folded blade.": "沉、油腻，刀片折起。",
+		"Hisses, jerks, a crushing grip.": "嘶嘶作响、会抽动、握力极大。",
+		"DIVER": "潜网",
+		"Burnt rims, heat scars, smoke.": "边缘烧焦、烫疤、冒烟。"
 	}
 }

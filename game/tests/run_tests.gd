@@ -263,6 +263,8 @@ func test_art() -> void:
 	for style in MainScript.ATTACK_STYLES.keys():
 		var s: Dictionary = MainScript.ATTACK_STYLES[style]
 		var files: Array = ["fx/%s.png" % str(s["mark"])]
+		if str(s["strike"]) == "burn":      # a weapon that burns also leaves the mark still glowing
+			files.append("fx/%s_hot.png" % str(s["mark"]))
 		for key in ["loop", "bite", "knock"]:
 			if str(s[key]) != "":
 				files.append("audio/%s.wav" % str(s[key]))
@@ -270,7 +272,8 @@ func test_art() -> void:
 		if cut != "":
 			ok(ClinicView.CUT_ART.has(cut) and MainScript.CUT_AT.has(cut), "the %s's cut, '%s', has its pictures and its place" % [style, cut])
 			for path in (ClinicView.CUT_ART.get(cut, {}) as Dictionary).values():
-				files.append(str(path))
+				if typeof(path) == TYPE_STRING:      # the pictures, not the places it bites ("spans", "holes")
+					files.append(str(path))
 		for i in 3:
 			files.append(("fx/dent_deep_%d.png" if bool(s["deep"]) else "fx/dent_%d.png") % i)
 		var absent: Array = []
@@ -879,11 +882,12 @@ func test_generated_speech_findings() -> void:
 ## calls: case id -> "treat" | "refer" | "shutter" | "gave_up" (patience spent, nobody decided).
 ## A patient who turns on the call is shut out in time, unless their id is in `slow`: then the
 ## shutter never comes and the blow lands. Visitors in `drops` are couriers tonight and the
-## code is said to them, rightly, before the call.
-func play(shift: ShiftState, calls: Dictionary, slow: Array = [], drops: Array = []) -> void:
+## code is said to them, rightly, before the call. night_cases: the composed cases of another
+## night than A (CaseDB.compose_night), for a shift given that night's order.
+func play(shift: ShiftState, calls: Dictionary, slow: Array = [], drops: Array = [], night_cases: Dictionary = {}) -> void:
 	while not shift.is_done():
 		var id := shift.current_id()
-		var v := visit(id)
+		var v := visit(id) if night_cases.is_empty() else VisitState.new((night_cases[id] as Dictionary).duplicate(true), rules)
 		if drops.has(id):
 			var entry := courier(id)
 			v.set_contact(entry)
@@ -1047,6 +1051,43 @@ func test_shift() -> void:
 	ok(cut_is_under, "THE CUT is given to every night under the line and to no other")
 	ok(some_held, "and with drops some nights hold the line")
 	ok(held_needs_four, "at 400 an hour night A holds the line only with four right calls or five")
+	# The newer five are dearer. On test night D (Dana, Priya, Ozzie, Lux and Kip; fees 1970) Dana
+	# treated and Priya and Lux handed over make 1500, and with both drops 2100: three right calls
+	# can hold the line there, OPEN, BARELY. Two never can, on any night: the roster's two dearest
+	# fees and every drop of a night come to less than the line.
+	var db := CaseDB.load_all()
+	var d_night: Dictionary = (db["nights"] as Dictionary)["D"]
+	var d_cases := CaseDB.compose_night(templates, d_night, parts)
+	var d_order := CaseDB.night_order(d_night)
+	var barely := ShiftState.new(rules, d_order)
+	play(barely, {"dana": "treat", "priya": "refer", "ozzie": "gave_up", "lux": "refer", "kip": "gave_up"}, [], ["ozzie", "kip"], d_cases)
+	var barely_rep := barely.report()
+	eq([barely_rep["total"], barely_rep["correct"], barely_rep["line_held"], barely_rep["title"]], [1500 + 2 * pay, 3, true, "OPEN, BARELY"],
+		"night D: three right calls and both drops, from the two who walked out, hold the line: open, barely")
+	var held_by_three := false
+	var held_needs_three := true
+	var d_named := true
+	for drops in [[], ["ozzie", "kip"]]:
+		for n in int(pow(options.size(), 5)):
+			var calls := {}
+			var code := n
+			for id in d_order:
+				calls[id] = options[code % options.size()]
+				code /= options.size()
+			var night := ShiftState.new(rules, d_order)
+			play(night, calls, [], drops, d_cases)
+			var night_rep := night.report()
+			d_named = d_named and str(night_rep["title"]) != "" and ((str(night_rep["title"]) == "THE CUT") == (not bool(night_rep["line_held"])))
+			held_by_three = held_by_three or (bool(night_rep["line_held"]) and int(night_rep["correct"]) == 3)
+			held_needs_three = held_needs_three and (not bool(night_rep["line_held"]) or int(night_rep["correct"]) >= 3)
+	ok(d_named, "night D: all 2 x 1024 combinations of calls end in a titled report, THE CUT exactly under the line")
+	ok(held_by_three and held_needs_three, "night D holds the line with three right calls, never with two")
+	var roster_fees := []
+	for id in CaseDB.roster_of(rules):
+		roster_fees.append(CaseDB.fees_of(db["people"], [id]))
+	roster_fees.sort()
+	ok(int(roster_fees[-1]) + int(roster_fees[-2]) + int(rules["contacts"]["per_night"]) * pay < 5 * int(rules["line"]["per_hour"]),
+		"no night holds the line on two right calls or fewer: ON NOTICE stays out of reach")
 	for entry in rules["titles"]:
 		ok(str(entry["title"]) != "" and str(entry["text"]) != "", "report title '%s' has its text" % str(entry["title"]))
 	var titles: Array = rules["titles"]
@@ -1357,6 +1398,7 @@ func test_night_draw() -> void:
 	# the test nights
 	var nights: Dictionary = db["nights"]
 	eq(CaseDB.validate_nights(nights, templates, rules, sheet, parts, people, contacts_data), [], "every test night is a night the draw could make")
+	eq(CaseDB.night_coverage(nights, templates), [], "the test nights show every character steady and drifting, and every sign of every row")
 	var a := CaseDB.compose_night(templates, nights["A"], parts)
 	eq(CaseDB.night_order(nights["A"]), rules["shift_order"], "night A lists shift_order")
 	eq(a.keys(), cases.keys(), "night A is what the game loads first")
@@ -1388,7 +1430,7 @@ func test_night_draw() -> void:
 	ok(has_error(short_errors, "fees add up to 1650"), "and so are its fees, out of the window for four hours")
 	# bad draw rules are caught
 	var wrong := rules.duplicate(true)
-	wrong["night"]["visitors"] = 9
+	wrong["night"]["visitors"] = (rules["roster"] as Array).size() + 1
 	wrong["night"]["broken"] = {"1": 1, "x": 2}
 	wrong["night"]["tries"] = 0
 	var rule_errors := CaseDB.validate_rules(wrong, sheet)
@@ -1417,19 +1459,45 @@ func test_contacts() -> void:
 	for cid in clues.keys():
 		alone_ok = alone_ok and CaseDB.clue_matches(clues[cid], people).size() >= 2
 	ok(alone_ok, "no clue alone points at one person of the roster")
+	# The opening's Lanterns card shows a made-up list. Neither entry may fit anyone in the cast,
+	# or the picture could be read as a real night's list.
+	var intro: Dictionary = CaseDB.load_json("res://data/intro.json")
+	var by_text := {}
+	for cid in clues.keys():
+		by_text[str(clues[cid]["text"])] = clues[cid]
+	var card_entries: Array = []
+	for card in intro.get("cards", []):
+		if str(card.get("id", "")) == "lanterns":
+			card_entries = card["labels"]["entries"]
+	var made_up := card_entries.size() == 2
+	for e in card_entries:
+		var fits: Array = people.keys()
+		for text in e["clues"]:
+			made_up = made_up and by_text.has(str(text))
+			if by_text.has(str(text)):
+				var m: Array = CaseDB.clue_matches(by_text[str(text)], people)
+				fits = fits.filter(func(id): return m.has(str(id)))
+		made_up = made_up and fits.is_empty()
+	ok(made_up, "the opening's Lanterns card: both made-up entries use the list's clues, and neither pair fits anyone in the cast")
+	# night A's five visitors are half the roster: the entries of the other five cannot be drawn on it
 	var pair_ok := true
 	var per_case := {}
+	var night_a_entries := 0
 	for e in contacts_data["pool"]:
+		per_case[str(e["case"])] = int(per_case.get(str(e["case"]), 0)) + 1
+		if not cases.has(str(e["case"])):
+			continue
+		night_a_entries += 1
 		var fits: Array = CaseDB.clue_matches(clues[str(e["clues"][0])], cases)
 		var both: Array = []
 		for f in CaseDB.clue_matches(clues[str(e["clues"][1])], cases):
 			if fits.has(f):
 				both.append(f)
 		pair_ok = pair_ok and both == [str(e["case"])]
-		per_case[str(e["case"])] = int(per_case.get(str(e["case"]), 0)) + 1
-	ok(pair_ok, "on night A every entry's two clues together point at its own visitor only")
-	eq(CaseDB.fair_contacts(contacts_data, people, rules["shift_order"]).size(), (contacts_data["pool"] as Array).size(),
-		"so on night A every entry is fair")
+	eq(night_a_entries, 10, "ten entries are for night A's five visitors")
+	ok(pair_ok, "on night A every entry of its visitors has two clues that together point at that visitor only")
+	eq(CaseDB.fair_contacts(contacts_data, people, rules["shift_order"]).size(), night_a_entries,
+		"so on night A every entry of its visitors is fair, and no other")
 	for id in people.keys():
 		ok(int(per_case.get(id, 0)) >= 2, "%s can be a courier under two different entries" % id)
 	# fairness is a matter of who comes in
@@ -1443,7 +1511,7 @@ func test_contacts() -> void:
 	var loose_ids: Array = []
 	for e in CaseDB.fair_contacts(loose, people, rules["shift_order"]):
 		loose_ids.append(str(e["id"]))
-	ok(not loose_ids.has("kip_a") and loose_ids.size() == (loose["pool"] as Array).size() - 1,
+	ok(not loose_ids.has("kip_a") and loose_ids.size() == night_a_entries - 1,
 		"an entry whose two clues fit Kip and Juno both is not used on a night they both come")
 	eq(CaseDB.fair_couriers(contacts_data, people, ["juno", "maren", "kip", "rook"]), ["kip", "rook"],
 		"with Juno, Maren, Kip and Rook in, only Kip and Rook can carry a fair contact, in the order they come")

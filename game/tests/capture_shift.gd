@@ -12,7 +12,7 @@ extends SceneTree
 ## moment it waits for never came. Use it to check this script without opening a window:
 ##   godot --headless --audio-driver Dummy --fixed-fps 60 --path game --script res://tests/capture_shift.gd
 ##
-## Nine shifts are played, so that the opening, the first night's training, tonight's contact
+## Fifteen shifts are played, so that the opening, the first night's training, tonight's contact
 ## list and its codes, the guide, the booth walls, the hourly meter, the doctor's own marks, a
 ## flare, a snap, a patient who runs out of patience, every way an attack can end, a night that
 ## ends with the doctor, the glass fitter and every patient's weapon are all seen:
@@ -44,6 +44,11 @@ extends SceneTree
 ##            her): Kip's bike lock and Juno's picks are stopped after two blows and Rook's loader
 ##            fist gets through (6); the fist is stopped and dents the shutter deep (7); the lock
 ##            gets through (8); the picks get through (9). G buys the glass back between patients.
+##   shifts 10 to 15, the newer five on test nights C to F, each pressed twice to turn: Bo's spike
+##            and Dana's baton are stopped and Ozzie's cleaver gets through (10, night C); Priya's
+##            laser is stopped and Lux's arc gets through (11, night D); the arc is stopped and the
+##            spike gets through (12, night F); the baton gets through (13, night C); the laser gets
+##            through (14, night D); the cleaver is stopped (15, night E).
 ## The glass belongs to the shift: a blow that lands in one attack leaves less time in the next.
 ## That is why the same two patients are seen with three blows, one blow and none.
 ## Right and wrong are told only on the report. A slip says what the counter did, and each report
@@ -67,7 +72,7 @@ extends SceneTree
 ##                    the attack scenes (the snap among them) and the glass fitter. The training is
 ##                    switched off for it, so the guide opens by itself at the first patient, as
 ##                    with --no-training, and is closed with ESC
-##   --weapons-only   only shifts 6 to 9, the weapon nights (the training switched off as above)
+##   --weapons-only   only shifts 6 to 15, the weapon nights (the training switched off as above)
 ##   --less-blood     passed on to the game: the same scenes without the blood
 
 const MainScript = preload("res://scripts/ui/main.gd")
@@ -166,7 +171,7 @@ func _run() -> void:
 	await d.seconds(0.6)
 	if not weapons_only:
 		await first_five(later_nights)
-	# ---------------------------------------------------------------- shifts 6 to 9
+	# ---------------------------------------------------------------- shifts 6 to 15
 	await weapon_nights()
 	if dry:
 		print("DRY RUN: %d frames would be captured, %d moments missed. Nothing was drawn or saved." % [count, missed])
@@ -1279,28 +1284,38 @@ func maren_whole_bar() -> void:
 	await d.take_slip()
 
 
-# ================================================================ shifts 6 to 9: the weapons
+# ================================================================ shifts 6 to 15: the weapons
 
 ## Test night B (data/nights.json): Maren and Vale steady; Kip, Juno and Rook drifting, each with
 ## his or her own hardware, so each leaves its own marks on the glass and the shutter and lands
-## its own way on the player's eyes.
+## its own way on the player's eyes. Then the newer five on test nights C to F, each of them
+## stopped once and through once.
 func weapon_nights() -> void:
 	await weapon_night("6", [["maren", "treat"], ["kip", "stopped"], ["vale", "treat"], ["juno", "stopped"], ["rook", "through"]])
 	await weapon_night("7", [["maren", "treat"], ["kip", "refer"], ["vale", "treat"], ["juno", "refer"], ["rook", "stopped"]])
 	await weapon_night("8", [["maren", "treat"], ["kip", "through"]])
 	await weapon_night("9", [["maren", "treat"], ["kip", "refer"], ["vale", "treat"], ["juno", "through"]])
+	await weapon_night("10", [["lux", "treat"], ["bo", "stopped"], ["dana", "stopped"], ["ozzie", "through"]], "C")
+	await weapon_night("11", [["dana", "treat"], ["priya", "stopped"], ["ozzie", "treat"], ["lux", "through"]], "D")
+	# Rook is treated, not handed over: called in, he turns on the call (cases/rook.json attack.on_refer)
+	await weapon_night("12", [["vale", "treat"], ["ozzie", "treat"], ["lux", "stopped"], ["rook", "treat"], ["bo", "through"]], "F")
+	await weapon_night("13", [["lux", "treat"], ["bo", "refer"], ["dana", "through"]], "C")
+	await weapon_night("14", [["dana", "treat"], ["priya", "through"]], "D")
+	await weapon_night("15", [["bo", "treat"], ["ozzie", "stopped"], ["juno", "refer"], ["maren", "refer"], ["priya", "treat"]], "E")
 
 
-## One shift on test night B. plan lists [id, what] in the night's order: "treat" or "refer"
-## (decided with no examination), "stopped" (pressed twice: the second press turns them, and the
-## shutter drops after the second blow) or "through" (pressed twice, and nobody drops it: the
-## night ends with them). Between patients G buys back what an attack took out of the glass.
-func weapon_night(shift: String, plan: Array) -> void:
-	main.test_night = "B"
+## One shift on a test night (B unless night says otherwise). plan lists [id, what] in the
+## night's order: "treat" or "refer" (decided with no examination), "stopped" (pressed twice: the
+## second press turns them, and the shutter drops after the second blow) or "through" (pressed
+## twice, and nobody drops it: the night ends with them). Between patients G buys back what an
+## attack took out of the glass.
+func weapon_night(shift: String, plan: Array, night: String = "B") -> void:
+	main.test_night = night
 	var was := pin_rules({"contacts": {"per_night": 0}})      # no couriers: only the visits
 	reached(await d.open_counter(), "night %s: the counter opens" % shift)
 	restore_rules(was)
-	reached(main.night_name == "B" and main.shift.glass == main.shift.glass_max(), "night %s: test night B, behind a whole pane" % shift)
+	reached(main.night_name == night and main.shift.glass == main.shift.glass_max(),
+		"night %s: test night %s, behind a whole pane" % [shift, night])
 	for step in plan:
 		var who := str(step[0])
 		var what := str(step[1])

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "Test nights (version 1, added 2026-11-18 with rules version 9): fixed nights beside the drawn ones, played with --test-night=<name> (night A also with --authored-order, and it is the night a test or a capture builds when it names nobody). Each lists its visitors in the order they come, each with a truth and the sign each sheet row shows: an id from that character's cases/<id>.json signs (a row left out shows the first normal sign). Every night must be one the draw could make on the first night of a session (case_db night_drawable): the right number of visitors, drifting visitors and broken rows, a steady first visitor who can carry a fair contact, fees under the line and within one drop of it, and enough fair contacts.",
+  "note": "Test nights (version 1, added 2026-11-18 with rules version 9; nights C to G, with the five newer visitors, added 2026-11-19): fixed nights beside the drawn ones, played with --test-night=<name> (night A also with --authored-order, and it is the night a test or a capture builds when it names nobody). Each lists its visitors in the order they come, each with a truth and the sign each sheet row shows: an id from that character's cases/<id>.json signs (a row left out shows the first normal sign). Every night must be one the draw could make on the first night of a session (case_db night_drawable): the right number of visitors, drifting visitors and broken rows, a steady first visitor who can carry a fair contact, fees under the line and within one drop of it, and enough fair contacts.",
   "nights": {
     "A": {
       "note": "The night as written, and the order of rules.json shift_order: Kip, Rook and Juno steady; Vale and Maren drifting, each with four broken rows and one that looks fine (Vale's grip, Maren's port). Fees 1900.",
@@ -122,8 +122,308 @@
         }
       ]
     },
+    "C": {
+      "note": "The five newer visitors come in. Lux opens steady and Kip closes steady; Bo, Dana and Ozzie drift, each with four broken rows (eyes, grip, port and speech) while the temper holds. Fees 1840.",
+      "visitors": [
+        {
+          "id": "lux",
+          "truth": "stable",
+          "signs": {
+            "eyes": "steady",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "own",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "bo",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "stray",
+            "hands": "holds",
+            "port": "threads",
+            "speech": "wants",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "dana",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "dead",
+            "hands": "holds",
+            "port": "threads",
+            "speech": "sorts",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "ozzie",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "drags",
+            "hands": "holds",
+            "port": "threads",
+            "speech": "chops",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "kip",
+          "truth": "stable",
+          "signs": {
+            "eyes": "steady",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "own",
+            "temper": "together"
+          }
+        }
+      ]
+    },
+    "D": {
+      "note": "Dana opens steady and Ozzie comes third, steady. Priya and Lux drift with four broken rows each (eyes, grip, port and speech), Kip with two (port and temper). Fees 1970.",
+      "visitors": [
+        {
+          "id": "dana",
+          "truth": "stable",
+          "signs": {
+            "eyes": "steady",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "own",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "priya",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "wide",
+            "hands": "holds",
+            "port": "threads",
+            "speech": "counts",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "ozzie",
+          "truth": "stable",
+          "signs": {
+            "eyes": "steady",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "own",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "lux",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "stray",
+            "hands": "holds",
+            "port": "threads",
+            "speech": "we",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "kip",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "steady",
+            "hands": "lets_go",
+            "port": "threads",
+            "speech": "own",
+            "temper": "flat"
+          }
+        }
+      ]
+    },
+    "E": {
+      "note": "Few signs each: Ozzie's eyes and temper, Juno's speech and temper, Maren's eyes and port (the port she keeps covered, shown when asked). Bo opens and Priya closes, both steady. Fees 1740.",
+      "visitors": [
+        {
+          "id": "bo",
+          "truth": "stable",
+          "signs": {
+            "eyes": "steady",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "own",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "ozzie",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "drags",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "own",
+            "temper": "cold"
+          }
+        },
+        {
+          "id": "juno",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "steady",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "we",
+            "temper": "flat"
+          }
+        },
+        {
+          "id": "maren",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "wide",
+            "hands": "lets_go",
+            "port": "threads",
+            "speech": "own",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "priya",
+          "truth": "stable",
+          "signs": {
+            "eyes": "steady",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "own",
+            "temper": "together"
+          }
+        }
+      ]
+    },
+    "F": {
+      "note": "Vale opens and Ozzie comes second, both steady. Lux's eyes and temper, Rook's eyes and temper, Bo's grip and temper. Fees 1940.",
+      "visitors": [
+        {
+          "id": "vale",
+          "truth": "stable",
+          "signs": {
+            "eyes": "snaps",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "own",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "ozzie",
+          "truth": "stable",
+          "signs": {
+            "eyes": "steady",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "own",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "lux",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "stray",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "own",
+            "temper": "polite"
+          }
+        },
+        {
+          "id": "rook",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "wide",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "own",
+            "temper": "flat"
+          }
+        },
+        {
+          "id": "bo",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "steady",
+            "hands": "holds",
+            "port": "calm",
+            "speech": "own",
+            "temper": "flat"
+          }
+        }
+      ]
+    },
+    "G": {
+      "note": "Bo and Rook steady. Priya and Juno show it only in what they say and how (speech and temper), Dana in her grip and temper. With nights C to F it shows every sign of the five newer visitors; with A, B, E, F and H every sign of the first five. Fees 1970.",
+      "visitors": [
+        {
+          "id": "bo",
+          "truth": "stable",
+          "signs": {
+            "eyes": "steady",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "own",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "rook",
+          "truth": "stable",
+          "signs": {
+            "eyes": "steady",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "own",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "priya",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "steady",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "counts",
+            "temper": "clinical"
+          }
+        },
+        {
+          "id": "dana",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "steady",
+            "hands": "holds",
+            "port": "calm",
+            "speech": "own",
+            "temper": "flat"
+          }
+        },
+        {
+          "id": "juno",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "steady",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "we",
+            "temper": "flat"
+          }
+        }
+      ]
+    },
     "H": {
-      "note": "Three drifting with few signs each: Vale's grip and speech (his port, which he will not show, looks fine), Kip's port, speech and temper, Juno's grip and speech. Rook opens and Maren comes fourth, both steady. With nights A and B it shows every sign of Kip, Juno and Vale; Rook's eyes and temper and Maren's port are left to the nights with the new visitors. Fees 1900.",
+      "note": "Three drifting with few signs each: Vale's grip and speech (his port, which he will not show, looks fine), Kip's port, speech and temper, Juno's grip and speech. Rook opens and Maren comes fourth, both steady. With nights A and B it shows every sign of Kip, Juno and Vale; Rook's eyes and temper come in night F and Maren's port in night E. Fees 1900.",
       "visitors": [
         {
           "id": "rook",
