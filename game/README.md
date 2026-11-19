@@ -143,10 +143,11 @@ changes only on the title card, where nothing is half-said.
   Speech is transcribed in that language. The offline patient's lines are in the case catalogs,
   and it listens for Chinese words as well as English ones (`data/lang/zh/topics.json`).
 - **The intake card in Chinese.** A hanzi is nine pixels tall where a capital is seven, so lines
-  set nine pixels apart touch. In Chinese a row's one or two notes are set ten apart, and a
-  finding puts 正常 or 异常 at the start of its text, with 你没有检查 on the right, instead of
-  under it (the second line starts under the label). A row with three notes still sets them
-  nine apart: they touch, but stay clear of the rule below.
+  set nine pixels apart touch. In Chinese a row's one or two notes are set ten apart. A row
+  with three notes still sets them nine apart: they touch, but stay clear of the rule below.
+  The findings left the card late on November 18: on the report's visit pages, in both
+  languages, NORMAL or BROKEN LINE (正常 or 异常) starts each finding's text and "you did not
+  check" (你没有检查) stands on the right.
 - **Keeping the two in step.** A change to the English is a change to the Chinese, in the same
   commit. `python tools/check_lang.py` fails on a line with no translation, a translation whose
   English has changed, two translations of one line, a line and its translation with different
@@ -230,7 +231,9 @@ in front of the window only while you have taken it down.
     key again or a right-click on it hangs it back. The sheet's corners blink until it has been
     down once.
   - the lender's **meter**: the till, the hour (one patient is one hour), the line the meter
-    wants when this hour ends, and a tick or cross for how each finished call went.
+    wants when this hour ends, and a lamp for each finished visit in the colour of what you did
+    (green TREAT, amber Trauma Team, blue shutter, red when a patient got through, dark when
+    nothing was done). The lamps say what you did, never whether it was right.
   - the **hall camera**: a small monitor that shows who is waiting. Click it, or press C, and a
     larger screen lights up in the lower left corner of the window. Between patients a second
     press, or a click on that screen, buzzes the next one in; ENTER does it at once, without
@@ -242,7 +245,7 @@ in front of the window only while you have taken it down.
     small number counts the notes you have not looked at yet. The small box at each row is
     yours: click once for a tick, again for a cross, a third time to clear it. The card counts
     your crosses against the house rule (`CROSSED 1/2`). Nothing scores a mark, and nothing on
-    the card says normal or abnormal until the visit is over.
+    the card ever says normal or abnormal: the findings are told at closing, on the report.
   - the **COUNTER GUIDE** booklet (click it, or H or F1).
   - a plate with four controls: the TREAT stamp, the TRAUMA call box, the SHUT lever and the
     GLASS key.
@@ -259,8 +262,8 @@ what the shutter is for.
 a click on it is never passed on to what is behind it. The middle of the window stays clear
 with a paper down on each side. The papers step aside by themselves for a tool close-up and
 come back after it. The intake card comes down by itself when it is needed: while the TREAT
-stamp is in your hand, for 1.3 seconds after the stamp lands, and with the findings when the
-visit is over. Once a patient has turned, nothing hangs in front of the window. Within a shift
+stamp is in your hand and for 1.3 seconds after the stamp lands. Once a patient has turned,
+nothing hangs in front of the window. Within a shift
 the papers stay where you left them from one patient to the next; a new shift starts with all
 of them on the wall. Until a patient turns, papers and screens behave the same whatever that
 patient is about to do.
@@ -296,8 +299,9 @@ is on its way, while a test or the microphone is open, and while the guide is up
 | Key | Effect |
 | --- | --- |
 | mouse | everything. A right-click on a paper or on the hall screen puts that one back. Anywhere else, a right-click (or ESC) puts away what is in hand; with empty hands it puts back the hall screen, then the card, then the paper on the left |
-| ENTER | start, next opening card, buzz the next patient in, hurry a line, tear off the slip, new shift; on a quiet strip it opens the typing line |
-| ESC | skip the opening cards; close the guide |
+| ENTER | start, next opening card, buzz the next patient in, hurry a line, tear off the slip, turn a report page, new shift; on a quiet strip it opens the typing line |
+| ESC | skip the opening cards; close the guide; on the report, go to the night's totals |
+| On the report | a click, ENTER, SPACE or RIGHT turns to the next page, and on the night's totals starts a new shift; BACKSPACE or LEFT goes back a page; ESC or a right-click goes to the totals |
 | H / F1 | the counter guide |
 | R | the reference sheet: down, or back on its nail |
 | L | tonight's contact list: down, or back on its nail |
@@ -410,26 +414,59 @@ code.]
 
 ## Decisions and money
 
-| What happened | Credits | Counts as a right call |
-| --- | --- | --- |
-| Treated a steady patient | their fee (250 to 350) | yes |
-| Treated a drifting patient | -400 | no |
-| Trauma Team took a drifting patient | +120 | yes |
-| The patient turned and the shutter came down in time | +120 | yes |
-| The patient turned and got through | -300 | only if it was your call to Trauma Team that set them off |
-| Trauma Team called on a steady patient | -150 (the call-out is billed) | no |
-| Shutter on a steady patient | -100 | no |
-| Shutter on a drifting patient during the exam | 0 | yes |
-| Pressed until they walked out | 0 | no |
-| Out of patience: they left by themselves | 0 | no |
-| A contact's drop (any time in the visit, whatever the call) | +300 | not a call |
-| CALM | -30 a use | not a call |
+[Student, November 18: say whether a call succeeded only at the end, so that the player is
+less sure; and look over the whole logic for holes.] Whether a call was right is told only at
+closing. During the night the doctor learns what was done, never whether it was right:
+
+- **The slip** says what the counter did (`rules.json` `counter`): TREATED, HANDED OVER, SHUTTER
+  HELD, SHUTTER DOWN, WALKED OUT or OUT OF PATIENCE, with a line of text that does not give the
+  truth away, the money AT THE COUNTER, a drop, a missed drop or CALM, and "Right or wrong: at
+  closing."
+- **At the counter** come in only fees for work done, drops, and CALM and glass going out. A
+  treated patient pays the fee at the counter whatever their truth; the bill for a drifting
+  one comes at closing. Trauma Team's bounty or call-out bill, the shutter's bounty or fine and
+  the cost of a blow all come at closing too.
+- **Nothing else tells.** The intake card holds only the doctor's own marks; the meter's lamps
+  show what was done; a shutter on a patient who did not turn falls quiet (no bounty plate, no
+  sound of money); the slip's sound follows only the counter money; the crew says the same
+  lines on every call, and what a patient says on being handed over does not give their truth
+  away; the till and the hourly readings count only the counter money until the last reading.
+- **The report** at closing has a page for each visit seen, then the night's totals. A visit's
+  page names the call, the patient's truth (STEADY or DRIFTING), RIGHT CALL, WRONG CALL or NO
+  CALL, what became of them, the five findings beside the doctor's own marks (NORMAL or BROKEN
+  LINE, what the patient said, and "you did not check" where no test was made) and the money
+  at the counter, at closing and in all. The totals add the two columns, the till, the meter's
+  lamps, the title and its text. The till's jingle plays only on the totals.
+
+| What happened | At the counter | At closing | In all | Counts as a right call |
+| --- | --- | --- | --- | --- |
+| Treated a steady patient | their fee (250 to 350) | 0 | the fee | yes |
+| Treated a drifting patient | their fee | -(fee + 400) | -400 | no |
+| Trauma Team took a drifting patient | 0 | +120 | +120 | yes |
+| The patient turned and the shutter came down in time | 0 | +120 | +120 | yes |
+| The patient turned and got through | 0 | -300 | -300, and the night ends | only if it was your call to Trauma Team that set them off |
+| Trauma Team called on a steady patient | 0 | -150 (the call-out is billed) | -150 | no |
+| Shutter on a steady patient | 0 | -100 | -100 | no |
+| Shutter on a drifting patient during the exam | 0 | 0 | 0 | yes |
+| Pressed until they walked out | 0 | 0 | 0 | no |
+| Out of patience: they left by themselves | 0 | 0 | 0 | no |
+| A contact's drop (any time in the visit, whatever the call) | +300 | | | not a call |
+| CALM | -30 a use | | | not a call |
+
+Two things are not hidden, by their nature. A patient who turns on a call shows by turning
+that they were drifting (only Vale does that, on a call to Trauma Team). And a quiet hand-over
+is not proof of a steady patient: Maren drifts but goes with the crew without a fight. The
+readings during the night can mislead: a night of treatments reads well at the counter and may
+still close under the line when the bills come in.
 
 **The lender's line.** The meter wants 240 more in the till every hour (`line.per_hour`), so
 hour n needs n x 240 and the night needs 1,200. After each slip the meter reads the till
-against the line for that hour: over, or UNDER THE LINE in red. A reading under the line is
-counted and shown in the report, but the shift goes on; only the last reading decides the
-night. Closing under the line is the ending called THE CUT, whatever else went right.
+against the line for that hour: over, or UNDER THE LINE in red. Until the last hour it reads
+only what came in at the counter (fees, drops, less CALM and glass); the last reading is taken
+at closing, with every visit's bounties and bills in. A reading under the line is counted and
+shown in the report, but the shift goes on; only the last reading decides the night. Closing
+under the line is the ending called THE CUT, whatever else went right. A night that ends with
+the doctor killed is LIGHTS OUT: nobody reads the meter, and no line is held.
 
 Five right calls make 1,140: under the line. With one drop they make 1,440, with both 1,740,
 less what CALM and glass cost. Treating everyone makes 100 and calling Trauma Team on everyone
@@ -451,7 +488,7 @@ on the glass. SPACE (or the SHUT lever) drops the shutter, and when you do it ma
 | after one or two blows | STOPPED AFTER 1 BLOW / 2 BLOWS | one lamp out per blow |
 | after the blow that takes the last lamp | STOPPED, BUT THE GLASS IS GONE | none left |
 | in time, with no glass left to hit | STOPPED IN TIME: NO GLASS LEFT | none left |
-| not in time | they come through | none left |
+| not in time | they come through, and the night ends | none left |
 
 The pane takes three blows a night (`attack.glass`), and what it has taken stays until you pay
 to have a layer put back or the shift ends. With whole glass the blows land 0.54, 0.99 and
@@ -461,6 +498,14 @@ a sloppy stop on the first attacker makes the second one faster. A pane that has
 lamp drops out of its frame behind the shutter, and the frame stays empty until you pay for a
 layer; the next shift starts with a whole pane either way. Trauma Team is an authored outcome
 with fixed lines; it is not another AI agent.
+
+**A blow that lands ends the night.** [Student, November 18: if the doctor is killed, the night
+should end there; how can it go on?] After the blow the screen goes dark. No slip prints,
+nobody else is buzzed in, and the report comes up out of the dark under the title LIGHTS OUT:
+"Nobody reads the meter tonight. Harrow Credit takes the clinic back." The visitors still in
+the hall are listed on the totals as never seen, the hour's reading is not taken, and the
+meter on the wall stays at the hour the night ended in. The -300 is billed at closing like
+every other outcome. The event log records it as `lights_out` (case, hour, who was unseen).
 
 **Snaps and flares.** [Student, November 17: during the eye test, the grip or any other
 action, the patient may suddenly fly into a rage and lunge, with transitions.]
@@ -592,32 +637,38 @@ $GODOT = "$env:LOCALAPPDATA\CodexTools\Godot\4.7.2\Godot_v4.7.2-stable_win64_con
 None of these opens a window, plays sound or opens a microphone. In Git Bash, write
 `"$GODOT"` in place of `& $GODOT`.
 
-| Check | Command | Result on the evening of November 18, in this checkout |
+| Check | Command | Result late on November 18, in this checkout |
 | --- | --- | --- |
-| Rules | `& $GODOT --headless --audio-driver Dummy --path game --script res://tests/run_tests.gd` | 934 passed, 0 failed |
-| Scene, offline | `& $GODOT --headless --audio-driver Dummy --fixed-fps 60 --path game --script res://tests/run_ui_smoke.gd` | 953 passed, 0 failed |
-| Scene, in Chinese | the same, with ` -- --lang=zh` at the end | 954 passed, 0 failed |
-| Scene, less blood | the same, with ` -- --less-blood` at the end | 953 passed, 0 failed |
+| Rules | `& $GODOT --headless --audio-driver Dummy --path game --script res://tests/run_tests.gd` | 970 passed, 0 failed |
+| Scene, offline | `& $GODOT --headless --audio-driver Dummy --fixed-fps 60 --path game --script res://tests/run_ui_smoke.gd` | 1001 passed, 0 failed |
+| Scene, in Chinese | the same, with ` -- --lang=zh` at the end | 1002 passed, 0 failed |
+| Scene, less blood | the same, with ` -- --less-blood` at the end | 1001 passed, 0 failed |
 | Window close | `& $GODOT --headless --audio-driver Dummy --verbose --path game --script res://tests/run_close_check.gd` (run it without `--fixed-fps`, which makes it fail) | 5 passed, 0 failed; no leak line in the verbose exit report |
 | Proxy | `npm test` in `agent_proxy` (no install needed) | 39 passed, 0 failed |
-| Game and proxy over HTTP | `node tools/run_proxy_integration.mjs $GODOT validation/2026-11-18/http-integration` | 196 passed, 0 failed; wire checks 15 passed, 0 failed |
+| Game and proxy over HTTP | `node tools/run_proxy_integration.mjs $GODOT validation/2026-11-18/http-integration` | 199 passed, 0 failed; wire checks 15 passed, 0 failed |
 | Translations | `python tools/check_lang.py` | 0 problems |
-| Text fits | `python measure_text.py`, run inside `tools/art` | 616 lines, 0 problems |
-| Text fits, in Chinese | `python measure_text.py --lang zh`, inside `tools/art` | 616 lines, 0 problems, none of them left in English |
+| Text fits | `python measure_text.py`, run inside `tools/art` | 682 lines, 0 problems |
+| Text fits, in Chinese | `python measure_text.py --lang zh`, inside `tools/art` | 682 lines, 0 problems, none of them left in English |
 | Rough lint | `python tools/gd_static_check.py` | 31 scripts, no findings |
-| Capture script, dry | `& $GODOT --headless --audio-driver Dummy --fixed-fps 60 --path game --script res://tests/capture_shift.gd` | 196 frames named, 0 missed |
-| Capture script, dry, in Chinese | the same, with ` -- --lang=zh` at the end | 196 frames named, 0 missed |
-| Capture script, dry, attacks | the same, with ` -- --attacks-only --less-blood` at the end | 91 frames named, 0 missed |
+| Capture script, dry | `& $GODOT --headless --audio-driver Dummy --fixed-fps 60 --path game --script res://tests/capture_shift.gd` | 204 frames named, 0 missed |
+| Capture script, dry, in Chinese | the same, with ` -- --lang=zh` at the end | 204 frames named, 0 missed |
+| Capture script, dry, attacks | the same, with ` -- --attacks-only --less-blood` at the end | 99 frames named, 0 missed |
 
-Every row ran on the final tree of November 18 (logs in the local
-`../validation/2026-11-18/checks/`, with the runner `run_checks.sh` beside them), exited 0 and
-wrote nothing to standard error. The same run imported with the existing cache (exit 0, nothing
-on standard error), imported a copy of `game/` with no cache and ran the rule and scene checks
-on it (below), and booted the main scene for 240 frames, offline and in model mode with no
-service behind the address (exit 0, with only the `4 ObjectDB instances were leaked` warning
-that `--quit-after` causes), and on the real renderer on a hidden desktop (exit 0 in 4 s,
-OpenGL 3.3). No file in `game/` changed during the run. These are automated checks with the
-dummy audio driver, a simulated microphone and the mock provider; no paid service was called.
+Every row ran late on November 18 and exited 0 (logs in the local
+`../validation/2026-11-18/checks-closing/`, with the runners `chain.sh` and `chain2.sh` beside
+them; each log holds standard error together with the output). no line in them is an error, and the only warnings are the `ObjectDB instances were leaked` lines that `--quit-after` causes in the three boots. The first run of
+the HTTP row failed one check of 196: in it Vale turns on a call to Trauma Team, and his blow
+landed, which now ends the night with no slip (A blow that lands ends the night). The check now
+drops the shutter in time and looks for the slip; the run after that passed 199 (three checks
+more). That change to `tests/run_proxy_integration.gd` came after the other rows had run once;
+the rule and scene rows and the window close were run again after it, with the commands
+exactly as the table gives them, and the dry captures do not read that file. The same runs
+imported with the existing cache (exit 0) and booted the main scene for 240 frames, offline and
+in model mode with no service behind the address (exit 0, with only the `ObjectDB instances
+were leaked` warning that `--quit-after` causes), and for 420 frames on the real renderer on a
+hidden desktop (exit 0 in 4.5 s on OpenGL 3.3, with the same warning; no window on the student's desktop). The import from an empty cache was not repeated late on
+November 18: no picture, sound or font changed. These are automated checks with the dummy
+audio driver, a simulated microphone and the mock provider; no paid service was called.
 
 The scene test in Chinese plays the same nine shifts in Chinese and fails on any English that
 reached the screen untranslated, outside names, code names and key names; it also switches the
@@ -656,10 +707,11 @@ was tried on: imported once more without clearing its cache, it exited 0 with ev
 unused), and then 820 rule checks and 940 scene checks
 passed on it. That is why `run-game.ps1` now imports before the first run and tries again
 (Launch). Logs: `../validation/2026-11-17/checks/crashed-fresh-import/` and
-`../validation/2026-11-17/fresh-import-repeats/`. In the final run of November 18 the import of
-a copy with no cache exited 0 in 10 s, with nothing on standard error and 754 files in the
-cache, and the rule and scene checks passed on the copy (934 and 953); one clean import says
-little about a crash that came twice in twenty tries.
+`../validation/2026-11-17/fresh-import-repeats/`. In the last run of the evening of November 18,
+on the tree committed as `3f1fcbd`, the import of a copy with no cache exited 0 in 10 s, with
+nothing on standard error and 754 files in the cache, and the rule and scene checks passed on
+the copy (934 and 953); one clean import says little about a crash that came twice in twenty
+tries.
 
 The scene test plays nine shifts through the real scene with the same input functions a player
 uses (`tests/play_driver.gd`). The first six check the counter itself with a few rules held
@@ -674,7 +726,7 @@ can make those windows.
 
 ## Screenshots
 
-`tests/capture_shift.gd` plays four shifts on the real renderer and saves 196 frames (with
+`tests/capture_shift.gd` plays five shifts on the real renderer and saves 204 frames (with
 ` --lang=zh` after `--out`, in Chinese): the
 title card, the six opening cards, the first night's training with one frame a tip (the list
 and its clues, the hall camera, Kip's intake card, his code and his package, the sheet, the
@@ -684,7 +736,10 @@ wrong code, the typing line, the staged push-to-talk strip, the staged thinking 
 reading the till over and under the line, Trauma Team, a flare answered with a needless
 shutter, a snap in the middle of a test, a patient who runs out of patience and leaves,
 attacks stopped clean, after two blows, with no glass left, after the blow that takes the last
-of the glass, and not stopped, and the fitter putting three layers back into an empty frame.
+of the glass, and not stopped, and the fitter putting three layers back into an empty frame;
+two nights that end in the dark when a blow lands (the first with Maren, the second with Vale,
+Juno and Maren never seen), and the report after each night as a player reads it: the first
+visit's page, the last visit's page and the totals, with the line that asks for a click lit.
 Each night's seed is fixed, so the list is the same in every run (Kip and Maren on the first
 night, Rook and Juno afterwards):
 
@@ -696,11 +751,17 @@ That command opens the game window on your screen. On Windows, `../tools/run_hid
 starts the same run on a separate desktop that is never displayed, so nothing appears on
 screen and nothing takes the keyboard; the full command is in that file's header. Add
 `--audio-driver Dummy` so nothing is played. Add ` --attacks-only --less-blood` after `--out`
-for the attack scenes (the snap among them) and the fitter without the blood (91 frames).
+for the attack scenes (the snap among them) and the fitter without the blood (99 frames).
 
+- `../validation/2026-11-18/captures-closing-en/`, `captures-closing-zh/` and
+  `captures-closing-attacks-less-blood/` hold the late-evening build of November 18 (right or
+  wrong at closing, lights out) as drawn that way: 204 frames in English, 204 in Chinese and
+  99 attack frames with `--less-blood`, 0 moments missed, each exit code 0, and no window
+  on the user's desktop. Claude looked at some of them: the report's pages and totals after the first and second nights (both end in the dark) and after the fifth, the meter left at the hour a night ended in, a false alarm's quiet slip and Rook's HANDED OVER slip, the same pages and slips in Chinese, Vale's intake card enlarged in both languages (only the doctor's marks), and with less blood Maren's strike and a report page. These are automated captures of fixed moments, not a
+  playtest.
 - `../validation/2026-11-18/captures-en/`, `captures-zh-3/` and
-  `captures-en-attacks-less-blood/` hold the November 18 build as drawn that way on the final
-  tree: 196 frames in English, 196 in Chinese (` --lang=zh`) and 91 attack frames with
+  `captures-en-attacks-less-blood/` hold the build of the evening of November 18 (commit
+  `3f1fcbd`) as drawn that way on its final tree: 196 frames in English, 196 in Chinese (` --lang=zh`) and 91 attack frames with
   `--less-blood`, 0 moments missed, each exit code 0 (after 174, 171 and 116 seconds), and no
   window on the user's desktop. The push-to-talk and thinking frames are staged, as before.
   An assistant looked at a few of them: in English the first opening card (FIRED), the
@@ -837,7 +898,7 @@ repository; commit them with the assets. (Godot marks the font atlas pictures `s
 - The counter-first screen was designed by an assistant from a two-line request of the
   student; the student's notes of November 17 are about it, and the answers to them have not
   been reviewed. What hangs where, the one hook shared by the sheet and the list, the keys R,
-  L, N, C, G and K, the card that comes down by itself for the stamp and the findings, and the
+  L, N, C, G and K, the card that comes down by itself for the stamp, and the
   transcript unit in the desk are all proposals. A paper that is down covers the top of one
   side of the window (132 of its 440 pixels in width); whether that is comfortable in play is
   unknown.
@@ -860,7 +921,7 @@ repository; commit them with the assets. (Godot marks the font atlas pictures `s
   hints on the wall objects, the fitter's line, the contacts' aliases, clues, codes and
   packages, and the flare lines were written by an assistant and have not been reviewed by the
   student.
-- The marks on the intake card are the player's own notes. After the visit they are shown
+- The marks on the intake card are the player's own notes. At closing the report shows them
   beside what was true; they are never scored, and no rule reads them.
 - While the patient is answering (up to 4 s with a slow service), asking, tools, CALM, PRESS,
   codes, typing and speaking wait; looking, the papers, marking, the stamp, the call line and

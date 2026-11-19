@@ -6,6 +6,14 @@ extends Control
 ## Input arrives through pointer_move / pointer_down / pointer_up / key_down / key_up, and every
 ## player action is a public act_* method, so a test can play the game the way a person does.
 ##
+## Right and wrong are told at closing (rules version 8). During the night the player learns the
+## truth only from what a patient does in the room (an attack, a walkout). The slip prints what
+## happened at the counter and the fee; the meter's lamps show the player's own calls; the crew
+## takes everybody the same way, and a shutter dropped before any attack is the same quiet beat
+## for everybody; the card keeps only the player's notes. At closing the report turns a page for
+## each visit, then shows the night's totals. A patient who gets through the window ends the
+## night: there is no slip, and the report comes up out of the dark.
+##
 ## Launch options (after "--" on the command line), all optional:
 ##   --seed=123                          fixed shift seed
 ##   --authored-order                    patients in the order rules.json lists them (tests, captures)
@@ -43,11 +51,14 @@ enum State { TITLE, WAIT, ENTER, EXAM, ATTACK, RESOLVE, SLIP, REPORT, INTRO }
 
 const SLIP_CLIP := Rect2(217, 148, 202, 152)   # over the counter: the slip feeds up out of the printer in the desk
 const SLIP_REST := 4.0                          # its last few pixels stay in the printer
-const SLIP_GAP := 8.0                           # least space between the call and the money on the slip's last line
-const SLIP_LINES := 5                           # lines of outcome text above the rule (measure_text.py SLIP_LINES)
-const SLIP_DROP := "DROP +%d"                   # under the call: what a courier's package put in the till
+const SLIP_GAP := 8.0                           # least space between AT THE COUNTER and the fee beside it
+const SLIP_LINES := 5                           # lines of counter text above the rule (measure_text.py SLIP_LINES)
+const SLIP_COUNTER := "AT THE COUNTER"          # under the rule, beside what the counter took in
+const SLIP_LATER := "Right or wrong: at closing."   # the slip never says; the report does
+const SLIP_DROP := "DROP +%d"                   # under the counter line: what a courier's package put in the till
 const SLIP_NO_DROP := "%s: NO DROP"             # a courier who came and went without one
 const SLIP_CALM := "CALM -%d"                   # what the calm-patches cost
+const REPORT_TURN := 0.25                       # seconds a report page stays before a click turns it
 const CARD_LINGER := 1.3                        # seconds a card that was just stamped stays out by itself
 const ARM_TIME := 2.2
 const CALL_ARM_TIME := 3.5                      # how long the Trauma Team line waits for the second press
@@ -60,7 +71,6 @@ const THINK_POSE_AFTER := 0.25                  # seconds an answer has to be on
 ## One number to change after a listening test.
 const ATTACK_TRIM_DB := -9.0
 const DENT_SPOTS := [Vector2(156, 84), Vector2(64, 58), Vector2(126, 44)]       # caught: where the shutter bulges
-const DENT_SPOTS_LOCKED := [Vector2(150, 80), Vector2(70, 66), Vector2(118, 118)]
 const FACE_CLEAR := Rect2(175, 50, 290, 256)      # the first blood on the view keeps off the attacker's face
 # what a hit leaves on the booth walls either side of the window: picture, centre on the screen.
 # The clinic view cuts each one off at the window's edge; the papers and keys hang in front of them.
@@ -325,6 +335,7 @@ var _slip_mode: String = "hidden"  # hidden | print | shown | drop
 var _slip_y: float = SLIP_CLIP.size.y   # from the top of its clip: this far down it is still inside the printer
 var _slip_age: float = 0.0
 var _slip_index: int = 0
+var _report_jingled: bool = false   # the totals page of the report has had its jingle
 # what the doctor has taken down from the booth walls. The papers and the big camera screen
 # are out of sight until they are asked for: the window is the screen.
 var _sheet_wanted: bool = false   # the reference sheet is down from the wall
@@ -842,10 +853,10 @@ func _panels_live() -> bool:
 		or state == State.RESOLVE or state == State.SLIP)
 
 
-## The card comes down by itself while there is a stamp to put on it, for a moment after it
-## was stamped, and when the visit's findings are written on it.
+## The card comes down by itself while there is a stamp to put on it, and for a moment after
+## it was stamped. The findings are not written on it: they wait for the report at closing.
 func _card_forced() -> bool:
-	return clipboard.armed != "" or _card_linger > 0.0 or clipboard.mode == "findings"
+	return clipboard.armed != "" or _card_linger > 0.0
 
 
 func _card_out() -> bool:
@@ -907,7 +918,7 @@ func act_card(on: int = -1) -> void:
 		return
 	var want := (not _card_out()) if on < 0 else on > 0
 	if not want and _card_forced():
-		_card_wanted = false      # it is out for the stamp or the findings: it stays while they need it
+		_card_wanted = false      # it is out for the stamp: it stays while the stamp needs it
 		return
 	if want == _card_wanted:
 		return
@@ -1037,10 +1048,10 @@ func act_repair_glass() -> void:
 	# the cracks that still show are the layers still missing: a whole pane shows none
 	clinic.set_glass(clampi(most - left, 0, 3))
 	clinic.set_glass_left(left, most)
-	clinic.till = shift.total()
+	clinic.till = shift.till()
 	audio.play("glass_fit")
 	audio.play("cash", 0.8, -8.0)
-	_log("glass_repair", {"cost": cost, "glass_left": left, "glass_max": most, "till": shift.total()})
+	_log("glass_repair", {"cost": cost, "glass_left": left, "glass_max": most, "till": shift.till()})
 	var ok: bool = await _narrate("GLASS", Lang.tf(GLASS_LINE, [cost, left, most]), token, 1.2)
 	# back to who is waiting, unless something else has happened meanwhile
 	if ok and state == State.WAIT and clinic.cam_prompt and shift != null:
@@ -1167,8 +1178,9 @@ func act_guide_close() -> void:
 		audio.play("click", 1.0, -6.0)
 
 
+## A new night, from the totals page of the report.
 func act_restart() -> void:
-	if state != State.REPORT or screens.age() < 0.8:
+	if state != State.REPORT or not screens.on_summary() or screens.age() < 0.8:
 		return
 	screens.hide_all()
 	audio.play("click")
@@ -2265,14 +2277,9 @@ func _team_takes(token: int) -> bool:
 		if next_step <= 0.0:
 			audio.play("step", 0.7, -3.0)
 			next_step = 0.12
-	if rig != null and visit != null:
-		var press: Array = visit.case_data.get("press", [])
-		if not visit.is_drifting() and not press.is_empty():
-			# a steady patient takes it the way they take any insult: face and voice together
-			var first: Dictionary = press[0]
-			rig.react(str(first.get("face", "")), str(first.get("hands", "")))
-		else:
-			rig.shake(1.0, 0.25)
+	if rig != null:
+		# the same start for everybody: how a patient takes the crew says nothing until closing
+		rig.shake(1.0, 0.25)
 	ok = await _crew_line("TRAUMA TEAM", CREW_LINE, token, 0.6)
 	if not ok:
 		return false
@@ -2722,8 +2729,7 @@ func _hit() -> void:
 	audio.play("heartbeat")
 	await _wait(0.6, token)
 	audio.play("drip")
-	await _fade_to(0.0, 0.8)
-	_resolve()
+	_resolve()      # the dark stays: the night is over (_lights_out)
 
 
 ## Brings whoever came through the window closer: at 1 their face fills the screen, past 1
@@ -2913,17 +2919,8 @@ func act_shutter() -> void:
 				clinic.strobe = 1.0
 				await _narrate("", CREW_AFTER_LINE, token, 0.8)
 				clinic.strobe = 0.0
-		"locked_out":
-			# they had not shown it yet; behind the shutter, they do
-			await _wait(0.9, token)
-			audio.play("scream_far", _scream_pitch(), 3.0)
-			await _wait(0.3, token)
-			for i in 3:
-				audio.play("bang", 0.95 - 0.08 * float(i), float(i))
-				clinic.shutter_dent(_dent_spot(DENT_SPOTS_LOCKED, i))
-				_shake(3.0 + float(i), 0.2)
-				await _wait(0.38 - 0.06 * float(i), token)
 		_:
+			# before any attack, steady or drifting: the same quiet on the far side of the metal
 			await _wait(0.7, token)
 			await _narrate("", "Nothing hits the shutter. After a while, footsteps, going away.", token, 0.7)
 	_remove_rig()
@@ -2952,7 +2949,6 @@ func _resolve() -> void:
 	shift.record(s)
 	if visit.verdict_kind == "":
 		clipboard.stamp("void")
-	clipboard.show_findings(s)      # the card comes down by itself to show them (_card_forced)
 	_panels_hold = false
 	_cam_wanted = false
 	_sheet_back = false
@@ -2968,33 +2964,58 @@ func _resolve() -> void:
 	clinic.danger = 0.0
 	clinic.hall_dark = 0.0
 	clinic.flicker = 0.0
-	clinic.results.append(bool(s.get("correct", false)))
+	clinic.results.append(str(s.get("call", "none")))      # the player's own call, not whether it was right
 	_alert_hint = ""
 	_base_hint = ""
-	_slip_data = s
-	_slip_index = shift.index + 1
-	_slip_mode = "print"
 	audio.trim_db = 0.0
-	_slip_y = SLIP_CLIP.size.y
-	_slip_age = 0.0
-	audio.play("printer")
 	_log("visit_end", {"outcome": str(s.get("outcome", "")), "verdict": str(s.get("verdict", "")),
 		"truth": str(s.get("truth", "")), "correct": bool(s.get("correct", false)), "credits": int(s.get("credits", 0)),
+		"counter": int(s.get("counter", 0)), "closing": int(s.get("closing", 0)), "call": str(s.get("call", "")),
 		"patience_left": int(s.get("patience_left", 0)), "press_count": int(s.get("press_count", 0)),
 		"crossed": int(s.get("crossed", 0)), "blows": int(s.get("blows", 0)), "grade": str(s.get("grade", "")),
 		"seen": visit.seen.keys(), "model_calls": agent.calls_this_visit, "fallbacks": agent.fallbacks_this_visit,
 		"contact": visit.is_contact(), "dropped": visit.dropped, "calm_spent": visit.calm_spent,
 		"codes_wrong": visit.codes_wrong, "snapped": visit.snapped, "flared": visit.flared})
+	if shift.died:
+		_lights_out(s, token)
+		return
+	_slip_data = s
+	_slip_index = shift.index + 1
+	_slip_mode = "print"
+	_slip_y = SLIP_CLIP.size.y
+	_slip_age = 0.0
+	audio.play("printer")
 	await _wait(0.8, token)
-	clinic.till = shift.total()
-	var credits := int(s.get("credits", 0))
-	if credits > 0:
+	clinic.till = shift.till()
+	# what the counter took in: a fee is a fee, whoever paid it, so the sound says nothing either
+	var counter := int(s.get("counter", 0))
+	if counter > 0:
 		audio.play("cash")
-	elif credits < 0:
+	elif counter < 0:
 		audio.play("fail")
-	audio.play("jingle_good" if bool(s.get("correct", false)) else "jingle_bad", 1.0, -5.0)
 	state = State.SLIP
 	_slip_age = 0.0
+
+
+## The shutter came too late and the doctor is dead: the night ends with this visit. There is no
+## slip and nobody else comes in; the report comes up out of the dark that _hit left.
+func _lights_out(s: Dictionary, token: int) -> void:
+	_log("lights_out", {"case": str(s.get("case_id", "")), "hour": shift.records.size(), "unseen": shift.unseen()})
+	_slip_data = {}
+	_slip_mode = "hidden"
+	clinic.under_glow = 0.0
+	clinic.team_clear()
+	_remove_rig()
+	visit = null
+	_hang_sheet()
+	clipboard.set_visit(null, "")
+	desk.badges.clear()
+	desk.warn.clear()
+	var ok: bool = await _wait(0.6, token)
+	if not ok:
+		return
+	_show_report()
+	await _fade_to(0.0, 1.4)
 
 
 func act_continue() -> void:
@@ -3033,17 +3054,71 @@ func _show_report() -> void:
 	clinic.set_cam("")
 	clinic.shutter_to(1.0, 0.6)
 	var report: Dictionary = shift.report()
+	var unseen := PackedStringArray()
+	for id in report.get("unseen", []):
+		unseen.append(str((cases.get(str(id), {}) as Dictionary).get("name", id)))
+	report["unseen_names"] = unseen
 	screens.show_report(report)
-	clinic.line = int(report.get("line", 0))
-	clinic.line_under = not bool(report.get("line_held", false))
-	audio.play("jingle_good" if bool(report.get("line_held", false)) else "jingle_bad")
+	_report_jingled = false
+	# the night's reports are in: the till has the bounties and the bills, and the last reading is
+	# taken. Nobody reads the meter for a dead doctor: it stays at the hour the night ended in.
+	clinic.till = shift.total()
+	if not shift.died:
+		clinic.line = int(report.get("line", 0))
+		clinic.line_under = not bool(report.get("line_held", false))
+	if screens.on_summary():
+		_report_summary_reached()
 	_log("shift_end", {"correct": int(report.get("correct", 0)), "count": int(report.get("count", 0)),
+		"died": bool(report.get("died", false)), "unseen": report.get("unseen", []),
+		"counter_total": int(report.get("counter_total", 0)), "closing_total": int(report.get("closing_total", 0)),
 		"total": int(report.get("total", 0)), "line": int(report.get("line", 0)),
 		"line_held": bool(report.get("line_held", false)), "hours_under": int(report.get("hours_under", 0)),
 		"injuries": int(report.get("injuries", 0)), "glass_left": int(report.get("glass", 0)),
 		"glass_paid": int(report.get("repair_total", 0)), "title": str(report.get("title", "")),
 		"drops": int(report.get("drops", 0)), "drop_total": int(report.get("drop_total", 0)),
 		"calm_total": int(report.get("calm_total", 0))})
+
+
+## The report, a page at a time: each visit seen tonight, then the night's totals. On the
+## totals page the next click starts a new night (act_restart).
+func act_report_next() -> void:
+	if state != State.REPORT:
+		return
+	if screens.on_summary():
+		act_restart()
+		return
+	if screens.age() < REPORT_TURN:
+		return
+	_report_turn(1)
+
+
+func act_report_back() -> void:
+	if state == State.REPORT:
+		_report_turn(-1)
+
+
+## Straight to the night's totals.
+func act_report_skip() -> void:
+	if state == State.REPORT and not screens.on_summary():
+		_report_turn(screens.pages())
+
+
+func _report_turn(step: int) -> void:
+	if not screens.turn(step):
+		return
+	audio.play("paper", 1.1, -6.0)
+	if screens.on_summary():
+		_report_summary_reached()
+
+
+## The totals page: the meter's word on the night, heard once.
+func _report_summary_reached() -> void:
+	if _report_jingled:
+		return
+	_report_jingled = true
+	var report: Dictionary = screens.report
+	var good := bool(report.get("line_held", false)) and not bool(report.get("died", false))
+	audio.play("jingle_good" if good else "jingle_bad")
 
 
 func _on_impact(strength: float) -> void:
@@ -3121,6 +3196,13 @@ func _pointer_press(pos: Vector2, button: int) -> void:
 		elif button == MOUSE_BUTTON_LEFT:
 			act_intro_next()
 		return
+	if state == State.REPORT:
+		# the report is over everything: a click turns its page, the right button goes to the totals
+		if button == MOUSE_BUTTON_RIGHT:
+			act_report_skip()
+		elif button == MOUSE_BUTTON_LEFT:
+			act_report_next()
+		return
 	# the training box is in front of the booth: its buttons first, and the rest of it is opaque
 	if button == MOUSE_BUTTON_LEFT and coach != null and coach.is_showing():
 		match coach.button_at(pos):
@@ -3160,8 +3242,6 @@ func _pointer_press(pos: Vector2, button: int) -> void:
 				act_language(code)
 			else:
 				act_start()
-		State.REPORT:
-			act_restart()
 		State.SLIP:
 			if not _wall_click(pos):
 				act_continue()
@@ -3282,6 +3362,17 @@ func _key_press(keycode: int, unicode: int) -> void:
 			KEY_M:
 				audio.set_muted(not audio.muted)
 		return
+	if state == State.REPORT:
+		match keycode:
+			KEY_ESCAPE:
+				act_report_skip()
+			KEY_LEFT, KEY_BACKSPACE:
+				act_report_back()
+			KEY_ENTER, KEY_KP_ENTER, KEY_SPACE, KEY_RIGHT:
+				act_report_next()
+			KEY_M:
+				audio.set_muted(not audio.muted)
+		return
 	if keycode == SPEAK_KEY:
 		act_speak_start("key")
 		return
@@ -3328,8 +3419,6 @@ func _key_press(keycode: int, unicode: int) -> void:
 						_skip = true
 				State.SLIP:
 					act_continue()
-				State.REPORT:
-					act_restart()
 				State.EXAM:
 					# first hurry the line on screen; on a quiet strip ENTER starts a sentence
 					if dialogue.typing or dialogue.waiting or not _can_act():
@@ -3788,33 +3877,31 @@ func _draw_slip() -> void:
 	var x1 := 191.0
 	var w := x1 - x0
 	var mid := 101.0
-	var ok := bool(s.get("correct", false))
-	var outcome := str(s.get("outcome", ""))
+	var who := str(s.get("name", ""))
 	Gfx.text(_slip, Vector2(x0, 17), Lang.tf("INTAKE SLIP %d/%d", [_slip_index, shift.count() if shift != null else 0]), Gfx.PRINT)
-	Gfx.text_right(_slip, x1, 17, str(s.get("name", "")), Gfx.PRINT)
-	var title := str(s.get("title", ""))
+	Gfx.text_right(_slip, x1, 17, who, Gfx.PRINT)
+	# what happened at the counter, in words that hold whoever the patient was (rules.json "counter")
+	var title := str(s.get("counter_title", ""))
 	if Gfx.big_w(title) <= w:
 		Gfx.big_center(_slip, mid, 27, title, Gfx.INKT)
 	else:
 		Gfx.text_center(_slip, mid, 33, title, Gfx.INKT, true)
-	Gfx.paragraph(_slip, Vector2(x0, 50), str(s.get("text", "")), w, Gfx.INKT, false, SLIP_LINES)
+	var y := 50.0
+	var lines := Gfx.wrap_raw(Lang.fill(str(s.get("counter_text", "")), {"name": who}), w)
+	for i in mini(lines.size(), SLIP_LINES):
+		Gfx.text_raw(_slip, Vector2(x0, y), lines[i], Gfx.INKT)
+		y += Gfx.LINE
 	_slip.draw_rect(Rect2(x0, 102, w, 1), Gfx.PAPER1)
-	var steady := str(s.get("truth", "")) == "stable"
-	_fit(_slip, x0, 105, Lang.tf("%s was %s.", [str(s.get("name", "")), Lang.t("STEADY" if steady else "DRIFTING")]), w, Gfx.INKT)
-	var call := "RIGHT CALL" if ok else "WRONG CALL"
-	if outcome == "walkout" or outcome == "gave_up" or (outcome == "hit" and not ok):
-		call = "NO CALL"
-	elif outcome == "hit" and ok:
-		call = "RIGHT CALL, HURT"      # the crew was the right answer; the shutter came too late
-	# what the call itself earned; a courier's package and the calm-patches go on the line below
-	var credits := int(s.get("outcome_credits", s.get("credits", 0)))
-	var paid := Lang.tf("%s credits", [Gfx.money(credits)])
-	# the call and the money share one line: the call gives way before it touches the figure
-	_fit(_slip, x0, 116, call, w - Gfx.text_w(paid, true) - SLIP_GAP, Gfx.GRN2 if ok else Gfx.RED1)
-	Gfx.text_right(_slip, x1, 116, paid, Gfx.INKT if credits >= 0 else Gfx.RED1, true)
+	# what the counter took in: the fee for work done, whoever paid it. The package and the
+	# calm-patches go on the line below; the rest of the visit's money waits for closing.
+	var fee := int(s.get("counter_fee", 0))
+	var paid := Lang.tf("%s credits", [Gfx.money(fee)])
+	_fit(_slip, x0, 105, SLIP_COUNTER, w - Gfx.text_w(paid, true) - SLIP_GAP, Gfx.INKT)
+	Gfx.text_right(_slip, x1, 105, paid, Gfx.INKT, true)
 	var extra := _slip_breakdown(s)
 	if extra != "":
-		Gfx.text_center(_slip, mid, 127, extra, Gfx.PRINT)
+		Gfx.text_center(_slip, mid, 116, extra, Gfx.PRINT)
+	Gfx.text_center(_slip, mid, 127, SLIP_LATER, Gfx.INKS)
 	if state == State.SLIP and _slip_age > 0.5 and fmod(_t, 1.0) < 0.65:
 		Gfx.text_center(_slip, mid, 138, "click to continue", Gfx.PRINT)
 
@@ -3827,8 +3914,9 @@ func _till_now() -> int:
 	if shift == null:
 		return 0
 	if visit != null and shift.records.size() <= shift.index:
-		return shift.total() + visit.till_change()
-	return shift.total()
+		return shift.till() + visit.till_change()
+	# the counter's money through the night; everything once the night's reports are in
+	return shift.total() if shift.is_done() else shift.till()
 
 
 ## How long a steady hand of the patient's model may take to let go of the grip bar (the hands

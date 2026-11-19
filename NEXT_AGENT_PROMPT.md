@@ -1,6 +1,6 @@
 # Continue Before the Cut
 
-Updated November 18, 2026, evening. Work on main in this repository, the only active checkout;
+Updated November 18, 2026, late evening. Work on main in this repository, the only active checkout;
 pull first. The sibling fathom directory is an archive. Do not write there or copy its Git history.
 
 Read AGENTS.md, HANDOFF.md, game/README.md, docs/development/chinese-translation.md and
@@ -11,12 +11,44 @@ English and Chinese: a change to its English is a change to its Chinese in the s
 (student, November 18; AGENTS.md, Languages).
 
 Git: both rounds of November 16 are in commit 822e8d7. The work of November 17 is in e7f94d7,
-made and pushed to origin/main on November 18 when the student asked. The work of November 18
-was not committed when this file was written. Run git status -sb and git log -3 --oneline: a
-commit after e7f94d7 holds the November 18 work, and anything uncommitted beyond it is newer
-than this file.
+made and pushed to origin/main on November 18 when the student asked. The language work of
+November 18 is in 3f1fcbd, pushed. The work of the latest checkpoint is committed after it,
+together with this file. Run git status -sb and git log -3 --oneline: anything uncommitted is
+newer than this file.
 
-Latest checkpoint (November 18, evening): the student's requests of that day, built by Claude
+Latest checkpoint (November 18, late evening): the student's five requests of that evening,
+paraphrased: say whether a call succeeded only at the end, so the player is less sure, and go
+over the whole logic for holes; what is 黑丝 (answered in chat: the assistant's shorthand for the
+dark threads that spread from a port, 黑色纹路 in the game; the glossary now warns that 黑丝
+reads as black stockings); the characters stay as they are, but any part may be abnormal at
+random, so every character needs a normal look, an abnormal look for each part and attack art,
+the rage attack included, done that way now if it was not (this answers the random-signs
+question: build it, with the art); a doctor who is killed ends the night; and five more
+characters with all their assets. Built by Claude (Opus 5.5) and checked:
+- Right or wrong is told only at closing. The slip says what the counter did (TREATED, HANDED
+  OVER, SHUTTER HELD, SHUTTER DOWN, WALKED OUT or OUT OF PATIENCE; rules.json counter,
+  version 8), the money AT THE COUNTER and "Right or wrong: at closing." Only fees for work
+  done, drops, CALM and glass change hands at the counter; every bounty, bill and fine comes
+  at closing, the bill for treating a drifting patient taking the fee back too, so each
+  outcome's total is unchanged. The intake card keeps only the doctor's own marks; the meter's
+  lamps show what was done, not whether it was right; a needless shutter is quiet; the slip's
+  sound follows the counter money; the crew says the same lines on every call; Maren's and
+  Vale's lines that gave their truth away were rewritten; the till and the hourly readings
+  count the counter money until the last reading, at closing. The report has a page for each
+  visit (the call, the truth, RIGHT CALL, WRONG CALL or NO CALL, the findings beside the
+  doctor's marks, the money at the counter, at closing and in all), then the totals; a click
+  or ENTER turns the page, BACKSPACE goes back, ESC goes to the totals. RIGHT THE HARD WAY
+  was removed. Left on purpose: a patient who turns on a call shows they were drifting (only
+  Vale does), a quiet hand-over proves nothing (Maren drifts but goes quietly), and the
+  readings during the night can mislead.
+- A blow that lands ends the night: the screen goes dark, no slip prints, nobody else is
+  buzzed in, and the report comes up under LIGHTS OUT with the visitors still in the hall
+  named as never seen; the hour is not read, the meter stays at that hour and no line is held.
+  The event log records lights_out.
+Not built yet: random signs with the per-part art, and the five new characters (Next three
+tasks).
+
+Previous checkpoint (November 18, evening): the student's requests of that day, built by Claude
 (Opus 5.5). After the November 17 build was pushed and opened for them in a window, the student
 sent a screenshot of the third opening card (THE LANTERNS) and asked, paraphrased: what the
 card and "chrome" mean; a language option on the title screen, Chinese first, with everything
@@ -64,7 +96,7 @@ In the November 17 checkpoint below, the IMPLANT readout and rules.json grip.lim
 superseded: the penlight readout names each eye's model (NO PUPIL for an eye without one),
 and the grip's limit is the hands model's.
 
-Previous checkpoint (November 17, evening): the student's five notes. They were first given to
+Earlier checkpoint (November 17, evening): the student's five notes. They were first given to
 Claude (Fable), whose quota ran out partway; Claude (Opus 5.5) took over in the same working
 tree and finished them. The notes, paraphrased: pass and fail were unclear, with nothing
 pointing at the reference sheet (how long is a reasonable grip?); CALM should go, or cost
@@ -127,18 +159,15 @@ picture, translation and sentence above is an assistant proposal. The student ha
 or played any of it, and no person has read the Chinese. Do not present it as approved, tuned
 or reviewed.
 
-Checks on the evening of November 18, on the final tree (automated, mock provider, simulated
-microphone, no paid call): 934 rule checks, 953 scene checks over nine shifts (954 in Chinese,
-953 with --less-blood), 5 normal-close checks, 39 proxy tests, 196 HTTP game checks and 15 wire
-checks (in English), the translation check with 0 problems, 616 measured text lines in each
-language and 31 linted scripts. All passed with exit code 0 and an empty standard error. The
-hidden-desktop runner drew 196 frames of four shifts in English, the same 196 in Chinese and 91
-attack frames with --less-blood, with zero missed moments and no window on the user's desktop,
-and the main scene booted there on the real renderer. Claude looked at a few frames of each
-final drawing (the first opening card, the training's sheet tip, the penlight readouts, the
-grip against LIMIT 1.5s, a slip; in Chinese the Lanterns card, the readouts, the transcript, a
-slip); no person has. Logs and frames: validation/2026-11-18/ (local, ignored by Git). The
-counts of November 17 and 16 are not results for this build. The scene test cues snaps and
+Checks late on November 18, on the final tree (automated, mock provider, simulated microphone,
+no paid call): 970 rule checks, 1001 scene checks over nine shifts (1002 in Chinese, 1001 with
+--less-blood), 5 normal-close checks, 39 proxy tests, 199 HTTP game checks and 15 wire checks
+(in English), the translation check with 0 problems, 682 measured text lines in each language
+and 31 linted scripts. All passed with exit code 0. The first HTTP run failed one check: Vale's
+blow landed there, which now ends the night with no slip; the check now drops the shutter in
+time. Drawn on a hidden desktop: 204 frames of five shifts in English and 204 in Chinese, and 99 attack frames with less blood, 0 moments missed in each; the main scene booted on the real renderer. Claude looked at some of the frames (the report's pages, the two nights that end in the dark, slips in both languages, two attack frames with less blood); no person has. Logs and frames:
+validation/2026-11-18/checks-closing/ and the captures-closing-* folders (local, ignored by
+Git). The counts of the earlier checkpoints are not results for this build. The scene test cues snaps and
 flares and presses the shutter within one frame, so it says nothing about human timing.
 Nobody has operated this build in a visible window, read its Chinese in play, typed with a
 real input method, listened to it, spoken to it or run it against a live model, in either
@@ -201,37 +230,37 @@ read only with python -I), and no English picture or sound changed. Commit each 
 gained the language field, the Chinese limits, the Chinese prompt and the transcription
 language.
 
-Waiting for the student since November 18: random signs. They asked whether abnormal signs
-could appear at random on different parts of a patient, from assets prepared in advance, and
-added that a fixed test wave showing every possible situation should remain. Nothing of it is
-built: only the arrival order, the two contacts, the timing of snaps and flares and a few
-offline line variants are random now. The assistant proposed fixed characters whose condition
-each night draws from its seed (one to three drifting, never the first patient of a session;
-at least two broken lines each, one of them needing a tool or a question; harmless decoys on
-the steady ones), a sign library keyed by slot and model on top of the spec binder, port
-overlays and attack art for Kip, Rook and Juno, neutral model briefs with the night's signs
-sent by the game, a validator run over a few hundred generated nights, two fixed test nights
-(A as now, B the reverse) with a coverage check, in three playable steps (rules and data, art,
-words) ending in a small paid live check that needs its own yes. It asked whether to do step 1
-and stop for the student to play, or all three steps in a row. HANDOFF.md, Student decisions,
-November 18, item 2, has the whole proposal.
+Random signs, answered late on November 18: build them, with the art, now. Nothing of it is
+built yet: only the arrival order, the two contacts, the timing of snaps and flares and a few
+offline line variants are random. The plan is the assistant's proposal of that afternoon,
+taken in full: fixed characters whose condition each night draws from its seed (one to three
+drifting, never the first patient of a session; at least two broken lines each, one of them
+needing a tool or a question; harmless decoys on the steady ones), a sign library keyed by slot
+and model on top of the spec binder, every character's normal look, an abnormal look for each
+part and attack art (only Vale and Maren have attack art now), neutral model briefs with the
+night's signs sent by the game, a validator run over a few hundred generated nights, and fixed
+test nights (A as now, B the reverse, more for the new characters) with a coverage check.
+HANDOFF.md, Student decisions, November 18, items 2 and 4, has the proposal and the answer.
 
-Next three tasks (first run git status -sb; the work of November 18 was not committed when
-this file was written):
+Next three tasks (first run git status -sb and git log -3 --oneline):
 1. Prepare two Braintrust replies due November 19, 23:59 New York (the soonest deadline), once
    the student has picked two G1 pitches with fewer than two replies: specific, moment-based
    notes in English for the student's review, never sent unasked. G1 is submitted; leave its
    snapshots, slides and narration alone.
-2. The student plays and reads (.\run-game.ps1, with headphones): a first night in Chinese
-   from a fresh start, reading every card, tip, sheet and slip, typing a sentence with a real
-   Chinese input method and marking what reads wrong; then a night in English. Look at the
-   sheets changing with the patient and the redrawn opening, and at the open questions of
-   November 16 and 17 (the training, the readouts and LIMIT, the list, CALM's price, a snap and
-   a flare, whether 240 an hour is fair). Then settle the proposals in HANDOFF.md under "For
-   the student to decide" and correct the translation from what the student marks, in both
-   languages at once. An agent operating the window, or the scene test, is not a substitute.
-3. Random signs, once the student answers (step 1 and stop, or all three steps), built on the
-   spec binder, in English and Chinese together.
+2. Random signs with every character's art for each part (above; HANDOFF.md, Next three tasks,
+   has the order of the work): the case files' parts and data/signs.json, the night composer
+   and its validator over a few hundred seeds, the test nights and the coverage check, the art
+   from tools/art/ (the port clean, with dark threads and raw, the other parts' abnormal looks,
+   attack art for Kip, Rook and Juno), exit lines and neutral briefs, in English and Chinese
+   together, with mock calls only.
+3. Five new characters with all their assets: case files, contacts' clues, Chinese, the
+   proxy's imports and briefs, every part's art and an attack. HANDOFF.md has the working
+   sketch (a nurse, a noodle cook, a netrunner, an off-duty police officer, a pit fighter).
+Once they are built, the student plays and reads (.\run-game.ps1, with headphones): a night in
+Chinese from a fresh start and a night in English, reading every card, tip, sheet, slip and
+report page and typing with a real Chinese input method; then settles the proposals in
+HANDOFF.md under "For the student to decide". An agent operating the window, or the scene
+test, is not a substitute.
 After these: a short live run in both languages (the model's Chinese inside 55 and 110
 characters, the student's real voice through TAB in both languages, the new moments with real
 latency), which is paid and needs the student's explicit yes first; a code is never passed to

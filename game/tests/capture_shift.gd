@@ -12,10 +12,10 @@ extends SceneTree
 ## moment it waits for never came. Use it to check this script without opening a window:
 ##   godot --headless --audio-driver Dummy --fixed-fps 60 --path game --script res://tests/capture_shift.gd
 ##
-## Four shifts are played, so that the opening, the first night's training, tonight's contact
+## Five shifts are played, so that the opening, the first night's training, tonight's contact
 ## list and its codes, the guide, the booth walls, the hourly meter, the doctor's own marks, a
-## flare, a snap, a patient who runs out of patience, every way an attack can end and the glass
-## fitter are all seen:
+## flare, a snap, a patient who runs out of patience, every way an attack can end, a night that
+## ends with the doctor and the glass fitter are all seen:
 ##   shift 1: the opening cards, then the first night's training, one frame a tip: tonight's list
 ##            and how to read it, the hall camera's two monitors, Kip's intake card, his code and
 ##            his package, the reference sheet, the three tools with what the sheet expects drawn
@@ -25,19 +25,26 @@ extends SceneTree
 ##            one cross, and the counter guide is opened with H at his arrival; Vale gets two
 ##            crosses, is called in, turns, and is stopped after the second blow (saw); Juno is
 ##            given the other courier's code on purpose and is seen thinking (staged); Maren hands
-##            her package over and then gets through what is left of the glass (torch)
+##            her package over and then gets through what is left of the glass (torch): the night
+##            ends in the dark with her, and the report comes up out of it
 ##   shift 2: Kip flares over the light and the doctor drops the shutter anyway: a false alarm,
 ##            and the first hour under the line; Trauma Team takes Rook away; Vale gets through
-##            whole glass (saw); Maren is stopped in time with no glass left (torch)
+##            whole glass (saw) and the night ends with him: the report names Juno and Maren, who
+##            were never seen
 ##   shift 3: Kip runs out of patience, is held once and then leaves by himself; Vale snaps in the
 ##            middle of a test and is stopped before the first blow (saw); Maren is stopped after
 ##            the third, with the glass gone (torch)
 ##   shift 4: Vale takes all three blows out of the pane before the shutter stops him, and the
-##            pane drops out of its frame; between patients the till buys it back, one layer at a
+##            pane drops out of its frame; Juno is seen behind the broken window; Maren is stopped
+##            in time with no glass left (torch)
+##   shift 5: Vale breaks the pane again; between patients the till buys it back, one layer at a
 ##            time; Maren turns behind the mended glass and has the whole bar again; the report
 ##            says what the glass cost
 ## The glass belongs to the shift: a blow that lands in one attack leaves less time in the next.
 ## That is why the same two patients are seen with three blows, one blow and none.
+## Right and wrong are told only on the report. A slip says what the counter did, and each report
+## is read the way a player reads it: a frame of the first visit's page, one of the last visit's
+## page and one of the night's totals.
 ##
 ## The night is played under the game's own rules: the line of 240 an hour, two couriers on
 ## each night's list, CALM at 30 credits. Each night's seed is fixed (seed_for()), so that the
@@ -176,9 +183,7 @@ func _run() -> void:
 	else:
 		await kip_false_alarm()
 		await team_takes("rook", "rook-clean-window")
-	await vale_gets_through()
-	await quick("treat", "juno-behind-broken-window")
-	await maren_stopped_bare()
+	await vale_gets_through()      # the night ends with him: Juno and Maren are never seen
 	await report_shot("report-2")
 	# ---------------------------------------------------------------- shift 3
 	await d.open_counter()
@@ -195,11 +200,19 @@ func _run() -> void:
 	await d.open_counter()
 	await quick("treat")
 	await quick("treat")
-	await vale_breaks_the_pane()
+	await vale_breaks_the_pane("vale-4")
+	await quick("treat", "juno-behind-broken-window")
+	await maren_stopped_bare()
+	await report_shot("report-4")
+	# ---------------------------------------------------------------- shift 5
+	await d.open_counter()
+	await quick("treat")
+	await quick("treat")
+	await vale_breaks_the_pane("vale-5")
 	await glass_fitter()
 	await quick("treat", "juno-behind-mended-glass")
 	await maren_whole_bar()
-	await report_shot("report-4")
+	await report_shot("report-5")
 	if dry:
 		print("DRY RUN: %d frames would be captured, %d moments missed. Nothing was drawn or saved." % [count, missed])
 	else:
@@ -208,10 +221,29 @@ func _run() -> void:
 	quit(0 if missed == 0 else 1)
 
 
-## The end-of-shift report, with the pointer beside the paper so that it covers none of the words.
+## The end-of-shift report, read the way a player reads it: the first visit's page, the last
+## visit's page (ESC to the totals, BACKSPACE back one) and the night's totals, with the pointer
+## beside the paper so that it covers none of the words. After a night that ended in the dark,
+## the dark has lifted first.
 func report_shot(stem: String) -> void:
+	reached(await d.wait_for_report(10.0), stem + ": the report is up")
+	reached(await d.until(func() -> bool: return main.screens.fade == 0.0, 4.0), stem + ": nothing covers it")
+	reached(main.screens.page == 0 and not main.screens.on_summary(), stem + ": it opens on the first visit's page")
+	# the line that asks for a click blinks; each frame waits for it to be lit
+	var lit := func() -> bool: return fmod(main.screens._t, 1.0) < 0.5
 	d.move(Vector2(580, 318))
-	await d.seconds(1.2)
+	await d.seconds(0.8)
+	await d.until(lit, 2.0)
+	await shot(stem + "-first-visit")
+	d.key(KEY_ESCAPE)
+	d.key(KEY_BACKSPACE)
+	reached(main.screens.page == main.screens.pages() - 2, stem + ": BACKSPACE from the totals is the last visit's page")
+	await d.seconds(0.5)
+	await d.until(lit, 2.0)
+	await shot(stem + "-last-visit")
+	d.key(KEY_ESCAPE)
+	reached(main.screens.on_summary(), stem + ": ESC goes to the night's totals")
+	await d.until(func() -> bool: return main.screens.age() > 0.85 and lit.call(), 3.0)
 	await shot(stem)
 
 
@@ -488,7 +520,8 @@ func stopped_shots(who: String) -> void:
 	await d.take_slip()
 
 
-## Nobody drops the shutter: the pane goes and they come through it.
+## Nobody drops the shutter: the pane goes and they come through it, and the night ends in the
+## dark with them. No slip prints: the report comes up out of the dark (report_shot has its frames).
 func through_shots(who: String) -> void:
 	await d.until(func() -> bool: return main.state != MainScript.State.ATTACK, 6.0)
 	reached(main.visit != null and main.visit.outcome == "hit", who + ": they are through")
@@ -510,15 +543,12 @@ func through_shots(who: String) -> void:
 	await shot(who + "-third")
 	await d.seconds(0.12)
 	await shot(who + "-last")
-	await d.until(func() -> bool: return main._slip_mode == "print", 10.0)
-	await shot(who + "-aftermath")
-	reached(await d.wait_for_slip(), who + ": the slip prints")
-	await shot(who + "-hit-slip")
-	await d.take_slip()
-	# the counter afterwards; after the last patient the report is up instead, and it has its own frame
-	if main.state != MainScript.State.REPORT:
-		await d.seconds(1.6)
-		await shot(who + "-after-slip")
+	# the dark: no slip prints and nobody else comes in; the report comes up out of it
+	reached(await d.until(func() -> bool: return main.screens.fade >= 1.0, 6.0), who + ": the lights go out")
+	reached(await d.wait_for_report(10.0), who + ": the night ends: the report comes up out of the dark")
+	reached(main._slip_mode == "hidden" and main.shift.died and main.shift.is_done(), who + ": no slip prints, and nobody else comes in")
+	await d.until(func() -> bool: return main.screens.fade <= 0.5, 3.0)
+	await shot(who + "-lights-out")
 
 
 # ================================================================ the doctor's own words
@@ -951,7 +981,7 @@ func juno() -> void:
 
 ## Maren, the night's other courier, answers her code and hands her package over; then she is
 ## pressed twice, turns, and nobody touches the shutter. The glass Vale left has one blow in it,
-## so she is through after one.
+## so she is through after one, and the night ends with her.
 func maren_gets_through(brief: bool) -> void:
 	await d.settle()
 	await d.buzz_in()
@@ -999,7 +1029,8 @@ func maren_gets_through(brief: bool) -> void:
 ## A flare: Kip loses his temper over the light, knocks the close-up out of the doctor's hand and
 ## slams the counter. No red bar comes up, and the first flare of a session brings the tip that
 ## says so. The doctor drops the shutter anyway: the armed shutter, and a false alarm on a steady
-## patient. The fine puts the first hour under the line, and the meter says so.
+## patient. Nothing came in for the hour, so it is under the line, and the meter says so; the
+## fine for the false alarm waits for the report.
 func kip_false_alarm() -> void:
 	await d.settle()
 	await d.buzz_in()
@@ -1035,7 +1066,7 @@ func kip_false_alarm() -> void:
 
 
 ## Trauma Team is called on Vale behind whole glass and nobody touches the shutter: three blows,
-## then he is through, and the pane is gone for the rest of the night.
+## then he is through, and the night ends with him.
 func vale_gets_through() -> void:
 	await d.settle()
 	await d.buzz_in()
@@ -1044,20 +1075,6 @@ func vale_gets_through() -> void:
 	await d.call_team()
 	await turn_shots("vale-2", due)
 	await through_shots("vale-2")
-
-
-## Maren is pressed twice with no glass left: there is no blow to wait for and very little
-## time, and the shutter comes down at once.
-func maren_stopped_bare() -> void:
-	await d.settle()
-	await d.buzz_in()
-	await d.settle()
-	await d.press()
-	await d.settle()
-	reached(blows_due() == 0, "maren-2: no glass is left for this attack")
-	await d.press()
-	await turn_shots("maren-2", 0)
-	await stopped_shots("maren-2")
 
 
 # ================================================================ shift 3
@@ -1158,19 +1175,36 @@ func maren_stopped_late() -> void:
 
 ## Vale is called in behind whole glass and nobody touches the shutter until the third blow has
 ## landed: he is stopped, but the pane has nothing left in it and drops out behind the shutter.
-func vale_breaks_the_pane() -> void:
+## No frames: what comes after shows the empty frame.
+func vale_breaks_the_pane(who: String) -> void:
 	await d.settle()
 	await d.buzz_in()
 	await d.settle()
 	await d.call_team()
-	reached(await d.wait_for_telegraph(), "vale-4: he turns")
-	reached(await d.until(func() -> bool: return main._blows >= 3, 5.0), "vale-4: the third blow lands")
+	reached(await d.wait_for_telegraph(), who + ": he turns")
+	reached(await d.until(func() -> bool: return main._blows >= 3, 5.0), who + ": the third blow lands")
 	d.shutter_key()
-	reached(main.visit != null and main.visit.outcome == "caught", "vale-4: the shutter is in time")
-	reached(await d.until(func() -> bool: return main.shift.glass_out, 6.0), "vale-4: the pane drops out behind the shutter")
-	reached(await d.wait_for_slip(), "vale-4: the slip prints")
+	reached(main.visit != null and main.visit.outcome == "caught", who + ": the shutter is in time")
+	reached(await d.until(func() -> bool: return main.shift.glass_out, 6.0), who + ": the pane drops out behind the shutter")
+	reached(await d.wait_for_slip(), who + ": the slip prints")
 	await d.take_slip()
 
+
+## Maren is pressed twice with no glass left: there is no blow to wait for and very little
+## time, and the shutter comes down at once.
+func maren_stopped_bare() -> void:
+	await d.settle()
+	await d.buzz_in()
+	await d.settle()
+	await d.press()
+	await d.settle()
+	reached(blows_due() == 0, "maren-4: no glass is left for this attack")
+	await d.press()
+	await turn_shots("maren-4", 0)
+	await stopped_shots("maren-4")
+
+
+# ================================================================ shift 5
 
 ## Between patients, with the frame empty: the GLASS key on the right wall is lit and shows its
 ## price, and each press has the fitter's arm bond one layer back. Three presses, a whole pane.
@@ -1209,13 +1243,13 @@ func maren_whole_bar() -> void:
 	await d.settle()
 	await d.press()
 	await d.settle()
-	reached(blows_due() == 3, "maren-4: the mended glass has all three blows in it again")
+	reached(blows_due() == 3, "maren-5: the mended glass has all three blows in it again")
 	await d.press()
-	reached(await d.wait_for_telegraph(), "maren-4: she turns")
+	reached(await d.wait_for_telegraph(), "maren-5: she turns")
 	await d.seconds(0.04)
-	await shot("maren-4-whole-bar")
+	await shot("maren-5-whole-bar")
 	d.shutter_key()
-	reached(main.visit != null and main.visit.outcome == "caught", "maren-4: the shutter is in time")
-	reached(await d.wait_for_slip(), "maren-4: the slip prints")
-	await shot("maren-4-stopped-slip")
+	reached(main.visit != null and main.visit.outcome == "caught", "maren-5: the shutter is in time")
+	reached(await d.wait_for_slip(), "maren-5: the slip prints")
+	await shot("maren-5-stopped-slip")
 	await d.take_slip()

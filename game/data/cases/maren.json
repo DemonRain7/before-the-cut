@@ -79,8 +79,8 @@
     "line": "I'm sorry. I'm so sorry."},
   "exit": {
     "treat": "Thank you, dear. I knew you'd understand.",
-    "refer": "They're coming for me? ...Yes. I think I knew.",
-    "taken": "Mind the hands, dear. They don't listen to me.",
+    "refer": "They're coming for me? ...All right, dear. If you think so.",
+    "taken": "No need to hold me, dears. I'll come quietly.",
     "gave_up": "I've kept you long enough, dear."
   },
   "rows": {
@@ -101,9 +101,9 @@
     "caught": {"title": "SHUTTER HELD",
       "text": "The torch burns a bright line through the slats and goes out. \"I'm sorry,\" she keeps saying from the other side, until Trauma Team comes."},
     "hit": {"title": "TOO SLOW",
-      "text": "The torch arm reaches you before the shutter does. She is crying when Trauma Team pulls her away."},
+      "text": "The torch arm reaches you before the shutter does. The last thing you hear is Maren saying sorry. Nobody else is seen tonight."},
     "locked_out": {"title": "LOCKED OUT",
-      "text": "The shutter comes down on a tired woman mid-sentence. \"That's all right, dear.\" Then the hands start on the metal. You were right. It did not feel like it."},
+      "text": "The shutter comes down on a tired woman mid-sentence. \"That's all right, dear.\" Before closing, the yard reports her hands. You were right. It did not feel like it."},
     "gave_up": {"title": "OUT OF PATIENCE",
       "text": "\"Never mind, dear.\" Maren goes back to the yard with hands that do not listen to her. You made no call. Nobody is paid for that."}
   }

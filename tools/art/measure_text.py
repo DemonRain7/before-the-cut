@@ -30,22 +30,27 @@ INTRO_GD = os.path.join(UI, "intro.gd")
 GUIDE_GD = os.path.join(UI, "guide.gd")
 COACH_GD = os.path.join(UI, "coach.gd")
 # "sheet" is the text column of a sheet row; "footer" is centred across the whole sheet.
-# "slip_title" is an outcome title in the big font across the result slip; wider than this and
-# the slip falls back to the small font. "report_title" is the big title on the end-of-shift
-# report, "report_line" one centred line of its text, "report_row" a label of its figures (the
-# figure is right-aligned on the same row; the meter row has five lamps there), "report_tally"
-# the last line across the report.
+# "slip_title" is what happened at the counter (rules.json "counter") in the big font across the
+# result slip; wider than this and the slip falls back to the small font. "report_title" is a big
+# title on the end-of-shift report, "report_line" one centred line of its text, "report_row" a
+# label of its figures (the figure is right-aligned on the same row; the meter row has five lamps
+# there), "report_tally" a line across the report. "visit_title" is how a visit ended, bold and
+# centred on the visit's own page of the report.
 # "hint" is the one dim line at the foot of the dialogue strip (dialogue_box.gd: TEXT_W); it does not wrap.
 # "plate" is the bold line that takes the attack bar's place once the shutter is down
 # (clinic_view.gd: SLOT, 207 px wide). "tally" is the bold count in the record's DECISION box
 # (clipboard.gd: DECISION, 78 px wide). "screen" is one centred line across the whole screen
 # (title card, opening cards). "lit_item" is one line of the lease picture's list.
 LIMITS = {"note": 186, "look": 186, "sheet": 182, "footer": 220, "row": 176, "question": 180, "name": 120, "request": 140,
-          "slip_title": 180, "report_title": 368, "report_line": 352, "report_row": 286, "report_tally": 368, "hint": 376,
+          "slip_title": 180, "report_title": 368, "visit_title": 368, "report_line": 352, "report_row": 286, "report_tally": 368, "hint": 376,
           "plate": 203, "tally": 74, "screen": 624}
 SLIP_WIDTH = 180        # the text column of the result slip (main.gd: _draw_slip)
 SLIP_GAP = 8            # least space between the call and the money on its last line (main.gd: SLIP_GAP)
-REPORT_VISIT_ROOM = 258 # a visit's second line on the report, from the call (x0 + 110) to the figure column (x1)
+REPORT_X0 = 136         # the report's text column (screens.gd: the panel's x + 16 ...
+REPORT_X1 = 504         # ... to its right edge - 16)
+REPORT_WIDTH = REPORT_X1 - REPORT_X0
+REPORT_NAME_ROOM = 94   # a row of the totals: the name, from x0 + 16 to the title at x0 + 110
+REPORT_VISIT_ROOM = 258 # a row of the totals: the title at x0 + 110, up to the figure column (x1)
 SLIP_LINES = 5          # lines of outcome text the slip has room for (main.gd: _draw_slip)
 REPORT_LINES = 3        # lines of title text the report has room for above the meter line and the tally
 STRIP_WIDTH = 376       # the dialogue strip (dialogue_box.gd: TEXT_W)
@@ -242,11 +247,6 @@ def check_lines(kind, where, text, width, most):
     return (kind, where, n, text, flag)
 
 
-REC_TEXT_X = 448        # clipboard.gd: the record card's text column
-REC_TEXT_W = 186
-REC_NOTE_RIGHT = 632    # clipboard.gd: where "you did not check" ends, at the right of the label's line
-LABEL_GAP = 6           # clipboard.gd: LABEL_GAP
-TALL_LINES = ("zh",)    # gfx.gd tall_lines: the languages whose lines fill their box
 
 
 def wrap_after(text, first_w, width):
@@ -265,24 +265,23 @@ def wrap_after(text, first_w, width):
 
 
 def check_finding(where, text, ok):
-    """A case's row text on the record card after the call (clipboard.gd _draw_findings), which
-    has room for two lines: under the label, or, in a language whose lines fill their box, one
-    after the label and one under it (_finding_after), with "you did not check" at the right end
-    of the label's line (measured as if it always were). The game's own widths count the gap
-    after the last letter, one pixel more than text_width."""
+    """A case's row text on the visit's page of the report (screens.gd _draw_finding and
+    _finding_text): it starts after the label (NORMAL or BROKEN LINE) on the label's line, which
+    ends where "you did not check" begins (measured as if it always were there), and has one more
+    line under it from the label's left edge; the game cuts anything longer with "...". The
+    game's own widths count the gap after the last letter, one pixel more than text_width."""
     text = tr(text)
     missing = missing_glyphs(text)
-    if LANG in TALL_LINES:
-        x = REC_TEXT_X + text_width(tr("NORMAL" if ok else "BROKEN LINE"), True) + 1 + LABEL_GAP
-        right = REC_NOTE_RIGHT - (text_width(tr("you did not check")) + 1) - LABEL_GAP
-        lines = wrap_after(text, right - x, REC_TEXT_W)
-    else:
-        lines = wrap(text, REC_TEXT_W)
+    gap = number(SCREENS_GD, "FINDING_GAP")
+    x = REPORT_X0 + number(SCREENS_GD, "FINDING_X")
+    after = x + text_width(tr("NORMAL" if ok else "BROKEN LINE"), True) + 1 + gap
+    right = REPORT_X1 - (text_width(tr("you did not check")) + 1) - gap
+    lines = wrap_after(text, right - after, REPORT_X1 - x)
     flag = ""
     if missing:
         flag += " MISSING GLYPHS %r" % "".join(missing)
     if len(lines) > 2:
-        flag += " TOO MANY LINES (%d, room for 2)" % len(lines)
+        flag += " TOO MANY LINES (%d, room for 2: the rest is cut)" % len(lines)
     return ("finding", where, len(lines), text, flag)
 
 
@@ -349,11 +348,25 @@ def inside(a, b):
     return a[0] >= b[0] and a[1] >= b[1] and a[0] + a[2] <= b[0] + b[2] and a[1] + a[3] <= b[1] + b[3]
 
 
-def slip_calls():
-    """The call labels the result slip can print, read from the game source so they cannot drift."""
-    src = source(MAIN_GD)
-    body = src[src.index("func _draw_slip"):]
-    return sorted(set(re.findall(r'"((?:RIGHT|WRONG|NO) CALL[^"]*)"', body)))
+def verdicts():
+    """The verdicts a visit's page of the report can print (screens.gd _verdict_of), read from
+    the game source so they cannot drift."""
+    src = source(SCREENS_GD)
+    body = src[src.index("func _verdict_of"):]
+    return sorted(set(re.findall(r'return "((?:RIGHT|WRONG|NO) CALL)"', body)))
+
+
+def visit_money(rules, fees, pay, calm_most):
+    """Every figure a visit can show on the report (its counter, closing and in-all money, and
+    the totals row): the fee with or without a drop and the calm-patches, each scoring rule the
+    same way, and the fee a patient who drifted takes back at closing."""
+    scoring = {k: int(v) for k, v in rules["scoring"].items()}
+    out = set()
+    for v in set(fees) | set(scoring.values()) | {0}:
+        out |= {v, v + pay, v - calm_most, v + pay - calm_most}
+    for fee in fees:
+        out.add(scoring.get("treat_drifting", 0) - fee)
+    return sorted(out)
 
 
 HINT_TABLES = ("MIC_HINTS", "OBJECT_HINT", "TAB_HINT", "SCOPE_HINT")
@@ -666,9 +679,22 @@ def main():
     sheet = json.load(open(os.path.join(DATA, "sheet.json"), encoding="utf-8"))
     parts = json.load(open(os.path.join(DATA, "parts.json"), encoding="utf-8"))
     rows.extend(sheet_rows(sheet, parts))
-    fees = set()
-    for path in sorted(glob.glob(os.path.join(DATA, "cases", "*.json"))):
-        c = json.load(open(path, encoding="utf-8"))
+    rules = json.load(open(os.path.join(DATA, "rules.json"), encoding="utf-8"))
+    contacts = rules.get("contacts", {})
+    reassure = rules.get("reassure", {})
+    calm_most = int(reassure.get("cost", 0)) * int(reassure.get("uses", 0))
+    cases = [json.load(open(p, encoding="utf-8")) for p in sorted(glob.glob(os.path.join(DATA, "cases", "*.json")))]
+    fees = set(int(c.get("fee", 0)) for c in cases)
+    figures = visit_money(rules, fees, int(contacts.get("pay", 0)), calm_most)
+    widest_money = max((money(v) for v in figures), key=tw)
+    tally_gap = dict(consts(SCREENS_GD, r"^TALLY_GAP$")).get("TALLY_GAP", "   •   ")
+    your_call = dict(consts(SCREENS_GD, r"^YOUR_CALL$")).get("YOUR_CALL", "")
+    calls = [tr(your_call.replace("%s", tr(t), 1)) for _, t in table(SCREENS_GD, "CALL_NAMES")]
+    if not your_call or not calls:
+        rows.append(("visit_call", "screens.gd:_draw_visit_page", 0, "", " NO CALL WORDS FOUND"))
+    widest_call = max(calls, key=lambda t: text_width(t, True)) if calls else ""
+    visit_lines = int(number(SCREENS_GD, "VISIT_TEXT_LINES"))
+    for c in cases:
         cid = c["id"]
         rows.append(check("name", cid + ".name", c["name"], bold=True))
         rows.append(check("request", cid + ".request", c["request"]))
@@ -688,33 +714,59 @@ def main():
             rows.append(check("line", cid + ".press%d.line" % i, p["line"]))
         for r, row in c["rows"].items():
             rows.append(check_finding(cid + ".rows." + r, row["text"], bool(row.get("ok", True))))
+        # the visit's page of the report: who it was, what the player did beside what was true,
+        # and how it ended; and its row among the totals
+        role = tr("%s, %d" % (c["role"], int(c["age"]))) + tally_gap + tr("For: %s" % c["request"])
+        rows.append(check("report_tally", cid + ":_draw_visit_page role", role))
+        was = max((tr("%s was %s." % (c["name"], t)) for t in ("STEADY", "DRIFTING")), key=lambda t: text_width(t, True))
+        w = text_width(widest_call, True) + 1 + SLIP_GAP + text_width(was, True) + 1
+        rows.append(("visit_call", cid + ":_draw_visit_page call", w, widest_call + " | " + was,
+                     " TOO WIDE (limit %d)" % REPORT_WIDTH if w > REPORT_WIDTH else ""))
+        rows.append(check("report_name", cid + ".name (totals row)", c["name"], bold=True, limit=REPORT_NAME_ROOM - 4))
         for k, o in c["outcomes"].items():
             rows.append(check("outcome", cid + ".outcomes." + k, o["text"]))
-            rows.append(check_lines("slip_text", cid + ".outcomes." + k + ".lines", o["text"], SLIP_WIDTH, SLIP_LINES))
-            rows.append(check("slip_title", cid + ".outcomes." + k + ".title", o["title"], bold=True, scale=2))
+            rows.append(check_lines("visit_text", cid + ".outcomes." + k + ".lines", o["text"], REPORT_WIDTH - 16, visit_lines))
+            rows.append(check("visit_title", cid + ".outcomes." + k + ".title", o["title"], bold=True))
+            rows.append(check("totals_row", cid + ".outcomes." + k + ".title (totals row)", o["title"],
+                              limit=REPORT_VISIT_ROOM - tw(widest_money) - SLIP_GAP))
         rows.append(check("line", cid + ".teaser", c["teaser"]))
         for k, v in c["lines"].items():
             for s in (v if isinstance(v, list) else [v]):
                 rows.append(check("line", cid + ".lines." + k, s))
         for k, s in c.get("exit", {}).items():
             rows.append(check("line", cid + ".exit." + k, s))
-        fees.add(int(c.get("fee", 0)))
-    # the slip's last line: the call on the left, the money on the right, both bold when there is room
-    rules = json.load(open(os.path.join(DATA, "rules.json"), encoding="utf-8"))
-    figures = sorted(fees | set(int(v) for v in rules["scoring"].values()) | {0})
-    widest = max(tw("%s credits" % money(v), True) for v in figures)
-    calls = slip_calls()
-    if not calls:
-        rows.append(("slip_call", "main.gd:_draw_slip", 0, "", " NO CALL LABELS FOUND"))
-    for label in calls:
-        room = SLIP_WIDTH - widest - SLIP_GAP
-        w = tw(label, True)
-        flag = ""
-        if tw(label) > room:
+    # the slip: its number and the patient's name, what happened at the counter (rules.json
+    # "counter", filled with the widest name), and under the rule what the counter took in
+    names = [c["name"] for c in cases]
+    longest_name = max(names, key=tw) if names else ""
+    head = tr("INTAKE SLIP %d/%d" % (len(rules.get("shift_order", [])), len(rules.get("shift_order", []))))
+    w = text_width(head) + 1 + SLIP_GAP + tw(longest_name) + 1
+    rows.append(("slip_call", "main.gd:_draw_slip head", w, head + " | " + longest_name,
+                 " TOO WIDE (limit %d)" % SLIP_WIDTH if w > SLIP_WIDTH else ""))
+    counter = rules.get("counter", {})
+    if not counter:
+        rows.append(("slip_title", "rules.counter", 0, "", " NO COUNTER WORDS FOUND"))
+    for k, e in counter.items():
+        title = tr(e.get("title", ""))
+        if text_width(title, True, 2) > SLIP_WIDTH:
+            rows.append(check("slip_title", "rules.counter." + k + ".title (small)", title, bold=True))
+        else:
+            rows.append(check("slip_title", "rules.counter." + k + ".title", title, bold=True, scale=2))
+        said = fill(tr(e.get("text", "")), {"name": longest_name})
+        rows.append(check_lines("slip_text", "rules.counter." + k + ".lines", said, SLIP_WIDTH, SLIP_LINES))
+    counter_fees = sorted(fees | {0})
+    widest = max(text_width(tr("%s credits" % money(v)), True) + 1 for v in counter_fees)
+    room = SLIP_WIDTH - widest - SLIP_GAP
+    for label in [t for n, t in consts(MAIN_GD, r"^SLIP_COUNTER$")] or [""]:
+        w = tw(label, True) + 1
+        flag = " NO COUNTER LABEL FOUND" if label == "" else ""
+        if label and tw(label) + 1 > room:
             flag = " TOUCHES THE MONEY (room %d px)" % room
-        elif w > room:
+        elif label and w > room:
             flag = " NOT BOLD (bold needs %d px, room %d px)" % (w, room)
-        rows.append(("slip_call", "main.gd:_draw_slip", w, label, flag))
+        rows.append(("slip_call", "main.gd:SLIP_COUNTER", w, label, flag))
+    for name, text in consts(MAIN_GD, r"^SLIP_LATER$"):
+        rows.append(check("slip_call", "main.gd:" + name, text, limit=SLIP_WIDTH))
     # the numbers the words are filled with (main.gd: _ready)
     hours = len(rules.get("shift_order", []))
     per_hour = int(rules.get("line", {}).get("per_hour", 0))
@@ -723,8 +775,6 @@ def main():
     repair_cost = int(rules.get("attack", {}).get("repair_cost", 0))
     # the most glass a night can buy: a whole pane before every patient
     repair_most = repair_cost * glass * hours
-    contacts = rules.get("contacts", {})
-    reassure = rules.get("reassure", {})
     costs = rules.get("costs", {})
     numbers = {"per_hour": per_hour, "hours": hours, "total": per_hour * hours, "threshold": threshold,
                "repair_cost": repair_cost, "pay": int(contacts.get("pay", 0)), "code_cost": int(contacts.get("wrong_cost", 0)),
@@ -751,29 +801,41 @@ def main():
     for name, text in consts(SCREENS_GD, r"_ROW$"):
         values = [repair_most] if name == "TILL_GLASS_ROW" else [hours, per_hour]
         rows.append(check("report_row", "screens.gd:" + name, worst_numbers(text, values), bold=name in ("OVER_ROW", "UNDER_ROW")))
+    for name, text in consts(SCREENS_GD, r"^UNSEEN$"):
+        rows.append(check("totals_row", "screens.gd:" + name, text, limit=REPORT_VISIT_ROOM - tw(widest_money) - SLIP_GAP))
     tally_words = dict(consts(SCREENS_GD, r"^TALLY_"))
     tally = tally_words.get("TALLY_GAP", "   •   ").join(
-        tr(worst_numbers(tally_words.get(k, k), [hours, hours])) for k in ("TALLY_CALLS", "TALLY_UNDER", "TALLY_HURT"))
-    rows.append(check("report_tally", "screens.gd:_draw_report tally", tally))
+        tr(worst_numbers(tally_words.get(k, k), [hours, hours])) for k in ("TALLY_CALLS", "TALLY_UNDER"))
+    rows.append(check("report_tally", "screens.gd:_draw_totals tally", tally))
     for name, text in consts(SCREENS_GD, r"^DROPS_TALLY$"):
         per_night = int(contacts.get("per_night", 0))
         rows.append(check("report_tally", "screens.gd:" + name,
                           worst_numbers(text, [per_night, per_night, per_night * int(contacts.get("pay", 0))])))
-    # a visit's second line: what the doctor did at x0 + 110, and what was not the call's own at x1
-    src = source(SCREENS_GD)
-    body = src[src.index("func _call_text"):]
-    said_calls = re.findall(r'return "([^"]+)"', body)
+    # a visit's page: its place in the report, the verdict, its money and what was not the call's
+    # own, and the words that turn the page
+    page_of = dict(consts(SCREENS_GD, r"^PAGE_OF$")).get("PAGE_OF", "")
+    head = tr("END OF SHIFT")
+    w = text_width(head, True) + 1 + SLIP_GAP + tw(worst_numbers(page_of, [hours, hours])) + 1
+    rows.append(("report_tally", "screens.gd:_draw_visit_page head", w, head + " | " + tr(worst_numbers(page_of, [hours, hours])),
+                 " TOO WIDE (limit %d)" % REPORT_WIDTH if w > REPORT_WIDTH else ""))
+    found = verdicts()
+    if not found:
+        rows.append(("report_title", "screens.gd:_verdict_of", 0, "", " NO VERDICTS FOUND"))
+    for text in found:
+        rows.append(check("report_title", "screens.gd:_verdict_of", text, scale=2))
     small = dict(consts(SCREENS_GD, r"^VISIT_"))
-    if not said_calls or len(small) < 3:
-        rows.append(("report_row", "screens.gd:_draw_report", 0, "", " NO VISIT LINE WORDS FOUND"))
+    if len([k for k in small if k in ("VISIT_DROP", "VISIT_NO_DROP", "VISIT_CALM", "VISIT_MONEY")]) < 4:
+        rows.append(("report_tally", "screens.gd:_draw_visit_page", 0, "", " NO VISIT LINE WORDS FOUND"))
     else:
-        calm_most = int(reassure.get("cost", 0)) * int(reassure.get("uses", 0))
         extra = "   ".join([tr(max(worst_numbers(small["VISIT_DROP"], [int(contacts.get("pay", 0))]), small["VISIT_NO_DROP"],
                                    key=tw)), tr(worst_numbers(small["VISIT_CALM"], [calm_most]))])
-        call = max(said_calls, key=tw)
-        room = REPORT_VISIT_ROOM - tw(call) - SLIP_GAP
-        rows.append(("report_row", "screens.gd:_visit_extra", tw(extra), extra,
-                     " RUNS INTO '%s' (room %d px)" % (call, room) if tw(extra) > room else ""))
+        rows.append(check("report_tally", "screens.gd:_visit_extra", extra))
+        rows.append(check("report_tally", "screens.gd:VISIT_MONEY", small["VISIT_MONEY"].replace("%s", widest_money)))
+    for name, text in consts(SCREENS_GD, r"^(NEXT_VISIT|TO_TOTALS)$"):
+        rows.append(check("report_tally", "screens.gd:" + name, text, bold=True))
+    for name, text in consts(SCREENS_GD, r"^PAGE_KEYS$"):
+        rows.append(check("report_tally", "screens.gd:" + name, text))
+    rows.append(check("report_tally", "screens.gd:_draw_totals", "CLICK FOR A NEW SHIFT", bold=True))
     # the title card
     for name, text in consts(SCREENS_GD, r"^HELP"):
         rows.append(check("screen", "screens.gd:" + name, text))
@@ -849,8 +911,8 @@ def main():
     for kind, where, w, text, flag in rows:
         by_kind.setdefault(kind, []).append(w)
     for kind, ws in sorted(by_kind.items()):
-        unit = "lines" if kind in ("slip_text", "report_text", "strip_text", "card_text", "guide_item", "training",
-                                   "finding") else "px"
+        unit = "lines" if kind in ("slip_text", "report_text", "visit_text", "strip_text", "card_text", "guide_item",
+                                   "training", "finding") else "px"
         print("%-12s n=%-3d max=%d %s" % (kind, len(ws), max(ws), unit))
     for kind, where, w, text, flag in bad:
         print("!! %s %s (%d)%s: %s" % (kind, where, w, flag, text))

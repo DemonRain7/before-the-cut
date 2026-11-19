@@ -6,6 +6,16 @@ extends RefCounted
 ## meter reads the till once an hour. One finished visit is one hour; hour n wants n x per_hour
 ## in the till. Readings on the way are warnings. The last one decides the night (see report()).
 ##
+## Two kinds of money (rules version 8). Through the night the till holds only what came in at
+## the counter: fees for work done, drops, less CALM and glass (till()). Whether each call was
+## right, and what it brings (Trauma Team's bounty or bill, the bill for work on somebody who
+## drifted), comes in at closing with the night's reports, before the last reading (total()).
+## So the readings on the way say nothing about who was drifting.
+##
+## A patient who gets through the window kills the doctor (record()): the night ends there, the
+## rest of the line goes home unseen, and the report is the last thing (is_done(), report()).
+## Nobody reads the meter in the hour it happened (readings()), and the line is not held.
+##
 ## Contacts (rules.json "contacts", data/contacts.json): each night some visitors are couriers.
 ## The list is drawn from the shift seed (draw_contacts()); a drop is paid into the visit's
 ## settlement, so the till and every reading count it like a fee.
@@ -25,6 +35,7 @@ var glass: int = 0        # blows the pane can still take tonight
 var glass_out: bool = false   # somebody came through it: no pane is left
 var repairs: Array = []   # one per layer paid for: {"after": visits finished by then, "cost": credits}
 var contacts: Array = []  # tonight's list: entries of data/contacts.json "pool", one per courier
+var died: bool = false    # somebody came through the window: the night ended with that visit
 
 
 func _init(p_rules: Dictionary = {}, p_order: Array = []) -> void:
@@ -114,16 +125,18 @@ func contact_for(case_id: String) -> Dictionary:
 	return {}
 
 
+## Who is at the counter: nobody once the night is over.
 func current_id() -> String:
-	return str(order[index]) if index < order.size() else ""
+	return str(order[index]) if not died and index < order.size() else ""
 
 
 func upcoming_id() -> String:
-	return str(order[index + 1]) if index + 1 < order.size() else ""
+	return str(order[index + 1]) if not died and index + 1 < order.size() else ""
 
 
+## The night is over: everybody has been seen, or the doctor is dead.
 func is_done() -> bool:
-	return index >= order.size()
+	return died or index >= order.size()
 
 
 func count() -> int:
@@ -132,18 +145,35 @@ func count() -> int:
 
 func record(settlement: Dictionary) -> void:
 	records.append(settlement.duplicate(true))
+	if str(settlement.get("outcome", "")) == "hit":
+		died = true
 
 
 func advance() -> void:
 	index += 1
 
 
-## What is in the till now: every finished visit, less what the glass has cost.
+## What is in the till at closing, with the night's reports in: every finished visit in full,
+## less what the glass has cost.
 func total() -> int:
 	var sum := 0
 	for r in records:
 		sum += int(r.get("credits", 0))
 	return sum - repair_total()
+
+
+## What is in the till during the night: what each finished visit paid at the counter, less
+## what the glass has cost. The rest of each visit's money waits for closing (total()).
+func till() -> int:
+	var sum := 0
+	for r in records:
+		sum += int(r.get("counter", r.get("credits", 0)))
+	return sum - repair_total()
+
+
+## Who never came in: the visitors still in the hall when the night ended early. Ids.
+func unseen() -> Array:
+	return order.slice(records.size())
 
 
 func correct_count() -> int:
@@ -170,26 +200,32 @@ func hour() -> int:
 	return mini(index + 1, maxi(1, order.size()))
 
 
-## The meter reading after `p_hour` finished visits (default: after the latest one). Glass that
-## was paid for before that hour's patient came in is out of the till by then; glass paid for
-## after the reading belongs to the next one, so a reading never changes once it is taken.
+## The meter reading after `p_hour` finished visits (default: after the latest one). Through
+## the night the meter reads what came in at the counter (till()); the last reading is taken at
+## closing, when the night's reports are in, and counts every visit in full (total()). Glass
+## that was paid for before that hour's patient came in is out of the till by then; glass paid
+## for after the reading belongs to the next one, so a reading never changes once it is taken.
 func reading(p_hour: int = -1) -> Dictionary:
 	var h := records.size() if p_hour < 0 else mini(p_hour, records.size())
+	var last := h >= order.size()
 	var till := 0
 	for i in h:
-		till += int(records[i].get("credits", 0))
+		var r: Dictionary = records[i]
+		till += int(r.get("credits", 0)) if last else int(r.get("counter", r.get("credits", 0)))
 	for r in repairs:
 		var paid: Dictionary = r
 		if int(paid.get("after", 0)) < h:
 			till -= int(paid.get("cost", 0))
 	var line := line_at(h)
 	return {"hour": h, "of": order.size(), "till": till, "line": line, "held": till >= line,
-		"margin": till - line, "last": h >= order.size()}
+		"margin": till - line, "last": last}
 
 
+## The readings taken so far, one an hour. Nobody reads the meter in the hour the doctor died.
 func readings() -> Array:
 	var out: Array = []
-	for h in range(1, records.size() + 1):
+	var hours := records.size() - (1 if died else 0)
+	for h in range(1, hours + 1):
 		out.append(reading(h))
 	return out
 
@@ -244,7 +280,7 @@ func repair_glass() -> Dictionary:
 	repairs.append({"after": records.size(), "cost": cost})
 	glass += 1
 	glass_out = false
-	return {"cost": cost, "glass": glass, "glass_max": glass_max(), "till": total()}
+	return {"cost": cost, "glass": glass, "glass_max": glass_max(), "till": till()}
 
 
 func repair_total() -> int:
@@ -282,17 +318,20 @@ func report() -> Dictionary:
 			injuries += 1
 	var correct := correct_count()
 	var line := line_at(order.size())
-	var line_held := total() >= line
+	var line_held := not died and total() >= line      # nobody reads the meter for a dead doctor
 	var title := ""
 	var text := ""
 	# titles are written for a five-patient shift; scale the threshold for other lengths
 	var scaled := correct
 	if order.size() > 0 and order.size() != 5:
 		scaled = int(round(5.0 * correct / order.size()))
-	# the first title that fits: enough right calls and, where a title asks for it, no more
-	# injuries than it allows and the night's last reading on the side of the line it names
+	# the first title that fits: enough right calls and, where a title asks for it, a night that
+	# did or did not end in the doctor's death, no more injuries than it allows and the night's
+	# last reading on the side of the line it names
 	for t in rules.get("titles", []):
 		var entry: Dictionary = t
+		if entry.has("died") and bool(entry["died"]) != died:
+			continue
 		if scaled < int(entry.get("min_correct", 0)):
 			continue
 		if entry.has("max_injuries") and injuries > int(entry["max_injuries"]):
@@ -311,12 +350,19 @@ func report() -> Dictionary:
 			drops += 1
 			drop_total += int(r.get("drop", 0))
 		calm_total += int(r.get("calm_spent", 0))
+	var said := "held" if line_held else "short"
+	if died:
+		said = "died"
 	return {
 		"visits": records.duplicate(true),
 		"count": order.size(),
 		"correct": correct,
 		"injuries": injuries,
 		"total": total(),
+		"counter_total": till() + repair_total(),      # what the counter took in, before the glass
+		"closing_total": total() - till(),             # what the night's reports added or billed
+		"died": died,
+		"unseen": unseen(),
 		"line": line,
 		"line_held": line_held,
 		"hours_under": hours_under(),
@@ -331,5 +377,5 @@ func report() -> Dictionary:
 		"calm_total": calm_total,
 		"title": title,
 		"text": text,
-		"line_text": str(line_text.get("held" if line_held else "short", "")),
+		"line_text": str(line_text.get(said, "")),
 	}

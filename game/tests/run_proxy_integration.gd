@@ -535,7 +535,21 @@ func meanwhile(main: MainScript, driver: PlayDriver) -> void:
 		if str(rec.get("type", "")) == "reply_dropped":
 			dropped += 1
 	check(dropped == 1, "meanwhile: the dropped answer is logged once, by stage, without words")
-	check(await driver.wait_for_slip(40.0), "meanwhile: the visit ends as a Trauma Team call")
+	# this is the third patient of the listed order, Vale, and a call turns him. A blow that
+	# lands would end the night with no slip (student, November 18), so the shutter stops him.
+	check(str(main.visit.case_data.get("id", "")) == "vale" and main.state == MainScript.State.ATTACK
+		and main.visit.attack_cause == "refer", "meanwhile: the call turns Vale, as it always does")
+	check(await driver.wait_for_telegraph(), "meanwhile: he gives his warning")
+	driver.shutter_key()
+	check(main.visit.outcome == "caught", "meanwhile: the shutter stops him")
+	var slipped: bool = await driver.wait_for_slip(40.0)
+	if not slipped:
+		# say where it stopped: the state and the last events of the visit
+		var last := PackedStringArray()
+		for rec in main.event_log.memory.slice(-8):
+			last.append(str(rec.get("type", "")))
+		print("meanwhile: stopped in state %d, last events: %s" % [main.state, ", ".join(last)])
+	check(slipped, "meanwhile: the visit ends with a slip")
 	check(main.agent.conversation_history.size() == history, "meanwhile: the late answer never joins the conversation")
 	client.base_url = str(urls.normal)
 

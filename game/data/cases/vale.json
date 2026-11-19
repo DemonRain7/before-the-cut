@@ -104,9 +104,9 @@
     "caught": {"title": "SHUTTER HELD",
       "text": "Three dents in the shutter, then saw teeth through the slats. They stop a hand short of you. Boots, a shout, quiet. Trauma Team collects him."},
     "hit": {"title": "TOO SLOW",
-      "text": "You were half a second late. The saw was not. Trauma Team finds you on the floor. He is long gone, and so is your night."},
+      "text": "You were half a second late. The saw was not. Trauma Team finds you on the floor, too late to help. The clinic stays dark."},
     "locked_out": {"title": "LOCKED OUT",
-      "text": "You dropped the shutter on a polite man mid-sentence. The dents arrive a moment later. You were right. Nobody pays for that."},
+      "text": "You dropped the shutter on a polite man mid-sentence. Trauma Team picked him up two streets away, the rig still running. You were right. Nobody pays for that."},
     "gave_up": {"title": "OUT OF PATIENCE",
       "text": "Vale thanks you for your time and walks back out into the city. You made no call. Whatever he does tonight, nobody asked you."}
   }

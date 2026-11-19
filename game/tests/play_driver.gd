@@ -246,11 +246,16 @@ func in_exam() -> bool:
 
 
 ## Title or report card -> the hall camera is asking to buzz the first patient in.
+## The report opens on the first visit's page; ESC goes straight to the night's totals, the
+## way a player skips it, and a click there starts the next night.
 ## The opening cards play once a session after the title. They are skipped here the way a
 ## player skips them, with ESC. With `watch_intro` the call returns as soon as the cards are
 ## up: the caller steps through them and then waits with wait_for_counter().
 func open_counter(watch_intro: bool = false) -> bool:
 	if main.state == MainScript.State.REPORT:
+		if not main.screens.on_summary():
+			key(KEY_ESCAPE)
+			await tree.process_frame
 		await until(func() -> bool: return main.screens.age() >= 0.85, 3.0)
 	click(Vector2(320, 300))
 	await tree.process_frame
@@ -413,3 +418,21 @@ func take_slip() -> bool:
 	click(MainScript.SLIP_CLIP.get_center())
 	return await until(func() -> bool:
 		return (main.state == MainScript.State.WAIT and main.clinic.cam_prompt) or main.state == MainScript.State.REPORT, 15.0)
+
+
+## Waits for the end-of-night report: after the last slip, or out of the dark when a blow
+## landed and the night ended early.
+func wait_for_report(limit: float = 30.0) -> bool:
+	return await until(func() -> bool: return main.state == MainScript.State.REPORT, limit)
+
+
+## Reads the report the way a player does: a click on each page once it has been up long
+## enough to turn, until the night's totals. Returns how many pages were turned.
+func read_report(limit: int = 12) -> int:
+	var turned := 0
+	while main.state == MainScript.State.REPORT and not main.screens.on_summary() and turned < limit:
+		await until(func() -> bool: return main.screens.age() >= MainScript.REPORT_TURN + 0.05, 3.0)
+		click(Vector2(320, 200))
+		await tree.process_frame
+		turned += 1
+	return turned

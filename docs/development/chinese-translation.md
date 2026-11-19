@@ -32,6 +32,7 @@ that uses it, in the same commit.
 | --- | --- | --- |
 | implant; chrome (slang) | 义体 | an eye implant is 义眼: "Implants in both eyes." 双眼都是义眼。 Chrome is slang in English (Juno's lines); Chinese has 义体 for both |
 | steady / drifting | 稳定 / 失控 | the card THE DRIFT is 失控 too |
+| dark threads | 黑色纹路 | the drift sign of dark lines spreading out from a port. Never 黑丝, which reads as black stockings |
 | Trauma Team | 创伤小组 | on the imprint, 创伤 over 小组 |
 | the Lanterns | 灯笼帮 | |
 | Kessler; Kessler Security | 凯斯勒; 凯斯勒安保 | |
@@ -68,6 +69,12 @@ that uses it, in the same commit.
 | fee | 诊费 | |
 | credits | 信用点 | 点 alone where room is short (`%dcr` is %d点) |
 | NEXT; SKIP ALL | 下一条; 全部跳过 | the training |
+| AT THE COUNTER; At the counter | 柜台实收 | the slip, and the report's first money row: what came in during the visit |
+| At closing | 收工结算 | the report's second money row: bounties, bills and the reports on the work |
+| TREATED; HANDED OVER; SHUTTER HELD; SHUTTER DOWN; WALKED OUT; OUT OF PATIENCE | 已治疗; 已移交; 卷闸守住了; 卷闸落下; 转身走了; 耐心耗尽 | the slip's title (`rules.json` `counter`): what was done, never whether it was right |
+| FALSE CALL; TAKEN IN | 错误呼叫; 移交收治 | a Trauma Team call on the report page |
+| LIGHTS OUT | 熄灯 | the title of a night that ended with the doctor killed |
+| never came in | 没等到接诊 | on that report, the visitors still in the hall |
 
 ## The patients' voices
 
@@ -121,8 +128,10 @@ voice:
   (常 | 见).
 - **The intake card.** Lines nine pixels apart touch in Chinese. Where a row has one or two
   notes they are set ten apart (`Gfx.tall_lines()`); three still go nine apart, a row higher.
-  A finding puts 正常 or 异常 at the start of its text and 你没有检查 on the right
-  (`clipboard.gd` `_finding_after()`).
+  The card holds only the doctor's own notes; the findings are told at closing.
+- **The report.** Each visit's page sets the findings beside the doctor's marks. A finding puts
+  正常 or 异常 at the start of its text and 你没有检查 on the right (`screens.gd`
+  `_finding_text()`).
 - **Pace.** A Chinese line says as much in about half the characters, so typewriters type it at
   half the English rate per character and a page of it is held twice as long per character
   (`Lang.PER_CHAR`).

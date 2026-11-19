@@ -4,6 +4,9 @@ extends SceneTree
 ## The first six check the counter itself under a few rules held still (no couriers, a free
 ## CALM, the old line, no snaps or flares, no training); the last three play the night as it
 ## is: the contact list and the paid CALM, the snaps and flares, and the first-night training.
+## Right and wrong are told only at closing: the slip says what the counter did, and through the
+## night the till holds what the counter took in. A blow that lands ends the night (shifts 2 and
+## 4): there is no slip, and the report comes up out of the dark with the visitors nobody saw.
 ## Run from the repository root:
 ##   godot --headless --path game --script res://tests/run_ui_smoke.gd
 ##   godot --headless --path game --script res://tests/run_ui_smoke.gd -- --lang=zh   (in Chinese)
@@ -276,15 +279,89 @@ func enter(id: String, keep_guide: bool = false) -> VisitState:
 	return v
 
 
-## The slip prints, the record flips to findings, and taking the slip moves on.
+## The counter's words for a call (rules.json "counter"): the title the slip prints.
+func counter_title(key: String) -> String:
+	var words: Dictionary = (main.rules.get("counter", {}) as Dictionary).get(key, {})
+	return str(words.get("title", ""))
+
+
+## The slip prints with the counter's words for the call, the card keeps the doctor's own notes,
+## the till shows what the counter took in, and taking the slip moves on.
 func finish_visit(label: String) -> void:
 	var printed: bool = await d.wait_for_slip(40.0)
 	check(printed, "%s: the result slip prints" % label)
-	check(main.clipboard.mode == "findings", "%s: the record shows the findings" % label)
-	check(main.clinic.till == main.shift.total(), "%s: the till matches the shift total" % label)
+	var key: String = main.visit.counter_key() if main.visit != null else ""
+	check(key != "" and str(main._slip_data.get("counter_title", "")) == counter_title(key),
+		"%s: the slip has the counter's words for the call, not whether it was right" % label)
+	check(main.clipboard.mode == "exam", "%s: the card still shows the doctor's own notes" % label)
+	check(main.clinic.till == main.shift.till(), "%s: the till shows what the counter took in" % label)
 	var moved: bool = await d.take_slip()
 	check(moved, "%s: taking the slip moves on" % label)
 	check(main.visit == null and main.rig == null, "%s: the counter is clear afterwards" % label)
+
+
+## A blow landed: the night ends with this visit. No slip prints; the report comes up out of the
+## dark, names the visitors still in the hall, and nobody reads the meter.
+func lights_out(label: String, unseen: Array) -> void:
+	var up: bool = await d.wait_for_report(40.0)
+	check(up and main.screens.mode == "report" and main.screens.fade > 0.5, "%s: the night ends here: the report comes up out of the dark" % label)
+	check(main._slip_data.is_empty() and main._slip_mode == "hidden", "%s: no slip prints for it" % label)
+	check(main.visit == null and main.rig == null, "%s: the counter is empty" % label)
+	check(main.shift.died and main.shift.is_done() and main.shift.current_id() == "", "%s: nobody else comes in tonight" % label)
+	check(main.shift.unseen() == unseen, "%s: still in the hall: %s" % [label, str(unseen)])
+	var r: Dictionary = main.screens.report
+	var said: Dictionary = main.rules.get("line_text", {})
+	check(str(r.get("title", "")) == "LIGHTS OUT" and str(r.get("line_text", "")) == str(said.get("died", "-")),
+		"%s: LIGHTS OUT, and nobody reads the meter" % label)
+	var names: Array = []
+	for id in unseen:
+		names.append(str((main.cases.get(str(id), {}) as Dictionary).get("name", id)))
+	var shown: PackedStringArray = r.get("unseen_names", PackedStringArray())
+	check(Array(shown) == names, "%s: the report names whoever never came in" % label)
+	var lit: bool = await d.until(func() -> bool: return main.screens.fade == 0.0, 4.0)
+	check(lit and main.state == MainScript.State.REPORT, "%s: and the dark lifts off it" % label)
+
+
+## The till at each of a report's hourly readings.
+func tills_of(r: Dictionary) -> Array:
+	var out: Array = []
+	for item in r.get("readings", []):
+		out.append(int((item as Dictionary).get("till", 0)))
+	return out
+
+
+## The report a page at a time: a page for each visit, then the night's totals. A click turns a
+## page once it has been up for a moment, BACKSPACE and LEFT go back, ESC goes to the totals,
+## and the jingle that says how the night went waits for them.
+func report_pages(visits: int) -> void:
+	section("Report pages: one for each visit, then the totals")
+	check(main.screens.pages() == visits + 1 and main.screens.page == 0 and not main.screens.on_summary(),
+		"the report opens on the first visit's page, of %d" % (visits + 1))
+	check(not main._report_jingled, "the night's jingle waits for the totals")
+	var early: bool = main.screens.age() < MainScript.REPORT_TURN
+	d.click(Vector2(320, 200))
+	check(not early or main.screens.page == 0, "a click as the page opens does not turn it yet")
+	if not early:
+		d.key(KEY_BACKSPACE)
+	await d.until(func() -> bool: return main.screens.age() >= MainScript.REPORT_TURN + 0.05, 3.0)
+	d.click(Vector2(320, 200))
+	check(main.screens.page == 1, "a moment later a click turns to the next visit")
+	d.key(KEY_BACKSPACE)
+	check(main.screens.page == 0, "BACKSPACE goes back a page")
+	d.key(KEY_LEFT)
+	check(main.screens.page == 0, "and LEFT on the first page stays there")
+	await d.until(func() -> bool: return main.screens.age() >= MainScript.REPORT_TURN + 0.05, 3.0)
+	d.key(KEY_RIGHT)
+	check(main.screens.page == 1, "RIGHT turns it too")
+	var read: int = await d.read_report()
+	check(main.screens.on_summary() and read == visits - 1, "page by page to the night's totals")
+	check(main._report_jingled, "the totals play the jingle")
+	d.click(Vector2(320, 200))
+	check(main.state == MainScript.State.REPORT and main.screens.on_summary(), "a click the moment the totals open does not start a new night")
+	d.key(KEY_BACKSPACE)
+	check(main.screens.page == visits - 1, "BACKSPACE goes back from the totals to the last visit")
+	d.key(KEY_ESCAPE)
+	check(main.screens.on_summary(), "ESC goes straight to the totals")
 
 
 # ================================================================ the opening and the guide
@@ -581,7 +658,7 @@ func shift_careful() -> void:
 	await d.stamp("treat")
 	check(v.verdict_kind == "treat" and v.outcome == "treated_ok", "stamping the card decides: TREAT")
 	await finish_visit("Kip")
-	check(main.shift.total() == 250, "his fee is in the till")
+	check(main.shift.till() == 250 and main.clinic.till == 250, "his fee is in the till")
 	check(main.clinic.cam_id == "rook", "the next patient is on the camera")
 	check(main.clinic.line == 240 and not main.clinic.line_under, "the meter read the first hour as over the line, and now shows the second hour's")
 	var meters: Array = logged("meter")
@@ -665,6 +742,8 @@ func shift_careful() -> void:
 		"after the first attack of a session the hint explains what the blows cost")
 	var printed: bool = await d.wait_for_slip(40.0)
 	check(printed, "Vale: the result slip prints")
+	check(str(main._slip_data.get("counter_title", "")) == counter_title("caught") and main.clinic.till == 550,
+		"the slip says the shutter held; the handover fee is not in the till yet")
 	check(not main.clinic.bar_on and main.clinic.bar_text == "", "the bar is gone when the slip prints out of its slot")
 	check(plan_is([540], 990), "with one glass left, the next one to turn would be through in under a second")
 	check(main.clinic.shutter_closed(), "the shutter is down")
@@ -674,7 +753,8 @@ func shift_careful() -> void:
 	check(main.clinic.glass_state == 2, "the cracks stay in the glass")
 	check((main.clinic.drip_count() > 0) != main.less_blood, "blood ran out under the shutter")
 	check(not main.audio._loops.has("alarm") and not main.audio._loops.has("saw_loop"), "the alarm and the saw are quiet")
-	check(bool(last_record().get("correct", false)) and int(last_record().get("credits", 0)) == 120, "a caught attack pays the handover fee")
+	check(bool(last_record().get("correct", false)) and int(last_record().get("credits", 0)) == 120 and int(last_record().get("counter", -1)) == 0,
+		"a caught attack pays the handover fee, at closing")
 	var moved: bool = await d.take_slip()
 	check(moved, "Vale: taking the slip moves on")
 	check(main.clinic.shutter_pos < 0.05, "the shutter is back up before the next patient is called")
@@ -721,18 +801,22 @@ func shift_careful() -> void:
 	check(came and main.rig != null and main.clinic.strobe > 0.5, "the crew comes in behind her with their lights in the hall")
 	await finish_visit("Maren")
 	check(not main.clinic.team_in_sight() and main.clinic.strobe == 0.0, "the crew and their lights are gone afterwards")
-	check(str(last_record().get("title", "")) == "TAKEN IN" and int(last_record().get("credits", 0)) == 120, "the handover pays its small fee")
+	check(str(last_record().get("title", "")) == "TAKEN IN" and int(last_record().get("credits", 0)) == 120, "the report will call it TAKEN IN, with its small fee")
 
 	section("Report")
 	check(main.state == MainScript.State.REPORT and main.screens.mode == "report", "the last slip leads to the end-of-shift report")
 	var r: Dictionary = main.screens.report
-	check(int(r.get("correct", 0)) == 5 and int(r.get("total", 0)) == 1140 and bool(r.get("line_held", false)),
-		"five right calls, 1140 in the till, over the line")
-	check(int(r.get("line", 0)) == 600 and int(r.get("hours_under", -1)) == 0 and (r.get("readings", []) as Array).size() == 5,
-		"the line was 600, and none of the five hourly readings was under it")
+	check(int(r.get("correct", 0)) == 5 and int(r.get("total", 0)) == 1140 and bool(r.get("line_held", false)) and not bool(r.get("died", true)),
+		"five right calls, 1140 at closing, over the line")
+	check(int(r.get("counter_total", 0)) == 900 and int(r.get("closing_total", 0)) == 240,
+		"900 came in at the counter, and the two handover fees with Trauma Team's report at closing")
+	check(int(r.get("line", 0)) == 600 and int(r.get("hours_under", -1)) == 0 and tills_of(r) == [250, 550, 550, 900, 1140],
+		"the line was 600; each hour the meter read what the counter had taken, and at closing everything")
 	check(str(r.get("title", "")) == "STEADY HANDS" and str(r.get("line_text", "")).contains("OVER THE LINE"), "the night gets its best name")
 	check(int(r.get("glass", -1)) == 1 and int(r.get("glass_max", 0)) == 3, "the report knows what the glass took")
-	check(main.clinic.line == 600 and not main.clinic.line_under, "the meter on the wall shows the last reading")
+	check(main.clinic.till == 1140 and main.clinic.line == 600 and not main.clinic.line_under, "the meter on the wall shows the last reading, with the night's reports in")
+	check(main.clinic.results == ["treat", "treat", "team", "treat", "team"], "its lamps show the doctor's calls, not whether they were right")
+	await report_pages(5)
 
 
 # ================================================================ shift 2
@@ -740,7 +824,7 @@ func shift_careful() -> void:
 func shift_reckless() -> void:
 	section("New shift")
 	var opened: bool = await d.open_counter()
-	check(opened, "a click on the report starts a new shift")
+	check(opened, "a click on the report's totals starts a new shift")
 	check(main.shift_number == 2 and main.shift.index == 0 and main.clinic.till == 0 and main.clinic.results.is_empty(),
 		"the new shift starts from zero")
 	check(main.shift.glass == 3 and not main.shift.glass_out and main.clinic.glass_left == 3, "a new night starts with whole glass")
@@ -762,8 +846,10 @@ func shift_reckless() -> void:
 	check(v.outcome == "false_alarm", "a second press drops it: a false alarm on a steady patient")
 	var printed: bool = await d.wait_for_slip(40.0)
 	check(printed, "Kip: the result slip prints")
-	check(main.clipboard.mode == "findings", "Kip: the record shows the findings")
-	check(main.clinic.till == main.shift.total(), "Kip: the till matches the shift total")
+	check(str(main._slip_data.get("counter_title", "")) == counter_title("shutter") and int(main._slip_data.get("counter", -1)) == 0,
+		"Kip: the slip says only that the shutter came down: no fee, no call")
+	check(main.clipboard.mode == "exam", "Kip: the card still shows the doctor's own notes")
+	check(main.clinic.till == 0 and main.shift.till() == 0, "Kip: nothing is off the till yet: the fine waits for closing")
 	d.click(MainScript.SLIP_CLIP.get_center())
 	var reading_up: bool = await d.until(func() -> bool: return main.dialogue.speaker == "METER", 15.0)
 	check(reading_up and main.clinic.queue_index == 0 and main.clinic.line == 120 and main.clinic.line_under,
@@ -771,7 +857,7 @@ func shift_reckless() -> void:
 	var turned: bool = await d.until(func() -> bool: return main.state == MainScript.State.WAIT and main.clinic.cam_prompt, 15.0)
 	check(turned and main.clinic.queue_index == 1, "then the notes turn to the second hour together")
 	check(main.visit == null and main.rig == null, "Kip: the counter is clear afterwards")
-	check(int(last_record().get("credits", 0)) == -100 and not bool(last_record().get("correct", true)), "the false alarm costs 100")
+	check(int(last_record().get("credits", 0)) == -100 and not bool(last_record().get("correct", true)), "the false alarm is billed at closing: 100")
 	check(main.clinic.line_under and main.clinic.line == 240, "the meter reads the first hour as under the line")
 
 	section("Rook: pressed twice, he walks out")
@@ -784,7 +870,7 @@ func shift_reckless() -> void:
 	await finish_visit("Rook")
 	check(int(last_record().get("credits", 0)) == 0 and not bool(last_record().get("correct", true)), "a walkout pays nothing")
 
-	section("Vale: Trauma Team called and no shutter")
+	section("Vale: Trauma Team called and no shutter: the night ends with him")
 	v = await enter("vale")
 	await d.call_team()
 	var warned: bool = await d.wait_for_telegraph()
@@ -797,41 +883,28 @@ func shift_reckless() -> void:
 	check(through and main.rig.back.get_parent() == main.gore.jump, "he comes through the window at the player")
 	var bled: bool = await d.until(func() -> bool: return main.gore.splat_count() >= 6, 3.0)
 	check(bled != main.less_blood, "blood lands on the player's view")
-	await finish_visit("Vale")
+	await lights_out("Vale", ["juno", "maren"])
 	check(v.outcome == "hit" and bool(last_record().get("injured", false)), "with no shutter the attack lands")
-	check(bool(last_record().get("correct", false)) and int(last_record().get("credits", 0)) == -300, "the call was right and it still cost 300")
-	check(main.clinic.glass_state == 4, "the window stays broken")
-	check(main.shift.glass == 0 and main.shift.glass_out and main.clinic.glass_left == 0, "there is no glass for the rest of the night")
-	check(plan_is([], 650), "whoever turns next has nothing to break first: 0.65 s")
+	check(bool(last_record().get("correct", false)) and int(last_record().get("credits", 0)) == -300, "the call was right, and it still cost 300")
+	check(main.clinic.glass_state == 4 and main.shift.glass == 0 and main.shift.glass_out and main.clinic.glass_left == 0, "the window is broken out")
 	check((main.clinic.stain_count() > 0) != main.less_blood, "the blood dries on the wall")
-	check(main.gore.splat_count() == 0 and not main.gore.busy() and main.gore.vignette == 0.0, "the player's view is clear again")
+	check(main.gore.splat_count() == 0 and not main.gore.busy() and main.gore.vignette == 0.0, "what was on the player's view went with the dark")
 
-	section("Juno: Trauma Team called on a steady patient")
-	v = await enter("juno")
-	await d.call_team()
-	check(v.outcome == "referred_stable", "the call goes through")
-	var came: bool = await d.until(func() -> bool: return main.clinic.team_in_sight(), 25.0)
-	check(came and main.rig != null, "the crew comes for her anyway")
-	await finish_visit("Juno")
-	check(not bool(last_record().get("correct", true)) and int(last_record().get("credits", 0)) == -150, "it was the wrong call and the call-out is billed")
-	check(str(last_record().get("title", "")) == "FALSE CALL", "the slip calls it a false call")
-	check(not main.clinic.team_in_sight() and main.clinic.strobe == 0.0, "the crew has left")
-
-	section("Maren: TREAT on a drifting patient")
-	v = await enter("maren")
-	await d.stamp("treat")
-	check(v.outcome == "treated_drifting", "the treatment goes ahead")
-	await finish_visit("Maren")
-	check(int(last_record().get("credits", 0)) == -400, "it costs 400")
-
-	section("Report after a bad night")
-	check(main.state == MainScript.State.REPORT, "the report is up")
+	section("Report: LIGHTS OUT")
 	var r: Dictionary = main.screens.report
-	check(int(r.get("total", 0)) == -950 and not bool(r.get("line_held", true)) and int(r.get("injuries", 0)) == 1,
-		"minus 950, under the line, one injury")
-	check(str(r.get("title", "")) == "THE CUT" and int(r.get("hours_under", 0)) == 5 and str(r.get("line_text", "")).contains("UNDER THE LINE"),
-		"every hour was under the line, and the lease is called in")
-	check(main.clinic.line == 600 and main.clinic.line_under, "the meter on the wall shows the last reading in red")
+	check(bool(r.get("died", false)) and str(r.get("title", "")) == "LIGHTS OUT" and not bool(r.get("line_held", true)),
+		"the night is LIGHTS OUT, and no line is held by a dead doctor")
+	check(int(r.get("total", 0)) == -400 and int(r.get("counter_total", -1)) == 0 and int(r.get("closing_total", 0)) == -400
+		and int(r.get("correct", 0)) == 1 and int(r.get("injuries", 0)) == 1,
+		"minus 400, all of it billed at closing: one right call, and the injury that ended the night")
+	check((r.get("readings", []) as Array).size() == 2 and int(r.get("hours_under", 0)) == 2 and tills_of(r) == [0, 0],
+		"two readings, both under the line, and none for the hour he came through")
+	check((r.get("unseen", []) as Array) == ["juno", "maren"] and (r.get("unseen_names", PackedStringArray()) as PackedStringArray).size() == 2,
+		"Juno and Maren were never seen")
+	check(main.screens.pages() == 4, "a page for each of the three visits, then the totals")
+	check(main.clinic.results == ["shutter", "none", "hit"], "the meter's lamps: the shutter, nothing, the blow")
+	check(main.clinic.till == -400 and main.clinic.line == 360 and main.clinic.line_under,
+		"the till on the wall shows the night's money; nobody reads the meter, so it stays at the third hour's line")
 
 
 # ================================================================ shift 3
@@ -931,7 +1004,7 @@ func shift_odds_and_ends() -> void:
 	check(v.outcome == "locked_out", "locking a drifting patient out ends the visit")
 	var dents_before: int = main.clinic.dent_count()
 	await finish_visit("Maren")
-	check(main.clinic.dent_count() == dents_before + 3, "she hits the shutter three times from the far side")
+	check(main.clinic.dent_count() == dents_before, "nothing hits the shutter from the far side: that would tell who she was")
 	check(bool(last_record().get("correct", false)) and int(last_record().get("credits", 0)) == 0, "it counts as a right call and pays nothing")
 	var r: Dictionary = main.screens.report
 	check(main.state == MainScript.State.REPORT and int(r.get("total", 0)) == 1020 and int(r.get("correct", 0)) == 5, "the third report adds up")
@@ -1001,7 +1074,7 @@ func shift_line_and_glass() -> void:
 	check(gone and v.verdict_kind == "", "left alone for the whole wait, he walks out, and nobody decided anything")
 	await finish_visit("Kip")
 	check(str(last_record().get("title", "")) == "OUT OF PATIENCE" and int(last_record().get("credits", 0)) == 0
-		and not bool(last_record().get("correct", true)), "the slip says OUT OF PATIENCE: no fee, no fine, not a right call")
+		and not bool(last_record().get("correct", true)), "the record says OUT OF PATIENCE: no fee, no fine, not a right call")
 	check(main.clinic.line_under and main.clinic.line == 240, "an hour with nothing in the till reads as under the line")
 	var meters: Array = logged("meter")
 	var reading: Dictionary = meters[meters.size() - 1]
@@ -1023,7 +1096,7 @@ func shift_line_and_glass() -> void:
 	check(v.outcome == "treated_ok", "TREAT against his own marks")
 	await finish_visit("Rook")
 	check(int(last_record().get("crossed", 0)) == 2 and bool(last_record().get("correct", false)) and int(last_record().get("credits", 0)) == 300,
-		"the game scores the call, not the marks: TREAT was right for Rook")
+		"the game scores the call, not the marks: TREAT was right for Rook, as the report will say")
 	check(not main.clinic.line_under and main.clinic.line == 360, "300 against 240: back over the line")
 
 	section("Vale: the shutter after the first blow")
@@ -1039,7 +1112,7 @@ func shift_line_and_glass() -> void:
 	check(main.clinic.bar_text == Lang.tf(main.STOP_BLOW_LINE, 1), "the bar counts it")
 	check(main.shift.glass == 2 and main.clinic.glass_left == 2 and not main.shift.glass_out, "the glass is down to two")
 	await finish_visit("Vale")
-	check(int(last_record().get("credits", 0)) == 120 and str(last_record().get("grade", "")) == "cracked", "the slip keeps the grade of the stop")
+	check(int(last_record().get("credits", 0)) == 120 and str(last_record().get("grade", "")) == "cracked", "the record keeps the grade of the stop, and the fee for closing")
 
 	section("Juno: a patient who takes time to answer is seen thinking")
 	v = await enter("juno")
@@ -1087,21 +1160,22 @@ func shift_line_and_glass() -> void:
 	var hit: bool = await d.until(func() -> bool: return v.outcome == "hit", 4.0)
 	check(hit and main._blows == 2 and v.blows_taken == 2 and v.shutter_grade() == "through", "with no shutter she is through after two blows")
 	check(main.shift.glass_out and main.shift.glass == 0 and main.clinic.glass_left == 0 and main.clinic.glass_state == 4, "the pane is gone")
-	await finish_visit("Maren")
+	await lights_out("Maren", [])
 	check(int(last_record().get("credits", 0)) == -300 and not bool(last_record().get("correct", true)) and bool(last_record().get("injured", false)),
 		"she was pushed into it: an injury, 300, and not a right call")
 
-	section("Report: over the line most of the night, under it at closing")
+	section("Report: the last visitor of the night came through the window")
 	check(main.state == MainScript.State.REPORT, "the report is up")
 	var r: Dictionary = main.screens.report
-	check(int(r.get("total", 0)) == 470 and int(r.get("correct", 0)) == 3 and int(r.get("injuries", 0)) == 1, "470 in the till, three right calls, one injury")
-	check(not bool(r.get("line_held", true)) and int(r.get("hours_under", 0)) == 2 and str(r.get("title", "")) == "THE CUT",
-		"under the line at closing: THE CUT, whatever the hours in between said")
+	check(int(r.get("total", 0)) == 470 and int(r.get("correct", 0)) == 3 and int(r.get("injuries", 0)) == 1, "470 at closing, three right calls, one injury")
+	check(bool(r.get("died", false)) and str(r.get("title", "")) == "LIGHTS OUT" and not bool(r.get("line_held", true))
+		and (r.get("unseen", []) as Array).is_empty(), "nobody was left to see, and it is still LIGHTS OUT: nobody reads the meter")
 	var held: Array = []
 	for item in r.get("readings", []):
 		var one: Dictionary = item
 		held.append(bool(one.get("held", false)))
-	check(held == [false, true, true, true, false], "the hour-by-hour meter: under, over, over, over, under")
+	check(held == [false, true, false, true] and int(r.get("hours_under", 0)) == 2,
+		"the meter: under, over, under (Vale's fee waits for closing), over, and no reading for the hour she came through")
 
 
 # ================================================================ shift 5
@@ -1142,14 +1216,20 @@ func shift_last_glass() -> void:
 	check(dropped, "behind the shutter the pane drops out of its frame")
 	await finish_visit("Vale")
 	check(bool(last_record().get("correct", false)) and int(last_record().get("credits", 0)) == 120 and int(last_record().get("blows", 0)) == 3,
-		"the call was right and pays the handover fee, and the slip keeps the three blows")
+		"the call was right: the record keeps the handover fee for closing, and the three blows")
 	check(plan_is([], 650), "whoever turns next has only the time on the bar: 0.65 s")
 
-	section("Juno: treated at once")
+	section("Juno: Trauma Team called on a steady patient")
 	v = await enter("juno")
-	await d.stamp("treat")
-	check(v.outcome == "treated_ok", "TREAT is right for Juno")
+	await d.call_team()
+	check(v.outcome == "referred_stable" and main.state != MainScript.State.ATTACK, "the call goes through, and she goes quietly")
+	var came: bool = await d.until(func() -> bool: return main.clinic.team_in_sight(), 25.0)
+	check(came and main.rig != null, "the crew comes for her anyway")
 	await finish_visit("Juno")
+	check(not bool(last_record().get("correct", true)) and int(last_record().get("credits", 0)) == -150 and int(last_record().get("counter", -1)) == 0,
+		"the wrong call: the call-out is billed at closing, not at the counter")
+	check(str(last_record().get("title", "")) == "FALSE CALL", "the report will call it a false call")
+	check(not main.clinic.team_in_sight() and main.clinic.strobe == 0.0, "the crew has left")
 
 	section("Maren: stopped in time with no glass left")
 	v = await enter("maren")
@@ -1170,15 +1250,17 @@ func shift_last_glass() -> void:
 	check(str(stop.get("outcome", "")) == "caught" and str(stop.get("grade", "")) == "clean" and int(stop.get("glass_left", -1)) == 0,
 		"the log has the stop: clean, with no glass left")
 	await finish_visit("Maren")
-	check(bool(last_record().get("correct", false)) and int(last_record().get("credits", 0)) == 120, "a caught attack pays the handover fee")
+	check(bool(last_record().get("correct", false)) and int(last_record().get("credits", 0)) == 120 and int(last_record().get("counter", -1)) == 0,
+		"a caught attack pays the handover fee, at closing")
 	check(main.clinic.glass_state == 4 and main.shift.glass_out, "the frame stays empty")
 
-	section("Report: every call right, and the pane lost on the way")
+	section("Report: one wrong call, and the pane lost on the way")
 	check(main.state == MainScript.State.REPORT, "the report is up")
 	var r: Dictionary = main.screens.report
-	check(int(r.get("total", 0)) == 1140 and int(r.get("correct", 0)) == 5 and int(r.get("injuries", -1)) == 0, "1140 in the till, five right calls, nobody hurt")
-	check(bool(r.get("line_held", false)) and int(r.get("hours_under", -1)) == 0 and str(r.get("title", "")) == "STEADY HANDS",
-		"over the line every hour: the night keeps its best name")
+	check(int(r.get("total", 0)) == 640 and int(r.get("correct", 0)) == 4 and int(r.get("injuries", -1)) == 0, "640 at closing, four right calls, nobody hurt")
+	check(bool(r.get("line_held", false)) and int(r.get("hours_under", -1)) == 0 and str(r.get("title", "")) == "A GOOD NIGHT'S WORK",
+		"over the line every hour with one call wrong: A GOOD NIGHT'S WORK")
+	check(tills_of(r) == [250, 550, 550, 550, 640], "through the night the fees as they came in; at closing, the handovers and the bill")
 	check(int(r.get("glass", -1)) == 0 and int(r.get("glass_max", 0)) == 3, "and the report knows the glass is gone")
 
 
@@ -1331,7 +1413,7 @@ func shift_walls_and_glass() -> void:
 	await d.stamp("treat")
 	check(v.outcome == "treated_ok", "TREAT is right for Rook")
 	await finish_visit("Rook")
-	check(main.shift.total() == 550, "550 in the till")
+	check(main.shift.till() == 550 and main.clinic.till == 550, "550 in the till")
 
 	section("Vale: nothing hangs in front of a patient who has turned")
 	v = await enter("vale")
@@ -1355,7 +1437,7 @@ func shift_walls_and_glass() -> void:
 	var dropped: bool = await d.until(func() -> bool: return main.shift.glass_out and main.clinic.glass_state == 4, 4.0)
 	check(dropped, "behind the shutter the pane drops out of its frame")
 	var over_now: bool = await d.until(func() -> bool: return main.state == MainScript.State.SLIP, 40.0)
-	check(over_now and d.sheet_down() and d.card_down(), "when it is over the sheet hangs where it was, and the card shows the findings")
+	check(over_now and d.sheet_down() and d.card_down(), "when it is over the sheet hangs where it was, and the card still holds the doctor's notes")
 	await finish_visit("Vale")
 
 	section("Between patients: the till buys the glass back")
@@ -1364,8 +1446,8 @@ func shift_walls_and_glass() -> void:
 		"the frame is empty: whoever turns next has only the time on the bar")
 	var meters: Array = logged("meter")
 	var reading: Dictionary = meters[meters.size() - 1]
-	check(int(reading.get("hour", 0)) == 3 and int(reading.get("till", 0)) == 670 and bool(reading.get("held", false)) and main.shift.total() == 670,
-		"the meter read the third hour before anything was bought: 670")
+	check(int(reading.get("hour", 0)) == 3 and int(reading.get("till", 0)) == 550 and bool(reading.get("held", false)) and main.shift.till() == 550,
+		"the meter read the third hour before anything was bought: 550, with the handover fee to come at closing")
 	check(main.desk.is_enabled("glass") and str(main.desk.badges.get("glass", "")) == "-40", "the GLASS key is lit, and shows its price")
 	d.move(d.pad_pos("glass"))
 	await process_frame
@@ -1375,16 +1457,16 @@ func shift_walls_and_glass() -> void:
 	d.pad("glass")
 	check(main.shift.glass == 1 and not main.shift.glass_out and main.clinic.glass_left == 1, "a click buys one layer: there is a pane in the frame again")
 	check(main.clinic.glass_state == 2, "it shows the cracks of the two layers still missing")
-	check(main.shift.total() == 630 and main.clinic.till == 630, "40 credits are off the till")
+	check(main.shift.till() == 510 and main.clinic.till == 510, "40 credits are off the till")
 	check(plan_is([540], 990), "and the next patient who turns has to break it first: 0.99 s")
 	check(main.dialogue.speaker == "GLASS" and strip_says(main.dialogue, Lang.tf(main.GLASS_LINE, [40, 1, 3])), "the strip says what was done and what it cost")
 	d.key(KEY_G)
-	check(main.shift.glass == 2 and main.clinic.glass_state == 1 and main.shift.total() == 590 and plan_is([540, 990], 1440),
-		"G buys the next one at once: two layers, 590 in the till, 1.44 s")
+	check(main.shift.glass == 2 and main.clinic.glass_state == 1 and main.shift.till() == 470 and plan_is([540, 990], 1440),
+		"G buys the next one at once: two layers, 470 in the till, 1.44 s")
 	var bought: Array = logged("glass_repair")
 	check(bought.size() == 2 and int(bought[1].get("cost", 0)) == 40 and int(bought[1].get("glass_left", 0)) == 2
-		and int(bought[1].get("glass_max", 0)) == 3 and int(bought[1].get("till", 0)) == 590, "both are logged, with the price and what is left")
-	check(int(main.shift.reading(3).get("till", 0)) == 670, "the reading already taken for the third hour does not change")
+		and int(bought[1].get("glass_max", 0)) == 3 and int(bought[1].get("till", 0)) == 470, "both are logged, with the price and what is left")
+	check(int(main.shift.reading(3).get("till", 0)) == 550, "the reading already taken for the third hour does not change")
 	check(main.desk.is_enabled("glass") and str(main.desk.badges.get("glass", "")) == "-40", "one layer is still missing, and the key stays lit")
 	var hall: bool = await d.until(func() -> bool: return main.dialogue.speaker == "HALL CAMERA", 12.0)
 	check(hall and main.state == MainScript.State.WAIT and main.clinic.cam_prompt, "then the strip goes back to who is waiting in the hall")
@@ -1400,26 +1482,26 @@ func shift_walls_and_glass() -> void:
 	check(main._hover_hint == main.GLASS_BUSY_HINT and main.desk.hover == "", "pointing at it says why")
 	d.pad("glass")
 	d.key(KEY_G)
-	check(main.shift.glass == 2 and main.shift.total() == 590 and logged("glass_repair").size() == 2, "and neither a click nor G buys anything now")
+	check(main.shift.glass == 2 and main.shift.till() == 470 and logged("glass_repair").size() == 2, "and neither a click nor G buys anything now")
 	await d.stamp("treat")
 	check(v.outcome == "treated_ok", "TREAT is right for Juno")
 	await finish_visit("Juno")
-	check(main.shift.total() == 940, "her fee on top of what the glass cost: 940")
+	check(main.shift.till() == 820, "her fee on top of what the glass cost: 820 in the till")
 
 	section("Between patients again: the last layer")
 	meters = logged("meter")
 	reading = meters[meters.size() - 1]
-	check(int(reading.get("hour", 0)) == 4 and int(reading.get("till", 0)) == 940 and int(reading.get("line", 0)) == 480 and bool(reading.get("held", false)),
-		"the fourth reading counts what the glass cost: 940 against 480, still over the line")
+	check(int(reading.get("hour", 0)) == 4 and int(reading.get("till", 0)) == 820 and int(reading.get("line", 0)) == 480 and bool(reading.get("held", false)),
+		"the fourth reading counts what the glass cost: 820 against 480, still over the line")
 	d.key(KEY_G)
-	check(main.shift.glass == 3 and main.clinic.glass_left == 3 and main.clinic.glass_state == 0 and main.shift.total() == 900,
-		"G buys the third layer: the pane is whole again, 900 in the till")
+	check(main.shift.glass == 3 and main.clinic.glass_left == 3 and main.clinic.glass_state == 0 and main.shift.till() == 780,
+		"G buys the third layer: the pane is whole again, 780 in the till")
 	check(plan_is([540, 990, 1440], 1800), "and it gives all of its time back: 1.8 s")
 	check(not main.desk.is_enabled("glass") and not main.desk.badges.has("glass") and main._glass_hint() == main.GLASS_WHOLE_HINT,
 		"nothing is left to mend, and the key goes dark")
 	d.key(KEY_G)
 	d.pad("glass")
-	check(main.shift.repairs.size() == 3 and main.shift.total() == 900, "more glass than the frame holds cannot be bought")
+	check(main.shift.repairs.size() == 3 and main.shift.till() == 780, "more glass than the frame holds cannot be bought")
 
 	section("Maren: the mended glass gives the whole bar back")
 	v = await enter("maren")
@@ -1449,7 +1531,7 @@ func shift_walls_and_glass() -> void:
 	for item in r.get("readings", []):
 		var one: Dictionary = item
 		tills.append(int(one.get("till", 0)))
-	check(tills == [250, 550, 670, 940, 1020], "hour by hour, the meter counted the glass from the hour it was paid in")
+	check(tills == [250, 550, 550, 820, 1020], "hour by hour, the meter counted the glass from the hour it was paid in")
 	var ends: Array = logged("shift_end")
 	var end: Dictionary = ends[ends.size() - 1]
 	check(int(end.get("glass_paid", 0)) == 120 and int(end.get("glass_left", 0)) == 3 and int(end.get("total", 0)) == 1020,
@@ -1552,7 +1634,7 @@ func shift_couriers() -> void:
 	var s: Dictionary = main._slip_data
 	check(int(s.get("outcome_credits", 0)) == 250 and int(s.get("credits", 0)) == 520, "the call earns the fee; with the drop and less the patch, 520")
 	check(main._slip_breakdown(s) == Lang.tf(main.SLIP_DROP, 300) + "  •  " + Lang.tf(main.SLIP_CALM, 30), "under the call the slip says what the drop brought and what CALM cost")
-	check(main.clinic.till == main.shift.total() and main.shift.total() == 520, "the till matches: 520")
+	check(main.clinic.till == main.shift.till() and main.shift.till() == 520, "the till matches: 520")
 	var moved: bool = await d.take_slip()
 	check(moved and main.clipboard.entry_mark(kip_id) == "picked", "Kip: taking the slip moves on, and his entry stays ticked off")
 
@@ -1561,7 +1643,7 @@ func shift_couriers() -> void:
 	check(not v.is_contact(), "Rook is not on the list")
 	await d.stamp("treat")
 	await finish_visit("Rook")
-	check(main.shift.total() == 820, "820 in the till")
+	check(main.shift.till() == 820, "820 in the till")
 	v = await enter("vale")
 	await d.call_team()
 	var warned: bool = await d.wait_for_telegraph()
@@ -1572,7 +1654,7 @@ func shift_couriers() -> void:
 	await d.stamp("treat")
 	check(v.outcome == "treated_ok", "TREAT is right for Juno")
 	await finish_visit("Juno")
-	check(main.shift.total() == 1290, "1290 in the till")
+	check(main.shift.till() == 1170 and main.shift.total() == 1290, "1170 in the till; Vale's handover fee comes at closing")
 
 	section("Maren: a courier who goes without her package")
 	v = await enter("maren")
@@ -1659,20 +1741,31 @@ func shift_surprises() -> void:
 	check(bool(last_record().get("correct", false)) and int(last_record().get("credits", 0)) == 120 and bool(last_record().get("snapped", false)),
 		"stopped after a snap: a right call, with the handover fee")
 
-	section("Juno and Maren, and a night under the line")
+	section("Juno and Maren: two treatments that look the same at the counter")
 	v = await enter("juno")
 	await d.stamp("treat")
 	check(v.outcome == "treated_ok", "TREAT is right for Juno")
 	await finish_visit("Juno")
 	v = await enter("maren")
-	await d.call_team()
-	check(v.outcome == "referred_drifting", "the call hands Maren over")
+	await d.stamp("treat")
+	check(v.outcome == "treated_drifting", "TREAT on Maren, who is drifting: the work goes ahead")
+	var printed: bool = await d.wait_for_slip(40.0)
+	var juno: Dictionary = main.shift.records[3]
+	var slip: Dictionary = main._slip_data
+	check(printed and str(slip.get("counter_title", "")) == str(juno.get("counter_title", "-"))
+		and str(slip.get("counter_text", "")) == str(juno.get("counter_text", "-")) and str(slip.get("call", "")) == str(juno.get("call", "-")),
+		"Maren's slip says what Juno's said: a treatment and its fee, nothing about how it will hold")
+	check(int(slip.get("counter", 0)) == 400 and main.shift.till() == 1300 and main.clinic.till == 1300, "her fee is in the till: 1300")
 	await finish_visit("Maren")
+
+	section("Report: what the night's reports took back")
 	check(main.state == MainScript.State.REPORT, "the report is up")
 	var r: Dictionary = main.screens.report
-	check(int(r.get("total", 0)) == 1140 and int(r.get("correct", 0)) == 5 and not bool(r.get("line_held", true))
-		and int(r.get("hours_under", 0)) == 2 and str(r.get("title", "")) == "THE CUT",
-		"five right calls with no drop are 1140, under the line of 1200: THE CUT")
+	check(int(r.get("total", 0)) == 620 and main.clinic.till == 620 and int(r.get("correct", 0)) == 4,
+		"Maren's treatment failed: her fee and the bill, 800, come off at closing, and 620 is left")
+	check(not bool(r.get("line_held", true)) and int(r.get("hours_under", 0)) == 3 and str(r.get("title", "")) == "THE CUT",
+		"under the line of 1200: THE CUT")
+	check(tills_of(r) == [250, 550, 550, 900, 620], "the meter: 250, 550, 550 and 900 through the night, 620 once the reports were in")
 	var missed := 0
 	for e in main.shift.contacts:
 		if main.clipboard.entry_mark(str((e as Dictionary).get("id", ""))) == "missed":
@@ -2123,9 +2216,11 @@ func check_log(six: int) -> void:
 			"check_done", "ask", "reassure", "press", "say", "mark", "call_line_open", "verdict", "attack", "attack_hit", "shutter",
 			"spent", "leaving", "gave_up", "agent_move", "visit_end", "shift_end", "panel", "glass_repair"]:
 		check(types.has(t), "the log has '%s' records" % t)
-	check(int(types.get("visit_start", 0)) == 30 and int(types.get("visit_end", 0)) == 30, "thirty visits were logged from start to end in the first six shifts")
+	check(int(types.get("visit_start", 0)) == 28 and int(types.get("visit_end", 0)) == 28,
+		"twenty-eight visits were logged from start to end in the first six shifts: two nights ended early")
 	check(int(types.get("shift_end", 0)) == 6, "six shifts were logged")
-	check(int(types.get("meter", 0)) == 24, "the meter was read after every patient but the last of each shift")
+	check(int(types.get("lights_out", 0)) == 2, "two of them ended with a blow that landed")
+	check(int(types.get("meter", 0)) == 22, "the meter was read after every patient but the last of each night, and not for the hour the doctor died")
 	check(int(types.get("glass_repair", 0)) == 3, "three layers of glass were bought, all in the sixth shift")
 	var named := 0
 	for rec in logged("panel").slice(0, int(types.get("panel", 0))):

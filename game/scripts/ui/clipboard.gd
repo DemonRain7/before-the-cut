@@ -7,7 +7,8 @@ extends Node2D
 ##   of the left-hand papers down at once)
 ##   the patient's intake card, from the right
 ## The card mirrors the five sheet lines. Notes land on it as the player looks, tests and
-## talks; nothing on it says "normal" or "abnormal" until the visit is over. The box beside
+## talks; nothing on it ever says "normal" or "abnormal" (the report at closing does, in
+## screens.gd, rules version 8). The box beside
 ## each row is the player's own tick or cross, and the decision box counts their crosses
 ## against the house rule on the sheet (sheet.json "threshold").
 ##
@@ -41,7 +42,6 @@ const REC_ROW_Y := 214.0
 const REC_ROW_H := 28.0
 const REC_TEXT_X := 448.0
 const REC_TEXT_W := 186.0
-const LABEL_GAP := 6.0            # between a finding's label and its text when they share a line
 const DECISION := Rect2(554, 182, 78, 26)
 const TALLY := "CROSSED %d/%d"    # the player's crosses, against the sheet's threshold
 const TAB := Vector2(12, 24)      # the tab that puts a paper back
@@ -58,8 +58,7 @@ const SAY_SIZE := Vector2(30, 11)
 
 var sheet: Dictionary = {}        # an assembled sheet (case_db sheet_for), set by the director
 var visit: VisitState = null      # the patient at the counter, or null
-var mode: String = "blank"        # "blank" | "exam" | "findings"
-var settlement: Dictionary = {}
+var mode: String = "blank"        # "blank" | "exam"
 var imprint: String = ""          # "", "treat", "refer" (the Trauma Team dispatch mark), "void"
 var armed: String = ""            # the stamp in the player's hand
 var highlight_row: String = ""
@@ -102,15 +101,9 @@ func set_visit(p_visit: VisitState, p_counter: String) -> void:
 	visit = p_visit
 	counter_text = p_counter
 	mode = "exam" if p_visit != null else "blank"
-	settlement = {}
 	imprint = ""
 	armed = ""
 	_fresh.clear()
-
-
-func show_findings(p_settlement: Dictionary) -> void:
-	settlement = p_settlement
-	mode = "findings"
 
 
 func stamp(kind: String) -> void:
@@ -426,9 +419,6 @@ func _draw_card_paper() -> void:
 		"exam":
 			_draw_header()
 			_draw_notes()
-		"findings":
-			_draw_header()
-			_draw_findings()
 		_:
 			_draw_blank()
 	_draw_decision()
@@ -509,64 +499,6 @@ func _draw_notes() -> void:
 				if age < 1.6:
 					col = Gfx.PENCIL.lerp(Gfx.RED1, clampf(1.0 - age / 1.6, 0.0, 1.0) * 0.6)
 			Gfx.text_raw(_card_n, Vector2(REC_TEXT_X, y + top + step * float(n)), text, col)
-
-
-func _draw_findings() -> void:
-	var rows: Array = settlement.get("rows", [])
-	for i in ROWS.size():
-		var id := str(ROWS[i])
-		var y := _row_frame(i, id)
-		var row: Dictionary = rows[i] if i < rows.size() else {}
-		_draw_mark(Vector2(410, y + 13.0), int(row.get("mark", 0)), false)
-		if str(row.get("assessment", "")) == "reported":
-			if Gfx.tall_lines():
-				_finding_after(y, "PATIENT SAID", Gfx.INKS, Gfx.printable(Lang.t(str(row.get("text", "")))), "")
-				continue
-			Gfx.text(_card_n, Vector2(REC_TEXT_X, y + 1.0), "PATIENT SAID", Gfx.INKS, true)
-			var wrapped := Gfx.wrap_raw(Gfx.printable(Lang.t(str(row.get("text", "")))), REC_TEXT_W)
-			if wrapped.size() > 2:
-				var last: String = wrapped[1]
-				while Gfx.text_w_raw(last + "...") > REC_TEXT_W and last.length() > 0:
-					last = last.left(last.length() - 1)
-				wrapped = PackedStringArray([wrapped[0], last + "..."])
-			for k in wrapped.size():
-				Gfx.text_raw(_card_n, Vector2(REC_TEXT_X, y + 10.0 + 9.0 * float(k)), wrapped[k], Gfx.INKT)
-			continue
-		var ok := bool(row.get("ok", true))
-		var truth := Gfx.tex("ui/truth_ok.png" if ok else "ui/truth_bad.png")
-		if truth != null:
-			_card_n.draw_texture(truth, Vector2(424, y + 13.0))
-		if Gfx.tall_lines():
-			_finding_after(y, "NORMAL" if ok else "BROKEN LINE", Gfx.GRN2 if ok else Gfx.RED1, Lang.t(str(row.get("text", ""))),
-					"" if bool(row.get("seen", false)) else "you did not check")
-			continue
-		Gfx.text(_card_n, Vector2(REC_TEXT_X, y + 1.0), "NORMAL" if ok else "BROKEN LINE", Gfx.GRN2 if ok else Gfx.RED1, true)
-		if not bool(row.get("seen", false)):
-			Gfx.text_right(_card_n, 632.0, y + 1.0, "you did not check", Gfx.PRINT)
-		Gfx.paragraph(_card_n, Vector2(REC_TEXT_X, y + 10.0), str(row.get("text", "")), REC_TEXT_W, Gfx.INKT, false, 2, 9)
-
-
-## A finding where a line fills its box (Gfx.tall_lines). A label with two lines under it would
-## not fit a 28-row record row, so the text starts on the label's line, after the label and
-## before the note at its right end, and goes on to one line under it, cut with "..." if it
-## needs more. measure_text.py checks that every case's row text fits.
-func _finding_after(y: float, label: String, label_col: Color, text: String, note: String) -> void:
-	Gfx.text(_card_n, Vector2(REC_TEXT_X, y + 1.0), label, label_col, true)
-	var x := REC_TEXT_X + Gfx.text_w(label, true) + LABEL_GAP
-	var right := REC_TEXT_X + REC_TEXT_W
-	if note != "":
-		Gfx.text_right(_card_n, 632.0, y + 1.0, note, Gfx.PRINT)
-		right = 632.0 - Gfx.text_w(note) - LABEL_GAP
-	var lines := Gfx.wrap_after(text, right - x, REC_TEXT_W)
-	if lines.size() > 2:
-		var last: String = lines[1]
-		while last.length() > 0 and Gfx.text_w_raw(last + "...") > REC_TEXT_W:
-			last = last.left(last.length() - 1)
-		lines = PackedStringArray([lines[0], last + "..."])
-	if lines.size() > 0:
-		Gfx.text_raw(_card_n, Vector2(x, y + 1.0), lines[0], Gfx.INKT)
-	if lines.size() > 1:
-		Gfx.text_raw(_card_n, Vector2(REC_TEXT_X, y + 11.0), lines[1], Gfx.INKT)
 
 
 func _draw_decision() -> void:

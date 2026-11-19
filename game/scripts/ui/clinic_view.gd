@@ -49,6 +49,9 @@ const DRIED := Color(0.7, 0.56, 0.58, 0.92)
 const SLOT := Rect2(216, 287, 207, 10)
 const PLATE := Color(0.027, 0.035, 0.047, 0.84)      # the dark backing of a readout over the window
 
+# the meter's lamp for each finished hour, by the call made (VisitState.call_kind())
+const CALL_LAMPS := {"treat": Gfx.GRN3, "team": Gfx.AMBER, "shutter": Gfx.CYAN2, "none": Gfx.TEAL4, "hit": Gfx.RED3}
+
 var scope: ScopeView = null
 var back_slot := Node2D.new()      # patient layers behind the sill (view space)
 var front_slot := Node2D.new()     # patient hands, in front of the sill (view space)
@@ -64,7 +67,7 @@ var line: int = 0                  # what the lender's meter wants in the till w
 var line_under: bool = false       # the last hourly reading was under the line
 var queue_index: int = 0           # one visit is one hour: the hour being worked, 0-based
 var queue_count: int = 5
-var results: Array = []            # one bool per finished visit: was the call right
+var results: Array = []            # one call kind per finished visit: treat | team | shutter | none | hit
 var patience: int = 0
 var patience_max: int = 0
 var show_patience: bool = false
@@ -903,7 +906,8 @@ func _draw_hud() -> void:
 
 
 ## The lender's meter on the wall: the till, the line it has to reach when this hour ends,
-## the hour (one patient is one hour), and how each call went.
+## the hour (one patient is one hour), and a lamp for the call made at each finished hour. The
+## lamps say what the player did, never whether it was right: that is told at closing.
 func _draw_meter() -> void:
 	var m := Gfx.METER
 	var x := m.position.x + 4.0
@@ -915,8 +919,9 @@ func _draw_meter() -> void:
 	Gfx.text(_hud, Vector2(x, y + 36.0), Lang.tf("LINE %d", [line]), Gfx.RED3 if line_under else Gfx.GRN3)
 	var n := results.size()
 	for i in n:
-		var ok := bool(results[i])
-		Gfx.text(_hud, Vector2(m.end.x - 4.0 - 7.0 * float(n - i), y + 36.0), "✓" if ok else "✗", Gfx.GRN4 if ok else Gfx.RED3)
+		var lamp := Rect2(m.end.x - 4.0 - 7.0 * float(n - i), y + 38.0, 5, 5)
+		_hud.draw_rect(lamp.grow(1.0), Gfx.INK0)
+		_hud.draw_rect(lamp, CALL_LAMPS.get(str(results[i]), Gfx.TEAL4))
 
 
 func _frame(rect: Rect2, color: Color) -> void:

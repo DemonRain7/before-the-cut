@@ -16,6 +16,11 @@ extends RefCounted
 ## Surprises (rules version 6): each action is rolled once. A drifting patient may snap and
 ## attack mid-exam; anyone may flare once a visit (a shout and a hand on the glass, never an
 ## attack, TEMPER evidence only). The training visit has neither.
+## The result is told twice (rules version 8). At the counter only what does not depend on the
+## truth: the fee for work done, whoever the patient was, the drop and CALM, and words that
+## hold either way (rules.json "counter"). The rest comes in at closing, with the night's
+## reports: whether the call was right, what Trauma Team pays or bills, and the bill for work
+## on a patient who drifted (credits_for() less counter_credits_for()).
 ## This class owns the truth, the evidence, patience, attacks and the result. The patient
 ## AI supplies original dialogue and decides exam cooperation. The offline script alone
 ## uses authored move choices. Physical test readings, scoring and attack timing stay here.
@@ -705,9 +710,58 @@ func is_correct(p_outcome: String) -> bool:
 	return false
 
 
-## Everything the result slip needs. Only meaningful once the visit is DONE. "credits" is what
-## the visit put in the till in all: the outcome's credits, the drop, less CALM.
+## What an outcome pays at the counter, on the spot: the fee for the work, whoever the patient
+## was. Everything that depends on the truth comes in at closing.
+func counter_credits_for(p_outcome: String) -> int:
+	if p_outcome.begins_with("treated"):
+		return int(case_data.get("fee", 0))
+	return 0
+
+
+## What the same outcome adds at closing, when the night's reports are in: Trauma Team's
+## bounty or bill, the bill for work on a patient who drifted (it takes the fee back too), the
+## cost of a shutter dropped on somebody steady.
+func closing_credits_for(p_outcome: String) -> int:
+	return credits_for(p_outcome) - counter_credits_for(p_outcome)
+
+
+## The player's own call, as the meter's lamps show it through the night: "treat", "team"
+## (Trauma Team was called, whether or not the patient then fought), "shutter" (the shutter
+## came down on the patient before any call), "none" (they walked out or gave up), or "hit".
+func call_kind() -> String:
+	if outcome.begins_with("treated"):
+		return "treat"
+	if outcome.begins_with("referred"):
+		return "team"
+	match outcome:
+		"caught":
+			return "team" if attack_cause == "refer" else "shutter"
+		"locked_out", "false_alarm":
+			return "shutter"
+		"hit":
+			return "hit"
+	return "none"
+
+
+## Which entry of rules.json "counter" the slip prints: words that hold whoever the patient was.
+func counter_key() -> String:
+	if outcome.begins_with("treated"):
+		return "treated"
+	if outcome.begins_with("referred"):
+		return "referred"
+	if outcome == "locked_out" or outcome == "false_alarm":
+		return "shutter"
+	return outcome
+
+
+## Everything the slip and the night's report need. Only meaningful once the visit is DONE.
+## "credits" is what the visit puts in the till in all, by closing: the outcome's credits, the
+## drop, less CALM. "counter" is the part of it that came in at the counter (the fee for work
+## done, the drop, less CALM) and "closing" the part that waits for the night's reports. The
+## slip shows only "counter_title", "counter_text" and "counter"; "title", "text", "truth",
+## "correct" and the findings ("rows") are for the report at closing.
 func settlement() -> Dictionary:
+	var counter: Dictionary = _rule("counter", counter_key(), {})
 	var key := outcome
 	if outcome.begins_with("treated"):
 		key = "treat"
@@ -736,11 +790,21 @@ func settlement() -> Dictionary:
 	return {
 		"case_id": str(case_data.get("id", "")),
 		"name": str(case_data.get("name", "")),
+		"role": str(case_data.get("role", "")),
+		"age": int(case_data.get("age", 0)),
+		"request": str(case_data.get("request", "")),
+		"fee": int(case_data.get("fee", 0)),
 		"outcome": outcome,
 		"verdict": verdict_kind,
 		"truth": str(case_data.get("truth", "stable")),
 		"credits": credits_for(outcome) + till_change(),
 		"outcome_credits": credits_for(outcome),
+		"counter": counter_credits_for(outcome) + till_change(),
+		"counter_fee": counter_credits_for(outcome),
+		"closing": closing_credits_for(outcome),
+		"counter_title": str(counter.get("title", "")),
+		"counter_text": str(counter.get("text", "")),
+		"call": call_kind(),
 		"correct": is_correct(outcome),
 		"injured": outcome == "hit",
 		"title": str(text.get("title", outcome.to_upper())),

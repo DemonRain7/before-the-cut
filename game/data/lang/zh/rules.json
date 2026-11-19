@@ -1,12 +1,12 @@
 {
-	"note": "Chinese for rules.json: the end-of-night titles and the meter line. Keyed by the exact English; tools/check_lang.py keeps it in step with the game.",
+	"note": "Chinese for rules.json: the end-of-night titles, the meter line and what the slip says at the counter. Keyed by the exact English; tools/check_lang.py keeps it in step with the game.",
 	"keep": [],
 	"strings": {
+		"LIGHTS OUT": "熄灯",
+		"The shutter came too late. Trauma Team found you on the clinic floor. Whoever was still waiting in the hall went home unseen.": "卷闸落得太晚了。创伤小组在诊所的地板上找到了你。走廊里还在等的人，都没见到医生就回去了。",
 		"Under the line at closing. Harrow Credit sends two quiet people to collect on the debt. They start with the hands.": "收工时低于红线。哈罗信贷派了两个沉默的人来收债。他们先从这双手下手。",
 		"STEADY HANDS": "一双稳手",
 		"Five patients, five right calls. The sheet goes back on its nail. You open again tomorrow.": "五个病人，五次判断全对。参照表挂回钉子上。明天照常开门。",
-		"RIGHT THE HARD WAY": "对得辛苦",
-		"Every call was right, and one of them still reached you. Reading people is half the job. The shutter is the other half.": "每次判断都对，可还是有一个够到了你。看人是这份工作的一半。卷闸是另一半。",
 		"A GOOD NIGHT'S WORK": "干得不错",
 		"One visit went wrong. Most nights are like that. The rest went the way they should.": "有一次出了错。大多数夜晚都是这样。其余的都按该有的样子走完了。",
 		"OPEN, BARELY": "勉强开张",
@@ -14,6 +14,19 @@
 		"ON NOTICE": "被盯上了",
 		"The line held, and that is the kindest thing to say. The Lanterns noticed the rest. The sheet was on the wall the whole time.": "红线守住了，这已是最客气的说法。其余的，灯笼帮都看在眼里。参照表一直挂在墙上。",
 		"Meter: OVER THE LINE. The debt waits another night.": "计费表：高于红线。债务再缓一夜。",
-		"Meter: UNDER THE LINE. The debt is called in.": "计费表：低于红线。债务被催收。"
+		"Meter: UNDER THE LINE. The debt is called in.": "计费表：低于红线。债务被催收。",
+		"Nobody reads the meter tonight. Harrow Credit takes the clinic back.": "今晚没人来读计费表。哈罗信贷把诊所收了回去。",
+		"TREATED": "已治疗",
+		"{name} pays the fee and goes through to the chair. Whether the work holds, you will hear at closing.": "{name} 付了诊费，进里间上了手术椅。这活儿靠不靠得住，收工时自会知道。",
+		"HANDED OVER": "已移交",
+		"The crew takes {name} away. Trauma Team sends its report at closing: a bounty if they were drifting, a bill for the call-out if they were not.": "小组把 {name} 带走了。创伤小组收工时送来报告：失控的话有一笔赏金，没失控的话，出勤费记在你账上。",
+		"SHUTTER HELD": "卷闸守住了",
+		"The shutter held, and Trauma Team came for {name}. What the night pays for it comes with their report, at closing.": "卷闸守住了，创伤小组来带走了 {name}。这一单算多少钱，收工时随他们的报告一起来。",
+		"SHUTTER DOWN": "卷闸落下",
+		"You dropped the shutter on {name}. No fee, no call. Whether it had to come down, you will know at closing.": "你对 {name} 落下了卷闸。没有诊费，也没有呼叫。该不该落，收工时就知道了。",
+		"WALKED OUT": "转身走了",
+		"Pushed too hard, {name} walks out. No fee, no call.": "逼得太紧，{name} 转身走了。没有诊费，也没有呼叫。",
+		"OUT OF PATIENCE": "耐心耗尽",
+		"{name} got tired of waiting and left. No fee, no call.": "{name} 等烦了，走了。没有诊费，也没有呼叫。"
 	}
 }

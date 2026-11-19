@@ -115,6 +115,7 @@ func _initialize() -> void:
 	test_marks()
 	test_settlement_rows()
 	test_generated_speech_findings()
+	test_counter_and_closing()
 	test_shift()
 	test_line()
 	test_glass()
@@ -651,11 +652,80 @@ func test_settlement_rows() -> void:
 	var s := v.settlement()
 	eq(s["title"], "TAKEN IN", "outcome title from the case")
 	var rows: Array = s["rows"]
-	eq(rows.size(), 5, "five rows on the slip")
+	eq(rows.size(), 5, "five rows on the report")
 	ok(not bool(rows[0]["ok"]) and bool(rows[0]["seen"]), "eyes: broken and seen")
-	eq(int(rows[0]["mark"]), 2, "player mark is carried to the slip")
+	eq(int(rows[0]["mark"]), 2, "player mark is carried to the report")
 	ok(not bool(rows[1]["ok"]) and not bool(rows[1]["seen"]), "hands: broken, not checked")
 	ok(bool(rows[2]["ok"]), "maren's port is fine")
+
+
+## Right and wrong are told at closing (rules version 8): the slip's words, its sound and the
+## counter's money are the same whoever the patient was; the rest comes in with the night's
+## reports. Every visit's counter money and closing money make the whole of it.
+func test_counter_and_closing() -> void:
+	var counter: Dictionary = rules["counter"]
+	for key in ["treated", "referred", "caught", "shutter", "walkout", "gave_up"]:
+		var entry: Dictionary = counter.get(key, {})
+		ok(str(entry.get("title", "")) != "" and str(entry.get("text", "")).contains("{name}"), "the slip has words for '%s'" % key)
+	var fee_kip := int(cases["kip"]["fee"])
+	var fee_maren := int(cases["maren"]["fee"])
+	# treated: the steady and the drifting print the same slip and pay the same way
+	var steady := visit("kip")
+	steady.verdict("treat")
+	var drifting := visit("maren")
+	drifting.verdict("treat")
+	var a := steady.settlement()
+	var b := drifting.settlement()
+	eq([a["counter_title"], a["counter_text"], a["call"]], [b["counter_title"], b["counter_text"], b["call"]],
+		"treating somebody steady and somebody drifting prints the same slip")
+	eq([a["counter_fee"], b["counter_fee"]], [fee_kip, fee_maren], "and the counter takes the fee from both")
+	eq([a["closing"], b["closing"]], [0, int(rules["scoring"]["treat_drifting"]) - fee_maren],
+		"at closing the work on somebody who drifted is billed, and takes the fee back")
+	# called in: nothing at the counter either way; the bounty or the call-out bill comes at closing
+	var called_steady := visit("kip")
+	called_steady.verdict("refer")
+	var called_drifting := visit("maren")
+	called_drifting.verdict("refer")
+	var c := called_steady.settlement()
+	var d := called_drifting.settlement()
+	eq([c["counter_title"], c["counter"], d["counter"]], [d["counter_title"], 0, 0], "a call to the crew prints the same slip and takes nothing in")
+	eq([c["closing"], d["closing"]], [int(rules["scoring"]["false_call"]), int(rules["scoring"]["refer_drifting"])],
+		"the call-out bill or the bounty comes at closing")
+	# the shutter before any attack: the same slip for a false alarm and a lock-out
+	var shut_steady := visit("kip")
+	shut_steady.shutter()
+	var shut_drifting := visit("maren")
+	shut_drifting.shutter()
+	var e := shut_steady.settlement()
+	var f := shut_drifting.settlement()
+	eq([e["outcome"], f["outcome"]], ["false_alarm", "locked_out"], "a shutter on the steady is a false alarm, on the drifting a lock-out")
+	eq([e["counter_title"], e["call"], e["counter"]], [f["counter_title"], f["call"], f["counter"]], "and the slip cannot tell them apart")
+	eq([e["closing"], f["closing"]], [int(rules["scoring"]["false_alarm"]), 0], "the false alarm is billed at closing")
+	# a drop and the calm-patches are counter money, whoever the patient was
+	var courier_visit := visit("kip")
+	var entry := courier("kip")
+	courier_visit.set_contact(entry)
+	courier_visit.say_code(entry)
+	courier_visit.verdict("refer")
+	var g := courier_visit.settlement()
+	eq([g["counter"], g["counter_fee"], g["closing"]], [int(rules["contacts"]["pay"]), 0, int(rules["scoring"]["false_call"])],
+		"a drop is paid at the counter; the call-out still waits for closing")
+	for s in [a, b, c, d, e, f, g]:
+		eq(int(s["counter"]) + int(s["closing"]), int(s["credits"]), "%s %s: the counter and closing make the whole visit" % [s["case_id"], s["outcome"]])
+	# the till through the night is counter money; at closing it is everything
+	var shift := ShiftState.new(rules, ["kip", "maren"])
+	shift.record(b)
+	shift.advance()
+	eq([shift.till(), shift.total(), shift.reading()["till"]], [fee_maren, int(rules["scoring"]["treat_drifting"]), fee_maren],
+		"after treating somebody who drifted, the meter shows the fee: the bill is still to come")
+	shift.record(a)
+	shift.advance()
+	eq([shift.till(), shift.total(), shift.reading()["till"], shift.reading()["last"]],
+		[fee_maren + fee_kip, int(rules["scoring"]["treat_drifting"]) + fee_kip, int(rules["scoring"]["treat_drifting"]) + fee_kip, true],
+		"at closing the reports are in: the till holds what the counter took, the last reading counts the bill")
+	var rep := shift.report()
+	eq(int(rep["counter_total"]) + int(rep["closing_total"]) - int(rep["repair_total"]), int(rep["total"]),
+		"the report's counter money and closing money, less the glass, make the till")
 
 
 ## A generated answer can hide the authored speech clue. Feedback must describe what was heard.
@@ -779,13 +849,34 @@ func test_shift() -> void:
 	ok(str(rules["line_text"]["short"]) != "" and str(rules["line_text"]["held"]) != "", "both meter lines are written")
 	eq(one.report()["title"], "A GOOD NIGHT'S WORK", "four right calls, nobody hurt, line held: a good night's work")
 	eq(two.report()["title"], "THE CUT", "three right calls under the line: the cut")
+	# a patient who gets through the window kills the doctor: the night ends with that visit
 	var hurt := ShiftState.new(rules)
 	play(hurt, {"kip": "treat", "rook": "treat", "vale": "refer", "juno": "treat", "maren": "refer"}, ["vale"], ["kip", "juno"])
 	var hurt_rep := hurt.report()
-	eq(hurt_rep["correct"], 5, "a right call that ended in a blow is still a right call")
+	ok(hurt.died and hurt.is_done() and hurt.current_id() == "" and hurt.upcoming_id() == "",
+		"a patient who gets through the window ends the night: nobody else comes to the counter")
+	eq([hurt.records.size(), hurt_rep["unseen"]], [3, ["juno", "maren"]], "the visit it happened in is the last one; the rest go home unseen")
+	eq(hurt_rep["correct"], 3, "a right call that ended in a blow is still a right call")
 	eq(hurt_rep["injuries"], 1, "and the blow is counted")
-	eq(hurt_rep["total"], 720 + 2 * pay, "right every time but hurt once: 720 and two drops in the till")
-	eq(hurt_rep["title"], "RIGHT THE HARD WAY", "five right calls with an injury are not called steady hands")
+	eq([hurt_rep["counter_total"], hurt_rep["closing_total"], hurt_rep["total"]], [250 + pay + 300, -300, 250 + pay],
+		"the counter took two fees and a drop, the blow is billed at closing, and Juno's drop never came")
+	eq(hurt_rep["title"], "LIGHTS OUT", "and the night is lights out, whatever else went right")
+	eq(str(hurt_rep["line_text"]), str(rules["line_text"]["died"]), "nobody reads the meter for a doctor who died")
+	ok(not bool(hurt_rep["line_held"]), "so the line is not held")
+	eq([hurt_rep["readings"].size(), hurt_rep["hours_under"]], [2, 0], "the hour it happened in is never read; the two before it were over the line")
+	# dead on the first visit: the whole hall goes home, and no reading was ever taken
+	var first_blow := ShiftState.new(rules, ["vale", "kip", "rook", "juno", "maren"])
+	play(first_blow, {"vale": "refer"}, ["vale"])
+	var first_rep := first_blow.report()
+	eq([first_rep["unseen"], first_rep["readings"], first_rep["hours_under"], first_rep["title"]], [["kip", "rook", "juno", "maren"], [], 0, "LIGHTS OUT"],
+		"killed by the first patient: four unseen, no reading taken, lights out")
+	eq([first_rep["counter_total"], first_rep["closing_total"], first_rep["total"]], [0, int(rules["scoring"]["hit"]), int(rules["scoring"]["hit"])],
+		"and the only money of the night is the bill for the blow")
+	# a hit on a patient nobody called the crew for (one who snapped) is no call at all
+	var snap := visit("vale")
+	snap.snap()
+	snap.attack_timeout()
+	ok(not bool(snap.settlement()["correct"]) and str(snap.settlement()["call"]) == "hit", "a snap that gets through is nobody's right call")
 	var thin := ShiftState.new(rules)
 	play(thin, {"kip": "treat", "rook": "treat", "vale": "treat", "juno": "treat", "maren": "shutter"}, [], ["kip", "rook"])
 	var thin_rep := thin.report()
@@ -798,7 +889,8 @@ func test_shift() -> void:
 		sore.record({"credits": row[0], "correct": row[1], "injured": row[2]})
 		sore.advance()
 	ok(bool(sore.report()["line_held"]) and int(sore.report()["correct"]) == 4, "four right calls, line held, one blow taken")
-	eq(sore.report()["title"], "OPEN, BARELY", "a night that hurt you is not called a good night either")
+	eq(sore.report()["title"], "OPEN, BARELY",
+		"should a blow ever not end the night, a night that hurt you is still not called a good one")
 	# with the line held, fewer right calls keep their own names; patients who left earn nothing
 	var three := ShiftState.new(rules)
 	play(three, {"kip": "treat", "rook": "treat", "vale": "gave_up", "juno": "treat", "maren": "gave_up"}, [], ["kip", "rook"])
@@ -835,9 +927,18 @@ func test_shift() -> void:
 	ok(some_held, "and with drops some nights hold the line")
 	for entry in rules["titles"]:
 		ok(str(entry["title"]) != "" and str(entry["text"]) != "", "report title '%s' has its text" % str(entry["title"]))
-	var first_title: Dictionary = (rules["titles"] as Array)[0]
-	ok(first_title.get("line_held") == false and int(first_title["min_correct"]) == 0 and not first_title.has("max_injuries"),
-		"the first title is the night under the line, whatever else went right")
+	var titles: Array = rules["titles"]
+	var first_title: Dictionary = titles[0]
+	ok(first_title.get("died") == true and int(first_title["min_correct"]) == 0 and not first_title.has("line_held"),
+		"the first title is the night the doctor died, whatever else went right")
+	var second_title: Dictionary = titles[1]
+	ok(second_title.get("line_held") == false and int(second_title["min_correct"]) == 0 and not second_title.has("max_injuries"),
+		"the second is the night under the line, whatever else went right")
+	var asks_died := 0
+	for entry in titles:
+		if (entry as Dictionary).has("died"):
+			asks_died += 1
+	eq(asks_died, 1, "and only the first asks how the night ended")
 	eq(int((rules["titles"] as Array).back()["min_correct"]), 0, "the last title fits any night over the line")
 	ok(not (rules["titles"] as Array).back().has("max_injuries"), "and asks for no clean record")
 	ok(int(rules["scoring"]["false_call"]) < int(rules["scoring"]["false_alarm"]),
@@ -868,8 +969,8 @@ func test_line() -> void:
 	var seen: Array = []
 	for r in shift.readings():
 		seen.append([r["hour"], r["till"], r["line"], r["held"]])
-	eq(seen, [[1, 550, 240, true], [2, 850, 480, true], [3, 970, 720, true], [4, 1320, 960, true], [5, 1440, 1200, true]],
-		"a perfect night with an early drop: five readings, each over its line")
+	eq(seen, [[1, 550, 240, true], [2, 850, 480, true], [3, 850, 720, true], [4, 1200, 960, true], [5, 1440, 1200, true]],
+		"a perfect night with an early drop: five readings, each over its line, the bounties only in the last")
 	eq(shift.hours_under(), 0, "no hour of it under")
 	ok(bool(shift.reading()["last"]) and not bool(shift.reading(4)["last"]), "the fifth reading is the last one")
 	eq(shift.hour(), 5, "the clock does not run past the shift")
@@ -879,7 +980,8 @@ func test_line() -> void:
 	play(slow, {"kip": "gave_up", "rook": "treat", "vale": "refer", "juno": "treat", "maren": "refer"}, [], ["rook", "juno"])
 	eq([slow.readings()[0]["held"], slow.readings()[0]["margin"]], [false, -per], "a first patient who left: one hour under at the first reading")
 	ok(bool(slow.readings()[1]["held"]), "the next fee brings the till back over")
-	eq([slow.hours_under(), slow.report()["hours_under"]], [1, 1], "one hour under is counted")
+	eq([slow.readings()[2]["held"], slow.readings()[2]["till"]], [false, 600], "Vale's bounty waits for closing, so the third hour is under too")
+	eq([slow.hours_under(), slow.report()["hours_under"]], [2, 2], "both hours under are counted")
 	ok(bool(slow.report()["line_held"]), "and a reading on the way does not decide the night")
 	eq(slow.report()["title"], "A GOOD NIGHT'S WORK", "four right calls, nobody hurt, line held at closing")
 	# on the line counts as holding it; a short shift is read against its own hours
