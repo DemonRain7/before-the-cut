@@ -73,6 +73,42 @@ function knows(lookup, key) {
 	return typeof key === "string" && Object.prototype.hasOwnProperty.call(lookup, key);
 }
 
+/**
+ * The sheet rows whose sign tonight changes how the patient talks and reacts. The game draws one
+ * sign for every row of the sheet each night (game/scripts/core/shift_state.gd draw_night) and
+ * names these two in the request; the model is given their sentences (a sign's `model`). The
+ * other rows (eyes, hands, port) are readings the game shows, so the model is not told them.
+ */
+export const MODEL_ROWS = Object.freeze(["speech", "temper"]);
+
+/** The sign with this id in one row of a case's template, normal or broken, or null. */
+function signIn(c, row, id) {
+	const r = isObject(c.signs) && has(c.signs, row) ? c.signs[row] : null;
+	if (!isObject(r) || typeof id !== "string") return null;
+	for (const kind of ["normal", "broken"]) {
+		for (const s of Array.isArray(r[kind]) ? r[kind] : []) {
+			if (isObject(s) && s.id === id && typeof s.model === "string" && s.model.trim() !== "") return s;
+		}
+	}
+	return null;
+}
+
+/** Tonight's signs as {speech: id, temper: id}, or null unless the request names exactly those rows, each with a sign of this case. */
+function signsOf(c, raw) {
+	if (!isObject(raw) || Object.keys(raw).length !== MODEL_ROWS.length) return null;
+	const out = {};
+	for (const row of MODEL_ROWS) {
+		if (signIn(c, row, raw[row]) === null) return null;
+		out[row] = raw[row];
+	}
+	return out;
+}
+
+/** The model's sentences for tonight's signs, in row order. */
+function tonight(c, signs) {
+	return MODEL_ROWS.map((row) => signIn(c, row, isObject(signs) ? signs[row] : undefined)).filter(Boolean).map((s) => s.model.trim()).join(" ");
+}
+
 /** A list of known ids with no repeats, or null. */
 function cleanList(raw, lookup) {
 	if (!Array.isArray(raw) || raw.length > 16) return null;
@@ -109,6 +145,8 @@ export function validateRequest(body, cases) {
 	if (body.case_version !== c.version) return bad(409, "case_version_mismatch", "the game and the proxy hold different versions of this case");
 	const language = languageOf(body);
 	if (language === null) return bad(400, "bad_request", "language");
+	const signs = signsOf(c, body.signs);
+	if (signs === null) return bad(400, "bad_request", "signs");
 
 	const tools = isObject(c.checks) ? c.checks : {};
 	const claimsKnown = isObject(c.claims) ? c.claims : {};
@@ -166,6 +204,7 @@ export function validateRequest(body, cases) {
 			case_id: body.case_id,
 			case_version: body.case_version,
 			language,
+			signs,
 			event,
 			state: {
 				patience: st.patience,
@@ -241,6 +280,9 @@ export function cleanTranscript(raw, maxChars = DEFAULT_LIMITS.maxTranscriptChar
 // ---------------------------------------------------------------- generation
 
 export function buildPrompt(c, rules, req, maxLineChars) {
+	// The background holds on any night; how this patient talks and reacts tonight comes from the
+	// night's signs, which the game drew.
+	const night = tonight(c, req.signs);
 	const system = [
 		"Play this patient at an implant clinic. The player is the doctor deciding on surgery or calling Trauma Team.",
 		"Choose your own words and interpersonal response from your personality, motives and conversation so far. There is no fixed answer tree or approved-answer list.",
@@ -255,6 +297,7 @@ export function buildPrompt(c, rules, req, maxLineChars) {
 		`Character: ${String(c.brief || "")}`,
 		`Background: ${CHARACTER_CONTEXT[c.id] || "Use the character brief."}`,
 		`Reason for visiting: ${String(c.request || "")}`,
+		...(night ? [`Tonight: ${night}`] : []),
 	].join("\n");
 	const user = JSON.stringify({
 		conversation_history: req.conversation_history,

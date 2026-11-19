@@ -7,6 +7,10 @@ const ResponseValidator = preload("res://scripts/core/move_validator.gd")
 const Lang = preload("res://scripts/core/lang.gd")
 const GAME_VERSION := "0.3.0"
 const MAX_HISTORY := 48          # turns kept for the model: a whole visit at the call cap
+## The sheet rows whose sign tonight changes how the patient talks and reacts (agent_proxy
+## core.mjs MODEL_ROWS). A request names tonight's sign of each; the proxy gives the model that
+## sign's sentence. The readings of the other rows are the game's and are not sent.
+const MODEL_ROWS := ["speech", "temper"]
 
 var rules: Dictionary = {}
 var client: Variant = null
@@ -188,9 +192,22 @@ func build_voice_payload(wav: PackedByteArray) -> Dictionary:
 		"client": {"game": "before-the-cut", "version": GAME_VERSION}}
 
 
+## Tonight's sign of each of MODEL_ROWS, {row: sign id}, from the night's case (case_db.gd
+## compose lists the signs it was made with). A case that names none gives {}, which the proxy
+## refuses, so the patient falls back to its offline lines.
+func model_signs() -> Dictionary:
+	var out := {}
+	var signs: Dictionary = case_data.get("signs", {}) if typeof(case_data.get("signs")) == TYPE_DICTIONARY else {}
+	for row in MODEL_ROWS:
+		if typeof(signs.get(row)) == TYPE_STRING:
+			out[row] = str(signs[row])
+	return out
+
+
 func build_payload(event: Dictionary, state: Dictionary) -> Dictionary:
 	return {"protocol": "3", "session_id": session_id, "visit_id": visit_id,
 		"case_id": str(case_data.get("id", "")), "case_version": int(case_data.get("version", 2)),
+		"signs": model_signs(),
 		"event": event.duplicate(true), "state": state.duplicate(true),
 		"conversation_history": conversation_history.duplicate(true),
 		"language": Lang.code,

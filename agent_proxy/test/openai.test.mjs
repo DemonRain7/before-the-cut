@@ -12,6 +12,7 @@ const KEY = "fake-test-key";
 const state = () => ({ patience: 6, patience_max: 6, granted: [], refusals: {}, reassured: [], claims: [], asked: {}, press_count: 0, reassure_used: 0, history: [] });
 const line = (type = "ask", id = "why", text = "What happened?") => ({
 	protocol: PROTOCOL, session_id: "openai-session", visit_id: "openai-visit-" + (++serial), case_id: "kip", case_version: 3,
+	signs: { speech: "own", temper: "together" },
 	event: { type, id, text }, state: state(), conversation_history: [], limits: { max_line_chars: 110 },
 });
 

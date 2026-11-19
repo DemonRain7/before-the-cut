@@ -13,12 +13,12 @@ English and Chinese: a change to its English is a change to its Chinese in the s
 Git: both rounds of November 16 are in commit 822e8d7. The work of November 17 is in e7f94d7,
 made and pushed to origin/main on November 18 when the student asked. The language work of
 November 18 is in 3f1fcbd, pushed; the work of late November 18 is in a487cea, pushed. The
-work of the latest checkpoint is committed after it,
-together with this file. Run git status -sb and git log -3 --oneline: anything uncommitted is
-newer than this file.
+data and the code of random signs are in 5b64d87, pushed; the model's night signs are
+committed after it, together with this file. Run git status -sb and git log -3 --oneline:
+anything uncommitted is newer than this file.
 
-Latest checkpoint (November 19): the data and the code of random signs, built by Claude (Opus
-5.5) and checked; nobody has played it. The five characters stay as they are; each night draws
+Latest checkpoint (November 19): the data and the code of random signs, then the model's
+night signs, built by Claude (Opus 5.5) and checked; nobody has played it. The five characters stay as they are; each night draws
 from its seed who of them drift (one to three) and which sign each sheet row shows (two to four
 broken rows on a drifting visitor, at least two of them rows the doctor can test whatever the
 patient says). cases/<id>.json (version 3) lists each character's normal and broken signs, row
@@ -29,12 +29,13 @@ data/nights.json has fixed test nights A (as written), B (the truths turned roun
 patient's own fee, paid on account at the counter and kept or taken back at closing; the line
 is 400 an hour; the visitors' fees come under the line but within one drop of it. Not done yet:
 attack art for Kip, Rook and Juno, and dark threads on any port but Vale's (a drifting Kip
-attacks as an unchanged portrait; a port with threads looks clean). The model's briefs still
-state Vale's and Maren's drift as fact, and the game does not send the night's signs. OPEN,
-BARELY and ON NOTICE are out of reach with the present five. Checks, all passed: run_tests 996;
-the scene test 1001, 1002 in Chinese, 1001 with less blood; the window close 5; the proxy 39;
-over HTTP 199 and 15 wire checks; dry captures 204, 204, 99 and 99; measure_text 908 lines in
-each language.
+attacks as an unchanged portrait; a port with threads looks clean). The model's backgrounds
+hold on any night, and every request names tonight's speech and temper signs, whose sentences
+the proxy adds for the model (mock calls only). OPEN, BARELY and ON NOTICE are out of reach
+with the present five. Checks, all passed: run_tests 1001; the scene test 1001, 1002 in
+Chinese, 1001 with less blood; the window close 5; the proxy 40; over HTTP 199 and 16 wire
+checks; measure_text 908 lines in each language; dry captures 204, 204, 99 and 99 (run before
+the night signs, which changed no drawing).
 
 Previous checkpoint (November 18, late evening): the student's five requests of that evening,
 paraphrased: say whether a call succeeded only at the end, so the player is less sure, and go
@@ -249,8 +250,8 @@ read only with python -I), and no English picture or sound changed. Commit each 
 gained the language field, the Chinese limits, the Chinese prompt and the transcription
 language.
 
-Random signs, answered late on November 18: build them, with the art, now. The data and the
-code are built (November 19, above); the art and the model's briefs are not. What was built
+Random signs, answered late on November 18: build them, with the art, now. The data, the code
+and the model's night signs are built (November 19, above); the art is not. What was built
 differs from the proposal of that afternoon in three ways: the signs live in each character's
 file (cases/<id>.json, version 3) rather than in a sign library keyed by slot and model; a
 steady visitor shows only normal signs (no decoys yet); and the money changed (rules version 9)
@@ -262,14 +263,13 @@ Next three tasks (first run git status -sb and git log -3 --oneline):
    the student has picked two G1 pitches with fewer than two replies: specific, moment-based
    notes in English for the student's review, never sent unasked. G1 is submitted; leave its
    snapshots, slides and narration alone.
-2. Every character's art for each part, and the model's briefs (the rest of request 3), from
-   tools/art/ only: the port clean and with dark threads for every character (the portrait's
-   <layer>_t twins where the port shows, the close-up's port_threads.png), attack art for Kip,
-   Rook and Juno with the attack drawing made general; then briefs that hold on any night, the
-   game sending the night's speech and temper signs, and the proxy adding each sign's sentence
-   for the model. English and Chinese together; mock calls only.
-3. Five new characters with all their assets: case files with every sign of every row,
-   contacts' clues, Chinese, the proxy's imports and briefs, every part's art and an attack,
+2. Every character's art for each part (the rest of request 3), from tools/art/ only: the
+   port clean and with dark threads for every character (the portrait's <layer>_t twins where
+   the port shows, the close-up's port_threads.png), and attack art for Kip, Rook and Juno with
+   the attack drawing made general. English and Chinese together.
+3. Five new characters with all their assets: case files with every sign of every row (a
+   sentence for the model on each speech and temper sign), contacts' clues, Chinese, the
+   proxy's imports and backgrounds that hold on any night, every part's art and an attack,
    test nights that show their signs (and Rook's broken eyes and temper and Maren's dark
    threads), and a coverage check that fails on a sign no test night shows. HANDOFF.md has the
    working sketch (a nurse, a noodle cook, a net diver, an off-duty police officer, a pit

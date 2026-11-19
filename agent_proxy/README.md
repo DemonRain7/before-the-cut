@@ -67,9 +67,18 @@ entry needs shared counters and deployment/authentication review before external
 
 ## Patient dialogue: `POST /v1/patient-dialogue`
 
-Request: `protocol: "3"`, session/visit/case identifiers, case version, `event`
-with `type`, `id` and the doctor's exact `text`, current visit state,
+Request: `protocol: "3"`, session/visit/case identifiers, case version, tonight's `signs`,
+`event` with `type`, `id` and the doctor's exact `text`, current visit state,
 `conversation_history`, a reply-length limit, and the player's `language`.
+
+`signs` is `{"speech": id, "temper": id}`: the sign each of those two rows shows tonight, as
+the game drew it from the case file's template (`game/data/cases/<id>.json`, `signs`). Both
+are required, no other row is accepted, and each id must be one of that row's normal or broken
+signs for this patient; anything else is refused with `400 bad_request` (message `signs`). The
+prompt adds each sign's `model` sentence after the reason for the visit (`Tonight: ...`). The
+background in `src/character_profiles.mjs` holds on any night, so whether a patient drifts
+reaches the model only through these two sentences; the other rows (eyes, hands, port) are
+the game's readings and are not sent.
 
 `language` is `"en"` or `"zh"`, the language the player chose on the title card. A request
 without it is English; any other value is refused with `400 bad_request` (message

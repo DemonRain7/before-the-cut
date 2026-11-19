@@ -1618,6 +1618,18 @@ func test_agent() -> void:
 	agent.remember_exchange(ev, d)
 	var payload := agent.build_payload({"type": "say", "id": "free", "text": "What would reassure you?"}, v.snapshot())
 	ok(not payload.has("legal_moves"), "no legal moves transmitted")
+	eq(payload.get("signs"), {"speech": str(v.case_data.signs.speech), "temper": str(v.case_data.signs.temper)},
+		"the request names tonight's speech and temper signs")
+	eq(payload.get("signs"), {"speech": "own", "temper": "together"}, "night A's Kip talks and reacts as his normal self")
+	ok(not payload.has("truth") and not (payload.state as Dictionary).has("truth") and not JSON.stringify(payload).contains("drifting"),
+		"and never names the patient's truth")
+	var night_vale := PatientAgent.new(rules, client, 3)
+	night_vale.begin_visit(visit("vale").case_data, "test-vale", 3)
+	eq(night_vale.build_payload({"type": "say", "id": "free", "text": "Go on."}, {}).get("signs"), {"speech": "it", "temper": "flat"},
+		"night A's Vale: the rig is 'it', and his face stays level when pushed")
+	var bare := PatientAgent.new(rules, client, 3)
+	bare.begin_visit({"id": "kip", "version": 3}, "test-bare", 3)
+	eq(bare.model_signs(), {}, "a case with no night's signs names none (the proxy refuses it)")
 	ok(JSON.stringify(payload.conversation_history).contains("Not until"), "actual previous speech remembered")
 	client.reply = {"ok": true, "data": {"reply": "My pupils look fine. Why are you worried?", "reaction": "Studies the doctor."}}
 	d = await agent.decide({"type": "ask", "id": "why", "text": "What happened?"}, v.snapshot(), ["answer"])

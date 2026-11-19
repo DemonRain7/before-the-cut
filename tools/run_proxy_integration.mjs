@@ -38,6 +38,7 @@ try {
       if (name === 'normal') prompts.push({ case_id: input.req.case_id, visit_id: input.req.visit_id, event: input.req.event,
         history_turns: input.req.conversation_history.length,
         doctor_turns: input.req.conversation_history.filter(t => t.role === 'doctor').map(t => t.text),
+        signs: input.req.signs, tonight: input.system.includes('\nTonight: '),
         characters: (input.system + '\n' + input.user).length });
       return mock.generate(input, signal);
     }};
@@ -63,6 +64,10 @@ try {
   for (const p of typed) byVisit.set(p.visit_id, [...(byVisit.get(p.visit_id) || []), p]);
   const visits = [...byVisit.values()];
   wire.push(['three patients were spoken to in typed or spoken lines', visits.length === 3]);
+  // The night's speech and temper signs ride along with every request, and the model hears them
+  wire.push([`every request named tonight's speech and temper signs, and the model heard them (${prompts.length} requests)`,
+    prompts.length > 0 && prompts.every(p => p.signs && typeof p.signs.speech === 'string' && typeof p.signs.temper === 'string'
+      && Object.keys(p.signs).length === 2 && p.tonight)]);
   for (const turns of visits) {
     let carried = true;
     for (let i = 1; i < turns.length; i += 1) {

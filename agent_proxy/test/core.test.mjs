@@ -6,7 +6,7 @@ import { loadGameData, startServer } from "../src/dev_server.mjs";
 const { cases, rules } = loadGameData();
 let serial = 0;
 const state = () => ({patience:6, patience_max:6, granted:[], refusals:{}, reassured:[], claims:[], asked:{}, press_count:0, reassure_used:0, history:[]});
-const body = (kind="ask", id="why", text="What happened?") => ({protocol:PROTOCOL, session_id:"test-session", visit_id:"test-visit-"+(++serial), case_id:"kip", case_version:3, event:{type:kind,id,text}, state:state(), conversation_history:[], limits:{max_line_chars:110}});
+const body = (kind="ask", id="why", text="What happened?") => ({protocol:PROTOCOL, session_id:"test-session", visit_id:"test-visit-"+(++serial), case_id:"kip", case_version:3, signs:{speech:"own",temper:"together"}, event:{type:kind,id,text}, state:state(), conversation_history:[], limits:{max_line_chars:110}});
 const novel = {reply:"I missed a delivery to be here. Can we work something out?", reaction:"Slides a battered dispatch badge onto the counter.", cooperates:false};
 const fixture = (answer=novel) => ({name:"fixture",model:"fixture",async generate(){return {text:JSON.stringify(answer),mock:true};}});
 function handler(provider=fixture(),limits={}) {
@@ -112,7 +112,28 @@ test("model sees only this request's patient and visit history",async()=>{
  const a=body();a.conversation_history=[{role:"patient",text:"Kip-only memory."}];await post(a);
  const b=body();b.case_id="maren";await post(b);
  assert.ok(inputs[0].user.includes("Kip-only"));assert.ok(!inputs[1].user.includes("Kip-only"));
- assert.ok(inputs[1].system.includes("warm torch"));assert.ok(!inputs[0].system.includes("warm torch"));
+ assert.ok(inputs[1].system.includes("thirty years"));assert.ok(!inputs[0].system.includes("thirty years"));
+});
+test("tonight's speech and temper signs are checked, and the model hears only their sentences",()=>{
+ const own=validateRequest(body(),cases).req; assert.deepEqual(own.signs,{speech:"own",temper:"together"});
+ const sp=buildPrompt(cases.kip,rules,own,110).system;
+ assert.ok(sp.includes("Tonight: "+cases.kip.signs.speech.normal[0].model+" "+cases.kip.signs.temper.normal[0].model));
+ assert.ok(!sp.includes(cases.kip.signs.speech.broken[0].model)&&!sp.includes(cases.kip.signs.temper.broken[0].model));
+ const lost=body(); lost.case_id="maren"; lost.signs={speech:"lost",temper:"blank"};
+ const lp=buildPrompt(cases.maren,rules,validateRequest(lost,cases).req,110).system;
+ assert.ok(lp.includes("warm torch")&&lp.includes(cases.maren.signs.temper.broken[0].model),"a night that drew Maren's lost hours tells the model so");
+ // on a night of normal speech and temper no patient is told a broken sign, and no background states one
+ for(const id of Object.keys(cases)){
+  const b=body(); b.case_id=id; b.signs={speech:cases[id].signs.speech.normal[0].id,temper:cases[id].signs.temper.normal[0].id};
+  const sys=buildPrompt(cases[id],rules,validateRequest(b,cases).req,110).system;
+  for(const row of ["speech","temper"]) for(const s of cases[id].signs[row].broken) assert.ok(!sys.includes(s.model),`${id}: a normal night does not hear the broken ${row} sign ${s.id}`);
+  for(const phrase of ["separate, tireless","warm torch","without your intention","sense of agency","does not act independently","do not move independently","does not control your thoughts"]) assert.ok(!sys.includes(phrase),`${id}: the background holds on any night (${phrase})`);
+ }
+ // signs are required, exactly these two rows, each a sign of this patient's own rows
+ for(const s of [undefined,null,"own",["own","together"],{speech:"own"},{speech:"own",temper:"together",eyes:"steady"},{speech:"ghost",temper:"together"},{speech:"together",temper:"own"},{speech:"lost",temper:"together"},{speech:"own",temper:7}]){
+  const b=body(); if(s===undefined) delete b.signs; else b.signs=s;
+  const v=validateRequest(b,cases); assert.equal(v.ok,false,`signs ${JSON.stringify(s)}`); assert.equal(v.message,"signs");
+ }
 });
 test("provider failure, invalid JSON and invalid shapes return explicit failures",async()=>{
  for(const [fail,status] of [["http_error",502],["invalid_json",422],["invalid_shape",422],["long_line",422]]){

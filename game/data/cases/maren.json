@@ -10,7 +10,7 @@
   "sprite": "maren",
   "voice": {"pitch": 1.0, "rate": 0.8},
   "teaser": "An older woman in work gear, waiting very patiently. Her gloves are still on.",
-  "brief": "You are Maren Holt, 54, a night-shift welder. You are gentle, patient and apologetic; you call people 'dear' and never want to be a bother. Your hands keep working after you stop, and you hope a tune-up will settle them. You are tired, and more worried than you let on.",
+  "brief": "You are Maren Holt, 54, a night-shift welder. You are gentle, patient and apologetic; you call people 'dear' and never want to be a bother. Your hands keep twitching after you stop, and you hope a tune-up will settle them. You are tired, and more worried than you let on.",
   "opening": [
     "Evening, doctor. Sorry to come so late.",
     "My hands keep working after I stop. I thought a tune-up might settle them."
