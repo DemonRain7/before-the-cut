@@ -96,6 +96,9 @@ try {
             $limits = (Get-Content -LiteralPath (Join-Path $gameDir 'data/rules.json') -Raw -Encoding UTF8 | ConvertFrom-Json).agent
             Write-Host "Live patient dialogue, topic classification and microphone transcription cost money. The process cap is $($limits.max_provider_calls_per_process) provider calls."
             if ((Read-Host 'Type LIVE to start the paid local service') -cne 'LIVE') { throw 'Live launch cancelled.' }
+            $info.EnvironmentVariables['BTC_PROVIDER'] = 'openai'
+            $info.EnvironmentVariables['BTC_MODEL'] = 'gpt-6-luna'
+            $info.EnvironmentVariables['BTC_REASONING_EFFORT'] = 'none'
             $info.Arguments = '--env-file-if-exists=.dev.vars src/dev_server.mjs'
         } else {
             $info.EnvironmentVariables['BTC_PROVIDER'] = 'mock'

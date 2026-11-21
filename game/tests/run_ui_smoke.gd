@@ -235,9 +235,12 @@ func title_menu() -> void:
 		"every choice of every row has its button on the screen, and BACK")
 	s.settings_row = s.SETTING_ROWS.find("patient_ai")
 	check(s.settings.patient_ai == "off" and not main.use_model, "patient AI starts switched off")
+	var configured_address: String = main.agent_url
+	main.agent_url = ""
 	d.click((rects["patient_ai:on"] as Rect2).get_center())
 	check(not main.use_model and s.settings.patient_ai == "off" and s.setting_hint() == s.PATIENT_HINTS.no_url,
 		"with no address the row stays OFF and explains how to connect")
+	main.agent_url = configured_address
 	for hint in s.PATIENT_HINTS.values():
 		var translated := Lang.t(str(hint))
 		check((Lang.code == "en" or translated != hint) and Gfx.wrap_text(str(hint), 380.0).size() <= 4,
