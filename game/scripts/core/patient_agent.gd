@@ -6,13 +6,14 @@ const ScriptedBrain = preload("res://scripts/core/scripted_brain.gd")
 const ResponseValidator = preload("res://scripts/core/move_validator.gd")
 const Lang = preload("res://scripts/core/lang.gd")
 const GAME_VERSION := "0.4.0"
-const MAX_HISTORY := 48          # turns kept for the model: a whole visit at the call cap
+const VisitState = preload("res://scripts/core/visit_state.gd")
+const VisitRecord = preload("res://scripts/core/visit_record.gd")
 const PROTOCOL := "4"
 
 var rules: Dictionary = {}
 var client: Variant = null
 var mode: String = "script"
-var session_id: String = ""
+var run_id: String = ""          # aggregate quotas across visits
 var visit_id: String = ""
 var case_data: Dictionary = {}
 var scripted: ScriptedBrain
@@ -29,7 +30,8 @@ var idle_beats_this_visit := 0
 var max_intents: int = 16
 var voice_clips_this_visit: int = 0
 var last: Dictionary = {}
-var conversation_history: Array = []
+var record: VisitRecord = null
+var max_body_bytes: int = 32768
 var _generation: int = 0
 
 
@@ -37,6 +39,7 @@ func _init(p_rules: Dictionary = {}, p_client: Variant = null, p_seed: int = 0) 
 	rules = p_rules
 	client = p_client
 	var limits: Dictionary = rules.get("agent", {})
+	max_body_bytes = int(limits.get("max_body_bytes", 32768))
 	max_intents = int(limits.get("intent", {}).get("max_calls_per_visit", 16))
 	max_calls = int(limits.get("max_model_calls_per_visit", 16))
 	max_line_chars = int(limits.get("max_line_chars", 110))
@@ -68,9 +71,10 @@ func set_mode(p_mode: String) -> void:
 	mode = "model" if p_mode == "model" and client != null else "script"
 
 
-func begin_visit(p_case: Dictionary, p_visit_id: String, p_seed: int) -> void:
-	_generation += 1
-	case_data = p_case
+func begin_visit(visit: VisitState, p_visit_id: String, p_seed: int) -> void:
+	end_visit()
+	case_data = visit.case_data
+	record = visit.record
 	visit_id = p_visit_id
 	calls_this_visit = 0
 	fallbacks_this_visit = 0
@@ -79,29 +83,45 @@ func begin_visit(p_case: Dictionary, p_visit_id: String, p_seed: int) -> void:
 	beats_this_visit = 0
 	idle_beats_this_visit = 0
 	last = {}
-	conversation_history = []
-	# the history is what the doctor saw: the authored lines in the player's language
-	for line in case_data.get("opening", []):
-		conversation_history.append({"role": "patient", "text": Lang.t(str(line))})
 	scripted.reseed(p_seed)
+
+
+func end_visit() -> void:
+	_generation += 1
+	if record != null:
+		record.clear()
+	record = null
+	visit_id = ""
+	case_data = {}
+	last = {}
+
+
+func _identity() -> Dictionary:
+	return {"protocol": PROTOCOL, "session_id": visit_id, "visit_id": visit_id,
+		"run_id": run_id if run_id != "" else visit_id, "language": Lang.code}
 
 
 ## fallback_options are ONLY for the offline script; never sent to or checked against AI.
 func decide(event: Dictionary, state: Dictionary, fallback_options: Array = [], signs: Dictionary = {}, fallback: String = "") -> Dictionary:
 	var base := {"event": event.duplicate(), "move": "", "line": "", "reply": "", "reaction": "",
 		"source": "script", "fallback_reason": "", "latency_ms": 0, "meta": {}}
-	if fallback != "" and mode == "model":
-		base.fallback_reason = fallback
-		return _with_script(base, event, state, fallback_options, true)
-	if mode != "model" or client == null or (event.get("type") == "ask" and rules.get("agent", {}).get("ask_answers", "authored") == "authored"):
-		return _with_script(base, event, state, fallback_options, false)
-	if calls_this_visit >= max_calls:
-		base["fallback_reason"] = "call_cap"
-		return _with_script(base, event, state, fallback_options, true)
+	if record == null:
+		return {}
+	var reason := fallback if mode == "model" else ""
+	var authored_ask: bool = event.get("type") == "ask" and rules.get("agent", {}).get("ask_answers", "authored") == "authored"
+	var generate := mode == "model" and client != null and not authored_ask
+	if generate and reason == "" and calls_this_visit >= max_calls:
+		reason = "call_cap"
+	# The current line travels as the event. It enters memory before a concurrent look or reply.
+	var payload := build_payload(event, state, signs) if generate and reason == "" else {}
+	record.append("doctor", str(event.get("text", "")))
+	if not generate or reason != "":
+		base.fallback_reason = reason
+		return _with_script(base, event, state, fallback_options, reason != "")
 	calls_this_visit += 1
 	var generation := _generation
 	var started := Time.get_ticks_msec()
-	var resp: Dictionary = await client.request_move(build_payload(event, state, signs))
+	var resp: Dictionary = await client.request_move(payload)
 	if generation != _generation:
 		return {}
 	base["latency_ms"] = Time.get_ticks_msec() - started
@@ -156,26 +176,12 @@ func _with_script(base: Dictionary, event: Dictionary, state: Dictionary, option
 	return base
 
 
-## Commit only exchanges that survive the UI cancellation token. Reset per patient.
-func remember_exchange(event: Dictionary, response: Dictionary) -> void:
-	var text := str(event.get("text", "")).strip_edges()
-	if text != "":
-		conversation_history.append({"role": "doctor", "text": text})
-	# a scripted line was shown in the player's language; a model's words are kept as they came
-	if str(response.get("reaction", "")) != "":
-		conversation_history.append({"role": "reaction", "text": Lang.t(str(response.reaction))})
-	if str(response.get("reply", "")) != "":
-		conversation_history.append({"role": "patient", "text": Lang.t(str(response.reply))})
-	while conversation_history.size() > MAX_HISTORY:
-		conversation_history.pop_front()
-
-
 ## Sends one push-to-talk clip for its words. The words are the player's own line, to be put in
 ## front of the player and sent like a typed one: nothing here speaks for the patient.
 ## Returns {"ok": true, "text": String, "latency_ms": int, "mock": bool} or
 ## {"ok": false, "error": String, "latency_ms": int}; {} when a new visit began while it waited.
 func transcribe(wav: PackedByteArray) -> Dictionary:
-	if mode != "model" or client == null or not client.has_method("request_transcript"):
+	if record == null or mode != "model" or client == null or not client.has_method("request_transcript"):
 		return {"ok": false, "error": "not_configured", "latency_ms": 0}
 	if voice_clips_this_visit >= max_voice_clips:
 		return {"ok": false, "error": "clip_cap", "latency_ms": 0}
@@ -197,13 +203,16 @@ func transcribe(wav: PackedByteArray) -> Dictionary:
 
 
 func build_voice_payload(wav: PackedByteArray) -> Dictionary:
-	return {"protocol": PROTOCOL, "session_id": session_id, "visit_id": visit_id, "language": Lang.code,
-		"audio": {"mime": "audio/wav", "data": Marshalls.raw_to_base64(wav)},
-		"client": {"game": "before-the-cut", "version": GAME_VERSION}}
+	var payload := _identity()
+	payload["audio"] = {"mime": "audio/wav", "data": Marshalls.raw_to_base64(wav)}
+	payload["client"] = {"game": "before-the-cut", "version": GAME_VERSION}
+	return payload
 
 
 ## Classify only the doctor's line. The intent route never receives a sign, state or history.
 func classify(text: String) -> Dictionary:
+	if record == null:
+		return {}
 	var fallback := ScriptedBrain.intent_for_text(case_data, text)
 	fallback.merge({"source":"script","reason":""})
 	if mode != "model" or client == null:
@@ -214,8 +223,8 @@ func classify(text: String) -> Dictionary:
 		return fallback
 	var generation := _generation
 	intents_this_visit += 1
-	var payload := {"protocol": PROTOCOL, "session_id": session_id, "visit_id": visit_id, "case_id": case_data.id,
-		"case_version": case_data.version, "language": Lang.code, "text": text}
+	var payload := _identity()
+	payload.merge({"case_id": case_data.id, "case_version": case_data.version, "text": text})
 	var response: Dictionary = await client.request_intent(payload)
 	if generation != _generation:
 		return {}
@@ -233,7 +242,7 @@ func classify(text: String) -> Dictionary:
 ## Speculative dialogue reserves a reply immediately. Only the director can accept it into memory.
 func can_beat(kind: String) -> bool:
 	var limits: Dictionary = rules.get("agent", {}).get("beats", {})
-	return mode == "model" and client != null and limits.get("enabled", false) and kind in ["arrive", "after_check", "idle"] and calls_this_visit < max_calls and beats_this_visit < int(limits.get("max_per_visit", 0)) and (kind != "idle" or idle_beats_this_visit < int(limits.get("max_idle_per_visit", 0)))
+	return record != null and mode == "model" and client != null and limits.get("enabled", false) and kind in ["arrive", "after_check", "idle"] and calls_this_visit < max_calls and beats_this_visit < int(limits.get("max_per_visit", 0)) and (kind != "idle" or idle_beats_this_visit < int(limits.get("max_idle_per_visit", 0)))
 
 
 func beat(kind: String, tool: String, state: Dictionary, signs: Dictionary) -> Dictionary:
@@ -255,11 +264,11 @@ func beat(kind: String, tool: String, state: Dictionary, signs: Dictionary) -> D
 
 
 func build_payload(event: Dictionary, state: Dictionary, signs: Dictionary = {}) -> Dictionary:
-	return {"protocol": PROTOCOL, "session_id": session_id, "visit_id": visit_id,
-		"case_id": str(case_data.get("id", "")), "case_version": int(case_data.get("version", 2)),
-		"signs": signs.duplicate(),
-		"event": event.duplicate(true), "state": state.duplicate(true),
-		"conversation_history": conversation_history.duplicate(true),
-		"language": Lang.code,
-		"limits": {"max_line_chars": line_chars()},
-		"client": {"game": "before-the-cut", "version": GAME_VERSION}}
+	if record == null:
+		return {}
+	var payload := _identity()
+	payload.merge({"case_id": str(case_data.get("id", "")), "case_version": int(case_data.get("version", 2)),
+		"signs": signs.duplicate(), "event": event.duplicate(true), "state": state.duplicate(true),
+		"limits": {"max_line_chars": line_chars()}, "client": {"game": "before-the-cut", "version": GAME_VERSION}})
+	record.put_in_request(payload, max_body_bytes)
+	return payload

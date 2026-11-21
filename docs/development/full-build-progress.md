@@ -2,6 +2,8 @@
 
 The November 21 full build follows KICKOFF. The results below are from this checkout and the three permanent services. [Full report and reproduction commands](../../HANDOFF.md#full-build-november-21)
 
+The student’s follow-up gave each appointment one session for its dialogue, reactions and actions. It passed 23 local check groups, all 1,102 mock evaluation calls and the three public Worker checks. [Appointment memory and cache evidence](../../HANDOFF.md#one-session-per-appointment)
+
 ## State when this file was written
 
 November 21, 2026, about 15:50 New York, by Claude (Fable). Read from the repository and not

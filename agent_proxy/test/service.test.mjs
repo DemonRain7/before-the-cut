@@ -38,6 +38,23 @@ test("two interleaved sessions keep their own prompts, visit counts and logged i
 	assert.ok(!JSON.stringify(logs).includes("history-"));
 });
 
+test("a returning patient starts with a fresh session and no words or actions from their last visit", async () => {
+	const mock = createMockProvider(), inputs = [];
+	const handle = createHandler({...loadGameData(), provider:{...mock, async generate(input, signal) {
+		inputs.push(input); return mock.generate(input, signal);
+	}}});
+	const result = await probe((path, bodyText) => handle({path, method:bodyText ? "POST" : "GET", bodyText}), "visit");
+	assert.equal(result.history_entries, 67);
+	assert.equal(inputs.length, 2);
+	const [a,b] = inputs;
+	assert.equal(a.req.run_id, b.req.run_id);
+	assert.notEqual(a.req.session_id, b.req.session_id);
+	assert.deepEqual(b.req.conversation_history, []);
+	assert.equal(b.req.visit_summary, undefined);
+	assert.ok(!b.user.includes("First appointment"));
+	assert.deepEqual(JSON.parse(a.user).visit_summary.actions, {"open:grip":2,"done:grip":1,"press:1":1});
+});
+
 test("the kill switch and voice switch answer before reading or counting", async () => {
 	const unexpected = () => assert.fail("body or counters touched");
 	for (const disabled of [true, false]) {

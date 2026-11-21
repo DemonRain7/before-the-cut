@@ -52,15 +52,15 @@ and `BTC_TRANSCRIBE_TIMEOUT_MS` are configurable. The Worker uses durable counte
 
 ## Topic classification
 
-`POST /v1/patient-intent` receives protocol, session, visit, case id and version, language and the typed or confirmed spoken line. The provider sees the current patient's question IDs and wording, and the doctor's actual line. A single-choice schema accepts an `ask_<id>` or one free class. The public result carries `about` (an allowed question ID or `none`) and `intent`. Free classes cover follow-up, tool request, reassurance, provocation, social or personal talk, role probe, unclear and other. An inferred paid ASK shows the question and lamp price before acceptance. A player can choose small talk or the question menu. The route has its own 16-attempt visit and 240-attempt session ceilings. Each attempt also uses one unit from the UTC-day budget. The upstream deadline is 2 seconds and the game waits up to 2.5 seconds. A failed classifier falls back to the offline keyword matcher.
+`POST /v1/patient-intent` receives protocol, run id, visit/session id, case id and version, language and the typed or confirmed spoken line. The provider sees the current patient's question IDs and wording, and the doctor's actual line. A single-choice schema accepts an `ask_<id>` or one free class. The public result carries `about` (an allowed question ID or `none`) and `intent`. Free classes cover follow-up, tool request, reassurance, provocation, social or personal talk, role probe, unclear and other. An inferred paid ASK shows the question and lamp price before acceptance. A player can choose small talk or the question menu. The route has its own 16-attempt visit and 240-attempt run ceilings. Each attempt also uses one unit from the UTC-day budget. The upstream deadline is 2 seconds and the game waits up to 2.5 seconds. A failed classifier falls back to the offline keyword matcher.
 
 ## Patient dialogue
 
-The request includes `protocol: "4"`, session/visit/case identifiers, case version, tonight's `signs`,
+The request includes `protocol: "4"`, run, session, visit and case identifiers, case version, tonight's `signs`,
 `event` with `type`, `id` and the doctor's exact `text`, current visit state,
 `conversation_history`, a reply-length limit, and the player's `language`.
 
-`signs` can contain `speech`, `temper`, both or neither. The game unlocks SPEECH with an answered ASK. A topic outside the broken sign's evidence list gets the character's normal sign until an informative question is answered. PRESS and flares unlock TEMPER. The proxy supplies exactly the corresponding sign sentences. An empty gate omits the entire Tonight line. Instrument readings stay in the game.
+`signs` can contain `speech`, `temper`, both or neither. The game unlocks SPEECH with an answered ASK. A topic outside the broken sign's evidence list gets the character's normal sign until an informative question is answered. PRESS and flares unlock TEMPER. The proxy supplies exactly the corresponding sign sentences. An empty gate omits the `earned_cues` field. Instrument readings stay in the game.
 
 `language` is `"en"` or `"zh"`, the language the player chose on the title card. A request
 without it is English; any other value is refused with `400 bad_request` (message
@@ -70,7 +70,11 @@ writes them. A hanzi takes the room of two letters on the dialogue strip, so Chi
 smaller length limits of its own (see Bounds). The language is written to the log with each
 entry; the words are not.
 
-Foreground events are `check`, `ask`, `press`, `reassure` and `say`. `say` carries the doctor's line and classified intent. Optional `arrive`, `after_check` and `idle` events may return an empty reply and reaction. Both service implementations cap these at three per visit and two idle attempts, within 16 dialogue attempts. Each generation rebuilds the case identity, job, voice and motive from trusted data. Up to 48 recent entries tagged `doctor`, `patient` or `reaction` carry this visit's actual words in the user message. New patients start a fresh history.
+Foreground events are `check`, `ask`, `press`, `reassure` and `say`. `say` carries the doctor's line and classified intent. Optional `arrive`, `after_check` and `idle` events may return an empty reply and reaction. Both service implementations cap these at three per visit and two idle attempts, within 16 dialogue attempts. Each generation rebuilds the case identity, job, voice and motive from trusted data. Godot starts a fresh session on every arrival. The visit owns one chronological record tagged `doctor`, `patient`, `reaction` and `action`. For example, opening GRIP twice and completing it once records two `open:grip` entries and one `done:grip`. A first committed PRESS records `press:1`. Chart readings and courier codes stay in Godot.
+
+Ordinary requests include the whole visit. When serialization would exceed 32 KiB, Godot retains the complete local record and sends a leading excerpt, a recent excerpt and `visit_summary`. Its `after` field locates the gap, `omitted` counts the missing entries and `actions` counts each action across the whole visit. A close or abandonment clears this memory and invalidates outstanding requests.
+
+GPT-6 Luna receives the character and rules in an initial developer message. Earlier events form chronological groups of eight. Each complete group keeps its message boundary as further events arrive. The current event and earned cues come last. Stable cache keys identify route, character and language. The provider can reuse eligible prefixes and reports actual cache reads and writes in `meta.usage.cached_input_tokens` and `cache_write_tokens` when available. Every answer is generated for the current request. [OpenAI prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching)
 
 Response:
 
@@ -99,8 +103,9 @@ Request:
 ```json
 {
   "protocol": "4",
+  "run_id": "cab1f00d",
   "session_id": "1a2b3c4d",
-  "visit_id": "1a2b3c4d-2-rook",
+  "visit_id": "1a2b3c4d",
   "audio": {"mime": "audio/wav", "data": "<base64>"},
   "language": "en"
 }
@@ -156,13 +161,13 @@ together. The Chinese numbers are `DEFAULT_LIMITS.languages.zh` here.
 | Limit | Patient lines | Topic classification | Push-to-talk clips |
 | --- | --- | --- | --- |
 | Attempts per visit | 16 | 16 | 24 |
-| Attempts per session | 240 | 240 | 360 |
+| Attempts per game run | 240 | 240 | 360 |
 | Proxy deadline | 3.5 s | 2 s | 6 s |
 | Game deadline | 4 s | 2.5 s | 7 s |
 | Request size | 32 KiB | 32 KiB | 512 KiB |
 | Output | 256 tokens. Reply target 110 characters, maximum 220. Reaction maximum 110. | 32 tokens. One allowed case question or free intent. | 256 tokens, up to 300 characters |
 | Chinese output | Reply target 55 characters, maximum 110. Reaction target 55, maximum 110. | Same topic ids | Up to 300 characters |
-| Conversation history | 48 most recent entries | None | None |
+| Visit history | Ordered appointment, bounded by request bytes | Current line only | Clip only |
 
 The three routes share the 1,500-attempt daily default and the local Node process's lifetime limit of 2,000 attempts. The deployed live environment has a 30-attempt daily limit. A ten-second clip takes about 417 KiB in base64.
 
@@ -207,9 +212,9 @@ deadlines, a hard 110-character reply limit and 24 history entries):
 
 `npm test` in `agent_proxy` runs on Node without Wrangler, an account or a provider key. The November 21 P1 run has **52 passing tests**. Another 7 pass in `node --test tools/live_model_guard.test.mjs` from the repository root. From the repository root, `node tools/run_proxy_integration.mjs <Godot-console-path> <evidence-directory>` drives the actual Godot HTTP client against local mocks. **334 game-side and 100 wire checks passed.** For each of ten characters in each language, four requests cross normal/broken SPEECH with normal/broken TEMPER. The wire checks match both sign ids and prompt sentences. Voice inputs are generated tones. These results measure transport, limits and game behavior. The bilingual GPT-6 Luna model results and outside-player comparison status are in the [full-build handoff](../HANDOFF.md#full-build-november-21).
 
-For two separate sessions the game supplies a fresh random session id and sends only the current visit's conversation with each action. The proxy constructs a fresh prompt from that request's character, signs, language and history. It stores no conversation. Each night's visit id includes the night number so a returning character starts with a fresh visit allowance.
+Dialogue, intent and transcription share one random `session_id` equal to `visit_id` at this appointment. `run_id` groups visits for the existing aggregate quotas. Legacy protocol 4 clients omit `run_id` and continue to use their original session identifier for those quotas. The proxy rebuilds each dialogue from the supplied visit and keeps only counter metadata.
 
-The Worker sends one reservation to the SQLite-backed Durable Object named for the session. Visit and session limits are checked there in order. A second object named for the UTC date reserves one daily slot across sessions and routes in that environment. These writes survive Worker and object restarts. Failed provider attempts use a slot. An unavailable counter fails closed with 503 `counter_unavailable`. Objects discard their storage after two idle days. Client-chosen session ids provide no authentication. The daily ceiling covers callers that change ids. The local Node process uses memory for the same limits and also stops at 2,000 provider attempts over its lifetime.
+The Worker sends one reservation to the SQLite-backed Durable Object named for the game run. Visit and run limits are checked there in order. A second object named for the UTC date reserves one daily slot across sessions and routes in that environment. These writes survive Worker and object restarts. Failed provider attempts use a slot. An unavailable counter fails closed with 503 `counter_unavailable`. Objects discard their storage after two idle days. Client-chosen session ids provide no authentication. The daily ceiling covers callers that change ids. The local Node process uses memory for the same limits and also stops at 2,000 provider attempts over its lifetime.
 
 ### Run the actual Worker locally
 
@@ -224,9 +229,10 @@ In another terminal in `agent_proxy`:
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8787/healthz
 node probe.mjs http://127.0.0.1:8787 isolation
+node probe.mjs http://127.0.0.1:8787 visit
 ```
 
-The probe checks the mock identity before sending synthetic fixtures. Session A receives 16 replies and a 429 `visit_call_cap` on call 17. Session B uses the same visit id in Chinese and still receives its second reply. A streamed 32,769-byte dialogue body gets 413. The Core unit test runs the same interleaving with delayed counters and inspects each in-memory prompt and log id. Only metadata is written to evidence.
+The `visit` probe sends a 67-entry timeline with a compressed span, checks a fresh return visit for the same character inside the same run, and rejects mismatched identifiers. Both probes check the mock identity before sending fixtures. Session A receives 16 replies and a 429 `visit_call_cap` on call 17. Session B uses the same visit id in Chinese and still receives its second reply. A streamed 32,769-byte dialogue body gets 413. The Core unit test runs the same interleaving with delayed counters and inspects each in-memory prompt and log id. Only metadata is written to evidence.
 
 For the other demonstrations, stop the previous local server with Ctrl+C and run one line at a time. Run the probe shown in the second terminal.
 

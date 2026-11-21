@@ -9,7 +9,7 @@
   "tools_available": [],
   "context_sources": [
     "case identity, background, voice, work and reason for visiting",
-    "up to 48 doctor, patient and reaction entries from the current visit",
+    "the current appointment in order, including spoken lines, visible reactions and performed actions",
     "latest player words or a game event with its required outcome",
     "earned SPEECH or TEMPER sign when available"
   ],
@@ -32,7 +32,7 @@
     "proxy_upstream_timeout_seconds": 3.5,
     "request_attempts": 1,
     "live_calls_per_visit": 16,
-    "live_calls_per_session": 240,
+    "live_calls_per_run": 240,
     "provider_calls_per_proxy_process": 2000,
     "reply_chars_asked": 110,
     "reply_chars_refused_over": 220,
@@ -50,7 +50,7 @@
     "status": "E1–E4 used 1,094 attempts under a USD 50 approval. Their conservative reservation was USD 0.595195. The intent and dialogue medians were 754 and 1,293 ms."
   },
   "fallback": "Authored offline comparison/fallback, separately labelled in UI and logs; no substitution on successful model replies.",
-  "memory_policy": "Last 48 conversation entries in memory per visit; reset for the next patient; no server-side cross-visit transcript.",
+  "memory_policy": "One in-memory session per appointment. Closing it releases the transcript. Requests exceeding 32 KiB include the opening, recent events and whole-visit action counts. GPT reuses eligible prompt prefixes.",
   "agent_team": [
     {
       "role": "Producer",

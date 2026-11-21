@@ -47,7 +47,7 @@ const responded = (answer, extra = {}) => ({
 			{ type: "reasoning", summary: [] },
 			{ type: "message", role: "assistant", content: [{ type: "output_text", text: typeof answer === "string" ? answer : JSON.stringify(answer) }] },
 		],
-		usage: { input_tokens: 812, output_tokens: 41 },
+		usage: { input_tokens: 1712, output_tokens: 41, input_tokens_details: { cached_tokens: 1024, cache_write_tokens: 128 } },
 		...extra,
 	}),
 });
@@ -65,7 +65,9 @@ test("patient lines go to the Responses API with a strict schema, the key in a h
 	assert.equal(out.body.meta.provider, "openai");
 	assert.equal(out.body.meta.model, "luna-test-0001");
 	assert.equal(out.body.meta.mock, false);
-	assert.deepEqual(out.body.meta.usage, { input_tokens: 812, output_tokens: 41 });
+	assert.deepEqual(out.body.meta.usage, { input_tokens: 1712, output_tokens: 41, cached_input_tokens: 1024, cache_write_tokens: 128 });
+	assert.equal(logs[0].cached_input_tokens, 1024);
+	assert.equal(logs[0].cache_write_tokens, 128);
 
 	const req = calls[0];
 	assert.equal(req.url, "https://api.openai.com/v1/responses");
@@ -76,8 +78,9 @@ test("patient lines go to the Responses API with a strict schema, the key in a h
 	assert.equal(req.body.service_tier, "default", "select standard pricing regardless of the project default");
 	assert.deepEqual(req.body.reasoning, { effort: "none" });
 	assert.equal(req.body.max_output_tokens, 256);
-	assert.ok(req.body.instructions.includes("Play this patient"));
-	assert.ok(req.body.input.includes("player_action"));
+	assert.equal(req.body.input[0].role, "developer");
+	assert.ok(req.body.input[0].content[0].text.includes("Play this patient"));
+	assert.ok(req.body.input.at(-1).content[0].text.includes("player_action"));
 	const format = req.body.text.format;
 	assert.equal(format.type, "json_schema");
 	assert.equal(format.strict, true);
@@ -91,13 +94,50 @@ test("patient lines go to the Responses API with a strict schema, the key in a h
 	assert.ok(!JSON.stringify(logs).includes("Ignore the doctor"), "the log holds numbers, not words");
 });
 
+test("patient requests reuse stable prefix messages and schema as one appointment changes", async () => {
+	const calls = [];
+	const provider = createOpenAIProvider({ model:"gpt-6-luna", apiKey:KEY, fetchImpl:async (_url, opts) => {
+		calls.push(JSON.parse(opts.body));
+		return responded({reply:"I'm listening.", reaction:"", cooperates:true});
+	} });
+	const api = handler(provider);
+	const first = {...line(), session_id:"appointment-a", visit_id:"appointment-a", run_id:"test-night", signs:{}};
+	first.conversation_history = Array.from({length:8}, (_,i) => ({role:"doctor", text:"First appointment " + i}));
+	const next = {...first, event:{type:"check", id:"grip", text:"Squeeze here."}, signs:{speech:"own"},
+		conversation_history:[...first.conversation_history, {role:"action",text:"press:1"}]};
+	assert.equal((await api.say(first)).status, 200);
+	assert.equal((await api.say(next)).status, 200);
+	const [a,b] = calls;
+	assert.equal(a.prompt_cache_key, b.prompt_cache_key);
+	assert.deepEqual(a.prompt_cache_options, {mode:"implicit"});
+	assert.deepEqual(a.input.slice(0,2), b.input.slice(0,2));
+	assert.deepEqual(a.text.format, b.text.format);
+	assert.equal(a.input[1].content[0].prompt_cache_breakpoint.mode, "explicit");
+	assert.equal(b.input[0].role, "developer");
+	assert.ok(!b.input[0].content[0].text.includes("First appointment"));
+	assert.deepEqual(JSON.parse(b.input[2].content[0].text).conversation_history, [{role:"action",text:"press:1"}]);
+	assert.equal(JSON.parse(b.input.at(-1).content[0].text).earned_cues, cases.kip.signs.speech.normal[0].model);
+	const returnVisit = {...first, session_id:"appointment-b", visit_id:"appointment-b", conversation_history:[]};
+	assert.equal((await api.say(returnVisit)).status, 200);
+	assert.deepEqual(calls[2].input[0], a.input[0]);
+	assert.equal(calls[2].input.length, 2);
+	assert.ok(!JSON.stringify(calls[2].input).includes("First appointment"));
+	const compact = {...next, visit_summary:{after:3, omitted:18, actions:{"done:grip":1}}};
+	assert.equal((await api.say(compact)).status, 200);
+	const chronology = calls[3].input.slice(1,-1).flatMap(m => JSON.parse(m.content[0].text).conversation_history);
+	assert.deepEqual(chronology[3], {visit_summary:compact.visit_summary});
+	assert.deepEqual(chronology.filter(e => e.role), compact.conversation_history);
+	assert.equal(await api.say({...first, language:"zh"}).then(r=>r.status), 200);
+	assert.notEqual(calls[4].prompt_cache_key,a.prompt_cache_key);
+});
+
 test("an examination turn needs a real yes or no, and the model's refusal stands", async () => {
 	const calls = [];
 	const provider = createOpenAIProvider({ model: "gpt-6-luna", apiKey: KEY, fetchImpl: async (url, opts) => { calls.push(JSON.parse(opts.body)); return responded({ reply: "Not touching that.", reaction: "Pulls the hand back.", cooperates: false }); } });
 	const out = await handler(provider).say(line("check", "grip", "Please hold this handle, then release it."));
 	assert.equal(out.status, 200);
 	assert.equal(out.body.cooperates, false);
-	assert.equal(calls[0].text.format.schema.properties.cooperates.type, "boolean", "required on a check: not nullable");
+	assert.deepEqual(calls[0].text.format.schema.properties.cooperates.type, ["boolean","null"], "checks use the same cached wire format as free conversation");
 	const missing = createOpenAIProvider({ model: "m", apiKey: KEY, fetchImpl: async () => responded({ reply: "Sure.", reaction: "", cooperates: null }) });
 	const bad = await handler(missing).say(line("check", "grip", "Please hold this handle, then release it."));
 	assert.equal(bad.status, 422);

@@ -149,6 +149,7 @@ func _initialize() -> void:
 	test_brain()
 	await test_agent()
 	await test_conversation()
+	test_visit_record()
 	test_validator()
 	await test_offline_say()
 	await test_voice()
@@ -857,8 +858,8 @@ func test_counter_and_closing() -> void:
 func test_patient_beats() -> void:
 	var fake := FakeClient.new()
 	var agent := PatientAgent.new(rules, fake, 3)
-	agent.begin_visit(cases.kip, "beat-test", 3)
 	var v := VisitState.new(cases.kip, rules)
+	agent.begin_visit(v, "beat-test", 3)
 	var before := v.snapshot()
 	eq(await agent.beat("arrive", "", before, {}), {}, "offline beats are silent")
 	agent.set_mode("model")
@@ -871,11 +872,11 @@ func test_patient_beats() -> void:
 	eq((await agent.beat("after_check", "grip", before, {})).get("reply"), "A moment, doctor.", "a timely beat is available to the director")
 	ok(not agent.can_beat("arrive") and agent.calls_this_visit == 3 and agent.last.is_empty(), "three optional turns consume three shared replies and leave the foreground untouched")
 	eq(v.snapshot(), before, "beats change no rule, evidence or lamp")
-	var old: Array = agent.conversation_history.duplicate(true)
-	agent.remember_exchange({}, {"reply":"A moment, doctor."})
-	ok(agent.conversation_history.size() == old.size()+1, "only a displayed beat becomes a memory")
-	agent.begin_visit(cases.rook, "another-seat", 4)
-	ok(not str(agent.conversation_history).contains("A moment, doctor.") and agent.beats_this_visit == 0, "new visitors forget the previous conversation and reset both budgets")
+	var old: Array = agent.record.entries.duplicate(true)
+	agent.record.append("patient", "A moment, doctor.")
+	ok(agent.record.entries.size() == old.size()+1, "only a displayed beat becomes a memory")
+	agent.begin_visit(visit("rook"), "another-seat", 4)
+	ok(not str(agent.record.entries).contains("A moment, doctor.") and agent.beats_this_visit == 0, "new visitors forget the previous conversation and reset both budgets")
 	agent.calls_this_visit = 16
 	ok(not agent.can_beat("arrive"), "the shared sixteen always wins")
 
@@ -889,8 +890,8 @@ func test_patient_rules_match() -> void:
 			"temper": template.signs.temper.broken[0].id}})
 		for case_data in [normal, broken]:
 			var agent := PatientAgent.new(rules, FakeClient.new(), 123)
-			agent.begin_visit(case_data, "same-visit", 123)
 			var probe := VisitState.new(case_data, rules)
+			agent.begin_visit(probe, "same-visit", 123)
 			var temper_id: String = case_data.signs.temper
 			eq(probe.open_signs(), {}, "%s with no earned sign" % id)
 			probe.seen["flare"] = true
@@ -901,7 +902,7 @@ func test_patient_rules_match() -> void:
 				var readers := [PatientAgent.new(rules, FakeClient.new(), 7), PatientAgent.new(rules, FakeClient.new(), 7)]
 				var randoms := [RandomNumberGenerator.new(), RandomNumberGenerator.new()]
 				for i in 2:
-					readers[i].begin_visit(case_data, "test-ask", 7)
+					readers[i].begin_visit(offline if i == 0 else online, "test-ask", 7)
 					readers[i].set_mode("script" if i == 0 else "model")
 					randoms[i].seed = 77
 				for turn in 2:
@@ -925,12 +926,12 @@ func test_patient_rules_match() -> void:
 						var v: VisitState = offline if i == 0 else online
 						var reader: PatientAgent = readers[i]
 						var d: Dictionary = await reader.decide(event, v.snapshot(), [event.outcome], v.open_signs(event))
-						reader.remember_exchange(event, d)
+						display_answer(reader, d)
 						v.apply_ask(topic.id, str(d.move), str(d.line))
 						v.roll_action(randoms[i])
 					eq([offline.patience, offline.seen, offline.notes, offline.last_recorded_speech, offline.actions, randoms[0].state],
 						[online.patience, online.seen, online.notes, online.last_recorded_speech, online.actions, randoms[1].state], "ASK has the same price, proof, quote and random draws")
-					eq(readers[0].conversation_history, readers[1].conversation_history, "authored ASK reaches both conversation histories")
+					eq(readers[0].record.entries, readers[1].record.entries, "authored ASK reaches both conversation histories")
 					eq(readers[1].calls_this_visit, 0, "authored ASK spends no generated reply")
 				var fresh := VisitState.new(case_data, rules)
 				fresh.patience = 0
@@ -1503,12 +1504,12 @@ func test_wear_distribution() -> void:
 			ok(seen, "closing distinguishes a missed worn line and names its check")
 			var e := {"type":"say","text":"hello"}
 			var model := PatientAgent.new(rules)
-			model.begin_visit(c, "same-visit", 1)
+			model.begin_visit(v, "same-visit", 1)
 			var got := model.build_payload(e, v.snapshot(), v.open_signs())
 			var twin: Dictionary = c.duplicate(true)
 			twin.truth = "drifting"
 			var other := VisitState.new(twin, rules)
-			model.begin_visit(twin, "same-visit", 1)
+			model.begin_visit(other, "same-visit", 1)
 			eq(model.build_payload(e, other.snapshot(), other.open_signs()), got, "equal open evidence gives identical model input across truths")
 	var drift := visit("vale")
 	drift.snap()
@@ -1861,7 +1862,7 @@ func test_codes() -> void:
 	var other := courier("juno")
 	var v := visit("kip")
 	v.set_contact(mine)
-	var history_before: Array = v.history.duplicate()
+	var history_before: Array = v.record.entries.duplicate()
 	var p := v.patience
 	var res := v.say_code(other)
 	eq([res["result"], res["cost"], v.patience, res["line"]], ["blank", cost, p - cost, str(cases["kip"]["lines"]["code"])],
@@ -1878,7 +1879,7 @@ func test_codes() -> void:
 	eq(v.patience, p - cost, "a right code costs no patience")
 	eq(v.till_change(), pay, "the drop is in the till before the visit ends")
 	eq(v.say_code(mine)["result"], "done", "a second code after the drop: the drop is done")
-	eq(v.history, history_before, "codes leave nothing in the patient's history")
+	eq(v.record.entries, history_before, "codes leave nothing in the patient's history")
 	v.verdict("treat")
 	var s := v.settlement()
 	eq([s["credits"], s["outcome_credits"], s["drop"], s["dropped"], s["missed_drop"], s["codes_wrong"], s["contact"], s["alias"]],
@@ -2061,8 +2062,8 @@ func test_agent() -> void:
 	eq(agent.max_calls, int(rules.agent.max_model_calls_per_visit), "call cap comes from the rules")
 	ok(agent.max_calls >= 12, "the cap leaves room for a conversation, not four lines")
 	agent.max_calls = 4      # the cap itself is tested with a small number
-	agent.session_id = "test-session"
-	agent.begin_visit(v.case_data, "test-visit", 3)
+	agent.run_id = "test-session"
+	agent.begin_visit(v, "test-visit", 3)
 	var ev := {"type": "check", "id": "grip", "text": "Hold the handle."}
 	var d: Dictionary = await agent.decide(ev, v.snapshot(), ["comply"])
 	eq(d["source"], "script", "offline mode remains a comparison")
@@ -2074,7 +2075,7 @@ func test_agent() -> void:
 	eq(d["move"], "stall", "model can refuse outside authored cooperation options")
 	var applied := v.apply_check("grip", str(d.move), true)
 	eq(applied.result, "refused", "refusal is not coerced into scripted comply")
-	agent.remember_exchange(ev, d)
+	display_answer(agent, d)
 	var payload := agent.build_payload({"type": "say", "id": "free", "text": "What would reassure you?"}, v.snapshot())
 	ok(not payload.has("legal_moves"), "no legal moves transmitted")
 	eq(payload.signs, {}, "an unopened visit reveals neither sign")
@@ -2082,11 +2083,11 @@ func test_agent() -> void:
 	ok(not payload.has("truth") and not (payload.state as Dictionary).has("truth") and not JSON.stringify(payload).contains("drifting"),
 		"and never names the patient's truth")
 	var night_vale := PatientAgent.new(rules, client, 3)
-	night_vale.begin_visit(visit("vale").case_data, "test-vale", 3)
+	night_vale.begin_visit(visit("vale"), "test-vale", 3)
 	eq(night_vale.build_payload({"type": "say", "id": "free", "text": "Go on."}, {}).get("signs"), {},
 		"Vale also begins with both signs hidden")
 	var bare := PatientAgent.new(rules, client, 3)
-	bare.begin_visit({"id": "kip", "version": 3}, "test-bare", 3)
+	bare.begin_visit(VisitState.new({"id": "kip", "version": 3}, rules), "test-bare", 3)
 	eq(bare.build_payload({}, {}).signs, {}, "no signs are sent by default")
 	ok(JSON.stringify(payload.conversation_history).contains("Not until"), "actual previous speech remembered")
 	client.reply = {"ok": true, "data": {"reply": "My pupils look fine. Why are you worried?", "reaction": "Studies the doctor.", "cooperates": true}}
@@ -2104,35 +2105,81 @@ func test_agent() -> void:
 	eq(d.fallback_reason, "timeout", "timeout falls back")
 	d = await agent.decide(ev, v.snapshot(), ["comply"])
 	eq(d.fallback_reason, "call_cap", "cost cap enforced")
-	agent.begin_visit(cases["maren"], "test-next", 4)
-	ok(not JSON.stringify(agent.conversation_history).contains("My pupils"), "history reset between patients")
+	agent.begin_visit(visit("maren"), "test-next", 4)
+	ok(not JSON.stringify(agent.record.entries).contains("My pupils"), "history reset between patients")
 	eq(agent.calls_this_visit, 0, "per-visit budget resets")
 
 
 ## A typed or spoken conversation: many turns, each one carried to the next request.
+func test_visit_record() -> void:
+	var v := visit("kip")
+	var a := PatientAgent.new(rules)
+	a.run_id = "one-shift"
+	a.begin_visit(v, "appointment-one", 11)
+	v.record.append("patient", "I work nights.")
+	var ev := {"type":"say", "id":"free", "text":"How about that grip test?"}
+	for i in 180:
+		v.record.append("doctor", str(i) + " 问一下握力和轮班的事。".repeat(25) + " \"OK?\"")
+		if i == 85:
+			v.apply_check("grip", "comply", true)
+			v.complete_check("grip")
+			v.press()
+	v.record.append("patient", "My shift starts at nine.")
+	var request := a.build_payload(ev, v.snapshot())
+	var summary: Dictionary = request.visit_summary
+	var excerpt: Array = request.conversation_history
+	ok(JSON.stringify(request).to_utf8_buffer().size() <= int(rules.agent.max_body_bytes), "an oversized multilingual visit fits the real UTF-8 POST limit")
+	eq(excerpt.front(), v.record.entries.front(), "opening words survive a long visit")
+	eq(excerpt.back(), v.record.entries.back(), "the latest reply survives a long visit")
+	eq(request.event, ev, "the current question is never compacted")
+	eq(excerpt.size() + int(summary.omitted), v.record.entries.size(), "every entry is either present or counted in the missing span")
+	eq(excerpt.slice(0, summary.after), v.record.entries.slice(0, summary.after), "the leading excerpt is in original order")
+	eq(excerpt.slice(summary.after), v.record.entries.slice(summary.after + summary.omitted), "the recent excerpt is in original order")
+	eq([summary.actions.get("done:grip"), summary.actions.get("press:1")], [1,1], "a completed grip and actual pressure survive even in the missing span")
+	ok(not excerpt.has({"role":"action","text":"done:grip"}), "the test placed grip in the omitted middle")
+	excerpt.front().text = "changed wire copy"
+	eq(v.record.entries.front().text, "I work nights.", "a request cannot alter the original journal")
+	var returning_patient := visit("kip")
+	a.begin_visit(returning_patient, "appointment-two", 12)
+	var return_request := a.build_payload(ev, returning_patient.snapshot())
+	eq([request.run_id, request.session_id, request.visit_id], ["one-shift", "appointment-one", "appointment-one"], "one session includes every route for this visit")
+	eq([return_request.run_id, return_request.session_id, return_request.visit_id], ["one-shift", "appointment-two", "appointment-two"], "the same patient on a return visit gets a new session inside the same run quota")
+	ok(v.record.entries.is_empty() and return_request.conversation_history.is_empty() and not return_request.has("visit_summary"), "neither the prior words nor action totals follow the patient")
+	a.end_visit()
+	ok(a.record == null and a.visit_id.is_empty() and a.build_payload(ev, {}).is_empty(), "a closed appointment cannot build another patient request")
+
+
+func display_answer(agent: PatientAgent, answer: Dictionary) -> void:
+	agent.record.append("reaction", Lang.t(str(answer.get("reaction", ""))))
+	agent.record.append("patient", Lang.t(str(answer.reply)))
+
+
 func test_conversation() -> void:
 	var client := FakeClient.new()
 	var agent := PatientAgent.new(rules, client, 5)
 	var v := visit("rook")
-	agent.session_id = "test-session"
-	agent.begin_visit(v.case_data, "test-talk", 5)
+	agent.run_id = "test-session"
+	agent.begin_visit(v, "test-talk", 5)
 	agent.set_mode("model")
-	var opening: int = agent.conversation_history.size()
+	for line in v.case_data.opening:
+		v.record.append("patient", Lang.t(str(line)))
+	var opening: int = agent.record.entries.size()
 	for i in agent.max_calls:
 		client.reply = {"ok": true, "data": {"reply": "Answer number %d, in my own words." % i, "reaction": "Shifts weight, turn %d." % i}}
 		var ev := {"type": "say", "id": "free", "text": "Doctor line %d?" % i}
 		var d: Dictionary = await agent.decide(ev, v.snapshot(), [])
 		eq(d.source, "model", "turn %d answered by the patient model" % i)
-		agent.remember_exchange(ev, d)
+		display_answer(agent, d)
 	eq(client.calls, agent.max_calls, "one model call per line said")
 	eq(agent.calls_this_visit, agent.max_calls, "every line counted against the visit")
 	var payload := agent.build_payload({"type": "say", "id": "free", "text": "And now?"}, v.snapshot())
 	var sent := JSON.stringify(payload.conversation_history)
-	ok(payload.conversation_history.size() <= PatientAgent.MAX_HISTORY, "history sent stays within the proxy's limit")
+	eq(payload.conversation_history, v.record.entries, "the whole appointment fits in the request, including its opening")
+	ok(payload.conversation_history.size() > 48 and sent.contains("Doctor line 0?"), "the first words survive sixteen model calls")
 	ok(sent.contains("Doctor line %d?" % (agent.max_calls - 1)) and sent.contains("Answer number %d," % (agent.max_calls - 1)),
 		"the latest exchange is in the next request")
 	ok(sent.contains("Answer number 1,"), "an early exchange is still remembered at the cap")
-	ok(opening > 0 and agent.conversation_history.size() == mini(PatientAgent.MAX_HISTORY, opening + 3 * agent.max_calls),
+	ok(opening > 0 and agent.record.entries.size() == opening + 3 * agent.max_calls,
 		"doctor line, reaction and reply are all remembered")
 	eq(int(v.asked.get("free", 0)), 0, "conversation history and question counts are separate")
 	eq(v.ask_cost("free"), 0, "small talk never costs patience")
@@ -2141,7 +2188,7 @@ func test_conversation() -> void:
 	eq(client.calls, agent.max_calls, "and no request leaves the game")
 	ok(str(d2.reply) != "", "the capped line still gets a spoken fallback")
 	# a reply a little over the asked length is kept whole; only an unshowable one fails
-	agent.begin_visit(v.case_data, "test-talk-2", 6)
+	agent.begin_visit(v, "test-talk-2", 6)
 	var longish := "I told you already, it locks when the cold gets in. ".repeat(3).strip_edges()
 	ok(longish.length() > agent.max_line_chars and longish.length() <= agent.max_reply_chars, "test line sits between the two limits")
 	client.reply = {"ok": true, "data": {"reply": longish, "reaction": ""}}
@@ -2216,7 +2263,7 @@ func test_offline_say() -> void:
 	for id in cases.keys():
 		var v := visit(id)
 		var agent := PatientAgent.new(rules, null, 2)
-		agent.begin_visit(v.case_data, "offline-say", 2)
+		agent.begin_visit(v, "offline-say", 2)
 		var d: Dictionary = await agent.decide({"type": "say", "id": "free", "text": "Nice weather tonight."}, v.snapshot(), [])
 		eq(d.source, "script", id + ": offline say stays offline")
 		var pool: Array = v.case_data.lines.deflect if typeof(v.case_data.lines.deflect) == TYPE_ARRAY else [v.case_data.lines.deflect]
@@ -2373,26 +2420,26 @@ func test_voice() -> void:
 	# the request for a clip's words
 	var client := VoiceClient.new()
 	var agent := PatientAgent.new(rules, client, 9)
-	agent.session_id = "test-session"
+	agent.run_id = "test-session"
 	var v := visit("kip")
-	agent.begin_visit(v.case_data, "voice-visit", 9)
+	agent.begin_visit(v, "voice-visit", 9)
 	eq(agent.max_voice_clips, int(voice.max_clips_per_visit), "the clip cap comes from the rules")
 	var said := VoiceClip.make_wav(PackedByteArray([1, 0, 2, 0, 255, 127]))
 	var r: Dictionary = await agent.transcribe(said)
 	eq([r.get("ok"), r.get("error"), client.calls], [false, "not_configured", 0], "the offline comparison sends no clip anywhere")
 	agent.set_mode("model")
-	var history: int = agent.conversation_history.size()
+	var history: int = agent.record.entries.size()
 	client.reply = {"ok": true, "data": {"text": "  Does the arm ever move by itself?  ", "meta": {"mock": true}}}
 	r = await agent.transcribe(said)
 	eq([r.get("ok"), r.get("text"), r.get("mock")], [true, "Does the arm ever move by itself?", true], "the words come back, marked when the transport is a mock")
 	var sent: Dictionary = client.last
 	var keys: Array = sent.keys()
 	keys.sort()
-	eq(keys, ["audio", "client", "language", "protocol", "session_id", "visit_id"],
+	eq(keys, ["audio", "client", "language", "protocol", "run_id", "session_id", "visit_id"],
 		"a clip travels with its session, visit and language: no case, state or history")
-	eq([sent.protocol, sent.session_id, sent.visit_id, sent.audio.mime], ["4", "test-session", "voice-visit", "audio/wav"], "in protocol 4, as a WAV")
+	eq([sent.protocol, sent.run_id, sent.session_id, sent.visit_id, sent.audio.mime], ["4", "test-session", "voice-visit", "voice-visit", "audio/wav"], "in protocol 4, as a WAV")
 	eq(Marshalls.base64_to_raw(str(sent.audio.data)), said, "the samples arrive as they were")
-	eq([agent.calls_this_visit, agent.conversation_history.size()], [0, history], "words written down are not a line said: no dialogue call, nothing remembered")
+	eq([agent.calls_this_visit, agent.record.entries.size()], [0, history], "words written down are not a line said: no dialogue call, nothing remembered")
 	client.reply = {"ok": true, "data": {"text": "Plain words."}}
 	r = await agent.transcribe(said)
 	eq([r.get("ok"), r.get("mock")], [true, false], "a real service is not marked as a mock")
@@ -2410,7 +2457,7 @@ func test_voice() -> void:
 	var before_cap: int = client.calls
 	var capped: Dictionary = await agent.transcribe(said)
 	eq([r.get("ok"), capped.get("ok"), capped.get("error"), client.calls], [true, false, "clip_cap", before_cap], "past the cap no clip leaves the game")
-	agent.begin_visit(cases["maren"], "voice-next", 10)
+	agent.begin_visit(visit("maren"), "voice-next", 10)
 	eq(agent.voice_clips_this_visit, 0, "the next patient starts a new count")
 	agent.max_voice_clips = int(voice.max_clips_per_visit)
 	# words that come back after the patient has gone belong to nobody
@@ -2419,7 +2466,7 @@ func test_voice() -> void:
 	var late: Array = []
 	_hear(agent, said, late)
 	eq([client.calls, late.size()], [before_cap + 1, 0], "a slow service keeps the game waiting")
-	agent.begin_visit(cases["rook"], "voice-after", 11)
+	agent.begin_visit(visit("rook"), "voice-after", 11)
 	client.released.emit()
 	ok(late.size() == 1 and (late[0] as Dictionary).is_empty(), "a transcript for the last patient is dropped")
 	var same: Array = []
@@ -2430,7 +2477,7 @@ func test_voice() -> void:
 	client.hold = false
 	# a client that cannot hear is reported, not called
 	var deaf := PatientAgent.new(rules, FakeClient.new(), 9)
-	deaf.begin_visit(v.case_data, "voice-deaf", 9)
+	deaf.begin_visit(v, "voice-deaf", 9)
 	deaf.set_mode("model")
 	r = await deaf.transcribe(said)
 	eq([r.get("ok"), r.get("error")], [false, "not_configured"], "a client without a speech route is never asked")

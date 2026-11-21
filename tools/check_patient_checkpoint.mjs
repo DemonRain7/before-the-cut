@@ -5,6 +5,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { buildPrompt, DEFAULT_LIMITS, PROTOCOL, validateRequest } from "../agent_proxy/src/core.mjs";
+import { openAIInput } from "../agent_proxy/src/providers.mjs";
 import { loadGameData } from "../agent_proxy/src/dev_server.mjs";
 
 const [mode, address, directory] = process.argv.slice(2);
@@ -67,13 +68,14 @@ try {
 		for (const [j, event] of actions.entries()) {
 			if (event.outcome === "answer") signs.speech = !speech.evidence?.length || speech.evidence.includes(q.id) ? speech.id : c.signs.speech.normal[0].id;
 			if (event.type === "press") signs.temper = temper.id;
-			const body = { protocol:PROTOCOL, session_id:session, visit_id:session + "-" + i, case_id:id, case_version:c.version,
+			const visit = session + "-" + i;
+			const body = { protocol:PROTOCOL, run_id:session, session_id:visit, visit_id:visit, case_id:id, case_version:c.version,
 				language, state:hearing, signs, event, conversation_history:history };
 			const checked = validateRequest(body, cases);
 			assert.ok(checked.ok);
 			const prompt = buildPrompt(c,rules,checked.req,zh ? 55 : 110);
 			// Each UTF-8 byte can take at most one token. Include the schema and framing, then reserve the full output limit.
-			const inputBound = Buffer.byteLength(JSON.stringify(prompt)) + 512;
+			const inputBound = Buffer.byteLength(JSON.stringify([openAIInput({...prompt, req:checked.req}, true), prompt.schema])) + 1024;
 			const worst = inputBound * inputNanoUsd + DEFAULT_LIMITS.maxOutputTokens * outputNanoUsd;
 			if (reserved >= 24 || spentBound + worst > maxNanoUsd) throw Error("Authorized checkpoint limit reached.");
 			const meta = { index:++reserved, case_id:id, language, event:event.type };

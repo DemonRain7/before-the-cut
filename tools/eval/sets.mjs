@@ -21,7 +21,7 @@ export function makeSets() {
   function item(group, c, language, event, signs = {}, fields = {}) {
     const index = sets[group].length;
     const id = group + "-" + String(index).padStart(3, "0");
-    const identity = { protocol: PROTOCOL, session_id: "eval-" + group + "-" + Math.floor(index / 50), visit_id:id, case_id:c.id, case_version:c.version, language };
+    const identity = { protocol: PROTOCOL, run_id: "eval-" + group + "-" + Math.floor(index / 50), session_id:id, visit_id:id, case_id:c.id, case_version:c.version, language };
     const request = group === "E1" ? { ...identity, text:event } : { ...identity, event, signs, state:cleanState(), conversation_history:c.opening.map(line => ({role:"patient",text:tr(c,language,line)})) };
     const row = { id, group, language, caseId:c.id, request, ...fields };
     sets[group].push(row);

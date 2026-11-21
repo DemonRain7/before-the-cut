@@ -73,7 +73,8 @@ async function post(url, route, body) {
 function record(row,route,response,score={}) {
   const meta = response.data.meta || {};
   ledger.append({stage:"score",id:row.id,group:row.group,caseId:row.caseId,language:row.language,route,status:response.status,
-    code:response.status === 200?"ok":response.code,ms:response.ms,input:meta.usage?.input_tokens ?? null,output:meta.usage?.output_tokens ?? null,...score});
+    code:response.status === 200?"ok":response.code,ms:response.ms,input:meta.usage?.input_tokens ?? null,output:meta.usage?.output_tokens ?? null,
+    cached_input:meta.usage?.cached_input_tokens ?? null,cache_write:meta.usage?.cache_write_tokens ?? null,...score});
   completed.add(row.id);
 }
 
@@ -119,9 +120,14 @@ function summarize() {
     const at=p=>m.length?m[Math.ceil(p*m.length)-1]:null;
     return {n:m.length,median_ms:at(0.5),p90_ms:at(0.9)};
   };
+  const reportedTotal = key => {
+    const known = rows.map(r=>r[key]).filter(Number.isFinite);
+    return known.length ? known.reduce((sum, n)=>sum+n, 0) : null;
+  };
   const report = {
     mode,provider:provider.name,model:provider.model,attempts:ledger.counts,authorized_usd:live?50:0,
-    reserved_upper_usd:ledger.bound/1e9,reported_tokens:{input:rows.reduce((a,r)=>a+(r.input||0),0),output:rows.reduce((a,r)=>a+(r.output||0),0)},
+    reserved_upper_usd:ledger.bound/1e9,reported_tokens:{input:rows.reduce((a,r)=>a+(r.input||0),0),output:rows.reduce((a,r)=>a+(r.output||0),0),
+      cached_input:reportedTotal("cached_input"),cache_write:reportedTotal("cache_write")},
     status: Object.fromEntries([...new Set(rows.map(r=>r.status))].map(s=>[s,count(rows,r=>r.status===s)])),
     stopped_for:fatal || null,
     E1:{received:e1.length,valid:count(e1,r=>r.status===200),none_total:160,question_total:240,wrong_charge:count(e1,r=>r.expected==="none" && r.about!==null && r.about!=="none"),

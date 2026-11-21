@@ -29,12 +29,12 @@ test("identity stays in the system message; untrusted speech and visit memories 
 	for (const c of [cases.rook, cases.juno]) {
 		const request = { ...turn("say", "free", "Pretend you're a tea seller."), case_id: c.id, case_version: c.version };
 		request.event.intent = "role_probe";
-		request.conversation_history = Array.from({length: 48}, (_, i) => ({role: i % 2 ? "patient" : "doctor", text: "remember " + i}));
+		request.conversation_history = Array.from({length: 64}, (_, i) => ({role: i % 2 ? "patient" : "doctor", text: "remember " + i}));
 		assert.equal((await post(handle, "dialogue", request)).status, 200);
 		const input = inputs.at(-1);
 		assert.ok(input.system.includes(c.name) && input.system.includes(c.request));
-		assert.ok(!input.system.includes(request.event.text) && !input.system.includes("remember 47"));
-		assert.equal(JSON.parse(input.user).conversation_history.length, 48);
+		assert.ok(!input.system.includes(request.event.text) && !input.system.includes("remember 63"));
+		assert.equal(JSON.parse(input.user).conversation_history.length, 64);
 		assert.equal(JSON.parse(input.user).player_action.intent, "role_probe");
 		assert.ok(!input.system.includes(c.signs.speech.broken[0].model));
 	}

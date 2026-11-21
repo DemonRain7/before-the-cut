@@ -39,13 +39,13 @@ func check(value: bool, label: String) -> void:
 		failed += 1
 		print("FAIL: " + label)
 
-func new_agent(c: Dictionary) -> PatientAgent:
+func new_agent(v: VisitState) -> PatientAgent:
 	serial += 1
 	var model_rules := rules.duplicate(true)
 	model_rules["agent"]["ask_answers"] = "model"
 	var a := PatientAgent.new(model_rules, client, 123)
-	a.session_id = "btc-http-qa"
-	a.begin_visit(c, "btc-http-visit-%d" % serial, 123)
+	a.run_id = "btc-http-qa"
+	a.begin_visit(v, "btc-http-visit-%d" % serial, 123)
 	a.set_mode("model")
 	return a
 
@@ -61,26 +61,27 @@ func _run() -> void:
 	for id in db.cases:
 		var c: Dictionary = db.cases[id]
 		var v := VisitState.new(c, rules)
-		var a := new_agent(c)
+		var a := new_agent(v)
 		var topic: Dictionary = c.topics[0]
 		var ev := {"type": "ask", "id": topic.id, "outcome": "answer", "text": topic.q}
 		var d: Dictionary = await a.decide(ev, v.snapshot(), v.legal_moves_for_ask(str(topic.id)), v.open_signs(ev))
 		check(d.get("source") == "model", str(id) + ": HTTP response used")
 		check(d.get("reply") == NOVEL, str(id) + ": speech survives unchanged")
 		check(bool(d.get("meta", {}).get("mock", false)), "synthetic response labelled mock")
-		a.remember_exchange(ev, d)
+		a.record.append("reaction", d.reaction)
+		a.record.append("patient", d.reply)
 		v.apply_ask(str(topic.id), str(d.move), str(d.reply))
 		ev = {"type": "check", "id": "grip", "text": "Please hold this handle, then release it."}
 		d = await a.decide(ev, v.snapshot(), v.legal_moves_for_check("grip"))
 		check(d.get("source") == "model" and bool(d.get("cooperates", false)), "tool consent through HTTP")
 		var result := v.apply_check("grip", str(d.move), true)
 		check(result.result == "granted", "AI cooperation reaches tool state")
-		check(a.conversation_history.size() >= 3, "visit history carries actual conversation")
+		check(a.record.entries.size() >= 3, "visit history carries actual conversation")
 	await test_sign_matrix(db)
 	for scenario in ["timeout", "invalid", "slow"]:
 		client.base_url = str(urls[scenario])
-		var a := new_agent(db.cases.kip)
 		var v := VisitState.new(db.cases.kip, rules)
+		var a := new_agent(v)
 		var started := Time.get_ticks_msec()
 		var d: Dictionary = await a.decide({"type":"ask","id":"why","outcome":"answer","text":"What happened?"}, v.snapshot(), ["answer"])
 		check(d.source == "fallback", scenario + ": explicit offline fallback")
@@ -91,6 +92,7 @@ func _run() -> void:
 	await test_speech_route(db.cases.kip)
 	await test_scene()
 	await test_optional_turns()
+	await test_visit_timeline()
 	for language in ["en", "zh"]:
 		await test_talk_rules(language)
 	Lang.pin("en")
@@ -109,9 +111,9 @@ func test_sign_matrix(db: Dictionary) -> void:
 				for temper in ["normal", "broken"]:
 					var signs := {"speech": template.signs.speech[speech][0].id, "temper": template.signs.temper[temper][0].id}
 					var c := CaseDB.compose(template, {"signs": signs, "truth": "stable" if speech == "normal" and temper == "normal" else "drifting"})
-					var a := new_agent(c)
-					a.session_id = "btc-sign-matrix"
 					var v := VisitState.new(c, rules)
+					var a := new_agent(v)
+					a.run_id = "btc-sign-matrix"
 					var evidence: Array = c.rows.speech.evidence
 					var id_to_ask := str(evidence[0]).trim_prefix("ask:")
 					v.press()
@@ -135,7 +137,7 @@ func test_speech_route(c: Dictionary) -> void:
 		frames[i] = Vector2(s, s)
 	one.push(frames)
 	var wav := one.wav()
-	var a := new_agent(c)
+	var a := new_agent(VisitState.new(c, rules))
 	var t: Dictionary = await a.transcribe(wav)
 	check(t.get("ok") == true and t.get("text") == MOCK_TRANSCRIPT, "speech: a clip's words come back over HTTP")
 	check(t.get("mock") == true, "speech: the synthetic transcript is labelled mock")
@@ -193,7 +195,7 @@ func spoken_conversation(main: MainScript, driver: PlayDriver) -> void:
 
 	# -- one working exchange
 	var calls: int = main.agent.calls_this_visit
-	var history: int = main.agent.conversation_history.size()
+	var history: int = main.agent.record.entries.size()
 	var clips: int = main.agent.voice_clips_this_visit
 	var free_lines: int = int(main.visit.asked.get("free", 0))
 	driver.key(KEY_TAB)
@@ -221,7 +223,7 @@ func spoken_conversation(main: MainScript, driver: PlayDriver) -> void:
 	check(box.input_open and box.input_status == "" and box.input_text == MOCK_TRANSCRIPT, "they are put on the typing line for the doctor to check")
 	check(main._base_hint == main.MIC_MOCK_HINT, "the hint says the mock transport heard nobody")
 	check(main.agent.voice_clips_this_visit == clips + 1, "one clip was sent")
-	check(main.agent.calls_this_visit == calls and main.agent.conversation_history.size() == history and not main._thinking
+	check(main.agent.calls_this_visit == calls and main.agent.record.entries.size() == history and not main._thinking
 		and int(main.visit.asked.get("free", 0)) == free_lines, "letting go of the key says nothing to the patient")
 	settled = await driver.until(func() -> bool: return AudioServer.get_bus_volume_db(0) > -0.5, 5.0)
 	check(settled, "the clinic's sound comes back")
@@ -240,7 +242,8 @@ func spoken_conversation(main: MainScript, driver: PlayDriver) -> void:
 	check(settled and main.agent.calls_this_visit == calls, "dictated ASK uses intent and the authored implant answer")
 	settled = await driver.until(func() -> bool: return box.speaker == main._patient_name() and " ".join(box.lines) == str(main.visit.topic("implant").a), 20.0)
 	check(settled, "the patient's reply is shown as text, as always")
-	check(main.agent.conversation_history.size() == history + 2 and str(main.agent.conversation_history[history].text) == corrected,
+	check(main.agent.record.entries.size() == history + 3 and main.agent.record.entries[history] == {"role":"doctor","text":corrected}
+		and main.agent.record.entries[history+1] == {"role":"action","text":"ask:implant:answer"},
 		"the history holds the approved words, once")
 	check(int(main.visit.asked.get("free", 0)) == free_lines, "the spoken question is recorded under implant only")
 
@@ -450,7 +453,7 @@ func spoken_conversation(main: MainScript, driver: PlayDriver) -> void:
 	driver.key(KEY_ENTER)
 	settled = await driver.until(func() -> bool: return main.agent.calls_this_visit == calls3 + 1 and not main._thinking and not main._lock, 20.0)
 	check(settled, "ENTER sends the words as they came back")
-	var now := JSON.stringify(main.agent.conversation_history)
+	var now := JSON.stringify(main.agent.record.entries)
 	check(now.contains(MOCK_TRANSCRIPT) and not now.contains("Does the arm ever move"), "its history holds its own spoken line and nothing from the last patient")
 
 	# -- the log: stages and numbers, never words or sound
@@ -466,7 +469,7 @@ func spoken_conversation(main: MainScript, driver: PlayDriver) -> void:
 	var logged := JSON.stringify(main.event_log.memory)
 	check(not logged.contains("mock transcript") and not logged.contains("Does the arm") and not logged.contains("UklGR"),
 		"the log holds no spoken words and no audio")
-	print("VOICE_SCENE session=%s clips_sent=%d" % [main.session_id, int(stages.get("sent", 0))])
+	print("VOICE_SCENE session=%s clips_sent=%d" % [main.run_id, int(stages.get("sent", 0))])
 
 
 ## The typing line in model mode, through the real key entry points and real HTTP:
@@ -477,7 +480,7 @@ func typed_conversation(main: MainScript, driver: PlayDriver) -> void:
 	var patience: int = main.visit.patience
 	for i in said.size():
 		await driver.settle()
-		var before: int = main.agent.conversation_history.size()
+		var before: int = main.agent.record.entries.size()
 		var calls: int = main.agent.calls_this_visit
 		driver.key(KEY_T, 116)
 		check(main.dialogue.input_open, "typed turn %d: T opens the typing line in model mode" % i)
@@ -490,8 +493,8 @@ func typed_conversation(main: MainScript, driver: PlayDriver) -> void:
 			"typed turn %d: one model call answers it" % i)
 		check(await driver.until(func() -> bool: return main.dialogue.speaker != "YOU" and " ".join(main.dialogue.lines) == NOVEL, 20.0),
 			"typed turn %d: the generated reply is shown" % i)
-		check(main.agent.conversation_history.size() == before + 3, "typed turn %d: doctor line, reaction and reply join the history" % i)
-		var turn: Dictionary = main.agent.conversation_history[before]
+		check(main.agent.record.entries.size() == before + 3, "typed turn %d: doctor line, reaction and reply join the history" % i)
+		var turn: Dictionary = main.agent.record.entries[before]
 		check(str(turn.role) == "doctor" and str(turn.text) == str(said[i]), "typed turn %d: the history holds the doctor's own words" % i)
 	check(main.visit.patience == patience, "after the first free line, talking costs no more patience")
 	check(not main.visit.asked.has("free"), "small talk never enters the question ledger")
@@ -511,9 +514,10 @@ func typed_conversation(main: MainScript, driver: PlayDriver) -> void:
 	var second: String = str(main.visit.case_data.id)
 	check(second != first, "it is a different patient")
 	check(main.agent.mode == "model" and main.agent.calls_this_visit == 0, "the call budget starts again")
-	var carried := JSON.stringify(main.agent.conversation_history)
+	check(await driver.until(func()->bool: return main._beat_opening_done, 16.0), "the second opening finishes playing before its full words are expected")
+	var carried := JSON.stringify(main.agent.record.entries)
 	check(not carried.contains("like the music") and not carried.contains(NOVEL), "the new patient's history has nothing from the last one")
-	check(main.agent.conversation_history.size() == (main.visit.case_data.opening as Array).size(), "it starts from that patient's own opening lines")
+	check(main.agent.record.entries.size() == (main.visit.case_data.opening as Array).size(), "it starts from that patient's own opening lines")
 	check(not main.dialogue.input_open and main.dialogue.input_text == "", "the typing line starts empty")
 	await driver.settle()
 	await driver.say("Hello. Would you like some music?")
@@ -521,7 +525,7 @@ func typed_conversation(main: MainScript, driver: PlayDriver) -> void:
 		"a typed line reaches the second patient")
 	check(await driver.until(func() -> bool: return main.dialogue.speaker != "YOU" and " ".join(main.dialogue.lines) == NOVEL, 20.0),
 		"and the second patient answers")
-	var now := JSON.stringify(main.agent.conversation_history)
+	var now := JSON.stringify(main.agent.record.entries)
 	check(now.contains("Hello. Would you like some music?") and not now.contains("like the music"), "its history holds only its own conversation")
 	# a line typed while the answer is still on its way is not sent twice
 	await driver.settle()
@@ -558,7 +562,7 @@ func meanwhile(main: MainScript, driver: PlayDriver) -> void:
 	check(main.agent.fallbacks_this_visit == fallbacks + 1 and main.dialogue.speaker == main._patient_name(),
 		"meanwhile: it is the patient's line (the authored one: this server is slower than the deadline)")
 	await driver.settle()
-	var history: int = main.agent.conversation_history.size()
+	var finished_record := main.visit.record
 	main.act_say("One more question, then.")
 	check(main._thinking, "meanwhile: thinking again")
 	main.act_pick_stamp("treat")
@@ -587,7 +591,7 @@ func meanwhile(main: MainScript, driver: PlayDriver) -> void:
 			last.append(str(rec.get("type", "")))
 		print("meanwhile: stopped in state %d, last events: %s" % [main.state, ", ".join(last)])
 	check(slipped, "meanwhile: the visit ends with a slip")
-	check(main.agent.conversation_history.size() == history, "meanwhile: the late answer never joins the conversation")
+	check(main.agent.record == null and finished_record.entries.is_empty(), "a resolved visit releases its record and drops late replies")
 	client.base_url = str(urls.normal)
 
 
@@ -636,12 +640,12 @@ func test_optional_turns() -> void:
 	check(await driver.open_counter() and await driver.buzz_in(), "a visit opens before its optional turns")
 	await driver.settle()
 	main.agent.client = client
-	main.agent.session_id = "scene-beats"
+	main.agent.run_id = "scene-beats"
 	main.agent.set_mode("model")
 	main._service_has_beats = true
 	var before: Dictionary = main.visit.snapshot()
 	var draws: int = main._snap_rng.state
-	var memory := main.agent.conversation_history.duplicate(true)
+	var memory := main.agent.record.entries.duplicate(true)
 	client.base_url = str(urls.stt_slow) # replies successfully after 700 ms of wall time
 	main._try_beat("arrive")
 	check(main._beat_pending and not main._lock and not main._thinking, "an outstanding beat never owns the action lock")
@@ -651,15 +655,45 @@ func test_optional_turns() -> void:
 	while main._beat_pending and Time.get_ticks_msec() < deadline:
 		await process_frame
 	check(not main._beat_pending, "the slow request resolves")
-	check(main.agent.conversation_history == memory and main.dialogue.input_open, "a late reply neither replaces the input nor enters memory")
+	check(main.agent.record.entries == memory and main.dialogue.input_open, "a late reply neither replaces the input nor enters memory")
 	main.act_cancel()
 	await driver.settle()
 	client.base_url = str(urls.normal)
 	main._try_beat("after_check","penlight")
 	check(await driver.until(func()->bool: return not main._beat_pending, 12.0), "a timely optional turn resolves")
-	check(main.agent.conversation_history.size() == memory.size()+1, "a timely reply appears in the visit")
+	check(main.agent.record.entries.size() == memory.size()+1, "a timely reply appears in the visit")
 	check(main.visit.snapshot() == before and main._snap_rng.state == draws, "a spoken beat leaves the simulation unchanged")
 	await driver.leave()
+
+
+func test_visit_timeline() -> void:
+	var main: MainScript = load("res://scenes/main.tscn").instantiate()
+	main.beats_enabled = false
+	main.authored_order = true
+	main.surprises_enabled = false
+	root.add_child(main)
+	await process_frame
+	var d := PlayDriver.new(self, main)
+	check(await d.open_counter() and await d.buzz_in(), "the visit timeline opens at the counter")
+	check(await d.until(func()->bool: return main._beat_opening_done, 16.0), "the timeline records the opening as it plays")
+	main.agent.client = client
+	main.agent.run_id = "btc-visit-record"
+	main.agent.set_mode("model")
+	client.base_url = str(urls.normal)
+	check(await d.request_tool("grip") == "open", "the doctor opens the grip gauge")
+	await d.put_away()
+	check(not main.visit.record.entries.has({"role":"action","text":"done:grip"}), "putting the gauge away records no completed test")
+	check(await d.request_tool("grip") == "open" and await d.squeeze_and_release(), "the doctor reopens and completes GRIP")
+	await d.put_away()
+	await d.settle()
+	await d.press()
+	check(await d.until(func()->bool: return main.visit.press_count == 1 and not main._lock and not main._thinking, 14.0), "an explicit PRESS follows the gauge reading")
+	await d.settle()
+	await d.say("Hello again.")
+	check(await d.until(func()->bool: return main.agent.calls_this_visit == 3 and not main._lock and not main._thinking, 14.0), "a later line goes through the service with the visit's events")
+	var performed: Array = main.event_log.memory.filter(func(e: Dictionary)->bool: return e.type in ["visit_start","scope_open","check_done","press","say"])
+	check(performed.size() >= 6 and performed.all(func(e: Dictionary)->bool: return e.get("visit_id") == main.agent.visit_id), "anonymous game events and the patient share the appointment id")
+	await d.leave()
 
 
 func test_talk_rules(language: String) -> void:
@@ -675,7 +709,7 @@ func test_talk_rules(language: String) -> void:
 	await d.settle()
 	client.base_url = str(urls.normal)
 	main.agent.client = client
-	main.agent.session_id = "btc-fair-" + language
+	main.agent.run_id = "btc-fair-" + language
 	main.agent.set_mode("model")
 	var v := main.visit
 	var p := v.patience
@@ -700,7 +734,7 @@ func test_talk_rules(language: String) -> void:
 	check(await d.until(func()->bool: return v.press_count == 1, 14.0), "CTRL+ENTER applies PRESS")
 	check(v.notes.temper.size() == 1 and main.agent.calls_this_visit == 2 and main.agent.intents_this_visit == 2,
 		"PRESS writes the temper note, skips intent and uses one reply")
-	check(main.agent.conversation_history.any(func(turn: Dictionary)->bool: return turn.role == "doctor" and turn.text == challenge), "the typed pressure line reaches history")
+	check(main.agent.record.entries.any(func(turn: Dictionary)->bool: return turn.role == "doctor" and turn.text == challenge), "the typed pressure line reaches history")
 	await d.settle()
 	main.act_press(challenge)
 	check(await d.until(func()->bool: return v.press_count == 2, 14.0), "terminal PRESS resolves")

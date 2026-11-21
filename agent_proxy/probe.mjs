@@ -49,6 +49,19 @@ export async function probe(send, scenario = "isolation") {
 		refused(await post(a), 504, "upstream_timeout");
 		return { posts: 1, status: 504, elapsed_ms: Math.round(performance.now() - start) };
 	}
+	if (scenario === "visit") {
+		const first = { ...a, run_id: run, visit_id: a.session_id };
+		const next = { ...b, run_id: run, session_id: "return-" + run, visit_id: "return-" + run,
+			case_id: first.case_id, case_version: first.case_version, event: first.event, signs: {}, conversation_history: [] };
+		first.conversation_history = Array.from({length:64}, (_, i) => ({role:"doctor", text:"First appointment " + i}));
+		first.conversation_history.push({role:"action", text:"open:grip"}, {role:"action", text:"done:grip"}, {role:"action", text:"press:1"});
+		first.state = {...a.state, granted:["grip"], press_count:1};
+		first.visit_summary = {after:8, omitted:31, actions:{"open:grip":2,"done:grip":1,"press:1":1}};
+		accepted(await post(first), "en");
+		accepted(await post(next), "zh");
+		refused(await post({...next, session_id:first.session_id}), 400, "bad_request");
+		return {visits:2, same_case:true, history_entries:first.conversation_history.length, omitted:first.visit_summary.omitted, return_entries:0, mismatched_session_status:400};
+	}
 	if (scenario === "budget") {
 		const results = await Promise.all([post(a), post(b), post(a), post(b)]);
 		assert.equal(results.filter(r => r.status === 200 && r.body.meta?.mock).length, 3);

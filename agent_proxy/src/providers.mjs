@@ -256,6 +256,35 @@ function dropNulls(text, optional) {
 	return JSON.stringify(parsed);
 }
 
+// Full groups keep their message boundaries as the visit grows. OpenAI can reuse the last
+// complete group and the developer prefix while the newest exchange still changes.
+const HISTORY_GROUP_SIZE = 8;
+
+export function openAIInput({ system, user, req, currentTurn }, useBreakpoints) {
+	const input = [];
+	function message(role, text, checkpoint = false) {
+		const block = { type: "input_text", text };
+		if (checkpoint && useBreakpoints) block.prompt_cache_breakpoint = { mode: "explicit" };
+		input.push({ role, content: [block] });
+	}
+
+	message("developer", system, true);
+	if (!currentTurn) {
+		message("user", user);
+		return input;
+	}
+	const history = req.conversation_history.slice();
+	const summary = req.visit_summary;
+	if (summary) history.splice(summary.after, 0, { visit_summary: summary });
+	const completed = history.length - history.length % HISTORY_GROUP_SIZE;
+	for (let start = 0; start < history.length; start += HISTORY_GROUP_SIZE) {
+		const group = history.slice(start, start + HISTORY_GROUP_SIZE);
+		message("user", JSON.stringify({ conversation_history: group }), start + HISTORY_GROUP_SIZE === completed);
+	}
+	message("user", JSON.stringify(currentTurn));
+	return input;
+}
+
 /** Reasoning tokens count against max_output_tokens, so a model that thinks gets room to think. */
 const REASONING_ALLOWANCE = { "": 0, none: 0, minimal: 256, low: 2048, medium: 4096, high: 8192 };
 
@@ -297,13 +326,19 @@ export function createOpenAIProvider({ model, sttModel = "gpt-4o-mini-transcribe
 		name: "openai",
 		model,
 		sttModel: listener,
-		async generate({ system, user, schema, maxOutputTokens }, signal) {
-			const optional = Object.keys(schema.properties || {}).filter((k) => !(schema.required || []).includes(k));
+		async generate(prompt, signal) {
+			const { schema, maxOutputTokens, req, currentTurn, intent } = prompt;
+			// One strict wire format across patient turns. The core still requires a real yes/no
+			// for consent and every promised outcome before it can reach the game.
+			const wireSchema = currentTurn ? { ...schema, required: ["reply", "reaction"] } : schema;
+			const optional = Object.keys(wireSchema.properties || {}).filter((k) => !(wireSchema.required || []).includes(k));
+			const useBreakpoints = /^gpt-6-luna(?:$|-)/.test(model) && Boolean(req?.case_id);
 			const body = {
 				model,
-				instructions: system,
-				input: user,
-				text: { format: { type: "json_schema", name: "patient_turn", schema: toOpenAISchema(schema), strict: true } },
+				input: openAIInput(prompt, useBreakpoints),
+				...(useBreakpoints ? { prompt_cache_options: { mode: "implicit" },
+					prompt_cache_key: ["btc-visit-v1", intent ? "intent" : "dialogue", req.case_id, req.language].join(":") } : {}),
+				text: { format: { type: "json_schema", name: "patient_turn", schema: toOpenAISchema(wireSchema), strict: true } },
 				max_output_tokens: maxOutputTokens + REASONING_ALLOWANCE[effort],
 				store: false,
 				service_tier: "default", // Match the standard rates used for the patient budget.
@@ -325,7 +360,12 @@ export function createOpenAIProvider({ model, sttModel = "gpt-4o-mini-transcribe
 			return {
 				text: dropNulls(text, optional),
 				model: typeof data.model === "string" ? data.model : model,
-				usage: { input_tokens: Number.isFinite(u.input_tokens) ? u.input_tokens : null, output_tokens: Number.isFinite(u.output_tokens) ? u.output_tokens : null },
+				usage: {
+					input_tokens: Number.isFinite(u.input_tokens) ? u.input_tokens : null,
+					output_tokens: Number.isFinite(u.output_tokens) ? u.output_tokens : null,
+					cached_input_tokens: u.input_tokens_details?.cached_tokens ?? null,
+					cache_write_tokens: u.input_tokens_details?.cache_write_tokens ?? null,
+				},
 			};
 		},
 		/** The clip goes up as a WAV file. A transcription model writes down words; it takes no orders. */

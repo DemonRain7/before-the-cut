@@ -21,7 +21,7 @@
   "agent": {"ask_answers": "authored", "beats": {"enabled": true, "max_per_visit": 3, "max_idle_per_visit": 2, "idle_seconds": 12}, "intent": {"max_calls_per_visit": 16, "max_calls_per_session": 240, "timeout_ms": 2500, "upstream_timeout_ms": 2000, "max_output_tokens": 32},
     "default_url": "https://before-the-cut-agent.demonrain777.workers.dev", "health_timeout_ms": 2000, "max_provider_calls_per_day": 1500, "max_provider_calls_per_process": 2000,
     "counter_retention_days": 2, "max_tracked_keys": 2000, "max_body_bytes": 32768, "upstream_timeout_ms": 3500,
-    "max_output_tokens": 256, "max_history_turns": 48, "max_model_calls_per_session": 240,
+    "max_output_tokens": 256, "max_model_calls_per_session": 240,
     "max_model_calls_per_visit": 16, "max_line_chars": 110, "max_reply_chars": 220, "timeout_ms": 4000,
     "languages": {"zh": {"max_line_chars": 55, "max_reply_chars": 110}},
     "languages_note": "A hanzi takes the room of two letters on the strip: Chinese gets half the characters. The same numbers are in agent_proxy/src/core.mjs DEFAULT_LIMITS.languages.",

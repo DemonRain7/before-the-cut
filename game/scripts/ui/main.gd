@@ -306,7 +306,7 @@ var visit: VisitState = null
 var agent: PatientAgent = null
 var model_client: ModelClient = null
 var event_log: EventLog = null
-var session_id: String = ""
+var run_id: String = ""
 var shift_seed: int = 0
 var shift_number: int = 0
 var fixed_seed: int = 0
@@ -614,9 +614,9 @@ func _build() -> void:
 
 func _start_session() -> void:
 	_boot_rng.randomize()
-	session_id = Crypto.new().generate_random_bytes(16).hex_encode()
+	run_id = Crypto.new().generate_random_bytes(16).hex_encode()
 	event_log = EventLog.new()
-	event_log.open(session_id)
+	event_log.open(run_id)
 	var agent_rules: Dictionary = rules.get("agent", {})
 	model_client = ModelClient.new()
 	model_client.base_url = agent_url
@@ -645,6 +645,8 @@ func _log(event_type: String, data: Dictionary = {}) -> void:
 	var record := data.duplicate()
 	if visit != null and not record.has("case"):
 		record["case"] = str(visit.case_data.get("id", ""))
+	if agent != null and agent.visit_id != "":
+		record["visit_id"] = agent.visit_id
 	event_log.write(event_type, record)
 
 
@@ -956,13 +958,16 @@ func _patient_name() -> String:
 	return str(visit.case_data.get("name", "")) if visit != null else ""
 
 
-func _patient_line(text: String, token: int, hold: float = 0.8) -> bool:
-	if text == "" or visit == null:
+func _patient_line(text: String, token: int, hold: float = 0.8, remember: bool = true) -> bool:
+	if token != _seq or text == "" or visit == null:
 		return token == _seq
+	var spoken := Lang.t(text)
+	if remember and agent != null and agent.record == visit.record:
+		visit.record.append("patient", spoken)
 	var voice: Dictionary = visit.case_data.get("voice", {})
 	_patient_talking = true
 	_set_voice("blip_glitch" if bool(voice.get("glitch", false)) else "blip", float(voice.get("pitch", 1.0)), -7.0)
-	dialogue.say(_patient_name(), text, Gfx.WARM6, Gfx.TEAL7, 44.0 * float(voice.get("rate", 1.0)))
+	dialogue.say(_patient_name(), _spoken_for_display(spoken), Gfx.WARM6, Gfx.TEAL7, 44.0 * float(voice.get("rate", 1.0)), true)
 	var ok: bool = await _run_line(token, hold)
 	return ok
 
@@ -1526,6 +1531,8 @@ func act_report_menu() -> void:
 ## A new night starts from it (_start_shift, which then puts tonight's queue, line and glass on
 ## the meter), and so does the title card when the player goes back to it (act_report_menu).
 func _reset_booth() -> void:
+	if agent != null:
+		agent.end_visit()
 	_visit_serial = 0
 	visit = null
 	clinic.till = 0
@@ -1592,7 +1599,7 @@ func _start_shift() -> void:
 	if agent_url != "":
 		client = model_client
 	agent = PatientAgent.new(rules, client, shift_seed)
-	agent.session_id = session_id
+	agent.run_id = run_id
 	agent.set_mode("model" if use_model else "script")
 	_reset_booth()
 	clinic.queue_count = shift.count()
@@ -1701,7 +1708,7 @@ func act_call_next() -> void:
 	_beat_opening_done = false
 	_beat_pending = false
 	_beat_activity()
-	agent.begin_visit(c, "%s-%d-%d-%s" % [session_id, shift_number, _visit_serial, id], shift_seed + _visit_serial * 7919)
+	agent.begin_visit(visit, Crypto.new().generate_random_bytes(16).hex_encode(), shift_seed + _visit_serial * 7919)
 	_telegraphed = false
 	_attack_t = 0.0
 	_blows = 0
@@ -1821,6 +1828,7 @@ func act_tool(tool: String) -> void:
 		_roll_surprise(0)
 		return
 	if visit.sealed_repeat(tool):
+		visit.record.append("action", "check:%s:sealed" % tool)
 		_base_hint = Lang.t("Sealed. CALM opens it.")
 		return
 	if visit.patience < visit.check_cost(tool):
@@ -1891,30 +1899,25 @@ func _decide(event: Dictionary, legal: Array, ask_line: String, token: int, own:
 		var ok: bool = await _run_line(token, 0.2)
 		if not ok:
 			return {}
-	agent.remember_exchange(event, d)
 	if d.get("source") == "fallback":
 		_base_hint = _fallback_hint(str(d.fallback_reason))
 	_lock = false
-	return _for_display(d)
-
-
-## The conversation keeps the patient's words as they came. The screen can only draw what
-## the bitmap font has, so typographic quotes, dashes and accents are made plain here.
-func _for_display(d: Dictionary) -> Dictionary:
-	for key in ["reply", "line", "reaction"]:
-		var raw := str(d.get(key, ""))
-		var plain := Gfx.printable(raw)
-		if raw != "" and plain == "" and key != "reaction":
-			plain = "..."
-		d[key] = plain
 	return d
+
+
+## Preserve the words in the visit record. Normalize glyphs only when drawing the strip.
+func _spoken_for_display(text: String) -> String:
+	var display := Gfx.printable(text)
+	return "..." if display == "" and text != "" else display
 
 
 func _show_reaction(response: Dictionary, token: int) -> bool:
 	var reaction := str(response.get("reaction", ""))
-	if reaction == "":
+	if token != _seq or visit == null or reaction == "":
 		return token == _seq
-	return await _narrate(_patient_name(), reaction, token, 0.35)
+	if agent != null and agent.record == visit.record:
+		visit.record.append("reaction", Lang.t(reaction))
+	return await _narrate(_patient_name(), _spoken_for_display(Lang.t(reaction)), token, 0.35)
 
 
 ## The patient will not pay for that: there is not enough patience left for it.
@@ -1994,6 +1997,7 @@ func _gave_up() -> void:
 func _open_scope(tool: String) -> void:
 	if visit == null:
 		return
+	visit.record.append("action", "open:" + tool)
 	var already := visit.seen.has("check:" + tool)
 	clinic.scope.standard = _sheet_normal(str(VisitState.TOOL_ROW.get(tool, "")))      # what the sheet calls steady
 	clinic.scope.limit_s = _grip_limit_s()
@@ -2155,6 +2159,7 @@ func act_press(said: String = "") -> void:
 	var question := said if said != "" else Lang.t(str(PRESS_LINES[mini(visit.press_count, PRESS_LINES.size() - 1)]))
 	var d := {}
 	if visit.press_breaks():
+		visit.record.append("doctor", question)
 		_doctor_say(question, true)
 	else:
 		d = await _decide({"type": "press", "id": "challenge"}, [], question, token, true)
@@ -3503,6 +3508,7 @@ func _resolve() -> void:
 		"seen": visit.seen.keys(), "model_calls": agent.calls_this_visit, "fallbacks": agent.fallbacks_this_visit,
 		"contact": visit.is_contact(), "dropped": visit.dropped, "calm_spent": visit.calm_spent,
 		"codes_wrong": visit.codes_wrong, "snapped": visit.snapped, "flared": visit.flared})
+	agent.end_visit()
 	if shift.died:
 		_lights_out(s, token)
 		return
@@ -3695,6 +3701,8 @@ func _close() -> void:
 		get_tree().quit()
 		return
 	_closing = true
+	if agent != null:
+		agent.end_visit()
 	if _mic_state == "listening":
 		act_speak_cancel()
 	audio.set_muted(true)      # nothing new starts while the game is on its way out
@@ -4249,7 +4257,6 @@ func _try_beat(kind: String, tool: String = "") -> void:
 	if revision != _beat_revision or token != _seq or not _beat_quiet() or result.is_empty():
 		return
 	# The optional line can be interrupted by any action; it never takes the action lock.
-	speaker.remember_exchange({}, {"reply": result.reply})
 	_log("patient_beat", {"stage": kind, "chars": str(result.reply).length()})
 	_patient_line(str(result.reply), token, 0.0)
 
@@ -4741,7 +4748,7 @@ func act_say_code(id: String) -> void:
 			_lock = false
 			audio.play("beep_low", 1.1, -8.0)
 			_roll_surprise(int(res.get("cost", 0)))
-			_patient_line(str(res.get("line", "")), token, 0.0)
+			_patient_line(str(res.get("line", "")), token, 0.0, false)
 		"drop":
 			if coach != null:
 				coach.event("code_said")
@@ -4749,7 +4756,7 @@ func act_say_code(id: String) -> void:
 			ok = await _doctor_line(str(entry.get("say", "")), token, 0.3)
 			if not ok:
 				return
-			ok = await _patient_line(str(res.get("line", "")), token, 0.6)
+			ok = await _patient_line(str(res.get("line", "")), token, 0.6, false)
 			if not ok:
 				return
 			_lock = false

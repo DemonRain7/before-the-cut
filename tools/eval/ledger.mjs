@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { ProviderError } from "../../agent_proxy/src/providers.mjs";
+import { openAIInput, ProviderError } from "../../agent_proxy/src/providers.mjs";
 
 export const LIMITS = Object.freeze({ E1: 400, E2: 408, E3: 120, E4: 174 });
 const maxNano = 50_000_000_000;
@@ -37,7 +37,7 @@ export function openLedger(dir, live) {
     const group = id.split("-")[0];
     if (!Object.hasOwn(LIMITS, group) || attempts.has(id) || counts[group] >= LIMITS[group]) throw new ProviderError("eval_call_cap");
     // Max UTF-8 bytes for the exact prompt, schema, framing and output. Upper standard/regional rates per token, in nanodollars.
-    const bytes = Buffer.byteLength(JSON.stringify([input.system, input.user, input.schema])) + 1024;
+    const bytes = Buffer.byteLength(JSON.stringify([openAIInput(input, true), input.schema])) + 1024;
     const nano = live ? bytes * 138 + input.maxOutputTokens * 550 : 0;
     if (bound + nano > maxNano) throw new ProviderError("eval_cost_cap");
     append({ stage: "reserve", id, group, nano });

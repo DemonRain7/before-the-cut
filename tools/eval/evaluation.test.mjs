@@ -11,7 +11,11 @@ test("synthetic matrix is balanced and keeps truth outside provider requests", (
   for (const [key, count] of Object.entries({E1:400,E2:204,E3:120,E4:174})) {
     assert.equal(s[key].length,count);
     assert.equal(s[key].filter(r=>r.language==="zh").length,count/2);
-    for (const row of s[key]) assert.equal("truth" in row.request,false);
+    for (const row of s[key]) {
+      assert.equal("truth" in row.request, false);
+      assert.equal(row.request.session_id, row.request.visit_id);
+      assert.notEqual(row.request.run_id, row.request.visit_id);
+    }
   }
   assert.equal(s.E2.filter(r=>r.sample).length,40);
   assert.equal(s.E3.filter(r=>r.opened).length,60);

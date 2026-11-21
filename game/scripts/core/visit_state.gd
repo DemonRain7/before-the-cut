@@ -32,6 +32,7 @@ extends RefCounted
 ## Used as: const VisitState = preload("res://scripts/core/visit_state.gd")
 
 const Lang = preload("res://scripts/core/lang.gd")
+const VisitRecord = preload("res://scripts/core/visit_record.gd")
 
 const ROWS := ["eyes", "hands", "port", "speech", "temper"]
 const ZONES := ["eyes", "hands", "port"]
@@ -64,7 +65,7 @@ var attack_cause: String = ""    # "refer", "press" or "snap"
 var blows_taken: int = 0         # blows that reached the glass before the shutter was down
 var verdict_kind: String = ""    # "treat", "refer" or ""
 var outcome: String = ""
-var history: Array = []          # short tags, newest last (sent to the patient brain)
+var record := VisitRecord.new()
 var contact: Dictionary = {}     # tonight's contact entry when this visitor is a courier, else {}
 var dropped: bool = false        # the courier answered the code and handed the package over
 var drop_pay: int = 0            # what the drop put in the till
@@ -118,9 +119,7 @@ func _first_line(key: String) -> String:
 
 
 func _note(tag: String) -> void:
-	history.append(tag)
-	if history.size() > 16:
-		history.pop_front()
+	record.append("action", tag)
 
 
 func add_note(row: String, key: String, text: String) -> bool:
@@ -203,7 +202,6 @@ func snapshot() -> Dictionary:
 		"asked": asked.duplicate(),
 		"press_count": press_count,
 		"reassure_used": reassure_used,
-		"history": history.duplicate(),
 	}
 
 
@@ -227,7 +225,7 @@ func look(zone: String) -> Dictionary:
 	res["ok"] = true
 	res["text"] = text
 	res["new"] = add_note(zone, key, text)
-	_note(key)
+	_note("look:" + zone)
 	return res
 
 
@@ -297,6 +295,7 @@ func apply_check(tool: String, move: String, autonomous: bool = false) -> Dictio
 		res["result"] = "granted"
 		return res
 	if sealed_repeat(tool):
+		_note("check:%s:sealed" % tool)
 		res["result"] = "refused"
 		return res
 	var cost := check_cost(tool)
@@ -698,7 +697,6 @@ func give_up() -> Dictionary:
 func _finish(p_outcome: String) -> void:
 	outcome = p_outcome
 	phase = Phase.DONE
-	_note("end:" + p_outcome)
 
 
 func cycle_mark(row: String) -> int:

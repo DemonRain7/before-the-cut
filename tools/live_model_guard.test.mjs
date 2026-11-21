@@ -81,7 +81,7 @@ test("rejected concurrent requests cannot finish or unlock the first request", a
 test("metadata logger drops text, audio, credentials, unexpected fields and unsafe identifiers", () => {
   assert.deepEqual(safeLog({ case_id: "kip", event: "say:free", status: 200, latency_ms: 45,
     reply: "private words", text: "private words", audio: "bytes", authorization: "secret",
-    code: "unsafe text", input_tokens: 120, output_tokens: null }),
-  { case_id: "kip", event: "say:free", status: 200, latency_ms: 45, input_tokens: 120, output_tokens: null });
+    code: "unsafe text", input_tokens: 120, cached_input_tokens: 64, cache_write_tokens: 32, output_tokens: null }),
+  { case_id: "kip", event: "say:free", status: 200, latency_ms: 45, input_tokens: 120, cached_input_tokens: 64, cache_write_tokens: 32, output_tokens: null });
   assert.deepEqual(latencySummary([20, 10, 30, 40]), { count: 4, median_ms: 25, p90_ms: 40, max_ms: 40 });
 });

@@ -1,5 +1,17 @@
 # Before the Cut: handoff
 
+## One session per appointment
+
+Every arrival creates a new patient session, including a return by the same character. Godot collects the doctor’s committed words, the patient’s displayed words, visible reactions and actions in chronological order. Opening GRIP, completing its squeeze-and-release and applying PRESS are distinct entries. Godot determines which clinical cues are available, charges the lamp cost for ASK and resolves the verdict. A resolved or abandoned visit releases its journal and invalidates late replies. Anonymous game events carry the visit ID. [Visit record](game/scripts/core/visit_record.gd) · [Patient agent](game/scripts/core/patient_agent.gd)
+
+The previous limit of 48 represented three entries for each of 16 replies. An ordinary request now contains the entire appointment. Above 32 KiB, excerpts preserve the opening and the latest exchange, and a summary carries the position of the gap and counts of every action across the visit. The complete record stays in memory until departure. Dialogue, intent and voice share a visit ID. A separate run ID carries aggregate quotas.
+
+The prompt follows Harbour Main’s ordering. Stable character instructions precede the appointment, followed by the current cues and action. GPT-6 Luna can cache the developer prefix and completed history groups. The proxy exposes actual cached-input and cache-write token counts when OpenAI supplies them. Transport tests exercised the prefix, schema, isolation and usage fields with a simulated provider. Live cache-hit rates remain unmeasured for this build. [Prompt assembly and transport](agent_proxy/src/providers.mjs) · [Service contract](agent_proxy/README.md#patient-dialogue)
+
+The release passed all 23 local check groups. Godot passed 2,099 rule checks and 1,247 / 1,248 / 1,247 scene checks in English, Chinese and reduced-blood mode. The game-to-service suite passed 354 integration and 102 wire checks, including opening GRIP twice, completing it once, applying PRESS and sending a follow-up. The proxy passed 57 tests, plus nine guard and evaluation tests. All 1,102 mock E1–E4 calls returned 200. Both languages passed 1,624 text measurements and produced 464 frames each. Verification lives in `validation/2026-11-21/patient-agent/visit-record-release/`.
+
+The same three Workers were redeployed. The public mock accepted a 67-entry record and a clean return visit for the same patient. The six-visit checkpoint received 24/24 mock replies. The forced-timeout Worker returned 504 and the Godot client displayed the fallback. The disabled live Worker returned 503. Deployment IDs and public probes are in `validation/2026-11-21/patient-agent/visit-session-cloud/`. The existing M0 account item and human E6 comparison remain open.
+
 ## Full build, November 21
 
 Rules version 12 and patient protocol 4 are on `main`. The ten patients can converse using OpenAI GPT-6 Luna. The student selected wear, the warned second PRESS, the repairs and the three redeployments. AI starts off. Enabling it in SETTINGS connects to the public mock. The live launcher below connects the game to OpenAI through its local service. [Milestone record](docs/development/full-build-progress.md)
@@ -34,7 +46,7 @@ Run one command from the repository root in PowerShell. The first two are free. 
 
 The Harbour `main` idea is implemented as a persistent character definition plus a router in front of each turn. The classifier reads the doctor's actual line against this patient's question list and returns one choice. Its ten meanings cover a case question, follow-up, instrument request, reassurance, provocation, social or personal chat, an attempt to change roles, ambiguity and other input. The prompt handles mixed languages and imperfect transcriptions. An inferred paid question shows its price. The player can choose free speech or select a precise question when the inference misses. A typed insult only counts as pressure if the doctor uses PRESS. [Routing and generation](agent_proxy/src/core.mjs) · [Godot input and confirmation](game/scripts/ui/main.gd)
 
-For dialogue the proxy puts the patient's own background, work, reason for visiting, voice and motives in the system message every time. The last 48 doctor, patient and reaction entries for this visit travel as conversation. A new visitor starts fresh. Godot owns proof, patience, outcomes, attacks, payment and codes. The model only receives earned SPEECH or TEMPER cues. Reassurance can change the tone without clearing clinical evidence, and a request in chat cannot fire an instrument. Mandatory outcomes are checked on return. Timeouts or unusable foreground answers take the labelled authored path. [Patient profiles](agent_proxy/src/character_profiles.mjs) · [Game agent](game/scripts/core/patient_agent.gd)
+For dialogue the proxy puts the patient's own background, work, reason for visiting, voice and motives in the system message every time. Each appointment supplies its own chronological record of speech, visible reactions and performed actions. Closing or abandoning the visit erases the record. Godot owns proof, patience, outcomes, attacks, payment and codes. The model only receives earned SPEECH or TEMPER cues. Reassurance can change the tone without clearing clinical evidence, and a request in chat cannot fire an instrument. Mandatory outcomes are checked on return. Timeouts or unusable foreground answers take the labelled authored path. [Patient profiles](agent_proxy/src/character_profiles.mjs) · [Game agent](game/scripts/core/patient_agent.gd)
 
 The authored opening always plays. A patient may add a short line on arrival, after use of an instrument or after 12 quiet seconds. Each visit allows three such attempts, including at most two idle attempts, inside the existing 16 replies. Input, a decision or a new visitor cancels an outstanding optional turn. Silence and optional service failure leave the player in control. The local service and Worker both enforce the allowances. [Service contract](agent_proxy/README.md)
 
@@ -999,11 +1011,11 @@ In a fresh clone the first run imports the pictures, fonts and sounds before the
 
 | Limit | Value |
 |---|---|
-| Patient replies per visit / per session | 16 / 240 (student: keep 16) |
+| Patient replies per visit / per game run | 16 / 240 (student: keep 16) |
 | Proxy deadline / game deadline | 3.5 s / 4 s |
 | Reply length | asked for 110 characters, refused only over 220; in Chinese 55 and 110 (`agent.languages`) |
-| Conversation memory | 48 entries per visit, cleared for the next patient |
-| Spoken clips | 0.35-10 s, 24 per visit, 360 per session; 6 s / 7 s deadlines |
+| Conversation memory | One appointment, released at departure. A 32 KiB request carries a bounded excerpt when needed. |
+| Spoken clips | 0.35–10 s, 24 per visit and 360 per game run, with 6 s / 7 s deadlines |
 | Provider calls per proxy process | 2,000, shared by both routes |
 
 The live run's maximum output was 66 tokens and maximum response time 2.54 seconds. No increase to the 256-token budget or deadlines was warranted.

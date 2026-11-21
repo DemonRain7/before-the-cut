@@ -2313,6 +2313,7 @@ func shift_abandon() -> void:
 	check(patient.snapshot() == before, "the paused visit spends no lamp or action")
 	d.key(KEY_ENTER)
 	check(not paused and main.state == MainScript.State.TITLE and main.visit == null and main.rig == null, "leave confirms, clears the chair and returns to the menu")
+	check(main.agent.record == null and patient.record.entries.is_empty(), "abandoning the shift erases the typed conversation and visit events")
 	check(await d.open_counter() and main.shift.records.is_empty() and main.shift.index == 0, "START opens a clean night after abandoning it")
 
 

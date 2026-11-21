@@ -88,8 +88,8 @@ export function guardedProvider(base, guard) {
 }
 
 // Explicit fields only: never serialize an upstream response, an Error, or a request body.
-const STRING_FIELDS = new Set(["t", "request_id", "route", "provider", "model", "code", "session_id", "visit_id", "case_id", "event"]);
-const NUMBER_FIELDS = new Set(["status", "latency_ms", "input_tokens", "output_tokens", "audio_seconds", "audio_bytes", "transcript_chars"]);
+const STRING_FIELDS = new Set(["t", "request_id", "route", "provider", "model", "code", "run_id", "session_id", "visit_id", "case_id", "event"]);
+const NUMBER_FIELDS = new Set(["status", "latency_ms", "input_tokens", "output_tokens", "cached_input_tokens", "cache_write_tokens", "audio_seconds", "audio_bytes", "transcript_chars"]);
 export function safeLog(entry) {
   const out = {};
   for (const [key, value] of Object.entries(entry)) {

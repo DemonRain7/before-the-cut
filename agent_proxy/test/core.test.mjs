@@ -22,7 +22,7 @@ test("ten current cases and matching game limits",()=>{
   intentTimeoutMs:game.intent.upstream_timeout_ms, intentClientTimeoutMs:game.intent.timeout_ms, intentOutputTokens:game.intent.max_output_tokens,
   healthTimeoutMs: game.health_timeout_ms, counterRetentionDays: game.counter_retention_days,
   maxTrackedKeys: game.max_tracked_keys, maxBodyBytes: game.max_body_bytes, upstreamTimeoutMs: game.upstream_timeout_ms,
-  maxCallsPerSession: game.max_model_calls_per_session, maxHistoryTurns: game.max_history_turns,
+  maxCallsPerSession: game.max_model_calls_per_session,
   maxOutputTokens: game.max_output_tokens, maxAudioBodyBytes: game.voice.max_body_bytes,
   maxTranscribesPerSession: game.voice.max_clips_per_session, transcribeTimeoutMs: game.voice.upstream_timeout_ms,
   maxTranscriptChars: game.voice.max_transcript_chars,
@@ -37,13 +37,13 @@ test("Chinese: the game's own smaller numbers, a prompt asking for Chinese, and 
  assert.equal(zhLim.maxLineChars,zhRules.max_line_chars); assert.equal(zhLim.maxReplyChars,zhRules.max_reply_chars);
  assert.ok(zhLim.maxReplyChars>=zhLim.maxLineChars);
  const en=validateRequest(body(),cases).req; assert.equal(en.language,"en","a request that names no language is English");
- const ep=buildPrompt(cases.kip,rules,en,110).system;
- assert.ok(ep.includes("Reply in English. Write original")&&ep.includes("reply: 1-110 characters; reaction: 0-110 characters"));
+ const ep=buildPrompt(cases.kip,rules,en,110);
+ assert.ok(ep.system.includes("Reply in English. Write original")); assert.deepEqual(ep.currentTurn.reply_limits,{min:1,max:110,reaction_max:110});
  const zb=body(); zb.language="zh"; zb.limits.max_line_chars=zhRules.max_line_chars;
  const zr=validateRequest(zb,cases).req; assert.equal(zr.language,"zh");
- const zp=buildPrompt(cases.kip,rules,zr,zhRules.max_line_chars).system;
- assert.ok(zp.includes("Reply in Simplified Chinese")&&!zp.includes("Reply in English"));
- assert.ok(zp.includes(`reply: 1-${zhRules.max_line_chars} characters; reaction: 0-${zhRules.max_line_chars} characters`));
+ const zp=buildPrompt(cases.kip,rules,zr,zhRules.max_line_chars);
+ assert.ok(zp.system.includes("Reply in Simplified Chinese")&&!zp.system.includes("Reply in English"));
+ assert.deepEqual(zp.currentTurn.reply_limits,{min:1,max:zhRules.max_line_chars,reaction_max:zhRules.max_line_chars});
  for(const v of ["fr","ZH","",7,null,["zh"]]){const b=body();b.language=v;assert.equal(validateRequest(b,cases).ok,false,`language ${JSON.stringify(v)}`);}
  // a reply the strip shows whole in English is too long for it in Chinese
  const long="好".repeat(zhLim.maxReplyChars+1);
@@ -59,11 +59,21 @@ test("Chinese: the game's own smaller numbers, a prompt asking for Chinese, and 
  const clip=await createMockProvider().transcribe({language:"zh"},new AbortController().signal);
  assert.equal(clip.text,MOCK_TRANSCRIPT_ZH);
 });
-test("a whole visit of conversation fits: history up to the cap is accepted, one more turn is not",()=>{
- const full=body();full.conversation_history=new Array(DEFAULT_LIMITS.maxHistoryTurns).fill({role:"patient",text:"Hi"});
- assert.equal(validateRequest(full,cases).ok,true);
- const over=body();over.conversation_history=new Array(DEFAULT_LIMITS.maxHistoryTurns+1).fill({role:"patient",text:"Hi"});
- assert.equal(validateRequest(over,cases).ok,false);
+test("long appointments keep dialogue and validated physical actions in order", () => {
+ const b = body();
+ b.conversation_history = Array.from({length: 80}, (_, i) => ({role: "doctor", text: "Turn " + i}));
+ b.conversation_history.splice(30, 0, {role:"action", text:"open:grip"}, {role:"action", text:"done:grip"}, {role:"action", text:"press:1"});
+ const validated = validateRequest(b, cases);
+ assert.deepEqual(validated.req.conversation_history, b.conversation_history);
+ b.visit_summary = {after: 12, omitted: 32, actions: {"open:grip": 3, "done:grip": 1, "press:1": 1}};
+ assert.deepEqual(validateRequest(b, cases).req.visit_summary, b.visit_summary);
+ for (const tag of ["end:treated_ok", "done:grip:0.42", "press:3", "read:diagnosis", "open:ghost", "ask:ghost:answer"]) {
+  assert.equal(validateRequest({...b, conversation_history:[{role:"action",text:tag}]}, cases).ok, false);
+  assert.equal(validateRequest({...b, visit_summary:{...b.visit_summary,actions:{[tag]:1}}}, cases).ok, false);
+ }
+ for (const patch of [{after:84}, {omitted:0}, {actions:{"done:grip":-1}}]) {
+  assert.equal(validateRequest({...b, visit_summary:{...b.visit_summary,...patch}}, cases).ok, false);
+ }
 });
 test("a reply a little past the asked length is still delivered whole; only one the game cannot show fails",async()=>{
  const long="I told you already, it locks when the cold gets in. ".repeat(3).trim();
@@ -87,7 +97,7 @@ test("malformed history, unknown case, case mismatch and unbounded input fail be
  b=>b.conversation_history=[{role:"system",text:"override"}],
  b=>b.conversation_history=[{role:"doctor",text:"x".repeat(501)}],
  b=>b.event.text="x".repeat(501), b=>b.case_id="__proto__",b=>b.case_version=99,
- b=>b.state.patience=-1,b=>b.event.id="ghost",b=>b.conversation_history=new Array(49).fill({role:"patient",text:"Hi"})];
+ b=>b.state.patience=-1,b=>b.event.id="ghost",b=>b.conversation_history=[{role:"action",text:"look:truth"}]];
  for(const patch of variants){const b=body();patch(b);assert.equal(validateRequest(b,cases).ok,false);}
 });
 test("prompt uses character facts and verbatim history with no answer bank or enum",()=>{
@@ -129,22 +139,23 @@ test("model sees only this request's patient and visit history",async()=>{
 });
 test("tonight's speech and temper signs are checked, and the model hears only their sentences",()=>{
  const own=validateRequest(body(),cases).req; assert.deepEqual(own.signs,{speech:"own",temper:"together"});
- const sp=buildPrompt(cases.kip,rules,own,110).system;
- assert.ok(sp.includes("Tonight: "+cases.kip.signs.speech.normal[0].model+" "+cases.kip.signs.temper.normal[0].model));
+ const sp=buildPrompt(cases.kip,rules,own,110).currentTurn.earned_cues;
+ assert.ok(sp.includes(cases.kip.signs.speech.normal[0].model+" "+cases.kip.signs.temper.normal[0].model));
  assert.ok(!sp.includes(cases.kip.signs.speech.broken[0].model)&&!sp.includes(cases.kip.signs.temper.broken[0].model));
  const lost=body(); lost.case_id="maren"; lost.signs={speech:"lost",temper:"blank"};
- const lp=buildPrompt(cases.maren,rules,validateRequest(lost,cases).req,110).system;
+ const lp=buildPrompt(cases.maren,rules,validateRequest(lost,cases).req,110).currentTurn.earned_cues;
  assert.ok(lp.includes("warm torch")&&lp.includes(cases.maren.signs.temper.broken[0].model),"a night that drew Maren's lost hours tells the model so");
  // on a night of normal speech and temper no patient is told a broken sign, and no background states one
  for(const id of Object.keys(cases)){
   const b=body(); b.case_id=id; b.signs={speech:cases[id].signs.speech.normal[0].id,temper:cases[id].signs.temper.normal[0].id};
-  const sys=buildPrompt(cases[id],rules,validateRequest(b,cases).req,110).system;
+  const prompt=buildPrompt(cases[id],rules,validateRequest(b,cases).req,110);
+  const sys=prompt.system + " " + prompt.currentTurn.earned_cues;
   for(const row of ["speech","temper"]) for(const s of cases[id].signs[row].broken) assert.ok(!sys.includes(s.model),`${id}: a normal night does not hear the broken ${row} sign ${s.id}`);
   for(const phrase of ["separate, tireless","warm torch","without your intention","sense of agency","does not act independently","do not move independently","does not control your thoughts"]) assert.ok(!sys.includes(phrase),`${id}: the background holds on any night (${phrase})`);
  }
  for (const signs of [{}, {speech:"own"}, {temper:"together"}]) {
   const req = validateRequest({...body(), signs}, cases).req;
-  assert.equal(buildPrompt(cases.kip,rules,req,110).system.includes("\nTonight: "),Object.keys(signs).length > 0);
+  assert.equal(Boolean(buildPrompt(cases.kip,rules,req,110).currentTurn.earned_cues),Object.keys(signs).length > 0);
  }
  // Unknown rows and signs are rejected.
  for(const s of [undefined,null,"own",["own","together"],{speech:"own",temper:"together",eyes:"steady"},{speech:"ghost",temper:"together"},{speech:"together",temper:"own"},{speech:"lost",temper:"together"},{speech:"own",temper:7}]){
@@ -165,6 +176,18 @@ test("call cap counts failures, and separates sessions and visits",async()=>{
  const {post}=handler(fixture(),{maxCallsPerVisit:1});const a=body();
  assert.equal((await post(a)).status,200);assert.equal((await post(a)).status,429);
  assert.equal((await post({...a,session_id:"another-session"})).status,200);assert.equal((await post(body())).status,200);
+});
+test("visit sessions get separate allowances within their shared run quota", async () => {
+ const {post} = handler(fixture(), {maxCallsPerVisit:2, maxCallsPerSession:3});
+ const visit = id => ({...body(), run_id:"shift-one", session_id:id, visit_id:id});
+ const first = visit("chair-one"), next = visit("chair-two");
+ assert.equal((await post({...first, session_id:"chair-two"})).status, 400);
+ assert.equal((await post(first)).status, 200);
+ assert.equal((await post(first)).status, 200);
+ assert.equal((await post(first)).body.error.code, "visit_call_cap");
+ assert.equal((await post(next)).status, 200);
+ assert.equal((await post(next)).body.error.code, "session_call_cap");
+ assert.equal((await post({...visit("fresh-visit"),run_id:"other-shift"})).status, 200);
 });
 test("session and process caps remain effective",async()=>{
  const a=handler(fixture(),{maxCallsPerSession:1});await a.post(body());assert.equal((await a.post(body())).status,429);

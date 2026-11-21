@@ -38,14 +38,16 @@ try {
     const mock = createMockProvider({ fail });
     const provider = { ...mock, async generate(input, signal) {
       if (name === 'normal' && !input.intent) prompts.push({ case_id: input.req.case_id, visit_id: input.req.visit_id, event: input.req.event,
-        language: input.req.language, matrix: input.req.session_id === 'btc-sign-matrix', fair: input.req.session_id.startsWith('btc-fair-'),
+        run_id: input.req.run_id, session_id: input.req.session_id,
+        actions: input.req.conversation_history.filter(t => t.role === 'action').map(t => t.text),
+        language: input.req.language, matrix: input.req.run_id === 'btc-sign-matrix', fair: input.req.run_id.startsWith('btc-fair-'),
         matching_prompt: ['speech', 'temper'].every(row => {
           const signs = input.caseData.signs[row];
-          return [...signs.normal, ...signs.broken].every(s => input.system.includes(s.model) === (s.id === input.req.signs[row]));
+          return [...signs.normal, ...signs.broken].every(s => (input.currentTurn.earned_cues || '').includes(s.model) === (s.id === input.req.signs[row]));
         }) && input.system.includes(input.req.language === 'zh' ? 'Reply in Simplified Chinese' : 'Reply in English.'),
         history_turns: input.req.conversation_history.length,
         doctor_turns: input.req.conversation_history.filter(t => t.role === 'doctor').map(t => t.text),
-        signs: input.req.signs, tonight: input.system.includes('\nTonight: '),
+        signs: input.req.signs, tonight: Boolean(input.currentTurn.earned_cues),
         characters: (input.system + '\n' + input.user).length });
       return mock.generate(input, signal);
     }};
@@ -85,7 +87,11 @@ try {
   // What actually crossed the wire in the scene test: every typed line of a visit must be in
   // the requests that follow it, and a new patient must start from that patient's opening only.
   const wire = [];
-  const typed = prompts.filter(p => !p.fair && p.event.type === 'say');
+  const typed = prompts.filter(p => !p.fair && p.run_id !== 'btc-visit-record' && p.event.type === 'say');
+  const visitRecord = prompts.find(p => p.run_id === 'btc-visit-record' && p.event.type === 'say');
+  wire.push(['dialogue carries one visit-scoped session id independently of the run', prompts.every(p => p.session_id === p.visit_id && p.run_id !== p.visit_id)]);
+  wire.push(['a follow-up remembers both gauge openings, one completion and actual pressure in order',
+    visitRecord?.actions.filter(a => a === 'open:grip' || a === 'done:grip' || a === 'press:1').join(',') === 'open:grip,open:grip,done:grip,press:1']);
   const byVisit = new Map();
   for (const p of typed) byVisit.set(p.visit_id, [...(byVisit.get(p.visit_id) || []), p]);
   const visits = [...byVisit.values()];
@@ -127,9 +133,9 @@ try {
   // nothing else, must have reached a proxy. Dialogue requests must carry no audio.
   const clips = requests.filter(r => r.route === 'transcribe');
   const scene = /VOICE_SCENE session=(\S+) clips_sent=(\d+)/.exec(stdout);
-  const sceneClips = scene ? clips.filter(r => r.session_id === scene[1]) : [];
+  const sceneClips = scene ? clips.filter(r => r.run_id === scene[1]) : [];
   const late = sceneClips.filter(r => r.scenario === 'stt_slow');
-  const numbersOnly = ['scenario', 't', 'request_id', 'route', 'provider', 'model', 'status', 'code', 'latency_ms', 'session_id', 'visit_id',
+  const numbersOnly = ['scenario', 't', 'request_id', 'route', 'provider', 'model', 'status', 'code', 'latency_ms', 'run_id', 'session_id', 'visit_id',
     'language', 'audio_seconds', 'audio_bytes', 'input_tokens', 'output_tokens', 'transcript_chars'];
   wire.push(['the scene reported the clips it sent', Boolean(scene) && Number(scene[2]) > 0]);
   wire.push([`every clip the scene sent reached a proxy, and a tap, silence or a dead microphone sent nothing (${sceneClips.length} clips)`,
