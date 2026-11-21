@@ -437,7 +437,25 @@ func reassure() -> Dictionary:
 	return res
 
 
-## Verbal pressure. The reaction is authored: it is evidence for the TEMPER line.
+## Whether the next PRESS is the one that breaks this patient: its entry of the press list ends
+## the visit (a walkout when steady, an attack when drifting). Every patient breaks on the second
+## (CaseDB.compose_night), so this says nothing about who is drifting.
+func press_breaks() -> bool:
+	var list: Array = case_data.get("press", [])
+	if list.is_empty():
+		return false
+	var entry: Variant = list[mini(press_count, list.size() - 1)]
+	return typeof(entry) == TYPE_DICTIONARY and str((entry as Dictionary).get("end", "")) != ""
+
+
+## The patience the next PRESS takes: rules.json costs.press, or every lamp left when it is the
+## push that breaks them (rules version 10), so the bar is empty when they go.
+func press_cost() -> int:
+	return patience if press_breaks() else _cost("press")
+
+
+## Verbal pressure. The reaction is authored: it is evidence for the TEMPER line. The push that
+## breaks the patient takes every lamp left (press_cost()).
 ## result: "react" | "walkout" | "attack" | "closed"
 func press() -> Dictionary:
 	var res := {"result": "closed", "line": "", "face": "", "hands": "", "note": "", "new": false}
@@ -446,8 +464,9 @@ func press() -> Dictionary:
 	var list: Array = case_data.get("press", [])
 	if list.is_empty():
 		return res
+	var breaks := press_breaks()
+	patience = 0 if breaks else maxi(0, patience - _cost("press"))
 	press_count += 1
-	patience = maxi(0, patience - _cost("press"))
 	var entry: Dictionary = list[mini(press_count - 1, list.size() - 1)]
 	res["line"] = str(entry.get("line", ""))
 	res["face"] = str(entry.get("face", ""))

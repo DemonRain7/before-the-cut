@@ -17,8 +17,10 @@ extends Node2D
 ## for the other.
 ##
 ## The contact list prints tonight's entries (data/contacts.json, drawn by ShiftState): an
-## alias, two clues and a code line each. During the exam each entry still open has a SAY
-## button; what a code does is decided by VisitState.say_code(), never here.
+## alias and a code line drawn for the night, and two clues, each. During the exam each entry
+## still open has a SAY button; what a code does is decided by VisitState.say_code(), never
+## here. An entry whose package came over the counter is stamped PICKED UP; nothing on the list
+## says who carried an entry that was not picked up (that is told at closing).
 ##
 ## The papers were laid out for a screen on which they sat one above the other, the sheet at
 ## SHEET_HOME and the card at CARD_HOME, and their rows are still written in those
@@ -73,7 +75,7 @@ var clues: Dictionary = {}        # data/contacts.json "clues": id -> {"text": .
 var list_title: String = "TONIGHT'S CONTACTS"
 var contact_pay: int = 0          # rules.json contacts.pay
 var code_cost: int = 1            # rules.json contacts.wrong_cost
-var contact_marks: Dictionary = {}    # entry id -> "picked" | "missed", for the rest of the night
+var contact_marks: Dictionary = {}    # entry id -> "picked", for the rest of the night
 var say_hover: String = ""        # the entry whose SAY button is under the pointer
 
 var _sheet_n := Node2D.new()
@@ -228,7 +230,7 @@ func decision_rect() -> Rect2:
 
 
 ## How an entry of tonight's list stands: "picked" (its package came over the counter
-## tonight), "missed" (its courier came and went without it) or "".
+## tonight) or "". A courier who came and went without it leaves the entry as it was.
 func entry_mark(id: String) -> String:
 	var mark := str(contact_marks.get(id, ""))
 	if mark == "" and visit != null and visit.dropped and str(visit.contact.get("id", "")) == id:
@@ -384,14 +386,13 @@ func _draw_list_paper() -> void:
 	Gfx.text_center(n, mid, LIST_FOOT_Y + 20.0, Lang.tf("Anyone else: a blank look, -%d patience.", [code_cost]), Gfx.INKS)
 
 
-## Right of an alias: the stamp of an entry that is settled, the pencilled "blank look" of a
-## code this visitor did not know, or the SAY button.
+## Right of an alias: the PICKED UP stamp of an entry whose package came over the counter, the
+## pencilled "blank look" of a code this visitor did not know, or the SAY button.
 func _draw_entry_state(i: int, id: String, y: float) -> void:
 	var n := _list_n
-	var mark := entry_mark(id)
-	if mark != "":
-		var text := "PICKED UP" if mark == "picked" else "MISSED"
-		var col: Color = Gfx.STAMP_G if mark == "picked" else Gfx.STAMP_R
+	if entry_mark(id) == "picked":
+		var text := "PICKED UP"
+		var col: Color = Gfx.STAMP_G
 		var w := Gfx.text_w(text, true) + 6.0
 		var r := Rect2(LIST_RIGHT - w, y - 2.0, w, 13)
 		n.draw_rect(r, col, false, 1.0)

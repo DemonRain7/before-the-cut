@@ -613,13 +613,16 @@ func test_talk() -> void:
 
 func test_press_and_attack() -> void:
 	var v := visit("kip")
+	eq([v.press_breaks(), v.press_cost()], [false, 2], "the first press does not break him, and costs two")
 	var r := v.press()
 	eq(r["result"], "react", "first press is a reaction")
 	eq(v.patience, 4, "pressure costs two patience")
+	eq([v.press_breaks(), v.press_cost()], [true, 4], "the next press breaks him, and costs every lamp left")
 	ok(v.row_seen("temper"), "the reaction is temper evidence")
 	eq(v.phase, VisitState.Phase.EXAM, "one press never ends a visit")
 	r = v.press()
 	eq(r["result"], "walkout", "a stable patient walks out on the second press")
+	eq(v.patience, 0, "and the push that breaks him leaves no lamp lit")
 	eq(v.outcome, "walkout", "walkout outcome")
 	eq(v.settlement()["credits"], 0, "walkout earns nothing")
 	ok(not v.settlement()["correct"], "walkout is not a correct call")
@@ -629,6 +632,7 @@ func test_press_and_attack() -> void:
 		v = visit(id)
 		eq(v.press()["result"], "react", "%s: first press is safe" % id)
 		eq(v.press()["result"], "attack", "%s: second press brings the attack" % id)
+		eq(v.patience, 0, "%s: the push that breaks them takes every lamp" % id)
 		eq(v.attack_cause, "press", "%s: cause recorded" % id)
 		eq(v.shutter()["result"], "caught", "%s: shutter stops it" % id)
 		eq(v.settlement()["credits"], int(cases[id]["fee"]) + int(rules["scoring"]["refer_drifting"]), "%s: caught pays the bounty" % id)
@@ -907,12 +911,31 @@ func play(shift: ShiftState, calls: Dictionary, slow: Array = [], drops: Array =
 		shift.advance()
 
 
-## The first pool entry for a visitor: tonight, they are a courier.
+## The first pool entry for a visitor: tonight, they are a courier. A night gives each entry an
+## alias and a code (ShiftState.name_contacts); here an entry takes the ones at its place in the
+## pool, so two visitors' entries never share them.
 func courier(id: String) -> Dictionary:
-	for e in contacts_data["pool"]:
-		if str(e["case"]) == id:
+	var pool: Array = contacts_data["pool"]
+	var aliases: Array = contacts_data["aliases"]
+	var codes: Array = contacts_data["codes"]
+	for i in pool.size():
+		if str(pool[i]["case"]) == id:
+			var e: Dictionary = (pool[i] as Dictionary).duplicate(true)
+			e["alias"] = str(aliases[i % aliases.size()])
+			e["say"] = str(codes[i % codes.size()]["say"])
+			e["answer"] = str(codes[i % codes.size()]["answer"])
 			return e
 	return {}
+
+
+## The words of a text: its runs of letters, lower case.
+func letter_words(text: String) -> Array:
+	var out: Array = []
+	var re := RegEx.new()
+	re.compile("[a-z]+")
+	for m in re.search_all(text.to_lower()):
+		out.append(m.get_string())
+	return out
 
 
 func test_shift() -> void:
@@ -1525,8 +1548,20 @@ func test_contacts() -> void:
 	bad["pool"][0]["clues"] = ["over_forty", "fee_low"]
 	ok(has_error(CaseDB.validate_contacts(bad, cases, rules), "does not fit its own courier"), "an entry whose clue does not fit its own courier is caught")
 	bad = contacts_data.duplicate(true)
-	bad["pool"][1]["say"] = bad["pool"][0]["say"]
-	ok(has_error(CaseDB.validate_contacts(bad, cases, rules), "code line"), "two entries with one code line are caught")
+	bad["codes"][1]["say"] = bad["codes"][0]["say"]
+	ok(has_error(CaseDB.validate_contacts(bad, cases, rules), "code line"), "two codes with one line are caught")
+	bad = contacts_data.duplicate(true)
+	bad["aliases"][1] = bad["aliases"][0]
+	ok(has_error(CaseDB.validate_contacts(bad, cases, rules), "used twice"), "an alias listed twice is caught")
+	bad = contacts_data.duplicate(true)
+	bad["pool"][0]["alias"] = "LADLE"
+	ok(has_error(CaseDB.validate_contacts(bad, cases, rules), "has its own"), "an entry with an alias of its own is caught: each night draws one")
+	bad = contacts_data.duplicate(true)
+	bad["aliases"] = [bad["aliases"][0]]
+	ok(has_error(CaseDB.validate_contacts(bad, cases, rules), "aliases are listed"), "fewer aliases than contacts a night are caught")
+	bad = contacts_data.duplicate(true)
+	bad["codes"] = [bad["codes"][0]]
+	ok(has_error(CaseDB.validate_contacts(bad, cases, rules), "codes are listed"), "fewer codes than contacts a night are caught")
 	bad = contacts_data.duplicate(true)
 	bad["pool"][0]["case"] = "ghost"
 	ok(has_error(CaseDB.validate_contacts(bad, cases, rules), "unknown visitor"), "an entry for nobody is caught")
@@ -1554,6 +1589,61 @@ func test_contacts() -> void:
 		all_ok = all_ok and has_first and trained.size() == per
 	ok(all_ok, "40 seeds: the same list for the same seed, %d couriers, all different, and the training night lists the first visitor" % per)
 	ok(first_varies.size() > 3, "different seeds give different lists")
+	# tonight's words (contacts.json version 2): each entry is given an alias and a code of the
+	# lists, none twice in a night, from the shift seed; who is on the list does not change
+	var aliases: Array = contacts_data["aliases"]
+	var says: Array = []
+	for code in contacts_data["codes"]:
+		says.append(str(code["say"]))
+	var words_ok := true
+	var kip_aliases := {}
+	var kip_says := {}
+	for s in range(1, 41):
+		var bare := ShiftState.draw_contacts(rules, pool, order, s)
+		var named := ShiftState.draw_contacts(rules, pool, order, s, false, contacts_data)
+		var named_again := ShiftState.draw_contacts(rules, pool, order, s, false, contacts_data)
+		words_ok = words_ok and named.size() == bare.size() and named == named_again
+		var night_aliases := {}
+		var night_says := {}
+		for i in named.size():
+			var e: Dictionary = named[i]
+			var at := says.find(str(e.get("say", "")))
+			words_ok = words_ok and str(e["id"]) == str(bare[i]["id"]) and aliases.has(str(e.get("alias", ""))) and at >= 0
+			words_ok = words_ok and str(e.get("answer", "")) == str(contacts_data["codes"][maxi(at, 0)]["answer"])
+			night_aliases[str(e.get("alias", ""))] = true
+			night_says[str(e.get("say", ""))] = true
+			if str(e["case"]) == "kip":
+				kip_aliases[str(e.get("alias", ""))] = true
+				kip_says[str(e.get("say", ""))] = true
+		words_ok = words_ok and night_aliases.size() == named.size() and night_says.size() == named.size()
+	ok(words_ok, "40 seeds: each entry gets an alias and a code of the lists, none twice a night, the same for the same seed, and the entries are the ones drawn without them")
+	ok(kip_aliases.size() > 3 and kip_says.size() > 3, "Kip carries other aliases and other codes on other nights")
+	# the words give nobody away: no alias is a word of any visitor's file, no code line uses a
+	# word (of four letters or more) of anyone's name, job or request, and the opening's made-up
+	# entries (KESTREL, COPPER) use neither list
+	var file_words := {}
+	var card_words := {}
+	for id in people.keys():
+		for w in letter_words(FileAccess.get_file_as_string("res://data/cases/%s.json" % str(id))):
+			file_words[w] = true
+		var person: Dictionary = people[id]
+		for w in letter_words("%s %s %s" % [person.get("name", ""), person.get("role", ""), person.get("request", "")]):
+			if str(w).length() >= 4:
+				card_words[w] = true
+	var aliases_clear := file_words.size() > 100
+	for a in aliases:
+		for w in letter_words(str(a)):
+			aliases_clear = aliases_clear and not file_words.has(w)
+	ok(aliases_clear, "no alias is a word of any visitor's file")
+	var codes_clear := card_words.size() > 20
+	for say in says:
+		for w in letter_words(str(say)):
+			codes_clear = codes_clear and not card_words.has(w)
+	ok(codes_clear, "no code line uses a word of anyone's name, job or request")
+	var made_up_apart := card_entries.size() == 2
+	for e in card_entries:
+		made_up_apart = made_up_apart and not aliases.has(str(e.get("alias", ""))) and not says.has(str(e.get("code", "")))
+	ok(made_up_apart, "the opening's made-up entries use no alias and no code of the list")
 	var short_night := ShiftState.draw_contacts(rules, pool, ["maren"], 3)
 	eq([short_night.size(), str(short_night[0]["case"])], [1, "maren"], "only tonight's visitors are drawn")
 	var off := rules.duplicate(true)

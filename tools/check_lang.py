@@ -63,10 +63,11 @@ SHOWN = {
       + [("signs", "*", "*", "*", "answers", "*", key) for key in ("a", "note")]
       + [("signs", "*", "*", "*", part, key) for part in ("press", "flare") for key in ("line", "note")]
       + [("outcomes", "*", "*", key) for key in ("title", "text")],
-    # a contact's alias is a code name: the same in every language (drawn with Gfx.text_raw)
+    # a contact's alias is a code name: the same in every language (drawn with Gfx.text_raw).
+    # Since contacts.json version 2 the codes are a list of their own, drawn onto tonight's entries
     "contacts.json": [
         ("title",), ("clues", "*", "text"),
-        ("pool", "*", "say"), ("pool", "*", "answer"), ("pool", "*", "package"),
+        ("codes", "*", "say"), ("codes", "*", "answer"), ("pool", "*", "package"),
     ],
     "intro.json": [
         ("cards", "*", "title"), ("cards", "*", "text"),

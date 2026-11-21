@@ -57,7 +57,6 @@ const SLIP_LINES := 5                           # lines of counter text above th
 const SLIP_COUNTER := "AT THE COUNTER"          # under the rule, beside what the counter took in
 const SLIP_LATER := "Right or wrong: at closing."   # the slip never says; the report does
 const SLIP_DROP := "DROP +%d"                   # under the counter line: what a courier's package put in the till
-const SLIP_NO_DROP := "%s: NO DROP"             # a courier who came and went without one
 const SLIP_CALM := "CALM -%d"                   # what the calm-patches cost
 const REPORT_TURN := 0.25                       # seconds a report page stays before a click turns it
 const CARD_LINGER := 1.3                        # seconds a card that was just stamped stays out by itself
@@ -178,6 +177,9 @@ const CALM_FREE_HINT := "CALM: +%d patience, and a refusal softens. %d left."
 const CALM_FREE_HOLD_HINT := "CALM: +%d patience. It keeps them at the counter. %d left."
 const SAY_CODE_HINT := "SAY the code. The right contact hands over a package. Anyone else: -%d patience."
 const CODE_BLANK_HINT := "Wrong code: a blank look, -%d patience. It says nothing about the patient."
+# the second PRESS breaks every patient and takes every lamp left (rules version 10)
+const PRESS_HINT := "PRESS: say something that stings. Costs %d patience. Twice, and they break."
+const PRESS_LAST_HINT := "PRESS again and they break: every lamp goes. The steady walk out; the drifting lunge."
 const TRAINING_SKIP_HINT := "SKIP ALL [K]: end the training. H opens the counter guide any time."
 const TRAINING_NEXT_HINT := "NEXT: on to the next tip."
 const SWAP_LIST_HINT := "Swap for tonight's contact list. [L]"
@@ -862,7 +864,7 @@ func _sync_visit() -> void:
 		desk.badges["calm"] = price
 	else:
 		desk.badges["calm"] = "x%d" % visit.reassure_left
-	desk.badges["press"] = "-%d" % int(costs.get("press", 2))
+	desk.badges["press"] = "-%d" % visit.press_cost()       # the push that breaks them takes every lamp left
 	desk.enabled["calm"] = visit.reassure_left > 0
 	clinic.till = _till_now()
 
@@ -1145,7 +1147,9 @@ func _pad_hint(pad: String) -> String:
 				return Lang.tf(CALM_FREE_HOLD_HINT if _leave_said else CALM_FREE_HINT, [gain, visit.reassure_left])
 			return Lang.tf(CALM_HOLD_HINT if _leave_said else CALM_HINT, [price, gain, visit.reassure_left])
 		"press":
-			return Lang.tf("PRESS: say something that stings. Costs %d patience.", [int(costs.get("press", 2))])
+			if visit.press_breaks():
+				return PRESS_LAST_HINT
+			return Lang.tf(PRESS_HINT, [visit.press_cost()])
 		"treat":
 			return "TREAT: they are steady. Pick it up and stamp the card."
 		"refer":
@@ -1273,7 +1277,8 @@ func _start_shift() -> void:
 	var contact_rules: Dictionary = rules.get("contacts", {})
 	# only the entries that are fair among tonight's visitors: no clue alone gives anybody away
 	var pool := CaseDB.fair_contacts(contact_data, people, shift.order)
-	shift.contacts = ShiftState.draw_contacts(rules, pool, shift.order, shift_seed, training)
+	# each entry is given an alias and a code for tonight only (contacts.json version 2)
+	shift.contacts = ShiftState.draw_contacts(rules, pool, shift.order, shift_seed, training, contact_data)
 	clipboard.set_contacts(shift.contacts, contact_data.get("clues", {}), str(contact_data.get("title", "")),
 		int(contact_rules.get("pay", 0)), int(contact_rules.get("wrong_cost", 1)))
 	var client: Variant = null
@@ -3127,9 +3132,10 @@ func _resolve() -> void:
 	_card_back = false
 	_list_back = false
 	_surprise = ""
-	if visit.is_contact():
-		# the list keeps tonight's answer: the package came over the counter, or it did not
-		clipboard.contact_marks[str(visit.contact.get("id", ""))] = "picked" if visit.dropped else "missed"
+	if visit.is_contact() and visit.dropped:
+		# the list keeps a package that came over the counter. A courier who went without theirs
+		# leaves no mark: who carried an entry that was not picked up is told only at closing
+		clipboard.contact_marks[str(visit.contact.get("id", ""))] = "picked"
 	clinic.show_patience = false
 	clinic.leaving = -1.0
 	clinic.bar_clear()                 # the slip prints out of the slot the bar sat on
@@ -4132,14 +4138,13 @@ func _sheet_normal(row: String) -> String:
 	return ""
 
 
-## The slip's line under the call: a courier's package (or the one that never came over the
-## counter) and what the calm-patches cost. Empty when there was neither.
+## The slip's line under the call: a courier's package and what the calm-patches cost. Empty
+## when there was neither. A courier who went without their package is not named: who carried
+## an entry of the list is told at closing.
 func _slip_breakdown(s: Dictionary) -> String:
 	var parts := PackedStringArray()
 	if bool(s.get("dropped", false)):
 		parts.append(Lang.tf(SLIP_DROP, [int(s.get("drop", 0))]))
-	elif bool(s.get("contact", false)):
-		parts.append(Lang.tf(SLIP_NO_DROP, [str(s.get("alias", ""))]))
 	var calm := int(s.get("calm_spent", 0))
 	if calm > 0:
 		parts.append(Lang.tf(SLIP_CALM, [calm]))

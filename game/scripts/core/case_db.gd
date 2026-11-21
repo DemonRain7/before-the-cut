@@ -1194,9 +1194,11 @@ static func clue_matches(clue: Dictionary, cases: Dictionary) -> Array:
 
 
 ## The contact list as written: every clue fits at least two people of the roster, every entry's
-## two clues both fit its own courier, and no two entries share an alias or a code line. Whether
-## an entry is fair on a night depends on who else comes in, so each night keeps only the fair
-## ones (fair_contacts). `cases` is CaseDB.people (or any {id: case}).
+## two clues both fit its own courier, and the aliases and codes that each night draws onto its
+## entries (ShiftState.name_contacts) are all different and enough for a night. An entry has no
+## alias or code of its own (contacts.json version 2). Whether an entry is fair on a night
+## depends on who else comes in, so each night keeps only the fair ones (fair_contacts). `cases`
+## is CaseDB.people (or any {id: case}).
 static func validate_contacts(contacts: Dictionary, cases: Dictionary, rules: Dictionary) -> Array:
 	var errors: Array = []
 	var clues: Variant = contacts.get("clues")
@@ -1226,28 +1228,21 @@ static func validate_contacts(contacts: Dictionary, cases: Dictionary, rules: Di
 		if not cases.is_empty() and clue_matches(clue, cases).size() < 2:
 			errors.append("contacts.json: clue '%s' fits fewer than two visitors, so alone it gives one away." % str(cid))
 	var ids: Array = []
-	var aliases: Array = []
-	var says: Array = []
 	var couriers: Dictionary = {}
 	for e in pool:
 		if typeof(e) != TYPE_DICTIONARY:
 			errors.append("contacts.json: every pool entry must be an object.")
 			continue
 		var id := str(e.get("id", ""))
-		for key in ["id", "case", "alias", "say", "answer", "package"]:
+		for key in ["id", "case", "package"]:
 			if str(e.get(key, "")) == "":
 				errors.append("contacts.json: entry '%s' needs '%s'." % [id, key])
+		for key in ["alias", "say", "answer"]:
+			if (e as Dictionary).has(key):
+				errors.append("contacts.json: entry '%s' has its own '%s'; each night draws it from aliases and codes." % [id, key])
 		if ids.has(id):
 			errors.append("contacts.json: entry id '%s' is used twice." % id)
 		ids.append(id)
-		var alias := str(e.get("alias", ""))
-		if aliases.has(alias):
-			errors.append("contacts.json: alias '%s' is used twice." % alias)
-		aliases.append(alias)
-		var say := str(e.get("say", ""))
-		if says.has(say):
-			errors.append("contacts.json: entry '%s' shares its code line with another." % id)
-		says.append(say)
 		var case_id := str(e.get("case", ""))
 		if not cases.is_empty() and not cases.has(case_id):
 			errors.append("contacts.json: entry '%s' names unknown visitor '%s'." % [id, case_id])
@@ -1262,11 +1257,39 @@ static func validate_contacts(contacts: Dictionary, cases: Dictionary, rules: Di
 				errors.append("contacts.json: entry '%s' uses unknown clue '%s'." % [id, str(cl)])
 			elif cases.has(case_id) and not clue_fits(clues[str(cl)], cases[case_id]):
 				errors.append("contacts.json: entry '%s' clue '%s' does not fit its own courier '%s'." % [id, str(cl), case_id])
+	# the words each night draws onto its entries
+	var aliases: Array = []
+	if typeof(contacts.get("aliases")) != TYPE_ARRAY:
+		errors.append("contacts.json: aliases must be a list.")
+	else:
+		for a in contacts["aliases"]:
+			var alias := str(a).strip_edges()
+			if alias == "":
+				errors.append("contacts.json: an alias is empty.")
+			elif aliases.has(alias):
+				errors.append("contacts.json: alias '%s' is used twice." % alias)
+			aliases.append(alias)
+	var says: Array = []
+	if typeof(contacts.get("codes")) != TYPE_ARRAY:
+		errors.append("contacts.json: codes must be a list.")
+	else:
+		for code in contacts["codes"]:
+			if typeof(code) != TYPE_DICTIONARY or str(code.get("say", "")) == "" or str(code.get("answer", "")) == "":
+				errors.append("contacts.json: every code needs 'say' and 'answer'.")
+				continue
+			var say := str(code["say"])
+			if says.has(say):
+				errors.append("contacts.json: the code line '%s' is used twice." % say)
+			says.append(say)
 	var per_night := 0
 	if typeof(rules.get("contacts")) == TYPE_DICTIONARY:
 		per_night = int(rules["contacts"].get("per_night", 0))
 	if per_night > couriers.size():
 		errors.append("contacts.json: the rules ask for %d contacts a night but only %d visitors can be one." % [per_night, couriers.size()])
+	if per_night > aliases.size():
+		errors.append("contacts.json: the rules ask for %d contacts a night but only %d aliases are listed." % [per_night, aliases.size()])
+	if per_night > says.size():
+		errors.append("contacts.json: the rules ask for %d contacts a night but only %d codes are listed." % [per_night, says.size()])
 	return errors
 
 

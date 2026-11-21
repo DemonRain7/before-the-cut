@@ -1,6 +1,6 @@
 # Continue Before the Cut
 
-Updated November 19, 2026. Work on main in this repository, the only active checkout;
+Updated November 20, 2026. Work on main in this repository, the only active checkout;
 pull first. The sibling fathom directory is an archive. Do not write there or copy its Git history.
 
 Read AGENTS.md, HANDOFF.md, game/README.md, docs/development/chinese-translation.md and
@@ -15,11 +15,30 @@ made and pushed to origin/main on November 18 when the student asked. The langua
 November 18 is in 3f1fcbd, pushed; the work of late November 18 is in a487cea, pushed. The
 data and the code of random signs are in 5b64d87, the model's night signs in 484ff85, every
 part's art in 813b9d0, the five new characters in e486887 and the launcher's -TestNight option
-in 62a5251, all pushed; Vale's redrawn port close-up is committed after 62a5251, together with
-this file. Run git status -sb and git log -3 --oneline:
+in 62a5251 and Vale's redrawn port close-up in 71a7e5d, all pushed; the work of November 20
+(the contact list's words, the push that breaks) is committed after 71a7e5d, together with this
+file. Run git status -sb and git log -3 --oneline:
 anything uncommitted is newer than this file.
 
-Latest checkpoint (November 19, afternoon): every character's art for each part (813b9d0)
+Latest checkpoint (November 20): the answers to three questions the student asked after playing
+the November 19 build, built by Claude (Opus 5.5) and checked; nobody has played them. The
+contact list gave each courier the same alias and code every night, in words of their trade
+(LADLE for the noodle cook), and it stamped MISSED, with ALIAS: NO DROP on the slip, when a
+contact left without a drop, so the list could be read against the names in the talk. Now
+contacts.json (version 2) keeps 16 aliases and 12 codes apart from the pool, and shift_state.gd
+name_contacts() hands each of tonight's entries one of each with a generator of its own; none of
+version 1's words is used again, and run_tests.gd checks that no alias is a word of a case file
+and no code line uses a word of a visitor's name, job or request. The list stamps only PICKED
+UP; the closing report still says which visit missed its drop. The second PRESS breaks every
+patient (the steady walk out, the drifting lunge) and now takes every lamp left (visit_state.gd
+press_cost(); rules.json version 10, no number changed); after the first, the badge and the
+hint say so. Checks, all passed: run_tests 1193; the scene test 1081, 1082 in Chinese, 1081
+with less blood; the window close 5; the proxy 40; over HTTP 199 and 16 wire checks;
+measure_text 1553 lines in each language; dry captures 439, 439, 334 and 235. Mock calls only;
+nothing paid; nothing drawn on the real renderer. Next, in the same session: the title menu
+(HANDOFF.md, Student decisions, November 20, item 2).
+
+Previous checkpoint (November 19, afternoon): every character's art for each part (813b9d0)
 and five new characters (e486887), built by Claude (Opus 5.5) and checked; nobody has played it. Every
 sign a template can draw has its picture (a _t twin with dark threads of every hands layer
 where the bust shows the port, a hands layer for each temper gesture, close-ups of both eyes,
@@ -44,7 +63,7 @@ lines in each language; dry captures 439, 439, 334 and 235; the weapon nights dr
 desktop, 235 frames, none missed. Mock calls only; nothing paid. run-game.ps1 -TestNight C
 plays a test night (a stand-in for Godot and a headless boot checked it; no window was opened).
 
-Previous checkpoint (November 19, early): the data and the code of random signs, then the model's
+Earlier checkpoint (November 19, early): the data and the code of random signs, then the model's
 night signs, built by Claude (Opus 5.5) and checked; nobody has played it. The five characters stay as they are; each night draws
 from its seed who of them drift (one to three) and which sign each sheet row shows (two to four
 broken rows on a drifting visitor, at least two of them rows the doctor can test whatever the
@@ -174,8 +193,8 @@ contact, a wrong code costing patience, and the whole smooth and airtight. What 
   off.
 - The story. Six opening cards: fired by Kessler, in debt to Harrow Credit, working the
   Lanterns' back-street counter. Two of each night's five visitors are contacts. Tonight's
-  list (left wall, or L; it shares the sheet's hook) gives each an alias, two clues and a code
-  line. Clues use only the intake card and the eyes; each alone fits at least two visitors and
+  list (left wall, or L; it shares the sheet's hook) gives each two clues, and an alias and a
+  code line drawn for the night (since November 20). Clues use only the intake card and the eyes; each alone fits at least two visitors and
   both together exactly one, which case_db.gd validate_contacts() checks when the data loads.
   SAY on the list speaks a code: the right contact hands over a package for +300, and anyone
   else loses 1 patience. Codes are game-owned: no model call, nothing in the patient's memory.
@@ -290,14 +309,19 @@ Next three tasks (first run git status -sb and git log -3 --oneline):
    the student has picked two G1 pitches with fewer than two replies: specific, moment-based
    notes in English for the student's review, never sent unasked. G1 is submitted; leave its
    snapshots, slides and narration alone.
-2. The student plays and reads (.\run-game.ps1, with headphones): a drawn night in Chinese from
+2. The title menu the student asked for on November 20 (HANDOFF.md, Student decisions,
+   November 20, item 2), being built in the same session after this file: START, GUIDE and
+   SETTINGS on the title card (the language, less blood, sound), and a clear word before the
+   first visit that a patient may attack without warning and that SPACE drops the shutter;
+   both languages, measured and scene-tested.
+3. The student plays and reads (.\run-game.ps1, with headphones): a drawn night in Chinese from
    a fresh start and a night in English, reading every card, tip, sheet, slip and report page
    and typing with a real Chinese input method; then the test nights with the newer five
    (.\run-game.ps1 -TestNight C, and D to G likewise); then settles the proposals in
-   HANDOFF.md under "For the student to decide" (ON NOTICE, and the five themselves). An agent
-   operating the window, or the scene test, is not a substitute.
-3. Small fixes from that play, and a scene test for a drifting newer patient (a test night of
-   C to G) if the student wants one; English and Chinese together.
+   HANDOFF.md under "For the student to decide" (the push that breaks, ON NOTICE, and the five
+   themselves). An agent operating the window, or the scene test, is not a substitute. Then
+   small fixes from that play, English and Chinese together, and a scene test for a drifting
+   newer patient (a test night of C to G) if the student wants one.
 After these: a short live run in both languages (the model's Chinese inside 55 and 110
 characters, the night's signs and the newer five's voices, the student's real voice through TAB
 in both languages, the new moments with real latency), which is paid and needs the student's explicit yes first; a code is never passed to

@@ -903,9 +903,11 @@ func shift_reckless() -> void:
 	v = await enter("rook")
 	await d.press()
 	check(v.in_exam() and v.press_count == 1, "the first insult only makes him angry")
+	check(str(main.desk.badges.get("press", "")) == "-%d" % v.patience and main._pad_hint("press") == main.PRESS_LAST_HINT,
+		"the PRESS pad now asks for every lamp left, and its hint says the next one breaks him")
 	await d.settle()
 	await d.press()
-	check(v.outcome == "walkout", "the second insult ends the visit")
+	check(v.outcome == "walkout" and v.patience == 0, "the second insult ends the visit, and every lamp goes out with it")
 	await finish_visit("Rook")
 	check(int(last_record().get("credits", 0)) == 0 and not bool(last_record().get("correct", true)), "a walkout pays nothing")
 
@@ -1594,17 +1596,19 @@ func shift_couriers() -> void:
 	check(opened and main.shift_number == 7, "a seventh shift starts")
 	var kip_id := ""
 	var maren_id := ""
-	var maren_alias := ""
+	var words_drawn := true
 	for e in main.shift.contacts:
 		var entry: Dictionary = e
+		words_drawn = words_drawn and (main.contact_data["aliases"] as Array).has(str(entry.get("alias", ""))) \
+			and str(entry.get("say", "")) != "" and str(entry.get("answer", "")) != ""
 		match str(entry.get("case", "")):
 			"kip":
 				kip_id = str(entry.get("id", ""))
 			"maren":
 				maren_id = str(entry.get("id", ""))
-				maren_alias = str(entry.get("alias", ""))
 	check(main.shift.contacts.size() == 2 and main.clipboard.contacts.size() == 2 and kip_id != "" and maren_id != "",
 		"two couriers are on tonight's list, Kip's entry and Maren's, and the list on the wall has both")
+	check(words_drawn, "each entry carries an alias and a code drawn for tonight")
 	check(main.clinic.line == 400 and main.shift.line_per_hour() == 400, "the meter wants 400 an hour")
 	check(main._shift_line() == Lang.tf(main.SHIFT_LIST_LINE, [5, 2, 400]), "the night opens by saying how many visitors are on the list")
 	var lists: Array = logged("contacts")
@@ -1616,7 +1620,7 @@ func shift_couriers() -> void:
 
 	section("Kip: the list, a wrong code, the right one, and a CALM that costs")
 	var v: VisitState = await enter("kip")
-	check(v.is_contact() and str(v.contact.get("id", "")) == kip_id, "Kip is tonight's courier SPARROW or PAPER CRANE")
+	check(v.is_contact() and str(v.contact.get("id", "")) == kip_id, "Kip is one of tonight's couriers")
 	check(not v.surprises, "the surprises are still held for this night")
 	await d.settle()
 	var before: int = logged("panel").size()
@@ -1704,9 +1708,9 @@ func shift_couriers() -> void:
 	await d.call_team()
 	check(v.outcome == "referred_drifting", "the call hands her over without a fight")
 	printed = await d.wait_for_slip(40.0)
-	check(printed and main._slip_breakdown(main._slip_data) == Lang.tf(main.SLIP_NO_DROP, maren_alias), "the slip says her package never came over the counter")
+	check(printed and main._slip_breakdown(main._slip_data) == "", "the slip says nothing of a package: who carried an entry is told at closing")
 	moved = await d.take_slip()
-	check(moved and main.clipboard.entry_mark(maren_id) == "missed", "her entry is marked missed")
+	check(moved and main.clipboard.entry_mark(maren_id) == "", "her entry stays as it was: the list does not say she went without it")
 
 	section("Report: the drops are on the bill")
 	check(main.state == MainScript.State.REPORT, "the report is up")
@@ -1808,11 +1812,12 @@ func shift_surprises() -> void:
 	check(not bool(r.get("line_held", true)) and int(r.get("hours_under", 0)) == 5 and str(r.get("title", "")) == "THE CUT",
 		"with no drop the fees trail 400 an hour all night, and the bill leaves 1100 under the line of 2000: THE CUT")
 	check(tills_of(r) == [250, 550, 1150, 1500, 1100], "the meter: 250, 550, 1150 and 1500 through the night, 1100 once the reports were in")
-	var missed := 0
+	var picked := 0
 	for e in main.shift.contacts:
-		if main.clipboard.entry_mark(str((e as Dictionary).get("id", ""))) == "missed":
-			missed += 1
-	check(int(r.get("drops", -1)) == 0 and int(r.get("contacts", 0)) == 2 and missed == 2, "neither courier's package came over the counter")
+		if main.clipboard.entry_mark(str((e as Dictionary).get("id", ""))) == "picked":
+			picked += 1
+	check(int(r.get("drops", -1)) == 0 and int(r.get("contacts", 0)) == 2 and picked == 0,
+		"neither courier's package came over the counter, and the list stamped neither")
 
 
 # ================================================================ shift 9

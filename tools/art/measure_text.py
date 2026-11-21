@@ -81,7 +81,7 @@ def use_language(code):
         _CAT.update({k: v for k, v in cat.get("strings", {}).items() if v})
         _KEEP.update(w.lower() for w in cat.get("keep", []))
     contacts = json.load(open(os.path.join(DATA, "contacts.json"), encoding="utf-8"))
-    RAW.update(str(e.get("alias", "")) for e in contacts.get("pool", []))
+    RAW.update(str(a) for a in contacts.get("aliases", []))
     for card in json.load(open(os.path.join(DATA, "intro.json"), encoding="utf-8")).get("cards", []):
         RAW.update(str(e.get("alias", "")) for e in card.get("labels", {}).get("entries", []))
     for en, said in _CAT.items():
@@ -809,8 +809,7 @@ def main():
     contact_data = json.load(open(os.path.join(DATA, "contacts.json"), encoding="utf-8"))
     packages = [str(e.get("package", "")) for e in contact_data.get("pool", [])]
     longest_package = max(packages, key=lambda t: tw(t)) if packages else ""
-    aliases = [str(e.get("alias", "")) for e in contact_data.get("pool", [])]
-    longest_alias = max(aliases, key=lambda t: tw(t, True)) if aliases else ""
+    aliases = [str(a) for a in contact_data.get("aliases", [])]
     # the widest readings: every hour at the dearest fee with Trauma Team's bounty on top, and
     # every drop of the night; or every hour at the worst a visit can cost
     best = (max(fees | {0}) + max(0, int(rules["scoring"].get("refer_drifting", 0)))) * hours \
@@ -889,7 +888,8 @@ def main():
                    "CALM_HOLD_HINT": [numbers["calm_cost"], numbers["calm_gain"], calm_uses],
                    "CALM_FREE_HINT": [numbers["calm_gain"], calm_uses],
                    "CALM_FREE_HOLD_HINT": [numbers["calm_gain"], calm_uses],
-                   "SAY_CODE_HINT": [numbers["code_cost"]], "CODE_BLANK_HINT": [numbers["code_cost"]]}
+                   "SAY_CODE_HINT": [numbers["code_cost"]], "CODE_BLANK_HINT": [numbers["code_cost"]],
+                   "PRESS_HINT": [numbers["press_cost"]]}
     for name, h in found:
         rows.append(check("hint", "main.gd:" + name, worst_numbers(h, hint_values.get(name, [len(sheet["rows"])] * 2))))
     said = consts(MAIN_GD, r"_LINE$")
@@ -925,15 +925,28 @@ def main():
     rows += guide_rows(intro, numbers)
     rows += training_rows(intro, numbers)
     # the slip's breakdown line under the call (main.gd: _slip_breakdown): the longest it can be
-    named = dict(consts(MAIN_GD, r"^SLIP_(DROP|NO_DROP|CALM)$"))
-    if len(named) < 3:
+    named = dict(consts(MAIN_GD, r"^SLIP_(DROP|CALM)$"))
+    if len(named) < 2:
         rows.append(("slip_call", "main.gd:SLIP_*", 0, "", " NO BREAKDOWN WORDS FOUND"))
     else:
-        worst = "  •  ".join([tr(max(worst_numbers(named["SLIP_DROP"], [numbers["pay"]]),
-                                     named["SLIP_NO_DROP"].replace("%s", longest_alias), key=tw)),
+        worst = "  •  ".join([tr(worst_numbers(named["SLIP_DROP"], [numbers["pay"]])),
                              tr(worst_numbers(named["SLIP_CALM"], [numbers["calm_cost"] * calm_uses]))])
         rows.append(("slip_call", "main.gd:_slip_breakdown", tw(worst), worst,
                      " WIDER THAN THE SLIP (%d px)" % SLIP_WIDTH if tw(worst) > SLIP_WIDTH else ""))
+    # tonight's contact list (clipboard.gd: _draw_list_paper), one column: each alias with what
+    # stands on its right (the SAY button, "blank look" or the PICKED UP stamp), each clue with its
+    # bullet, and each code line in its quotes
+    list_room = int(number(CLIPBOARD_GD, "LIST_RIGHT") - number(CLIPBOARD_GD, "LIST_X"))
+    say_w = int(re.search(r"^const SAY_SIZE := Vector2\((\d+)", source(CLIPBOARD_GD), re.M).group(1))
+    right_w = max(say_w, tw("PICKED UP", True) + 6, tw("blank look"))
+    if not aliases or not contact_data.get("codes"):
+        rows.append(("list", "contacts.json", 0, "", " NO ALIASES OR CODES FOUND"))
+    for a in aliases:
+        rows.append(check("list", "contacts.aliases." + a, a, bold=True, limit=list_room - right_w - 6))
+    for cid, clue in contact_data.get("clues", {}).items():
+        rows.append(check("list", "contacts.clues." + cid, "• " + str(clue.get("text", "")), limit=list_room))
+    for i, code in enumerate(contact_data.get("codes", [])):
+        rows.append(check("list", "contacts.codes.%d" % i, '"%s"' % str(code.get("say", "")), limit=list_room))
     bad = [r for r in rows if r[4]]
     by_kind = {}
     for kind, where, w, text, flag in rows:

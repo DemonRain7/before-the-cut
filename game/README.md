@@ -15,9 +15,9 @@ is optional and in any order, and you can decide before doing any of it. Then yo
 drop the shutter.
 
 Two of each night's five visitors are the Lanterns' **contacts**, carrying smuggled military
-implants. Tonight's **contact list** on the left wall gives each one an alias, two clues and a
-code. Say the right code to the right visitor and the package pays 300 credits; say it to
-anyone else and it costs that visitor's patience.
+implants. Tonight's **contact list** on the left wall gives each one two clues, and an alias
+and a code drawn for that night. Say the right code to the right visitor and the package pays
+300 credits; say it to anyone else and it costs that visitor's patience.
 
 You are squeezed too. Your chair, your tools and your own two hands are on lease from Harrow,
 and its meter reads your till once an hour: every patient is one hour, and every hour the till
@@ -280,7 +280,7 @@ patient is about to do.
 | PORT | desk | a close look at the socket | 1 patience to ask if it is covered, otherwise free |
 | ASK | desk | a short list of questions | 1 patience for a new answer |
 | CALM | desk | a calm-patch from the drawer: +1 patience and a refusal softens; twice per visit | 30 credits a use |
-| PRESS | desk | say something that stings and watch the reaction | 2 patience |
+| PRESS | desk | say something that stings and watch the reaction; a second PRESS breaks them | 2 patience; the second takes every lamp left |
 | SAY | contact list, while it is down | say that entry's code to the visitor | right: +300 credits; wrong: 1 patience |
 | TREAT | right wall | pick up the stamp, then stamp the intake card | decision |
 | TRAUMA | right wall | press twice: the line opens, then the call goes out | decision |
@@ -300,6 +300,16 @@ runs for eight seconds, and they walk out by themselves: no fee, no fine, not a 
 and the hour is gone. You can still decide while the bar runs. CALM during it gives one lamp
 back, for its 30 credits, and keeps them at the counter. The bar stands still while an answer
 is on its way, while a test or the microphone is open, and while the guide is up.
+
+**The push that breaks them takes every lamp.** [Student, November 20: why does a patient with
+1 patience left still walk out after two PRESSes? How is that designed?] The second PRESS breaks
+every patient, whatever their truth: a steady one walks out and a drifting one lunges. Until
+November 20 it cost 2 like the first, so a patient could leave with a lamp still lit and the
+meter said one thing while the counter did another. Now the push that breaks them takes every
+lamp left (`VisitState.press_cost()`, rules version 10), and they go at once, with no LEAVING
+bar. After the first PRESS the pad's badge shows what the second will take (`-4` with four
+lamps left) and its hint says that a second PRESS breaks them. The first PRESS still costs 2,
+and a patient whose last lamp goes any other way still gets the bar.
 
 | Key | Effect |
 | --- | --- |
@@ -396,8 +406,19 @@ code.]
 - **The list.** Each night two entries (`contacts.per_night`) are drawn from the pool in
   `data/contacts.json`, each for a different visitor who comes that night, with a generator
   seeded from the shift seed. The pool has two entries per character, twenty in all, each with
-  its own alias, clue pair, code line, counter-line and package. The list is not in arrival
-  order.
+  its own clue pair and package. The list is not in arrival order.
+- **Aliases and codes.** [Student, November 20, with a screenshot of the list: being able to see
+  the names here is cheating, since the player sees them in the talk below as well.] An entry
+  has no alias or code of its own. `contacts.json` keeps sixteen aliases and twelve codes (the
+  doctor's line and the contact's answer) apart from the pool, and each night
+  `ShiftState.name_contacts()` hands tonight's entries an alias and a code from them, with a
+  generator of its own, so the same character comes under another alias and another code on
+  another night. Until November 20 every alias and code belonged to one character and spoke of
+  their trade (LADLE and the late bowls for the noodle cook, the precinct for the off-duty
+  cop), so the list could be read without its clues. None of those words is used again.
+  `run_tests.gd` checks that no alias is a word of any visitor's file, that no code line uses a
+  word of a visitor's name, job or request, and that the opening's made-up KESTREL and COPPER
+  are in neither list.
 - **The clues** use only what the player can see: the intake card (age, fee, request) and a
   look at the eyes (implants in both, or at least one natural eye). When the data loads,
   `scripts/core/case_db.gd` refuses a clue that fits fewer than two of the ten characters. Each
@@ -406,7 +427,7 @@ code.]
   with too few such entries is drawn again. So the list never names anyone, and one clue alone
   never gives anyone away.
 - **SAY.** During the exam each open entry on the list has a SAY button. The right contact
-  answers with the entry's counter-line and hands a package over: the narrator says what it is,
+  answers with the code's answer and hands a package over: the narrator says what it is,
   and 300 credits go into the till at once, whatever you decide. Anyone else, or a contact
   given the other entry's code, gives a blank look in their own words and loses 1 patience
   (`contacts.wrong_cost`). A code needs at least that much patience left, so a patient on the
@@ -416,10 +437,12 @@ code.]
   same, the blank look is in the visitor's own voice whatever their truth, and the contacts
   are steady and drifting alike. The drop changes neither the case, nor the call's credits,
   nor the chance of an attack.
-- **On paper.** The list marks an entry PICKED UP after its drop, or MISSED when its contact
-  came and went without one, and pencils in the codes a visitor did not know. The slip prints
-  `DROP +300` or `ALIAS: NO DROP`; the report adds "Drops picked up: n of 2 (+X)" and, under each
-  visit, `drop +300`, `drop missed` or `calm -N`.
+- **On paper.** [Student, November 20: the player should not learn during play that a drop was
+  missed.] The list stamps an entry PICKED UP after its drop and, during a visit, pencils in the
+  codes that visitor did not know. Nothing during the night says who carried an entry that was
+  not picked up: there is no MISSED stamp, and the slip prints `DROP +300` after a drop and
+  nothing about the list otherwise. At closing the report adds "Drops picked up: n of 2 (+X)"
+  and, under each visit, `drop +300`, `drop missed` or `calm -N`.
 - **Words.** On screen the people on the list are always contacts. Kip's own job is bike
   courier (his card says "Bike courier, 22"), so the gang's people are never called couriers
   where the player can read it; the code, the data notes and the tests still say courier for
@@ -433,7 +456,7 @@ closing. During the night the doctor learns what was done, never whether it was 
 
 - **The slip** says what the counter did (`rules.json` `counter`): TREATED, HANDED OVER, SHUTTER
   HELD, SHUTTER DOWN, WALKED OUT or OUT OF PATIENCE, with a line of text that does not give the
-  truth away, the money AT THE COUNTER, a drop, a missed drop or CALM, and "Right or wrong: at
+  truth away, the money AT THE COUNTER, a drop or CALM, and "Right or wrong: at
   closing."
 - **At the counter** come in the fees, drops, and CALM and glass going out. A treated patient
   pays the fee at the counter whatever their truth; the bill for a drifting one comes at
@@ -778,23 +801,30 @@ $GODOT = "$env:LOCALAPPDATA\CodexTools\Godot\4.7.2\Godot_v4.7.2-stable_win64_con
 None of these opens a window, plays sound or opens a microphone. In Git Bash, write
 `"$GODOT"` in place of `& $GODOT`.
 
-| Check | Command | Result on November 19, in this checkout |
+| Check | Command | Result on November 20, in this checkout |
 | --- | --- | --- |
-| Rules | `& $GODOT --headless --audio-driver Dummy --path game --script res://tests/run_tests.gd` | 1179 passed, 0 failed |
-| Scene, offline | `& $GODOT --headless --audio-driver Dummy --fixed-fps 60 --path game --script res://tests/run_ui_smoke.gd` | 1079 passed, 0 failed |
-| Scene, in Chinese | the same, with ` -- --lang=zh` at the end | 1080 passed, 0 failed |
-| Scene, less blood | the same, with ` -- --less-blood` at the end | 1079 passed, 0 failed |
+| Rules | `& $GODOT --headless --audio-driver Dummy --path game --script res://tests/run_tests.gd` | 1193 passed, 0 failed |
+| Scene, offline | `& $GODOT --headless --audio-driver Dummy --fixed-fps 60 --path game --script res://tests/run_ui_smoke.gd` | 1081 passed, 0 failed |
+| Scene, in Chinese | the same, with ` -- --lang=zh` at the end | 1082 passed, 0 failed |
+| Scene, less blood | the same, with ` -- --less-blood` at the end | 1081 passed, 0 failed |
 | Window close | `& $GODOT --headless --audio-driver Dummy --verbose --path game --script res://tests/run_close_check.gd` (run it without `--fixed-fps`, which makes it fail) | 5 passed, 0 failed; no leak line in the verbose exit report |
 | Proxy | `npm test` in `agent_proxy` (no install needed) | 40 passed, 0 failed |
-| Game and proxy over HTTP | `node tools/run_proxy_integration.mjs $GODOT validation/2026-11-19/http-integration` | 199 passed, 0 failed; wire checks 16 passed, 0 failed |
+| Game and proxy over HTTP | `node tools/run_proxy_integration.mjs $GODOT validation/2026-11-20/contacts-press/http-integration` | 199 passed, 0 failed; wire checks 16 passed, 0 failed |
 | Translations | `python tools/check_lang.py` | 0 problems |
-| Text fits | `python measure_text.py`, run inside `tools/art` | 1513 lines, 0 problems |
-| Text fits, in Chinese | `python measure_text.py --lang zh`, inside `tools/art` | 1513 lines, 0 problems, none of them left in English |
+| Text fits | `python measure_text.py`, run inside `tools/art` | 1553 lines, 0 problems |
+| Text fits, in Chinese | `python measure_text.py --lang zh`, inside `tools/art` | 1553 lines, 0 problems, none of them left in English |
 | Rough lint | `python tools/gd_static_check.py` | 31 scripts, no findings |
 | Capture script, dry | `& $GODOT --headless --audio-driver Dummy --fixed-fps 60 --path game --script res://tests/capture_shift.gd` | 439 frames named, 0 missed |
 | Capture script, dry, in Chinese | the same, with ` -- --lang=zh` at the end | 439 frames named, 0 missed |
 | Capture script, dry, attacks | the same, with ` -- --attacks-only --less-blood` at the end | 334 frames named, 0 missed |
 | Capture script, dry, weapons | the same, with ` -- --weapons-only` at the end | 235 frames named, 0 missed |
+
+Every row ran on November 20 on the working tree of the contacts and PRESS change and exited 0
+(logs in the local `../validation/2026-11-20/contacts-press/`; the HTTP run wrote into the
+assistant's scratch folder and was copied there). These too are automated checks with the
+dummy audio driver, a simulated microphone and the mock provider; no paid service was called,
+nothing was drawn on the real renderer, and nobody has played the change. The November 19
+paragraph below is kept as it was.
 
 Every row ran on November 19 on the final working tree and exited 0 (logs in the local
 `../validation/2026-11-19/step7/final/`; `chain2.sh` beside them ran the whole table after the
@@ -998,7 +1028,7 @@ a switch on the title card (`language`). The log is English in both languages.
 
 ```
 data/rules.json, sheet.json, cases/*.json   numbers, the sheet and its house rule, the ten characters' templates
-data/contacts.json                          the pool of contacts: aliases, clues, codes, counter-lines, packages
+data/contacts.json                          tonight's contacts: the pool's clues and packages, the aliases and codes drawn each night
 data/intro.json                             the words of the opening cards, the counter guide and the training
 data/parts.json                             the spec binder: every implant model's normal, by slot, and the baseline body
 data/nights.json                            the fixed test nights A to H: who comes, who drifts and which rows break

@@ -24,8 +24,9 @@ extends RefCounted
 ## Nobody reads the meter in the hour it happened (readings()), and the line is not held.
 ##
 ## Contacts (rules.json "contacts", data/contacts.json): each night some visitors are couriers.
-## The list is drawn from the shift seed (draw_contacts()); a drop is paid into the visit's
-## settlement, so the till and every reading count it like a fee.
+## The list is drawn from the shift seed (draw_contacts()), and so are the alias and the code
+## each entry carries tonight (name_contacts()); a drop is paid into the visit's settlement, so
+## the till and every reading count it like a fee.
 ##
 ## The glass (rules.json "attack"): the pane in the counter window takes "glass" blows in a
 ## shift. Each blow that lands before the shutter is down uses one up, and the damage stays,
@@ -43,7 +44,7 @@ var records: Array = []   # one settlement per finished visit
 var glass: int = 0        # blows the pane can still take tonight
 var glass_out: bool = false   # somebody came through it: no pane is left
 var repairs: Array = []   # one per layer paid for: {"after": visits finished by then, "cost": credits}
-var contacts: Array = []  # tonight's list: entries of data/contacts.json "pool", one per courier
+var contacts: Array = []  # tonight's list: entries of data/contacts.json "pool", one per courier, with tonight's alias and code
 var died: bool = false    # somebody came through the window: the night ended with that visit
 
 
@@ -180,8 +181,10 @@ static func _shuffle(a: Array, rng: RandomNumberGenerator) -> void:
 ## game passes the entries that are fair tonight (CaseDB.fair_contacts), so neither clue alone
 ## gives anybody away and the two together fit the courier only. `first_on_list` (the training
 ## night) puts the first visitor on the list, so the first visit can show how a code works. The
-## list is not in arrival order, so it says nothing about who comes when.
-static func draw_contacts(p_rules: Dictionary, pool: Array, p_order: Array, p_seed: int, first_on_list: bool = false) -> Array:
+## list is not in arrival order, so it says nothing about who comes when. With `words` (the
+## aliases and codes of data/contacts.json) each entry is given tonight's alias and code
+## (name_contacts()); without them the entries are as the pool has them.
+static func draw_contacts(p_rules: Dictionary, pool: Array, p_order: Array, p_seed: int, first_on_list: bool = false, words: Dictionary = {}) -> Array:
 	var per := 0
 	if typeof(p_rules.get("contacts")) == TYPE_DICTIONARY:
 		per = maxi(0, int(p_rules["contacts"].get("per_night", 0)))
@@ -213,7 +216,35 @@ static func draw_contacts(p_rules: Dictionary, pool: Array, p_order: Array, p_se
 			continue
 		out.append((e as Dictionary).duplicate(true))
 		taken[cid] = true
+	if not words.is_empty():
+		name_contacts(out, words, p_seed)
 	return out
+
+
+## Gives each of tonight's entries an alias of `words.aliases` and a code of `words.codes` ("say",
+## the doctor's line, and "answer", the courier's), none twice, drawn from the shift seed with a
+## generator of their own. So an alias says nothing about who carries it, and a visitor carries
+## another alias and another code on another night (contacts.json version 2). Who is on the list
+## does not change with the words. An entry past the end of either list keeps what it has.
+static func name_contacts(entries: Array, words: Dictionary, p_seed: int) -> void:
+	var aliases: Array = []
+	if typeof(words.get("aliases")) == TYPE_ARRAY:
+		aliases = (words["aliases"] as Array).duplicate()
+	var codes: Array = []
+	if typeof(words.get("codes")) == TYPE_ARRAY:
+		codes = (words["codes"] as Array).duplicate()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("contact-words:%d" % p_seed)
+	_shuffle(aliases, rng)
+	_shuffle(codes, rng)
+	for i in entries.size():
+		var e: Dictionary = entries[i]
+		if i < aliases.size():
+			e["alias"] = str(aliases[i])
+		if i < codes.size() and typeof(codes[i]) == TYPE_DICTIONARY:
+			var code: Dictionary = codes[i]
+			e["say"] = str(code.get("say", ""))
+			e["answer"] = str(code.get("answer", ""))
 
 
 ## The list entry for a visitor, or {} when they are not a courier tonight.

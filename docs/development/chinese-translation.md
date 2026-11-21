@@ -179,7 +179,8 @@ Run these before a commit that touches any words (`AGENTS.md`, Languages):
 
 On November 18 all three passed: 0 problems, 616 lines that fit in each language, 954 scene
 checks; on November 19, with the five new characters, 0 problems, 1513 lines in each language
-and 1080 scene checks. That shows that every line has a translation and fits, not that the translation is good.
+and 1080 scene checks; on November 20, with the contacts' new codes (aliases stay English),
+0 problems, 1553 lines in each language and 1082 scene checks. That shows that every line has a translation and fits, not that the translation is good.
 
 ## Adding a language
 
