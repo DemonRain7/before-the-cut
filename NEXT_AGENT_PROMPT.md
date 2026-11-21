@@ -1,12 +1,16 @@
 # Continue Before the Cut
 
-**Resume after patient-agent P1 (November 21, 2026).** D1–D3 and the three deployment and spending decisions were approved in chat. The game has one set of ASK, PRESS, evidence and case rules. Fix 4 is implemented. Use rules version 11 and protocol 4. The earlier P0 entry is historical.
+Start with the [full-build checklist](docs/development/full-build-progress.md). Account deployment succeeded at 20:36 UTC. The November 21 flow work is committed.
+
+**Historical P1 handoff (November 21, 2026).** D1–D3 and the three deployment and spending decisions were approved in chat. The game has one set of ASK, PRESS, evidence and case rules. Fix 4 is implemented. Use rules version 11 and protocol 4. The earlier P0 entry is historical.
 
 The public double-session and timeout probes passed. The Godot timeout fallback appeared at 3,836 ms and the visit finished at its slip. A public, disabled live Worker rejected POST with 503. Local and public mocks passed the six-visit rehearsal. OpenAI usage for this checkpoint is zero. The [dated checkpoint](docs/development/live-model-results-2026-11-21.md) has evidence and the temporary addresses. Working-checkout tests passed 2,025 rules, 52 proxy tests, 334 Godot HTTP and 100 wire assertions. An independent commit export passed the same rules and HTTP checks plus both scene languages. See [HANDOFF.md](HANDOFF.md) for the baseline comparison and the separate export counts.
 
 1. Deploy persistently after the student completes Wrangler's interactive login. The one-hour preview is automatically discarded if unclaimed.
 2. Have the student enter the project key through Wrangler's hidden prompt and turn on the monthly hard limit in the provider project. Keep live disabled until the private run.
 3. Execute the already-approved `gpt-6-luna` checkpoint through the private deployment, up to 24 dialogues and zero transcriptions for USD 0.01 maximum. Restore the disabled config. Commands and limits are in the [runbook](agent_proxy/README.md#deployment-and-rollback). Preserve the November 15 ledger and the earlier uncommitted design and flow work.
+
+**Everything that is left, in one run (afternoon of November 21).** The student asked for the rest to be built without stops and shown when it is finished. [docs/development/patient-agent-handoff/KICKOFF.md](docs/development/patient-agent-handoff/KICKOFF.md) was rewritten as the prompt for that run: the three tasks above, then the play-logic rules, P2 and P3. It replaces the P0-only version of that file, and [docs/development/full-build-progress.md](docs/development/full-build-progress.md) is its checklist. Nothing of it is built.
 
 **Historical patient-agent P0 handoff (November 21, 2026).** P0 was implemented and verified locally on top of the previous sessions' uncommitted work. Use the active P0 checkpoint at the top of HANDOFF.md for current results and the proxy README for commands. Earlier instructions below to begin P0 describe the previous checkpoint. Inspect `git status -sb` before pulling or staging.
 
@@ -17,7 +21,7 @@ The public double-session and timeout probes passed. The Godot timeout fallback 
 - The next three tasks each require their own answer. (1) Confirm the instructor's foundation/rubric, then deploy and probe the mocks only after approval and the student's login. (2) After live-setup approval, have the student enter the secret in the disabled live environment, enable a hard provider spend limit and decide future redeployment authority. (3) After spending approval, use a fresh 24-dialogue/0-transcription allowance for OpenAI `gpt-6-luna`, six bilingual visits, estimated USD 0.00231 with a proposed USD 0.01 ceiling. The November 15 ledger stays closed.
 - Stop before P1. D1, D2 and D3 propose ASK-equivalent typed questions, pressure through PRESS only and game-owned case promises respectively. Each defaults to yes and awaits the student. Course posting and the play-logic proposals remain separate.
 
-Updated November 20, 2026. Work on main in this repository, the only active checkout;
+Updated November 21, 2026. Work on main in this repository, the only active checkout;
 pull first. The sibling fathom directory is an archive. Do not write there or copy its Git history.
 
 Read AGENTS.md, HANDOFF.md, game/README.md, docs/development/chinese-translation.md and
@@ -34,10 +38,35 @@ data and the code of random signs are in 5b64d87, the model's night signs in 484
 part's art in 813b9d0, the five new characters in e486887 and the launcher's -TestNight option
 in 62a5251 and Vale's redrawn port close-up in 71a7e5d, all pushed; the work of November 20
 on the contact list's words and the push that breaks is in 80bb202, pushed; the title card's
-menu is committed after 80bb202, together with this file. Run git status -sb and git log -3
---oneline: anything uncommitted is newer than this file.
+menu is committed after 80bb202, together with this file (361baa7). The work of November 21
+was not committed when its checkpoint was written, and two sessions wrote it: stage your own
+files by path. Run git status -sb and git log -3 --oneline: anything uncommitted is newer than
+this file.
 
-Latest checkpoint (November 20, evening): the title card's menu the student asked for, built by
+Latest checkpoint (November 21): a recheck, a review and a handoff, by Claude (Fable). Nobody
+has played any of it and the student has reviewed none of it. No paid model call was made and
+nothing was deployed. HANDOFF.md, "Checkpoint of November 21", has the detail.
+- Four flow fixes, built and checked; rules version 10 and protocol 3 are unchanged. The
+  figure beside AT THE COUNTER on the slip is everything the counter took in for the visit, and
+  after a drop or a calm-patch a line under it says what it is made of (FEE +250 • DROP +300 •
+  CALM -30). The slip's rows sit at fixed heights. The totals page says CLICK FOR THE NEXT
+  NIGHT or CLICK TO TRY AGAIN and names its keys. ESC on the night's totals goes back to the
+  title card.
+- The checks of that day, with the mock: rules 1193; scene test 1130 in English, 1131 in
+  Chinese, 1130 with less blood; window close 5; check_lang 0 problems; measure_text 1609 lines
+  in each language; lint 32 scripts; npm test 40; HTTP run 199 and 16; captures drawn on a
+  hidden desktop, 446 frames in each language; all with 0 failures. Logs:
+  validation/2026-11-21/recheck-2/. The import from an empty cache and the boots were not run
+  again.
+- The play-logic review is written: docs/development/play-logic-review.md. Computed play, not
+  a playtest. It finds that one broken line is proof today, so no tool is ever needed, and it
+  recommends letting a steady visitor carry one broken line (proposal A), with five fixes.
+  Nothing is built from it. Its four questions wait for the student.
+- The patient agent is designed, not built: docs/development/patient-agent-handoff/. KICKOFF.md
+  is the message for Codex, 01-design.md the design, 02-phases.md the ground rules, the phases
+  P0 to P3 and the decisions D1 to D9.
+
+The checkpoint before it (November 20, evening): the title card's menu the student asked for, built by
 Claude (Opus 5.5) and checked; nobody has played it. The student could not find where the
 language was chosen (a small switch in the title card's corner), found the opening guidance
 still unclear (a new player may not know that a patient can attack without warning) and
@@ -342,16 +371,24 @@ steady visitor shows only normal signs (no decoys yet); and the money changed (r
 because drawn truths broke the old line. HANDOFF.md, Student decisions, November 18, items 2
 and 4, has the proposal and the answer.
 
-Next three tasks (first run git status -sb and git log -3 --oneline):
+Next three tasks, and a fourth added on November 21 for Codex (first run git status -sb and
+git log -3 --oneline):
 1. Prepare two Braintrust replies due today, November 19, 23:59 New York (the soonest deadline), once
    the student has picked two G1 pitches with fewer than two replies: specific, moment-based
    notes in English for the student's review, never sent unasked. G1 is submitted; leave its
    snapshots, slides and narration alone.
-2. The push that breaks (HANDOFF.md, For the student to decide): when the student answers,
-   keep the rule, or build the alternative (a patient leaves only when the lamps run out, a
-   second PRESS costs 2 like the first, and a steady patient with lamps left stays), changing
-   with it the guide's patience and talk items, the training's talk tip, the PRESS hints and
-   the last point of HOW TO PLAY's attack page; both languages, measured and scene-tested.
+2. The play-logic review (HANDOFF.md, Student decisions, November 21). The student is giving
+   it to Claude (Fable) with docs/development/play-logic-review-brief.md.
+   - The question: whether each examination, ASK, PRESS and the talk with the patient AI
+     earns its place, measured with the game's own draw.
+   - The write-up: docs/development/play-logic-review.md, with two or three proposals. The
+     push that breaks is decided inside it.
+   - Build nothing from it until the student picks. Then the guide, the training's talk tip,
+     the PRESS hints and HOW TO PLAY change with the rule, in both languages, measured and
+     scene-tested.
+   - Written on November 21: docs/development/play-logic-review.md. It recommends proposal A
+     with the five fixes of its section 9, and it waits for the student's answers to its four
+     questions (HANDOFF.md, For the student to decide). The pick gets its own brief.
 3. The student plays and reads (.\run-game.ps1, with headphones): the title card's HOW TO PLAY
    and SETTINGS, then a drawn night in Chinese from a fresh start and a night in English,
    reading every card, tip, sheet, slip and report page and typing with a real Chinese input
@@ -361,13 +398,26 @@ Next three tasks (first run git status -sb and git log -3 --oneline):
    themselves). An agent operating the window, or the scene test, is not a substitute. Then
    small fixes from that play, English and Chinese together, and a scene test for a drifting
    newer patient (a test night of C to G) if the student wants one.
+4. The patient agent, phase P0, for Codex. The student starts Codex with the message in
+   docs/development/patient-agent-handoff/KICKOFF.md.
+   - P0 only, aimed at the checkpoint of Monday November 23: a Worker that can be deployed,
+     session isolation and the forced-timeout fallback shown, run-game.ps1 -Patient and a
+     PATIENT AI row in SETTINGS in both languages, the current build proven against the mock,
+     the runbook. No rule of play changes, and protocol 3 stays.
+   - Then stop and ask. Deploying the mock, a live environment and a small paid check each
+     need the student's own yes. P1 to P3 wait for the student's answers to D1, D2 and D3
+     (02-phases.md, section 3).
+   - If the student also picks a rule from the review, that pick is built first and P1 after
+     it.
 After these: a short live run in both languages (the model's Chinese inside 55 and 110
 characters, the night's signs and the newer five's voices, the student's real voice through TAB
 in both languages, the new moments with real latency), which is paid and needs the student's explicit yes first; a code is never passed to
 the model, so the patient AI does not know one was said. Then the visual check of the PATIENT
 SAID row, paste support for the typing line, and the fresh-import crash (another Godot version
 on a copy, or an upstream report with the logs; a public report is a post and needs the
-student's yes).
+student's yes). The patient-agent package plans that live run as its evaluation (01-design.md,
+section 12, E1 to E5); each run still needs the student's yes to the provider, the model, the
+number of calls and the cost.
 
 Update the handoffs at checkpoints with actual results and remaining work. Commit and push
 normally to main when authorized; never force-push, add Co-Authored-By or add AI commit
