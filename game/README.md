@@ -1,5 +1,10 @@
 # Before the Cut: playable prototype
 
+
+### Playing rules version 12
+
+One broken row can be wear on a steady visitor. Two broken rows mean drift. Fixed nights I and J cover wear on all five rows. Both PRESS actions need two lamps. The second takes all remaining lamps. A steady visitor walks out and a drifting one lunges. Press SPACE to catch that lunge for a bonus of 150 at closing. A free check or small talk never rolls a surprise. CALM opens a sealed tool. Each visitor's closing page labels wear and explains missed lines, and the totals show which tools the doctor used.
+
 Version 0.4.0, Godot 4.7.2 (GL Compatibility), 640 x 360 pixel art shown at whole multiples
 (the window opens at 1280 x 720). One night at the counter of a back-street implant clinic:
 five visitors drawn from a cast of ten, one decision each, and two of them carrying something

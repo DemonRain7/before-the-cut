@@ -449,6 +449,7 @@ static func validate_nights(nights: Dictionary, templates: Dictionary, rules: Di
 				errors.append("%s: %s names a sign its file does not have (%s)." % [where, id, describe_pick(pick)])
 				sound = false
 				continue
+			resolve_parts(c, parts)
 			composed[id] = c
 			for e in validate_case(c, rules, sheet, parts):
 				errors.append("%s: %s: %s" % [where, id, str(e)])
@@ -482,12 +483,19 @@ static func night_drawable(rules: Dictionary, night: Dictionary, cases: Dictiona
 	var counts: Variant = spec.get("drifting")
 	if typeof(counts) == TYPE_DICTIONARY and not (counts as Dictionary).has(str(drifting.size())):
 		errors.append("%d of its visitors drift; rules.json night.drifting never draws that many." % drifting.size())
+	for id in ids:
+		if not drifting.has(id) and cases.has(id):
+			var worn := broken_count(cases[id])
+			if worn > 1 or (worn > 0 and first_of_session and id == ids[0] and spec.get("wear", {}).get("first_protected", true)):
+				errors.append("%s has wear that cannot be drawn in this slot." % id)
 	var broken: Variant = spec.get("broken")
 	for id in drifting:
 		var n := broken_count(cases[id])
 		if typeof(broken) == TYPE_DICTIONARY and not (broken as Dictionary).has(str(n)):
 			errors.append("%s shows %d broken rows; rules.json night.broken never draws that many." % [id, n])
-	var couriers := fair_couriers(contacts, people, ids)
+	var couriers := fair_couriers(contacts, cases, ids)
+	if couriers != fair_couriers(contacts, people, ids):
+		errors.append("The composed signs changed a contact clue.")
 	if first_of_session and bool(spec.get("first_opens_steady", false)) and not ids.is_empty():
 		var first := str(ids[0])
 		if drifting.has(first):
@@ -560,6 +568,7 @@ static func fees_of(people: Dictionary, ids: Array) -> int:
 ## every attack, comes up on some test night.
 static func night_coverage(nights: Dictionary, templates: Dictionary) -> Array:
 	var seen := {}
+	var wear := {}
 	for night in nights.values():
 		if typeof(night) != TYPE_DICTIONARY:
 			continue
@@ -573,7 +582,12 @@ static func night_coverage(nights: Dictionary, templates: Dictionary) -> Array:
 			seen["%s:%s" % [id, str(c["truth"])]] = true
 			for row in ROWS:
 				seen["%s:%s:%s" % [id, row, str(c["signs"].get(row, ""))]] = true
+				if c.truth == "stable" and not c.rows[row].ok:
+					wear[row] = true
 	var missing: Array = []
+	for row in ROWS:
+		if not wear.has(row):
+			missing.append("no steady visitor shows wear on " + str(row))
 	for id in templates.keys():
 		for truth in ["stable", "drifting"]:
 			if not seen.has("%s:%s" % [str(id), truth]):
@@ -650,6 +664,17 @@ static func _validate_night(rules: Dictionary, threshold: int) -> Array:
 			var n := int(str(count)) if str(count).is_valid_int() else -1
 			if n < lo or n > hi or float(w[count]) <= 0.0:
 				errors.append("rules.json: night.%s: '%s' must be a number from %d to %d with a positive weight." % [key, str(count), lo, hi])
+	if spec.has("wear"):
+		var wear: Dictionary = spec.wear
+		var chance := float(wear.get("chance", -1.0))
+		var total := 0.0
+		for row in ROWS:
+			var weight := float(wear.get("weights", {}).get(row, -1))
+			if weight < 0:
+				errors.append("night.wear weights must be nonnegative for each row.")
+			total += maxf(weight, 0.0)
+		if chance < 0 or chance > 1 or total <= 0:
+			errors.append("night.wear needs a probability and at least one weighted row.")
 	if int(spec.get("tries", 0)) < 1:
 		errors.append("rules.json: night.tries must be at least 1.")
 	return errors
@@ -1115,8 +1140,8 @@ static func validate_case(c: Dictionary, rules: Dictionary, sheet: Dictionary = 
 	var threshold := int(sheet.get("threshold", 1))
 	if drifting and broken > 0 and broken < threshold:
 		errors.append("a drifting patient needs at least %d broken sheet lines (sheet.json threshold)." % threshold)
-	if not drifting and broken > 0:
-		errors.append("a stable patient must have no broken sheet line.")
+	if not drifting and broken > 1:
+		errors.append("a stable patient can show at most one worn line.")
 	if drifting and broken > 0 and broken_reachable == 0:
 		errors.append("at least one broken line must be impossible to refuse for good.")
 	elif drifting and broken >= threshold and broken_reachable < threshold:

@@ -1,5 +1,10 @@
 # Before the Cut
 
+## Current counter rules
+
+The student selected wear and the warned second PRESS on November 21. Half of steady visitors can show one worn row. The protected opening visitor has none. Two broken rows establish drift. The second PRESS needs two lamps, takes all lamps and pays 150 at closing for a successful shutter catch. Reopened tools and correct codes are free and safe. CALM and actions that take a lamp can trigger surprises. Closing reveals the diagnosis. These rules have been measured by simulation and await outside players.
+
+
 A Godot 4 game about examining patients before cybernetic surgery. You compare a patient's appearance and responses with a reference sheet of the normal states of the implants that patient wears, choose examinations or dialogue in any order, and decide whether to approve surgery or call in Trauma Team. Every examination is optional. Defend yourself if threatened. Fired by a megacorp and deep in debt, the doctor works the counter of a street gang's back-street clinic, where two of each night's visitors are contacts to be picked out from tonight's list and given the right code. The game is in English or Chinese (中文); the switch is on the title card.
 
 This is one student's ongoing course project. The fictional cyberpsychosis premise is inspired by Cyberpunk 2077; the patients and screening rules are original game design.

@@ -1,5 +1,10 @@
 # Before the Cut: working instructions
 
+## Agreed rules for this build
+
+The student selected wear and the warned second PRESS on November 21. Half of steady visitors can show one worn row. The protected opening visitor has none. Two broken rows establish drift. The second PRESS needs two lamps, takes all lamps and pays 150 at closing for a successful shutter catch. Reopened tools and correct codes are free and safe. CALM and actions that take a lamp can trigger surprises. Closing reveals the diagnosis. These rules have been measured by simulation and await outside players.
+
+
 Read `README.md`, `HANDOFF.md` and `NEXT_AGENT_PROMPT.md` first. This is the ongoing Before the Cut repository (formerly before-the-cut-g1) and, since November 15, 2026, the only active checkout: the game, the patient-AI proxy and the tools live here. The sibling `fathom` folder is an archive; do not write to it.
 
 Communicate with the student in Chinese. Write game text, comments, documents, slides, scripts and handoffs in English. The game itself is bilingual: its English text has a Chinese translation in `game/data/lang/zh/` (see Languages below).

@@ -243,10 +243,16 @@ func check_status(tool: String) -> String:
 func check_cost(tool: String) -> int:
 	if granted.has(tool):
 		return 0
+	if sealed_repeat(tool):
+		return 0
 	var c := _cost("check")
 	if check_status(tool) == "refused":
 		c += _cost("insist")
 	return c
+
+
+func sealed_repeat(tool: String) -> bool:
+	return int(_rule("costs", "free_sealed_repeat", 0)) > 0 and check_status(tool) == "refused" and check_outcome(tool) == "refuse"
 
 
 func check_outcome(tool: String) -> String:
@@ -290,6 +296,9 @@ func apply_check(tool: String, move: String, autonomous: bool = false) -> Dictio
 	if granted.has(tool):
 		res["result"] = "granted"
 		return res
+	if sealed_repeat(tool):
+		res["result"] = "refused"
+		return res
 	var cost := check_cost(tool)
 	if patience < cost:
 		res["result"] = "spent"
@@ -314,7 +323,8 @@ func apply_check(tool: String, move: String, autonomous: bool = false) -> Dictio
 		res["claim"] = cid
 	else:
 		refusals[tool] = int(refusals.get(tool, 0)) + 1
-		add_note(str(TOOL_ROW[tool]), "refuse:" + tool, Lang.tf("Declined the %s.", [Lang.t(str(TOOL_NAME[tool]))]))
+		var refusal := Lang.t("Sealed. CALM opens it.") if sealed_repeat(tool) else Lang.tf("Declined the %s.", [Lang.t(str(TOOL_NAME[tool]))])
+		add_note(str(TOOL_ROW[tool]), "refuse:" + tool, refusal)
 		res["result"] = "refused"
 	_note("check:%s:%s" % [tool, move.get_slice(":", 0)])
 	return res
@@ -447,6 +457,10 @@ func press_breaks() -> bool:
 
 ## The patience the next PRESS takes: rules.json costs.press, or every lamp left when it is the
 ## push that breaks them (rules version 10), so the bar is empty when they go.
+func can_pay_press() -> bool:
+	return int(_rule("costs", "require_press_lamps", 0)) == 0 or patience >= _cost("press")
+
+
 func press_cost() -> int:
 	return patience if press_breaks() else _cost("press")
 
@@ -460,6 +474,9 @@ func press() -> Dictionary:
 		return res
 	var list: Array = case_data.get("press", [])
 	if list.is_empty():
+		return res
+	if not can_pay_press():
+		res["result"] = "spent"
 		return res
 	var breaks := press_breaks()
 	patience = 0 if breaks else maxi(0, patience - _cost("press"))
@@ -563,8 +580,8 @@ func flare_chance() -> float:
 ## Looking is free and is not one. Counts it and rolls, with the director's generator, whether
 ## the patient snaps (drifting only) or flares (anyone, once a visit). Returns "snap", "flare"
 ## or "". Nothing happens yet: snap() and flare() do it when the director is ready.
-func roll_action(rng: RandomNumberGenerator) -> String:
-	if phase != Phase.EXAM:
+func roll_action(rng: RandomNumberGenerator, cost: int = 1, calm: bool = false) -> String:
+	if phase != Phase.EXAM or (cost == 0 and not calm and int(_rule("snap", "free_actions_roll", 0)) == 0):
 		return ""
 	actions += 1
 	var s := snap_chance()
@@ -701,6 +718,10 @@ func row_seen(row: String) -> bool:
 	return false
 
 
+func press_bonus(p_outcome: String) -> int:
+	return int(_rule("scoring", "press_catch_bonus", 0)) if p_outcome == "caught" and attack_cause == "press" and is_drifting() else 0
+
+
 func credits_for(p_outcome: String) -> int:
 	match p_outcome:
 		"treated_ok":
@@ -709,7 +730,7 @@ func credits_for(p_outcome: String) -> int:
 			return int(_rule("scoring", "treat_drifting", -400))
 		"referred_drifting", "caught":
 			# Trauma Team's bounty: the patient's fee, plus refer_drifting (rules version 9)
-			return int(case_data.get("fee", 0)) + int(_rule("scoring", "refer_drifting", 0))
+			return int(case_data.get("fee", 0)) + int(_rule("scoring", "refer_drifting", 0)) + press_bonus(p_outcome)
 		"referred_stable":
 			# the crew came out for a steady patient: the call-out is billed
 			return int(_rule("scoring", "false_call", -150))
@@ -804,8 +825,26 @@ func settlement() -> Dictionary:
 		}
 		if row == "speech" and last_recorded_speech != "":
 			finding["text"] = last_recorded_speech
+		finding["wear"] = not is_drifting() and not finding.ok
+		if not finding.ok and not finding.seen and int(_rule("report", "missed_hints", 1)) > 0:
+			var how := {"eyes": "LIGHT", "hands": "GRIP", "port": "CALM then PORT" if case_data.checks.port.get("insist") == "refuse" else "PORT", "temper": "PRESS"}
+			if row == "speech":
+				var needed := str(spec.evidence[0]).trim_prefix("ask:")
+				var question := Lang.t(str(topic(needed).get("q", "")))
+				finding["show_with"] = Lang.tf("ASK: %s", [question])
+				finding["other_question"] = not asked.is_empty()
+			else:
+				finding["show_with"] = Lang.t(str(how[row]))
 		rows.append(finding)
+	var usage := {}
+	if int(_rule("report", "show_usage", 1)) > 0:
+		for tool in TOOLS:
+			usage[tool] = granted.has(tool) or refusals.has(tool)
+		usage["ask"] = not asked.is_empty()
+		usage["press"] = press_count > 0
+		usage["calm"] = reassure_used > 0
 	return {
+		"usage": usage, "press_bonus": press_bonus(outcome),
 		"case_id": str(case_data.get("id", "")),
 		"name": str(case_data.get("name", "")),
 		"role": str(case_data.get("role", "")),

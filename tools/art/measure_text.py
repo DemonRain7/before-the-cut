@@ -974,7 +974,7 @@ def main():
     numbers = {"per_hour": per_hour, "hours": hours, "total": per_hour * hours, "threshold": threshold,
                "repair_cost": repair_cost, "pay": int(contacts.get("pay", 0)), "code_cost": int(contacts.get("wrong_cost", 0)),
                "per_night": int(contacts.get("per_night", 0)), "calm_cost": int(reassure.get("cost", 0)),
-               "calm_gain": int(reassure.get("gain", 0)), "ask_cost": int(costs.get("ask", 0)),
+               "catch_bonus": int(rules["scoring"]["press_catch_bonus"]), "calm_gain": int(reassure.get("gain", 0)), "ask_cost": int(costs.get("ask", 0)),
                "press_cost": int(costs.get("press", 0)), "check_cost": int(costs.get("check", 0)), "glass": glass,
                "false_alarm": abs(int(rules.get("scoring", {}).get("false_alarm", 0)))}
     contact_data = json.load(open(os.path.join(DATA, "contacts.json"), encoding="utf-8"))

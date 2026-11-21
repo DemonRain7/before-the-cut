@@ -175,6 +175,8 @@ func _run() -> void:
 		await first_five(later_nights)
 	# ---------------------------------------------------------------- shifts 6 to 15
 	await weapon_nights()
+	if not attacks_only:
+		await wear_nights()
 	if dry:
 		print("DRY RUN: %d frames would be captured, %d moments missed. Nothing was drawn or saved." % [count, missed])
 	else:
@@ -1089,6 +1091,9 @@ func maren_gets_through(brief: bool) -> void:
 		await d.seconds(0.3)
 		await shot("maren-port")
 		await d.put_away()
+		await d.settle()
+		await d.reassure()
+		await d.settle()
 	await d.press()
 	await d.seconds(0.5)
 	if not brief:
@@ -1337,6 +1342,62 @@ func maren_whole_bar() -> void:
 ## his or her own hardware, so each leaves its own marks on the glass and the shutter and lands
 ## its own way on the player's eyes. Then the newer five on test nights C to F, each of them
 ## stopped once and through once.
+## Play the two nights that carry all five kinds of wear and photograph the actual reading.
+func wear_nights() -> void:
+	main.surprises_enabled = false
+	main.training_enabled = false
+	for night in ["I", "J"]:
+		main.test_night = night
+		reached(await d.open_counter(), "wear night " + night)
+		var ids: Array = main.shift.order.duplicate()
+		for id in ids:
+			var c: Dictionary = main.cases[id]
+			if c.truth != "stable" or CaseDB.broken_count(c) == 0:
+				await quick("treat")
+				continue
+			reached(await d.buzz_in(), "worn visitor arrives")
+			await d.settle()
+			for row in CaseDB.ROWS:
+				if c.rows[row].ok:
+					continue
+				var tool := str({"eyes":"penlight","hands":"grip","port":"port"}.get(row, ""))
+				if tool != "":
+					reached(await d.request_tool(tool) == "open", "worn instrument opens")
+					match tool:
+						"penlight": await d.sweep_eyes()
+						"grip": await d.squeeze_and_release()
+						"port": await d.watch_port()
+				elif row == "temper":
+					await d.press()
+					await d.settle()
+				else:
+					var subject := str(c.rows.speech.evidence[0]).trim_prefix("ask:")
+					for i in c.topics.size():
+						if c.topics[i].id == subject:
+							await d.ask(i)
+							await d.settle()
+							if not main.visit.row_seen("speech"):
+								await d.ask(i)
+								await d.settle()
+				reached(main.visit.row_seen(row), "wear reading " + row)
+				await shot("wear-" + row)
+				if tool != "":
+					await d.put_away()
+			await d.settle()
+			await d.stamp("treat")
+			await d.wait_for_slip()
+			await d.take_slip()
+		await report_shot("wear-night-" + night)
+		# Rook is second on both nights. His report page labels the worn row.
+		for back in range(main.screens.pages() - 2):
+			d.key(KEY_BACKSPACE)
+		reached(main.screens.page == 1, "worn visitor report")
+		await d.seconds(0.8)
+		await shot("wear-report-" + night)
+		d.key(KEY_ESCAPE)
+	main.test_night = ""
+
+
 func weapon_nights() -> void:
 	await weapon_night("6", [["maren", "treat"], ["kip", "stopped"], ["vale", "treat"], ["juno", "stopped"], ["rook", "through"]])
 	await weapon_night("7", [["maren", "treat"], ["kip", "refer"], ["vale", "treat"], ["juno", "refer"], ["rook", "stopped"]])

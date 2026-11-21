@@ -80,7 +80,7 @@
       "title": "THE WINDOW",
       "items": [
         {"key": "patient", "text": "THE PATIENT. Click eyes, hands or port for a closer look. Looking is free."},
-        {"key": "patience", "text": "PATIENCE. Tools, questions, PRESS and wrong codes cost lamps. When the last one goes out they leave: no fee, no fine."},
+        {"key": "patience", "text": "PATIENCE. First checks, questions, PRESS and wrong codes cost lamps. Reopening a tool is free. One broken line can be wear. Two mean drift."},
         {"key": "glass", "text": "GLASS. What the pane can still take tonight. Every blow that lands leaves less time at the next attack."}
       ]
     },
@@ -112,7 +112,7 @@
       "items": [
         {"key": "tools", "text": "TOOLS. Penlight, grip bar, port check. Each costs patience and gives one reading."},
         {"key": "say", "text": "YOUR OWN WORDS. T types a line. With the patient AI running, hold TAB to speak it."},
-        {"key": "talk", "text": "TALK. ASK a question. CALM gives patience back, but each calm-patch costs {calm_cost} credits. PRESS pushes them hard. A second PRESS breaks them and takes every lamp: the steady walk out, the drifting lunge."}
+        {"key": "talk", "text": "TALK. CALM costs {calm_cost} and opens sealed checks. Each PRESS needs {press_cost} lamps. The second takes all: steady visitors walk, drifting ones lunge. SPACE to catch them for +{catch_bonus}."}
       ],
       "closing": "Nothing is required. Decide whenever you like. H opens this guide again."
     }
@@ -125,7 +125,7 @@
       "lines": [
         "{hours} visitors come to your counter tonight, one an hour. The HALL CAMERA shows who is next: click it, then the big screen, to buzz them in.",
         "Compare each one with the REFERENCE SHEET on the left wall: eyes, hands, port, speech and temper. Look, use the tools and talk, in any order. Nothing is required.",
-        "Steady? Stamp the card TREAT, and the fee is yours. {threshold} broken lines mean drifting: call TRAUMA TEAM, press twice.",
+        "One broken line can be wear. Stamp TREAT for steady visitors. At {threshold} broken lines, call TRAUMA TEAM: press its button twice.",
         "Nothing tells you during the night whether a call was right. You learn it at closing."
       ]
     },
@@ -134,11 +134,11 @@
       "art": "attack",
       "title": "WHEN ONE TURNS ON YOU",
       "lines": [
-        "A drifting visitor can turn on you mid-exam, with no warning. The more you do with one, the likelier it gets; looking is free.",
+        "A drifting visitor may attack after a paid action or CALM. Looking, small talk and reopening a tool are free and safe.",
         "A red bar fills in the slot under the window. Press SPACE at once: during an attack one press drops the shutter. The SHUT lever on the right does it too.",
         "Each notch on the bar is a blow on the glass: stop it before the first and the glass holds. The pane takes {glass} blows a night. The less is left, the sooner they come through, and then the night ends.",
         "A shout or a hand slammed on the glass with no red bar is only temper: there is nothing to stop. The shutter dropped on a steady visitor costs {false_alarm} at closing.",
-        "PRESS twice and anyone breaks: the steady walk out, the drifting lunge."
+        "The second PRESS spends every lamp. Steady visitors walk out unpaid. Drifting ones lunge: SPACE shuts the gate, +{catch_bonus} for a catch."
       ]
     },
     {
@@ -252,7 +252,7 @@
       "phase": "exam",
       "until": "next",
       "area": "talk",
-      "text": "ASK or type a question: {ask_cost}. Small talk is free. PRESS tests temper for {press_cost}. Press again and every lamp goes. CALM: +{calm_gain} for {calm_cost} credits."
+      "text": "ASK: {ask_cost}. Small talk is free. PRESS needs {press_cost} lamps. The second takes all. Steady walks, drift lunges: SPACE. CALM costs {calm_cost}."
     },
     {
       "id": "marks",
@@ -266,7 +266,7 @@
       "phase": "exam",
       "until": "verdict",
       "area": "decide",
-      "text": "Steady? Pick up TREAT and stamp the card. {threshold} broken lines mean drifting: call TRAUMA TEAM, press twice."
+      "text": "One cross may be wear. Stamp TREAT for steady visitors. At {threshold} broken lines, press TRAUMA TEAM twice."
     },
     {
       "id": "after",

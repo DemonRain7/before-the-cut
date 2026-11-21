@@ -481,6 +481,106 @@
           }
         }
       ]
+    },
+    "I": {
+      "note": "Steady visitors with wear on eyes, hands, port.",
+      "visitors": [
+        {
+          "id": "kip",
+          "truth": "stable",
+          "signs": {
+            "eyes": "steady",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "own",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "rook",
+          "truth": "stable",
+          "signs": {
+            "eyes": "wide"
+          }
+        },
+        {
+          "id": "vale",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "dead",
+            "hands": "lets_go",
+            "port": "threads",
+            "speech": "it",
+            "temper": "flat"
+          }
+        },
+        {
+          "id": "juno",
+          "truth": "stable",
+          "signs": {
+            "hands": "holds"
+          }
+        },
+        {
+          "id": "maren",
+          "truth": "stable",
+          "signs": {
+            "port": "threads"
+          }
+        }
+      ]
+    },
+    "J": {
+      "note": "Steady visitors with wear on speech, temper.",
+      "visitors": [
+        {
+          "id": "kip",
+          "truth": "stable",
+          "signs": {
+            "eyes": "steady",
+            "hands": "lets_go",
+            "port": "calm",
+            "speech": "own",
+            "temper": "together"
+          }
+        },
+        {
+          "id": "rook",
+          "truth": "stable",
+          "signs": {
+            "speech": "it"
+          }
+        },
+        {
+          "id": "vale",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "dead",
+            "hands": "lets_go",
+            "port": "threads",
+            "speech": "it",
+            "temper": "flat"
+          }
+        },
+        {
+          "id": "juno",
+          "truth": "stable",
+          "signs": {
+            "temper": "flat"
+          }
+        },
+        {
+          "id": "maren",
+          "truth": "drifting",
+          "signs": {
+            "eyes": "wide",
+            "hands": "holds",
+            "port": "calm",
+            "speech": "lost",
+            "temper": "blank"
+          }
+        }
+      ]
     }
   }
 }

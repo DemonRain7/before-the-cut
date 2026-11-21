@@ -188,7 +188,7 @@ const SAY_CODE_HINT := "SAY the code. The right contact hands over a package. An
 const CODE_BLANK_HINT := "Wrong code: a blank look, -%d patience. It says nothing about the patient."
 # the second PRESS breaks every patient and takes every lamp left (rules version 10)
 const PRESS_HINT := "PRESS: say something that stings. Costs %d patience. Twice, and they break."
-const PRESS_LAST_HINT := "PRESS again and they break: every lamp goes. The steady walk out; the drifting lunge."
+const PRESS_LAST_HINT := "All lamps. Steady: walks, no fee. Drift: lunges. SPACE to stop it (+%d at closing)."
 const TRAINING_SKIP_HINT := "SKIP ALL [K]: end the training. H opens the counter guide any time."
 const TRAINING_NEXT_HINT := "NEXT: on to the next tip."
 const SWAP_LIST_HINT := "Swap for tonight's contact list. [L]"
@@ -561,7 +561,7 @@ func _build() -> void:
 	var numbers := {"per_hour": per_hour, "hours": hours, "total": per_hour * hours, "threshold": int(sheet.get("threshold", 0)),
 		"repair_cost": repair_cost, "pay": int(contact_rules.get("pay", 0)), "code_cost": int(contact_rules.get("wrong_cost", 1)),
 		"per_night": int(contact_rules.get("per_night", 0)), "calm_cost": int(calm_rules.get("cost", 0)),
-		"calm_gain": int(calm_rules.get("gain", 1)), "ask_cost": int(costs.get("ask", 1)), "press_cost": int(costs.get("press", 2)),
+		"catch_bonus": int(rules.scoring.press_catch_bonus), "calm_gain": int(calm_rules.get("gain", 1)), "ask_cost": int(costs.get("ask", 1)), "press_cost": int(costs.get("press", 2)),
 		"check_cost": int(costs.get("check", 1)), "glass": int((rules.get("attack", {}) as Dictionary).get("glass", 3)),
 		"false_alarm": absi(int((rules.get("scoring", {}) as Dictionary).get("false_alarm", 0)))}
 	intro = Intro.new()
@@ -1093,7 +1093,7 @@ func _sync_visit() -> void:
 		desk.badges["calm"] = price
 	else:
 		desk.badges["calm"] = "x%d" % visit.reassure_left
-	desk.badges["press"] = "-%d" % visit.press_cost()       # the push that breaks them takes every lamp left
+	desk.badges["press"] = Lang.t("BREAK") if visit.press_breaks() else "-%d" % visit.press_cost()       # the push that breaks them takes every lamp left
 	desk.enabled["calm"] = visit.reassure_left > 0
 	clinic.till = _till_now()
 
@@ -1377,7 +1377,7 @@ func _pad_hint(pad: String) -> String:
 			return Lang.tf(CALM_HOLD_HINT if _leave_said else CALM_HINT, [price, gain, visit.reassure_left])
 		"press":
 			if visit.press_breaks():
-				return PRESS_LAST_HINT
+				return Lang.tf(PRESS_LAST_HINT, [int(rules.scoring.get("press_catch_bonus", 0))])
 			return Lang.tf(PRESS_HINT, [visit.press_cost()])
 		"treat":
 			return "TREAT: they are steady. Pick it up and stamp the card."
@@ -1565,7 +1565,7 @@ func _start_shift() -> void:
 	var training := training_enabled and intro_enabled and not _trained and coach != null and coach.has_steps()
 	var contact_rules: Dictionary = rules.get("contacts", {})
 	# only the entries that are fair among tonight's visitors: no clue alone gives anybody away
-	var pool := CaseDB.fair_contacts(contact_data, people, shift.order)
+	var pool := CaseDB.fair_contacts(contact_data, cases, shift.order)
 	# each entry is given an alias and a code for tonight only (contacts.json version 2)
 	shift.contacts = ShiftState.draw_contacts(rules, pool, shift.order, shift_seed, training, contact_data)
 	clipboard.set_contacts(shift.contacts, contact_data.get("clues", {}), str(contact_data.get("title", "")),
@@ -1795,7 +1795,10 @@ func act_tool(tool: String) -> void:
 	audio.play("tool_pick")
 	if visit.granted.has(tool):
 		_open_scope(tool)
-		_roll_surprise()
+		_roll_surprise(0)
+		return
+	if visit.sealed_repeat(tool):
+		_base_hint = Lang.t("Sealed. CALM opens it.")
 		return
 	if visit.patience < visit.check_cost(tool):
 		_spent(token)
@@ -1824,14 +1827,14 @@ func act_tool(tool: String) -> void:
 			if ok and _held == "" and _call_armed <= 0.0:
 				_open_scope(tool)
 			if ok:
-				_roll_surprise()      # the close-up is no shelter: they can come at the glass during it
+				_roll_surprise(int(res.get("cost", 0)))      # the close-up is no shelter: they can come at the glass during it
 		"explained":
 			_base_hint = Lang.tf("They gave a reason instead. Insist (costs %d) or CALM them.", [visit.check_cost(tool)])
-			_roll_surprise()
+			_roll_surprise(int(res.get("cost", 0)))
 			_patient_line(line, token, 1.0)
 		"refused":
-			_base_hint = Lang.tf("They said no. Insist (costs %d) or CALM them first.", [visit.check_cost(tool)])
-			_roll_surprise()
+			_base_hint = Lang.t("Sealed. CALM opens it.") if visit.sealed_repeat(tool) else Lang.tf("They said no. Insist (costs %d) or CALM them first.", [visit.check_cost(tool)])
+			_roll_surprise(int(res.get("cost", 0)))
 			_patient_line(line, token, 1.0)
 		"spent":
 			_spent(token)
@@ -2071,13 +2074,13 @@ func act_ask(id: String, said: String = "", fallback: String = "") -> void:
 	match result:
 		"answered":
 			_mark_new_notes(before)
-			_roll_surprise()
+			_roll_surprise(int(res.get("cost", 0)))
 			_patient_line(str(res.get("line", "")), token, 0.0)
 		"deflected":
 			_base_hint = Lang.t("They dodged it. Ask the same thing again and they answer.")
 			if said != "":
 				_base_hint = Lang.tf("Asked as: %s", [Lang.t(str(topic.q))]) + " " + _base_hint
-			_roll_surprise()
+			_roll_surprise(int(res.get("cost", 0)))
 			_patient_line(str(d.get("line", "")), token, 0.0)
 		"spent":
 			_spent(token)
@@ -2110,7 +2113,7 @@ func act_reassure() -> void:
 		return
 	if rig != null:
 		rig.soften()
-	_roll_surprise()
+	_roll_surprise(0, true)
 	_patient_line(str(d.get("reply", "")), token, 0.0)
 
 
@@ -2119,6 +2122,9 @@ func act_press(said: String = "") -> void:
 	if not _can_act():
 		return
 	var token := _begin_action()
+	if not visit.can_pay_press():
+		_base_hint = Lang.tf("PRESS needs %d lamps.", [int(rules.costs.press)])
+		return
 	var question := said if said != "" else Lang.t(str(PRESS_LINES[mini(visit.press_count, PRESS_LINES.size() - 1)]))
 	var d := {}
 	if visit.press_breaks():
@@ -2487,6 +2493,7 @@ func act_mark(row: String) -> void:
 			audio.play("beep_low", 1.2, -10.0)
 	elif crossed > 0:
 		_base_hint = Lang.tf(CROSS_SOME_HINT, [crossed, need])
+		_coach("wear", "One cross can be wear. Two broken lines mean drift.")
 	else:
 		_base_hint = ""
 
@@ -4549,7 +4556,7 @@ func act_say_code(id: String) -> void:
 				return
 			_lock = false
 			audio.play("beep_low", 1.1, -8.0)
-			_roll_surprise()
+			_roll_surprise(int(res.get("cost", 0)))
 			_patient_line(str(res.get("line", "")), token, 0.0)
 		"drop":
 			if coach != null:
@@ -4566,7 +4573,7 @@ func act_say_code(id: String) -> void:
 			audio.play("cash")
 			if coach == null or not coach.is_running():
 				_coach("drop", DROP_COACH_HINT)
-			_roll_surprise()
+			_roll_surprise(0)
 			_narrate("PACKAGE", Lang.tf(DROP_LINE, [Lang.t(str(res.get("package", ""))), int(res.get("pay", 0))]), token, 0.0)
 		"tried", "done":
 			audio.play("beep_low", 1.2, -10.0)
@@ -4708,10 +4715,10 @@ func _on_training_finished(was_skipped: bool) -> void:
 ## One action of the doctor's has run its course: roll whether the patient snaps (drifting
 ## only) or flares (anyone, once a visit). What comes up happens a moment later, inside
 ## whatever the doctor is doing by then.
-func _roll_surprise() -> void:
+func _roll_surprise(cost: int = 1, calm: bool = false) -> void:
 	if visit == null or state != State.EXAM or not visit.in_exam():
 		return
-	var kind := visit.roll_action(_snap_rng)
+	var kind := visit.roll_action(_snap_rng, cost, calm)
 	if kind == "" or kind == _surprise or (kind == "flare" and _surprise == "snap"):
 		return
 	_surprise = kind

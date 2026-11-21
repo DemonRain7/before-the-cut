@@ -670,6 +670,9 @@ func _draw_visit_page(p: Rect2, visit: Dictionary, i: int, n: int) -> void:
 		Gfx.money(int(visit.get("closing", 0))), Gfx.money(int(visit.get("credits", 0)))])
 	Gfx.text_center_raw(self, mid, y, money, Gfx.INKT)
 	y += 11.0
+	if int(visit.get("press_bonus", 0)) > 0:
+		Gfx.text_center_raw(self, mid, y, Lang.tf("Shutter catch bonus +%d", [visit.press_bonus]), Gfx.PRINT)
+		y += 10.0
 	var extra := _visit_extra(visit)
 	if extra != "":
 		Gfx.text_center_raw(self, mid, y, extra, Gfx.PRINT)
@@ -691,8 +694,14 @@ func _draw_finding(x0: float, x1: float, y: float, row: Dictionary) -> void:
 	var truth := Gfx.tex("ui/truth_ok.png" if ok else "ui/truth_bad.png")
 	if truth != null:
 		draw_texture(truth, Vector2(x0 + 64.0, y))
-	_finding_text(x, x1, y, "NORMAL" if ok else "BROKEN LINE", Gfx.GRN2 if ok else Gfx.RED1,
-		Lang.t(str(row.get("text", ""))), "" if bool(row.get("seen", false)) else "you did not check")
+	var detail := Lang.t(str(row.get("text", "")))
+	var status := "" if bool(row.get("seen", false)) else "you did not check"
+	if row.has("show_with"):
+		detail = Lang.tf("Shown by %s", [row.show_with])
+		if row.get("other_question", false):
+			status = "asked, but not about this"
+	var label := "WEAR" if row.get("wear", false) else ("NORMAL" if ok else "BROKEN LINE")
+	_finding_text(x, x1, y, label, Gfx.GRN2 if ok else Gfx.RED1, detail, status)
 
 
 ## The label, then the text after it on the same line and on one line under it, cut with "..."
@@ -775,7 +784,15 @@ func _draw_totals(p: Rect2, visits: Array) -> void:
 			draw_rect(Rect2(lamp, y + 1.0, 9, 7), Gfx.INKT)
 			draw_rect(Rect2(lamp + 1.0, y + 2.0, 7, 5), Gfx.GRN3 if over else Gfx.RED2)
 			lamp += 12.0
-	y += 16.0
+	y += 11.0
+	if not visits.is_empty() and not visits[0].get("usage", {}).is_empty():
+		var totals := [0, 0, 0, 0, 0, 0]
+		var tools := ["penlight", "grip", "port", "ask", "press", "calm"]
+		for record in visits:
+			for i in tools.size():
+				totals[i] += int(record.get("usage", {}).get(tools[i], false))
+		Gfx.text_center_raw(self, 320, y, Lang.tf("LIGHT %d  GRIP %d  PORT %d  ASK %d  PRESS %d  CALM %d", totals), Gfx.PRINT)
+		y += 12.0
 	draw_rect(Rect2(x0, y, x1 - x0, 1), Gfx.PAPER1)
 	y += 8.0
 	Gfx.big_center(self, 320.0, y, str(report.get("title", "")), Gfx.INKT)

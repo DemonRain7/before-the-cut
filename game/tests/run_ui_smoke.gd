@@ -107,6 +107,7 @@ func _run() -> void:
 	voice_words()
 	counter_words()
 	check_log(six, nine)
+	await shift_wear()
 	untranslated_words()
 	print("")
 	print("RESULT: %d passed, %d failed" % [passed, failed])
@@ -1042,7 +1043,7 @@ func shift_reckless() -> void:
 	v = await enter("rook")
 	await d.press()
 	check(v.in_exam() and v.press_count == 1, "the first insult only makes him angry")
-	check(str(main.desk.badges.get("press", "")) == "-%d" % v.patience and main._pad_hint("press") == main.PRESS_LAST_HINT,
+	check(str(main.desk.badges.get("press", "")) == Lang.t("BREAK") and main._pad_hint("press") == Lang.tf(main.PRESS_LAST_HINT, [int(main.rules.scoring.press_catch_bonus)]),
 		"the PRESS pad now asks for every lamp left, and its hint says the next one breaks him")
 	await d.settle()
 	await d.press()
@@ -1212,7 +1213,7 @@ func shift_odds_and_ends() -> void:
 	check(main.clinic.dent_count() == dents_before, "nothing hits the shutter from the far side: that would tell who she was")
 	check(bool(last_record().get("correct", false)) and int(last_record().get("credits", 0)) == 0, "it counts as a right call and pays nothing")
 	var r: Dictionary = main.screens.report
-	check(main.state == MainScript.State.REPORT and int(r.get("total", 0)) == 1500 and int(r.get("correct", 0)) == 5, "the third report adds up")
+	check(main.state == MainScript.State.REPORT and int(r.get("total", 0)) == 1650 and int(r.get("correct", 0)) == 5, "the third report includes the PRESS catch bonus")
 
 
 # ================================================================ shift 4
@@ -1454,17 +1455,17 @@ func shift_last_glass() -> void:
 	check(str(stop.get("outcome", "")) == "caught" and str(stop.get("grade", "")) == "clean" and int(stop.get("glass_left", -1)) == 0,
 		"the log has the stop: clean, with no glass left")
 	await finish_visit("Maren")
-	check(bool(last_record().get("correct", false)) and int(last_record().get("credits", 0)) == 400 and int(last_record().get("counter", -1)) == 400,
-		"a caught attack: Trauma Team pays her fee on account at the counter, and keeps it as the bounty at closing")
+	check(bool(last_record().get("correct", false)) and int(last_record().get("credits", 0)) == 550 and int(last_record().get("counter", -1)) == 400,
+		"the counter pays her fee and the PRESS catch adds its bonus at closing")
 	check(main.clinic.glass_state == 4 and main.shift.glass_out, "the frame stays empty")
 
 	section("Report: one wrong call, and the pane lost on the way")
 	check(main.state == MainScript.State.REPORT, "the report is up")
 	var r: Dictionary = main.screens.report
-	check(int(r.get("total", 0)) == 1400 and int(r.get("correct", 0)) == 4 and int(r.get("injuries", -1)) == 0, "1400 at closing, four right calls, nobody hurt")
+	check(int(r.get("total", 0)) == 1550 and int(r.get("correct", 0)) == 4 and int(r.get("injuries", -1)) == 0, "1550 at closing, four right calls, nobody hurt")
 	check(bool(r.get("line_held", false)) and int(r.get("hours_under", -1)) == 0 and str(r.get("title", "")) == "A GOOD NIGHT'S WORK",
 		"over the line every hour with one call wrong: A GOOD NIGHT'S WORK")
-	check(tills_of(r) == [250, 550, 1150, 1500, 1400],
+	check(tills_of(r) == [250, 550, 1150, 1500, 1550],
 		"through the night the fees as they came in, Juno's too; at closing the crew took hers back and billed the call-out")
 	check(int(r.get("glass", -1)) == 0 and int(r.get("glass_max", 0)) == 3, "and the report knows the glass is gone")
 
@@ -1727,7 +1728,7 @@ func shift_walls_and_glass() -> void:
 	section("Report: what the glass cost is on the bill")
 	check(main.state == MainScript.State.REPORT, "the report is up")
 	var r: Dictionary = main.screens.report
-	check(int(r.get("total", 0)) == 1780 and int(r.get("correct", 0)) == 5 and int(r.get("injuries", -1)) == 0, "1780 in the till, five right calls, nobody hurt")
+	check(int(r.get("total", 0)) == 1930 and int(r.get("correct", 0)) == 5 and int(r.get("injuries", -1)) == 0, "1930 in the till, five right calls, nobody hurt")
 	check(int(r.get("repairs", 0)) == 3 and int(r.get("repair_total", 0)) == 120, "three layers of glass: 120 credits")
 	check(int(r.get("glass", -1)) == 3 and int(r.get("glass_max", 0)) == 3, "and the pane is whole at closing")
 	check(bool(r.get("line_held", false)) and int(r.get("hours_under", -1)) == 0 and str(r.get("title", "")) == "STEADY HANDS",
@@ -1736,10 +1737,10 @@ func shift_walls_and_glass() -> void:
 	for item in r.get("readings", []):
 		var one: Dictionary = item
 		tills.append(int(one.get("till", 0)))
-	check(tills == [250, 550, 1150, 1420, 1780], "hour by hour, the meter counted the glass from the hour it was paid in")
+	check(tills == [250, 550, 1150, 1420, 1930], "hour by hour, the meter counted the glass from the hour it was paid in")
 	var ends: Array = logged("shift_end")
 	var end: Dictionary = ends[ends.size() - 1]
-	check(int(end.get("glass_paid", 0)) == 120 and int(end.get("glass_left", 0)) == 3 and int(end.get("total", 0)) == 1780,
+	check(int(end.get("glass_paid", 0)) == 120 and int(end.get("glass_left", 0)) == 3 and int(end.get("total", 0)) == 1930,
 		"the log's last line of the night says what was paid for glass")
 
 
@@ -2285,6 +2286,24 @@ func typing_line(v: VisitState) -> void:
 ## and leaves its own marks: Kip's bike lock and Juno's ten picks are stopped at the shutter
 ## after two blows, and Rook's loader fist is let through. Vale's saw and Maren's torch are
 ## played in the earlier shifts.
+func shift_wear() -> void:
+	main.surprises_enabled = false
+	main.training_enabled = false
+	main.test_night = "I"
+	check(await d.open_counter(), "fixed wear night I begins")
+	for id in main.shift.order.duplicate():
+		var v: VisitState = await enter(id)
+		await d.settle()
+		if id == "rook":
+			check(await d.request_tool("penlight") == "open" and await d.sweep_eyes(), "Rook's worn lens can be read in the chair")
+			await d.put_away()
+			await d.settle()
+		await d.stamp("treat")
+		await finish_visit(id)
+	check(await d.wait_for_report() and main.screens.report.visits[1].rows[0].wear, "closing identifies the worn lens")
+	main.test_night = ""
+
+
 func shift_attack_styles() -> void:
 	section("Tenth shift: test night B, and three more ways through the glass")
 	var from: int = main.event_log.memory.size()

@@ -108,6 +108,9 @@ static func draw_night(db: Dictionary, p_seed: int, first_of_session: bool) -> D
 	for i in k:
 		drifting[int(open[i])] = true
 	var visitors: Array = []
+	var wear_rng := RandomNumberGenerator.new()
+	wear_rng.seed = hash("wear:%d" % p_seed)
+	var wear: Dictionary = spec.get("wear", {})
 	for i in ids.size():
 		var t: Dictionary = templates[ids[i]]
 		var broken: Array = []
@@ -118,6 +121,17 @@ static func draw_night(db: Dictionary, p_seed: int, first_of_session: bool) -> D
 			var pool := CaseDB.sign_ids(t, row, "broken" if broken.has(row) else "normal")
 			if not pool.is_empty():
 				signs[row] = pool[rng.randi_range(0, pool.size() - 1)]
+		if not drifting.has(i) and not (first_of_session and i == 0 and wear.get("first_protected", true)):
+			if wear_rng.randf() < float(wear.get("chance", 0.0)):
+				var weights := PackedFloat32Array()
+				for row in CaseDB.ROWS:
+					weights.append(float(wear.get("weights", {}).get(row, 0.0)))
+				var pos := wear_rng.rand_weighted(weights)
+				if pos >= 0:
+					var row: String = CaseDB.ROWS[pos]
+					var worn := CaseDB.sign_ids(t, row, "broken")
+					if not worn.is_empty():
+						signs[row] = worn[wear_rng.randi_range(0, worn.size() - 1)]
 		visitors.append({"id": ids[i], "truth": "drifting" if drifting.has(i) else "stable", "signs": signs})
 	return {"name": "", "visitors": visitors}
 

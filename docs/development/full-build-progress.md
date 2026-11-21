@@ -31,15 +31,7 @@ re-run.
 - [x] **M0 baseline.** Re-ran all checks on `06714b8` with the existing November 21 edits, including the empty import, both boots, guard (7), six mock visits (24 dialogues) and hidden captures. Commands and logs are in `validation/2026-11-21/patient-agent/finish-M0/`.
 - [ ] **M0 paid cloud check.** All three permanent Workers were deployed to the student's account. The live service is disabled. Wrangler lists zero OpenAI secrets in that environment. The message provides an API key and an evaluation ceiling. It does not specify a configured monthly hard limit in the API project.
 - [x] **M1 November 21 work.** Flow changes are `d4bb069`. The review and phase briefs follow in the documentation commit. M0 (`4bc8697`) verified these exact game files.
-- [ ] **M2 Play logic,** rules version 12 (`play-logic-build.md`).
-  - [ ] R1 wear, with its fixed nights, tests and drawn frames. Commit:
-  - [ ] R2 the second PRESS: the warning and the catch bonus. Commit:
-  - [ ] R3 free actions roll nothing; R4 PRESS needs its lamps; R5 a sealed tool says so.
-        Commit:
-  - [ ] R6 the report names what shows a missed line; R7 the usage line. Commit:
-  - [ ] Words in both languages, HOW TO PLAY, the guide and the training.
-  - [ ] Measured: wear alone against the review's what-if, then everything together.
-        Evidence:
+- [x] **M2 play logic.** Rules 12, R1–R7, nights I/J, bilingual teaching, report and captures. Rules 2,074; scenes 1,232 / 1,233 / 1,232; proxy 52; guard 7; HTTP / wire 334 / 100; 1,623 text measurements per language; 460 drawn frames each. Every check passed. See `validation/2026-11-21/patient-agent/finish-M2-green/` and the 5,000-night measurements in `validation/2026-11-21/full-build/play-logic/`.
 - [ ] **M3 P2, a turn of its own** (`02-phases.md`, section 6). Commit:
 - [ ] **M4 P3, evaluation** (`02-phases.md`, section 7).
   - [ ] Scripts in `tools/eval/`, each set run against the mock. Commit:

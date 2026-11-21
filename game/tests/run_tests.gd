@@ -140,6 +140,7 @@ func _initialize() -> void:
 	test_glass()
 	test_repair()
 	test_night_draw()
+	test_wear_distribution()
 	test_contacts()
 	test_codes()
 	test_calm_cost()
@@ -636,7 +637,7 @@ func test_press_and_attack() -> void:
 		eq(v.patience, 0, "%s: the push that breaks them takes every lamp" % id)
 		eq(v.attack_cause, "press", "%s: cause recorded" % id)
 		eq(v.shutter()["result"], "caught", "%s: shutter stops it" % id)
-		eq(v.settlement()["credits"], int(cases[id]["fee"]) + int(rules["scoring"]["refer_drifting"]), "%s: caught pays the bounty" % id)
+		eq(v.settlement()["credits"], int(cases[id]["fee"]) + int(rules["scoring"]["refer_drifting"]) + int(rules["scoring"]["press_catch_bonus"]), "%s: caught pays the bounty and the PRESS bonus" % id)
 		ok(v.settlement()["correct"], "%s: caught counts as right" % id)
 		v = visit(id)
 		v.press()
@@ -1406,6 +1407,88 @@ func test_repair() -> void:
 ## in it holds; the same seed gives the same night; the first night of a session opens with a
 ## steady visitor who can carry a fair contact; a broken row can be any row; and the test nights
 ## of nights.json are nights the draw could make.
+func test_wear_distribution() -> void:
+	var db := CaseDB.load_all()
+	var pristine := db.duplicate(false)
+	pristine.rules = rules.duplicate(true)
+	pristine.rules.night.wear.chance = 0.0
+	var total := 0
+	var worn := 0
+	var frequencies := {}
+	var invariant := true
+	for seed_value in range(1, 5001):
+		var a: Array = ShiftState.draw_night(db, seed_value, false).visitors
+		var b: Array = ShiftState.draw_night(pristine, seed_value, false).visitors
+		for i in a.size():
+			var drawn: Dictionary = a[i]
+			var old: Dictionary = b[i]
+			invariant = invariant and drawn.id == old.id and drawn.truth == old.truth
+			if drawn.truth == "drifting":
+				invariant = invariant and drawn == old
+				continue
+			total += 1
+			var broken := 0
+			for row in CaseDB.ROWS:
+				var clean := CaseDB.find_sign(templates[drawn.id], row, old.signs[row])
+				invariant = invariant and bool(clean.ok)
+				if drawn.signs[row] != old.signs[row]:
+					invariant = invariant and not CaseDB.find_sign(templates[drawn.id], row, drawn.signs[row]).ok
+					broken += 1
+					frequencies[row] = int(frequencies.get(row, 0)) + 1
+			worn += int(broken > 0)
+			invariant = invariant and broken <= 1
+		if seed_value <= 500:
+			var first: Dictionary = ShiftState.draw_night(db, seed_value, true).visitors[0]
+			for row in CaseDB.ROWS:
+				invariant = invariant and CaseDB.find_sign(templates[first.id], row, first.signs[row]).ok
+	ok(invariant, "5000 paired seeds preserve visitors, truths and drifting signs; chance zero and protected first visitors stay clean")
+	ok(float(worn) / total >= 0.45 and float(worn) / total <= 0.55, "half of steady visitors show one worn line: %d/%d" % [worn, total])
+	for row in CaseDB.ROWS:
+		var share := float(frequencies.get(row, 0)) / worn
+		ok(share >= 0.17 and share <= 0.23, "one fifth of wear is %s: %.3f" % [row, share])
+	for night in ["I", "J"]:
+		var composed := CaseDB.compose_night(templates, db.nights[night], parts)
+		for c in composed.values():
+			if c.truth != "stable" or CaseDB.broken_count(c) != 1:
+				continue
+			var v := VisitState.new(c, rules)
+			ok(not v.snap() and v.snap_chance() == 0.0, "wear cannot cause a snap")
+			ok(v.verdict("refer").get("next") != "attack", "a worn patient never lunges at a call")
+			v = VisitState.new(c, rules)
+			v.press()
+			var enough := v.patience
+			v.patience = int(rules.costs.press) - 1
+			eq(v.press().result, "spent", "short on lamps at the breaking press")
+			eq(v.press_count, 1, "a short PRESS does not advance the visit")
+			v.patience = enough
+			eq(v.press().result, "walkout", "a worn patient walks out on the breaking press")
+			v = VisitState.new(c, rules)
+			var rng := RandomNumberGenerator.new()
+			rng.seed = 17
+			var before := rng.state
+			for repeat in 10:
+				v.roll_action(rng, 0)
+			ok(v.actions == 0 and rng.state == before, "ten free actions consume no roll")
+			var seen := false
+			for row in v.settlement().rows:
+				if row.wear:
+					seen = not row.ok and not row.seen and row.has("show_with")
+			ok(seen, "closing distinguishes a missed worn line and names its check")
+			var e := {"type":"say","text":"hello"}
+			var model := PatientAgent.new(rules)
+			model.begin_visit(c, "same-visit", 1)
+			var got := model.build_payload(e, v.snapshot(), v.open_signs())
+			var twin: Dictionary = c.duplicate(true)
+			twin.truth = "drifting"
+			var other := VisitState.new(twin, rules)
+			model.begin_visit(twin, "same-visit", 1)
+			eq(model.build_payload(e, other.snapshot(), other.open_signs()), got, "equal open evidence gives identical model input across truths")
+	var drift := visit("vale")
+	drift.snap()
+	drift.shutter()
+	eq(drift.settlement().press_bonus, 0, "a snap earns no PRESS bonus")
+
+
 func test_night_draw() -> void:
 	var db: Dictionary = CaseDB.load_all()
 	var people: Dictionary = db["people"]
@@ -2367,7 +2450,9 @@ func has_error(errors: Array, fragment: String) -> bool:
 func test_bad_data() -> void:
 	var c: Dictionary = (cases["kip"] as Dictionary).duplicate(true)
 	c["rows"]["port"]["ok"] = false
-	ok(has_error(CaseDB.validate_case(c, rules, {}, parts), "stable patient must have no broken"), "stable + broken line is caught")
+	ok(not has_error(CaseDB.validate_case(c, rules, {}, parts), "at most one worn"), "one worn port is legal")
+	c.rows.hands.ok = false
+	ok(has_error(CaseDB.validate_case(c, rules, {}, parts), "at most one worn"), "two worn lines on a stable visitor are rejected")
 	c = (cases["kip"] as Dictionary).duplicate(true)
 	c["press"][1]["end"] = "attack"
 	ok(has_error(CaseDB.validate_case(c, rules, {}, parts), "must never attack"), "stable attacker is caught")
