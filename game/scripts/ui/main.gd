@@ -53,12 +53,20 @@ enum State { TITLE, WAIT, ENTER, EXAM, ATTACK, RESOLVE, SLIP, REPORT, INTRO }
 
 const SLIP_CLIP := Rect2(217, 148, 202, 152)   # over the counter: the slip feeds up out of the printer in the desk
 const SLIP_REST := 4.0                          # its last few pixels stay in the printer
-const SLIP_GAP := 8.0                           # least space between AT THE COUNTER and the fee beside it
+const SLIP_GAP := 8.0                           # least space between AT THE COUNTER and the money beside it
 const SLIP_LINES := 5                           # lines of counter text above the rule (measure_text.py SLIP_LINES)
-const SLIP_COUNTER := "AT THE COUNTER"          # under the rule, beside what the counter took in
+const SLIP_COUNTER := "AT THE COUNTER"          # under the rule, beside what the counter took in: what the till moves by
 const SLIP_LATER := "Right or wrong: at closing."   # the slip never says; the report does
-const SLIP_DROP := "DROP +%d"                   # under the counter line: what a courier's package put in the till
-const SLIP_CALM := "CALM -%d"                   # what the calm-patches cost
+const SLIP_FEE := "FEE +%d"                     # under the counter line, when the figure is more than the fee: the fee,
+const SLIP_DROP := "DROP +%d"                   # what a courier's package put in the till,
+const SLIP_CALM := "CALM -%d"                   # and what the calm-patches cost
+# the lines under the slip's rule, from the slip's top: the counter line, what it is made of,
+# the word on right and wrong, and the prompt. Ten rows apart, and clear of the slip's lower
+# edge (SLIP_CLIP's height less SLIP_REST): a Chinese line is two rows taller than an English one.
+const SLIP_COUNTER_Y := 105.0
+const SLIP_PARTS_Y := 115.0
+const SLIP_LATER_Y := 125.0
+const SLIP_PROMPT_Y := 136.0
 const REPORT_TURN := 0.25                       # seconds a report page stays before a click turns it
 const CARD_LINGER := 1.3                        # seconds a card that was just stamped stays out by itself
 const ARM_TIME := 2.2
@@ -1477,6 +1485,62 @@ func act_restart() -> void:
 	_start_shift()
 
 
+## From the totals page of the report back to the title card: its menu, HOW TO PLAY and SETTINGS
+## (the language is only changed there). The booth behind the card is put back the way a night
+## finds it. START then goes straight to the counter: the opening cards and the first night's
+## training have been seen in this session.
+func act_report_menu() -> void:
+	if state != State.REPORT or not screens.on_summary() or screens.age() < 0.8:
+		return
+	audio.play("click", 1.0, -6.0)
+	_bump()
+	_log("menu_return", {"shift": shift_number})
+	if coach != null and coach.is_running():
+		coach.stop(false)
+	_reset_booth()
+	clinic.line = 0
+	clinic.set_glass_left(clinic.glass_max, clinic.glass_max)
+	_show_title()
+
+
+## The booth the way a night finds it: nobody at the counter, an empty till, no lamps on the
+## meter, the window, the walls and the shutter whole and clean, and every paper on its board.
+## A new night starts from it (_start_shift, which then puts tonight's queue, line and glass on
+## the meter), and so does the title card when the player goes back to it (act_report_menu).
+func _reset_booth() -> void:
+	_visit_serial = 0
+	visit = null
+	clinic.till = 0
+	clinic.snap_till()
+	clinic.results = []
+	clinic.queue_index = 0
+	clinic.line_under = false
+	clinic.reset_damage()
+	_leave_t = -1.0
+	_leave_said = false
+	_leave_idle = 0.0
+	# everything hangs on the walls again
+	_sheet_wanted = false
+	_card_wanted = false
+	_cam_wanted = false
+	_sheet_back = false
+	_card_back = false
+	_card_linger = 0.0
+	_card_unseen = 0
+	_panels_hold = false
+	_list_wanted = false
+	_list_back = false
+	_list_seen = false
+	_surprise = ""
+	gore.clear()
+	for c in _mess.get_children():
+		c.queue_free()
+	_stop_attack_audio()
+	audio.trim_db = 0.0
+	clinic.set_cam("")
+	clinic.corner_text = ""
+
+
 ## Tonight: the test night asked for (--test-night, or night A with --authored-order), or one
 ## drawn from the shift seed (ShiftState.draw_night). A drawn night that comes out empty, which
 ## only broken data can make, falls back to night A.
@@ -1512,40 +1576,10 @@ func _start_shift() -> void:
 	agent = PatientAgent.new(rules, client, shift_seed)
 	agent.session_id = session_id
 	agent.set_mode("model" if use_model else "script")
-	_visit_serial = 0
-	visit = null
-	clinic.till = 0
-	clinic.snap_till()
-	clinic.results = []
-	clinic.queue_index = 0
+	_reset_booth()
 	clinic.queue_count = shift.count()
 	clinic.line = shift.line_at(1)
-	clinic.line_under = false
-	clinic.reset_damage()
 	clinic.set_glass_left(shift.glass, shift.glass_max())
-	_leave_t = -1.0
-	_leave_said = false
-	_leave_idle = 0.0
-	# a new night: everything hangs on the walls again
-	_sheet_wanted = false
-	_card_wanted = false
-	_cam_wanted = false
-	_sheet_back = false
-	_card_back = false
-	_card_linger = 0.0
-	_card_unseen = 0
-	_panels_hold = false
-	_list_wanted = false
-	_list_back = false
-	_list_seen = false
-	_surprise = ""
-	gore.clear()
-	for c in _mess.get_children():
-		c.queue_free()
-	_stop_attack_audio()
-	audio.trim_db = 0.0
-	clinic.set_cam("")
-	clinic.corner_text = ""
 	_log("shift_start", {"shift": shift_number, "seed": shift_seed, "night": night_name if night_name != "" else "drawn",
 		"order": shift.order, "agent_mode": agent.mode})
 	_log("night", {"name": night_name, "visitors": (night.get("visitors", []) as Array).duplicate(true)})
@@ -3493,7 +3527,8 @@ func _show_report() -> void:
 
 
 ## The report, a page at a time: each visit seen tonight, then the night's totals. On the
-## totals page the next click starts a new night (act_restart).
+## totals page the next click starts a new night (act_restart), and ESC goes back to the title
+## card (act_report_menu).
 func act_report_next() -> void:
 	if state != State.REPORT:
 		return
@@ -3800,7 +3835,11 @@ func _key_press(keycode: int, unicode: int, control: bool) -> void:
 	if state == State.REPORT:
 		match keycode:
 			KEY_ESCAPE:
-				act_report_skip()
+				# from a visit's page to the night's totals; from the totals to the title menu
+				if screens.on_summary():
+					act_report_menu()
+				else:
+					act_report_skip()
 			KEY_LEFT, KEY_BACKSPACE:
 				act_report_back()
 			KEY_ENTER, KEY_KP_ENTER, KEY_SPACE, KEY_RIGHT:
@@ -4372,19 +4411,19 @@ func _draw_slip() -> void:
 		Gfx.text_raw(_slip, Vector2(x0, y), lines[i], Gfx.INKT)
 		y += Gfx.LINE
 	_slip.draw_rect(Rect2(x0, 102, w, 1), Gfx.PAPER1)
-	# what the counter took in: the fee, for work done or paid on account by Trauma Team, whoever
-	# the patient was. The package and the calm-patches go on the line below; the rest of the
-	# visit's money waits for closing.
-	var fee := int(s.get("counter_fee", 0))
-	var paid := Lang.tf("%s credits", [Gfx.money(fee)])
-	_fit(_slip, x0, 105, SLIP_COUNTER, w - Gfx.text_w(paid, true) - SLIP_GAP, Gfx.INKT)
-	Gfx.text_right(_slip, x1, 105, paid, Gfx.INKT, true)
+	# what the counter took in, all of it: the fee (for work done, or paid on account by Trauma
+	# Team, whoever the patient was), a courier's package, less the calm-patches. It is the figure
+	# the till moves by and the one the report calls "At the counter" for this visit. The line
+	# below says what it is made of; the rest of the visit's money waits for closing.
+	var paid := Lang.tf("%s credits", [Gfx.money(int(s.get("counter", 0)))])
+	_fit(_slip, x0, SLIP_COUNTER_Y, SLIP_COUNTER, w - Gfx.text_w(paid, true) - SLIP_GAP, Gfx.INKT)
+	Gfx.text_right(_slip, x1, SLIP_COUNTER_Y, paid, Gfx.INKT, true)
 	var extra := _slip_breakdown(s)
 	if extra != "":
-		Gfx.text_center(_slip, mid, 116, extra, Gfx.PRINT)
-	Gfx.text_center(_slip, mid, 127, SLIP_LATER, Gfx.INKS)
+		Gfx.text_center_raw(_slip, mid, SLIP_PARTS_Y, extra, Gfx.PRINT)      # _slip_breakdown translated it
+	Gfx.text_center(_slip, mid, SLIP_LATER_Y, SLIP_LATER, Gfx.INKS)
 	if state == State.SLIP and _slip_age > 0.5 and fmod(_t, 1.0) < 0.65:
-		Gfx.text_center(_slip, mid, 138, "click to continue", Gfx.PRINT)
+		Gfx.text_center(_slip, mid, SLIP_PROMPT_Y, "click to continue", Gfx.PRINT)
 
 
 # ================================================================ the couriers and the till
@@ -4440,14 +4479,22 @@ func _sheet_normal(row: String) -> String:
 	return ""
 
 
-## The slip's line under the call: a courier's package and what the calm-patches cost. Empty
-## when there was neither. A courier who went without their package is not named: who carried
-## an entry of the list is told at closing.
+## The slip's line under the counter figure: what that figure is made of, when it is more than
+## the fee alone: the fee (if one was paid), a courier's package and what the calm-patches
+## cost. Empty when there was neither a package nor a patch: the figure is the fee then. A
+## courier who went without their package is not named: who carried an entry of the list is
+## told at closing. In the player's language already.
 func _slip_breakdown(s: Dictionary) -> String:
-	var parts := PackedStringArray()
-	if bool(s.get("dropped", false)):
-		parts.append(Lang.tf(SLIP_DROP, [int(s.get("drop", 0))]))
+	var dropped := bool(s.get("dropped", false))
 	var calm := int(s.get("calm_spent", 0))
+	if not dropped and calm <= 0:
+		return ""
+	var parts := PackedStringArray()
+	var fee := int(s.get("counter_fee", 0))
+	if fee > 0:
+		parts.append(Lang.tf(SLIP_FEE, [fee]))
+	if dropped:
+		parts.append(Lang.tf(SLIP_DROP, [int(s.get("drop", 0))]))
 	if calm > 0:
 		parts.append(Lang.tf(SLIP_CALM, [calm]))
 	return "  •  ".join(parts)

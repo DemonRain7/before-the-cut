@@ -383,8 +383,8 @@ and a patient whose last lamp goes any other way still gets the bar.
 | mouse | everything. A right-click on a paper or on the hall screen puts that one back. Anywhere else, a right-click (or ESC) puts away what is in hand; with empty hands it puts back the hall screen, then the card, then the paper on the left |
 | On the title card | UP / DOWN or W / S: the menu's item, or the row on SETTINGS; a click or ENTER: open the lit item, or change the lit setting; LEFT / RIGHT: turn a page of HOW TO PLAY, or change a setting; ESC, BACKSPACE or a right-click: back to the menu; H or F1: HOW TO PLAY. SPACE does nothing there |
 | ENTER | the lit item of the title card's menu, next opening card, buzz the next patient in, hurry a line, tear off the slip, turn a report page, new shift; on a quiet strip it opens the typing line |
-| ESC | skip the opening cards; close the guide; on the report, go to the night's totals |
-| On the report | a click, ENTER, SPACE or RIGHT turns to the next page, and on the night's totals starts a new shift; BACKSPACE or LEFT goes back a page; ESC or a right-click goes to the totals |
+| ESC | skip the opening cards; close the guide; on the report, go to the night's totals, and from the totals back to the title card |
+| On the report | a click, ENTER, SPACE or RIGHT turns to the next page, and on the night's totals starts the next night (CLICK FOR THE NEXT NIGHT after a night over the line, CLICK TO TRY AGAIN after one that was lost); BACKSPACE or LEFT goes back a page; ESC or a right-click goes to the totals; ESC on the totals goes back to the title card, where the language and the other settings can be changed (the opening and the training are not played again) |
 | H / F1 | the counter guide |
 | R | the reference sheet: down, or back on its nail |
 | L | tonight's contact list: down, or back on its nail |
@@ -524,8 +524,12 @@ closing. During the night the doctor learns what was done, never whether it was 
 
 - **The slip** says what the counter did (`rules.json` `counter`): TREATED, HANDED OVER, SHUTTER
   HELD, SHUTTER DOWN, WALKED OUT or OUT OF PATIENCE, with a line of text that does not give the
-  truth away, the money AT THE COUNTER, a drop or CALM, and "Right or wrong: at
-  closing."
+  truth away, the money AT THE COUNTER, and "Right or wrong: at closing." The figure beside AT
+  THE COUNTER is everything the counter took in for the visit (the fee, a drop, less the
+  calm-patches): it is what the till moves by and what the report calls "At the counter".
+  After a drop or a calm-patch a line under it says what it is made of, for example
+  `FEE +250  •  DROP +300  •  CALM -30` (since November 21; before that the slip printed the
+  fee alone while the till moved by more).
 - **At the counter** come in the fees, drops, and CALM and glass going out. A treated patient
   pays the fee at the counter whatever their truth; the bill for a drifting one comes at
   closing. Trauma Team pays the fee on account for anyone it takes, on a call or after the

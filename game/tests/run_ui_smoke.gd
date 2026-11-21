@@ -1086,6 +1086,29 @@ func shift_reckless() -> void:
 	check(main.clinic.till == -400 and main.clinic.line == 360 and main.clinic.line_under,
 		"the till on the wall shows the night's money; nobody reads the meter, so it stays at the third hour's line")
 
+	section("From the totals back to the title card")
+	d.key(KEY_ESCAPE)
+	check(main.state == MainScript.State.REPORT and main.screens.on_summary(), "ESC on a visit's page goes to the night's totals")
+	d.key(KEY_ESCAPE)
+	check(main.state == MainScript.State.REPORT and main.screens.on_summary(), "ESC the moment the totals open does not leave the report")
+	await d.until(func() -> bool: return main.screens.age() >= 0.85, 3.0)
+	d.right_click()
+	check(main.state == MainScript.State.REPORT and main.screens.on_summary(), "the right button on the totals does nothing")
+	d.key(KEY_ESCAPE)
+	check(main.state == MainScript.State.TITLE and main.screens.mode == "title" and main.screens.menu_item() == "start",
+		"a moment later ESC on the totals goes back to the title card, with START lit")
+	check(main.visit == null and main.clinic.till == 0 and main.clinic.results.is_empty() and main.clinic.line == 0 and not main.clinic.line_under,
+		"behind the card nobody is at the counter, and the till and the meter are empty")
+	await process_frame      # the dried blood goes with the frame (queue_free)
+	await process_frame
+	check(main.clinic.glass_state == 0 and main.clinic.glass_left == main.clinic.glass_max and main.clinic.stain_count() == 0
+		and main.clinic.dent_count() == 0 and main.clinic.decal_count() == 0 and main.gore.splat_count() == 0,
+		"and the window, the walls and the shutter are whole and clean again")
+	check(logged("menu_return").size() == 1, "the log has the way back")
+	languages()
+	d.key(KEY_ESCAPE)
+	check(main.state == MainScript.State.TITLE and main.screens.mode == "title", "ESC on the menu itself does nothing")
+
 
 # ================================================================ shift 3
 
@@ -1093,6 +1116,8 @@ func shift_odds_and_ends() -> void:
 	section("Third shift")
 	var opened: bool = await d.open_counter()
 	check(opened, "a third shift starts")
+	check(main.shift_number == 3 and logged("intro").size() == 1 and not main.screens.on_title(),
+		"START on the title card goes straight to the counter: the opening is not played again")
 	check(main.clinic.glass_state == 0 and main.clinic.stain_count() == 0 and main.clinic.dent_count() == 0
 		and main.clinic.drip_count() == 0 and main.clinic.decal_count() == 0, "the window, the wall and the shutter are whole again")
 	check(main.shift.glass == 3 and not main.shift.glass_out and main.clinic.glass_left == 3 and plan_is([540, 990, 1440], 1800),
@@ -1815,7 +1840,10 @@ func shift_couriers() -> void:
 	check(printed, "Kip: the result slip prints")
 	var s: Dictionary = main._slip_data
 	check(int(s.get("outcome_credits", 0)) == 250 and int(s.get("credits", 0)) == 520, "the call earns the fee; with the drop and less the patch, 520")
-	check(main._slip_breakdown(s) == Lang.tf(main.SLIP_DROP, 300) + "  •  " + Lang.tf(main.SLIP_CALM, 30), "under the call the slip says what the drop brought and what CALM cost")
+	check(int(s.get("counter", 0)) == 520 and int(s.get("counter_fee", 0)) == 250,
+		"the slip's counter figure is what the till moved by: the fee, the drop, less the patch")
+	check(main._slip_breakdown(s) == Lang.tf(main.SLIP_FEE, 250) + "  •  " + Lang.tf(main.SLIP_DROP, 300) + "  •  " + Lang.tf(main.SLIP_CALM, 30),
+		"under it the slip says what that is made of: the fee, what the drop brought and what CALM cost")
 	check(main.clinic.till == main.shift.till() and main.shift.till() == 520, "the till matches: 520")
 	var moved: bool = await d.take_slip()
 	check(moved and main.clipboard.entry_mark(kip_id) == "picked", "Kip: taking the slip moves on, and his entry stays ticked off")

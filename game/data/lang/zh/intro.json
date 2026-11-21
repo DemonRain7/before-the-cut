@@ -116,6 +116,6 @@
 		"T types a line. Hold TAB for voice with AI. Asking a listed question costs the ASK price. Small talk is free. CTRL+ENTER sends a PRESS.": "T 打字。AI 开启时按住 TAB 说话。问到列表里的问题照常扣耐心，闲聊免费。CTRL+ENTER 施压。",
 		"SPACE: the shutter. Outside an attack it asks first, so press twice; during one, once is enough.": "SPACE：卷闸。没有袭击时它会先确认，所以要按两下；袭击中按一下就够。",
 		"ENTER buzzes the next visitor in. K ends the first night's training. M mutes; F11 switches full screen.": "ENTER 放下一位访客进来。K 结束第一晚的教学。M 静音；F11 切换全屏。",
-		"SETTINGS on the title card: the language, the blood, the sound and the screen.": "标题画面的设置里可以改：语言、血腥、声音和画面。"
+		"SETTINGS on the title card: the language, the blood, the sound and the screen. ESC on the night's totals goes back to the title card.": "标题画面的设置里可以改：语言、血腥、声音和画面。在当晚总账页按 ESC 回到标题画面。"
 	}
 }

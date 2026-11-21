@@ -12,7 +12,9 @@ extends Node2D
 ## The report is where right and wrong are told (rules version 8): a page for each visit seen
 ## tonight, in the order they came (who it was, what the player did, what was true, and what
 ## each part of the patient really showed beside the player's own marks), then the night's
-## totals. main.gd turns the pages (act_report_next, act_report_back, act_report_skip).
+## totals. main.gd turns the pages (act_report_next, act_report_back, act_report_skip). On the
+## totals a click starts the next night (or the same one again, after a night that was lost) and
+## ESC goes back to the title card (act_report_menu).
 
 const Gfx = preload("res://scripts/ui/gfx.gd")
 const Lang = preload("res://scripts/core/lang.gd")
@@ -123,6 +125,10 @@ const TALLY_UNDER := "Hours under the line: %d"
 const TALLY_GAP := "   •   "
 const UNSEEN := "never came in"          # a visitor still in the hall when the night ended
 const TOTALS_ROW_H := 13.0
+# what the next click on the totals starts, by how the night went, and the keys under it
+const NEXT_NIGHT := "CLICK FOR THE NEXT NIGHT"    # the line held: the debt waits another night
+const TRY_AGAIN := "CLICK TO TRY AGAIN"           # under the line, or the doctor died: the night over again
+const TOTALS_KEYS := "BACKSPACE: BACK   •   ESC: THE MENU"
 # under a visit's figure, what in it was not the call's own (the slip's words, in small)
 const VISIT_DROP := "drop +%d"
 const VISIT_NO_DROP := "drop missed"
@@ -795,8 +801,11 @@ func _draw_totals(p: Rect2, visits: Array) -> void:
 		var drops := int(report.get("drops", 0))
 		Gfx.text_center_raw(self, 320.0, y + 11.0, Lang.tf(DROPS_TALLY, [drops, listed, int(report.get("drop_total", 0))]),
 			Gfx.GRN2 if drops > 0 else Gfx.INKS)
+	# what a click starts: another night if the line held, the night over again if it did not.
+	# ESC is the way back to the title card's menu (main.gd: act_report_menu).
 	if _age > 0.8 and fmod(_t, 1.0) < 0.65:
-		Gfx.text_center(self, 320.0, p.end.y - 16.0, "CLICK FOR A NEW SHIFT", Gfx.RED1, true)
+		Gfx.text_center(self, 320.0, p.end.y - 28.0, NEXT_NIGHT if held else TRY_AGAIN, Gfx.RED1, true)
+	Gfx.text_center(self, 320.0, p.end.y - 16.0, TOTALS_KEYS, Gfx.INKS)
 
 
 ## A row of the totals: words already in the player's language, and a figure at the right.

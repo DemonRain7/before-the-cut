@@ -945,8 +945,11 @@ def main():
             rows.append(check("slip_title", "rules.counter." + k + ".title", title, bold=True, scale=2))
         said = fill(tr(e.get("text", "")), {"name": longest_name})
         rows.append(check_lines("slip_text", "rules.counter." + k + ".lines", said, SLIP_WIDTH, SLIP_LINES))
-    counter_fees = sorted(fees | {0})
-    widest = max(text_width(tr("%s credits" % money(v)), True) + 1 for v in counter_fees)
+    # the figure beside AT THE COUNTER is all the counter took in (main.gd: _draw_slip): a fee or
+    # none, with or without a courier's package, less the calm-patches
+    drop_pay = int(contacts.get("pay", 0))
+    counter_figures = sorted({f + d - c for f in fees | {0} for d in (0, drop_pay) for c in (0, calm_most)})
+    widest = max(text_width(tr("%s credits" % money(v)), True) + 1 for v in counter_figures)
     room = SLIP_WIDTH - widest - SLIP_GAP
     for label in [t for n, t in consts(MAIN_GD, r"^SLIP_COUNTER$")] or [""]:
         w = tw(label, True) + 1
@@ -1026,11 +1029,17 @@ def main():
                                    key=tw)), tr(worst_numbers(small["VISIT_CALM"], [calm_most]))])
         rows.append(check("report_tally", "screens.gd:_visit_extra", extra))
         rows.append(check("report_tally", "screens.gd:VISIT_MONEY", small["VISIT_MONEY"].replace("%s", widest_money)))
-    for name, text in consts(SCREENS_GD, r"^(NEXT_VISIT|TO_TOTALS)$"):
+    # the words that turn a page, and on the totals start the next night or the same one again
+    prompts = consts(SCREENS_GD, r"^(NEXT_VISIT|TO_TOTALS|NEXT_NIGHT|TRY_AGAIN)$")
+    if len(prompts) < 4:
+        rows.append(("report_tally", "screens.gd", 0, "", " NO PAGE PROMPTS FOUND"))
+    for name, text in prompts:
         rows.append(check("report_tally", "screens.gd:" + name, text, bold=True))
-    for name, text in consts(SCREENS_GD, r"^PAGE_KEYS$"):
+    keys = consts(SCREENS_GD, r"^(PAGE_KEYS|TOTALS_KEYS)$")
+    if len(keys) < 2:
+        rows.append(("report_tally", "screens.gd", 0, "", " NO PAGE KEYS FOUND"))
+    for name, text in keys:
         rows.append(check("report_tally", "screens.gd:" + name, text))
-    rows.append(check("report_tally", "screens.gd:_draw_totals", "CLICK FOR A NEW SHIFT", bold=True))
     # the title card
     for name, text in consts(SCREENS_GD, r"^HELP"):
         rows.append(check("screen", "screens.gd:" + name, text))
@@ -1091,11 +1100,12 @@ def main():
     rows += training_rows(intro, numbers)
     rows += howto_rows(intro, numbers)
     # the slip's breakdown line under the call (main.gd: _slip_breakdown): the longest it can be
-    named = dict(consts(MAIN_GD, r"^SLIP_(DROP|CALM)$"))
-    if len(named) < 2:
+    named = dict(consts(MAIN_GD, r"^SLIP_(FEE|DROP|CALM)$"))
+    if len(named) < 3:
         rows.append(("slip_call", "main.gd:SLIP_*", 0, "", " NO BREAKDOWN WORDS FOUND"))
     else:
-        worst = "  •  ".join([tr(worst_numbers(named["SLIP_DROP"], [numbers["pay"]])),
+        worst = "  •  ".join([tr(worst_numbers(named["SLIP_FEE"], [max(fees | {0})])),
+                             tr(worst_numbers(named["SLIP_DROP"], [numbers["pay"]])),
                              tr(worst_numbers(named["SLIP_CALM"], [numbers["calm_cost"] * calm_uses]))])
         rows.append(("slip_call", "main.gd:_slip_breakdown", tw(worst), worst,
                      " WIDER THAN THE SLIP (%d px)" % SLIP_WIDTH if tw(worst) > SLIP_WIDTH else ""))
