@@ -1302,9 +1302,7 @@ func shift_line_and_glass() -> void:
 	main.agent.client = slow
 	main.agent.set_mode("model")
 	check(main.agent.mode == "model" and main._mic_why_not() == "no_service", "a stand-in service that answers slowly, and cannot hear")
-	d.pad("ask")
-	await process_frame
-	d.click(main.dialogue.menu_point(0))
+	main.act_tool("grip")
 	d.move(Gfx.DIALOGUE.position + Vector2(200, 38))      # off the list, on nothing that can be pressed
 	var pondering: bool = await d.until(func() -> bool: return main.rig != null and main.rig.thinking and main.rig._bubble.visible, 2.0)
 	check(pondering, "while the answer is on its way she is seen thinking, with a thought bubble by her head")
@@ -2194,7 +2192,7 @@ func typing_line(v: VisitState) -> void:
 	check(box.speaker == "YOU" and " ".join(box.lines) == typed, "the doctor says exactly what was typed")
 	var answered: bool = await d.until(func() -> bool: return v.answered.has("why") and box.speaker != "YOU", 12.0)
 	check(answered and v.patience == patience - 1, "offline, a sentence about the eye gets the eye answer and costs one patience")
-	check(has_note_text(v, "speech", "pavement"), "the answer is noted like any other")
+	check(has_note_text(v, "speech", Lang.t(str(v.topic("why").a))), "the note quotes the answer in the player's language")
 	await d.settle()
 	# the same question again: nothing new to charge for
 	await d.say("So what happened to your eye, again?")
@@ -2208,7 +2206,7 @@ func typing_line(v: VisitState) -> void:
 	check(dodged and strip_says(box, "Uh. Can we skip that one?"), "small talk gets his own way of declining")
 	check(v.patience == patience - 1 and int(v.asked.get("free", 0)) == 0, "an unanswered sentence costs nothing")
 	check(note_count(v, "speech") + note_count(v, "temper") == notes_before, "and writes nothing on the card")
-	check(main._base_hint == main.SAY_OFFLINE_HINT, "the hint explains that the offline patient only knows its script")
+	check(main._base_hint == main.SAY_SMALL_HINT, "the hint says that small talk stays off the card")
 	await d.settle()
 	# other actions put the sentence away
 	d.key(KEY_T, 116)

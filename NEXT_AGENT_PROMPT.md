@@ -1,6 +1,14 @@
 # Continue Before the Cut
 
-**Resume after patient-agent P0 (November 21, 2026).** P0 was implemented and verified locally on top of the previous sessions' uncommitted work. Use the active P0 checkpoint at the top of HANDOFF.md for current results and the proxy README for commands. Earlier instructions below to begin P0 describe the previous checkpoint. Inspect `git status -sb` before pulling or staging.
+**Resume after patient-agent P1 (November 21, 2026).** D1–D3 and the three deployment and spending decisions were approved in chat. The game has one set of ASK, PRESS, evidence and case rules. Fix 4 is implemented. Use rules version 11 and protocol 4. The earlier P0 entry is historical.
+
+The public double-session and timeout probes passed. The Godot timeout fallback appeared at 3,836 ms and the visit finished at its slip. A public, disabled live Worker rejected POST with 503. Local and public mocks passed the six-visit rehearsal. OpenAI usage for this checkpoint is zero. The [dated checkpoint](docs/development/live-model-results-2026-11-21.md) has evidence and the temporary addresses. Working-checkout tests passed 2,025 rules, 52 proxy tests, 334 Godot HTTP and 100 wire assertions. An independent commit export passed the same rules and HTTP checks plus both scene languages. See [HANDOFF.md](HANDOFF.md) for the baseline comparison and the separate export counts.
+
+1. Deploy persistently after the student completes Wrangler's interactive login. The one-hour preview is automatically discarded if unclaimed.
+2. Have the student enter the project key through Wrangler's hidden prompt and turn on the monthly hard limit in the provider project. Keep live disabled until the private run.
+3. Execute the already-approved `gpt-6-luna` checkpoint through the private deployment, up to 24 dialogues and zero transcriptions for USD 0.01 maximum. Restore the disabled config. Commands and limits are in the [runbook](agent_proxy/README.md#deployment-and-rollback). Preserve the November 15 ledger and the earlier uncommitted design and flow work.
+
+**Historical patient-agent P0 handoff (November 21, 2026).** P0 was implemented and verified locally on top of the previous sessions' uncommitted work. Use the active P0 checkpoint at the top of HANDOFF.md for current results and the proxy README for commands. Earlier instructions below to begin P0 describe the previous checkpoint. Inspect `git status -sb` before pulling or staging.
 
 - Launch a local demo with `.\run-game.ps1 -Patient mock` or `-Patient timeout`. Add `-CheckPatient` for the headless visit. SETTINGS offers PATIENT AI in both languages. The shipped default is scripted with an empty URL. Rules version 10, protocol 3 and 16 replies per visit still apply.
 - Current working-tree results are 1193 rule checks, 1184/1185/1184 scene checks, 47 proxy tests, 312 Godot HTTP and 96 wire checks, 1620 measured lines per language, zero translation issues and zero findings in 32 scripts. Hidden captures produced 447/447 frames. The full before/after table, isolated preference checks and engine exit notes are in HANDOFF.md.

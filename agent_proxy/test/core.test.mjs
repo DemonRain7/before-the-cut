@@ -6,9 +6,9 @@ import { loadGameData, startServer } from "../src/dev_server.mjs";
 const { cases, rules } = loadGameData();
 let serial = 0;
 const state = () => ({patience:6, patience_max:6, granted:[], refusals:{}, reassured:[], claims:[], asked:{}, press_count:0, reassure_used:0, history:[]});
-const body = (kind="ask", id="why", text="What happened?") => ({protocol:PROTOCOL, session_id:"test-session", visit_id:"test-visit-"+(++serial), case_id:"kip", case_version:3, signs:{speech:"own",temper:"together"}, event:{type:kind,id,text}, state:state(), conversation_history:[], limits:{max_line_chars:110}});
+const body = (kind="ask", id="why", text="What happened?") => ({protocol:PROTOCOL, session_id:"test-session", visit_id:"test-visit-"+(++serial), case_id:"kip", case_version:3, signs:{speech:"own",temper:"together"}, event:{type:kind,id,text,...(kind==="ask"?{outcome:"answer"}:{})}, state:state(), conversation_history:[], limits:{max_line_chars:110}});
 const novel = {reply:"I missed a delivery to be here. Can we work something out?", reaction:"Slides a battered dispatch badge onto the counter.", cooperates:false};
-const fixture = (answer=novel) => ({name:"fixture",model:"fixture",async generate(){return {text:JSON.stringify(answer),mock:true};}});
+const fixture = (answer={...novel,cooperates:true}) => ({name:"fixture",model:"fixture",async generate(){return {text:JSON.stringify(answer),mock:true};}});
 function handler(provider=fixture(),limits={}) {
  const logs=[]; const handle=createHandler({cases,rules,provider,limits,log:e=>logs.push(e)});
  return {handle,logs,post:b=>handle({method:"POST",path:"/v1/patient-dialogue",bodyText:JSON.stringify(b)})};
@@ -18,6 +18,8 @@ test("ten current cases and matching game limits",()=>{
  const game = rules.agent;
  const mirrored = {
   maxCallsPerDay: game.max_provider_calls_per_day, maxCallsTotal: game.max_provider_calls_per_process,
+  maxIntentsPerVisit:game.intent.max_calls_per_visit, maxIntentsPerSession:game.intent.max_calls_per_session,
+  intentTimeoutMs:game.intent.upstream_timeout_ms, intentClientTimeoutMs:game.intent.timeout_ms, intentOutputTokens:game.intent.max_output_tokens,
   healthTimeoutMs: game.health_timeout_ms, counterRetentionDays: game.counter_retention_days,
   maxTrackedKeys: game.max_tracked_keys, maxBodyBytes: game.max_body_bytes, upstreamTimeoutMs: game.upstream_timeout_ms,
   maxCallsPerSession: game.max_model_calls_per_session, maxHistoryTurns: game.max_history_turns,
@@ -45,7 +47,7 @@ test("Chinese: the game's own smaller numbers, a prompt asking for Chinese, and 
  for(const v of ["fr","ZH","",7,null,["zh"]]){const b=body();b.language=v;assert.equal(validateRequest(b,cases).ok,false,`language ${JSON.stringify(v)}`);}
  // a reply the strip shows whole in English is too long for it in Chinese
  const long="好".repeat(zhLim.maxReplyChars+1);
- const {post,logs}=handler(fixture({reply:long,reaction:""}));
+ const {post,logs}=handler(fixture({reply:long,reaction:"",cooperates:true}));
  const zh=body(); zh.language="zh"; const refused=await post(zh);
  assert.equal(refused.status,422); assert.equal(refused.body.error.message,"reply_too_long");
  assert.equal((await post(body())).status,200);
@@ -66,7 +68,7 @@ test("a whole visit of conversation fits: history up to the cap is accepted, one
 test("a reply a little past the asked length is still delivered whole; only one the game cannot show fails",async()=>{
  const long="I told you already, it locks when the cold gets in. ".repeat(3).trim();
  assert.ok(long.length>DEFAULT_LIMITS.maxLineChars&&long.length<=DEFAULT_LIMITS.maxReplyChars);
- const a=handler(fixture({reply:long,reaction:""}));const out=await a.post(body());
+ const a=handler(fixture({reply:long,reaction:"",cooperates:true}));const out=await a.post(body());
  assert.equal(out.status,200);assert.equal(out.body.reply,long);
  const b=handler(fixture({reply:"x".repeat(DEFAULT_LIMITS.maxReplyChars+1),reaction:""}));
  const refused=await b.post(body());assert.equal(refused.status,422);assert.equal(refused.body.error.message,"reply_too_long");
@@ -93,7 +95,7 @@ test("prompt uses character facts and verbatim history with no answer bank or en
  const req=validateRequest(b,cases).req;const p=buildPrompt(cases.kip,rules,req,110);
  assert.ok(p.system.includes("bicycle fall")); assert.ok(p.user.includes("Please don't"));
  assert.ok(!p.system.includes(cases.kip.signs.speech.normal[0].answers.why.a)); assert.ok(!p.user.includes("legal_moves"));
- assert.ok(!JSON.stringify(p.schema).includes('"enum"')); assert.deepEqual(p.schema.required,["reply","reaction"]);
+ assert.ok(!JSON.stringify(p.schema).includes('"enum"')); assert.deepEqual(p.schema.required,["reply","reaction","cooperates"]);
 });
 test("speech mentioning symptoms, instrument readings or markup is not semantically blocked",()=>{
  for(const reply of ["My pupils are fine.", "GRIP: STEADY? That is not how my arm feels.", "<fine> [maybe] {no promises}"]){
@@ -110,11 +112,11 @@ test("only shape, size, control characters and tool consent are validated",()=>{
 test("novel model answer survives proxy verbatim; no authored substitution",async()=>{
  const {post,logs}=handler();const out=await post(body());
  assert.equal(out.status,200);assert.equal(out.body.reply,novel.reply);assert.equal(out.body.reaction,novel.reaction);
- assert.equal(out.body.cooperates,false);assert.ok(!("move" in out.body));
+ assert.equal(out.body.cooperates,true);assert.ok(!("move" in out.body));
  assert.ok(!JSON.stringify(logs).includes(novel.reply)); assert.ok(!JSON.stringify(logs).includes("What happened"));
 });
 test("AI can refuse an exam even if the authored case only permits comply",async()=>{
- const {post}=handler();const out=await post(body("check","grip","Hold this handle."));
+ const {post}=handler(fixture(novel));const out=await post(body("check","grip","Hold this handle."));
  assert.deepEqual(cases.kip.checks.grip.first,["comply"]); assert.equal(out.body.cooperates,false);
 });
 test("model sees only this request's patient and visit history",async()=>{
@@ -140,8 +142,12 @@ test("tonight's speech and temper signs are checked, and the model hears only th
   for(const row of ["speech","temper"]) for(const s of cases[id].signs[row].broken) assert.ok(!sys.includes(s.model),`${id}: a normal night does not hear the broken ${row} sign ${s.id}`);
   for(const phrase of ["separate, tireless","warm torch","without your intention","sense of agency","does not act independently","do not move independently","does not control your thoughts"]) assert.ok(!sys.includes(phrase),`${id}: the background holds on any night (${phrase})`);
  }
- // signs are required, exactly these two rows, each a sign of this patient's own rows
- for(const s of [undefined,null,"own",["own","together"],{speech:"own"},{speech:"own",temper:"together",eyes:"steady"},{speech:"ghost",temper:"together"},{speech:"together",temper:"own"},{speech:"lost",temper:"together"},{speech:"own",temper:7}]){
+ for (const signs of [{}, {speech:"own"}, {temper:"together"}]) {
+  const req = validateRequest({...body(), signs}, cases).req;
+  assert.equal(buildPrompt(cases.kip,rules,req,110).system.includes("\nTonight: "),Object.keys(signs).length > 0);
+ }
+ // Unknown rows and signs are rejected.
+ for(const s of [undefined,null,"own",["own","together"],{speech:"own",temper:"together",eyes:"steady"},{speech:"ghost",temper:"together"},{speech:"together",temper:"own"},{speech:"lost",temper:"together"},{speech:"own",temper:7}]){
   const b=body(); if(s===undefined) delete b.signs; else b.signs=s;
   const v=validateRequest(b,cases); assert.equal(v.ok,false,`signs ${JSON.stringify(s)}`); assert.equal(v.message,"signs");
  }
@@ -168,18 +174,18 @@ test("oversize request and unknown/legacy routes never invoke the provider",asyn
  const {handle}=handler();
  assert.equal((await handle({method:"POST",path:"/v1/patient-dialogue",bodyText:"x".repeat(32769)})).status,413);
  assert.equal((await handle({method:"POST",path:"/v1/patient-move",bodyText:"{}"})).status,404);
- assert.equal((await handle({method:"GET",path:"/healthz"})).body.protocol,"3");
+ assert.equal((await handle({method:"GET",path:"/healthz"})).body.protocol,PROTOCOL);
 });
 test("Google transport forwards unconstrained JSON schema and conversation (fake fetch)",async()=>{
  let request;
  const provider=createGoogleProvider({model:"test-model",apiKey:"fake-test-key",fetchImpl:async(url,opts)=>{
   request=JSON.parse(opts.body);return {ok:true,json:async()=>({candidates:[{content:{parts:[{text:JSON.stringify(novel)}]}}],usageMetadata:{promptTokenCount:10,candidatesTokenCount:12}})};
  }});
- const {post}=handler(provider);assert.equal((await post(body())).body.reply,novel.reply);
+ const {post}=handler(provider);assert.equal((await post(body("say","free"))).body.reply,novel.reply);
  assert.ok(!JSON.stringify(request.generationConfig.responseSchema).includes('"enum"'));
  assert.ok(request.contents[0].parts[0].text.includes("player_action"));
 });
-test("real HTTP server returns protocol 3 response with mock label",async()=>{
+test("real HTTP server returns protocol 4 response with mock label",async()=>{
  const server=await startServer({port:0,provider:createMockProvider(),log:()=>{}});
  try{const res=await fetch(server.url+"/v1/patient-dialogue",{method:"POST",body:JSON.stringify(body()),headers:{"content-type":"application/json"}});
  const data=await res.json();assert.equal(res.status,200);assert.equal(data.meta.mock,true);assert.ok(data.reply.length);
@@ -200,7 +206,7 @@ test("unrestricted event ids cannot introduce player text into a service log", a
 test("Worker entry imports the current ten cases and serves the same contract in Node",async()=>{
  const worker=(await import("../src/worker.mjs")).createWorker(() => createMemoryCounters());
  const health=await worker.fetch(new Request("https://local.test/healthz"),{BTC_PROVIDER:"mock"});
- const data=await health.json();assert.equal(data.protocol,"3");assert.deepEqual(data.cases.sort((a,b)=>a.id.localeCompare(b.id)), Object.values(cases).map(({id,version})=>({id,version})).sort((a,b)=>a.id.localeCompare(b.id)));
+ const data=await health.json();assert.equal(data.protocol,PROTOCOL);assert.deepEqual(data.cases.sort((a,b)=>a.id.localeCompare(b.id)), Object.values(cases).map(({id,version})=>({id,version})).sort((a,b)=>a.id.localeCompare(b.id)));
  const res=await worker.fetch(new Request("https://local.test/v1/patient-dialogue",{method:"POST",body:JSON.stringify(body())}),{BTC_PROVIDER:"mock"});
  const reply=await res.json();assert.equal(res.status,200);assert.equal(reply.meta.mock,true);
 });

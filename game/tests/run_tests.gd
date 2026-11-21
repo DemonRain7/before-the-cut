@@ -133,6 +133,7 @@ func _initialize() -> void:
 	test_marks()
 	test_settlement_rows()
 	test_generated_speech_findings()
+	await test_patient_rules_match()
 	test_counter_and_closing()
 	test_shift()
 	test_line()
@@ -850,29 +851,109 @@ func test_counter_and_closing() -> void:
 		"the report's counter money and closing money, less the glass, make the till")
 
 
+## Compare both patient modes using the actual request builder and visit transitions.
+func test_patient_rules_match() -> void:
+	var outside := 0
+	for id in templates:
+		var template: Dictionary = templates[id]
+		var normal := CaseDB.compose(template, {})
+		var broken := CaseDB.compose(template, {"truth": "drifting", "signs": {"speech": template.signs.speech.broken[0].id,
+			"temper": template.signs.temper.broken[0].id}})
+		for case_data in [normal, broken]:
+			var agent := PatientAgent.new(rules, FakeClient.new(), 123)
+			agent.begin_visit(case_data, "same-visit", 123)
+			var probe := VisitState.new(case_data, rules)
+			var temper_id: String = case_data.signs.temper
+			eq(probe.open_signs(), {}, "%s with no earned sign" % id)
+			probe.seen["flare"] = true
+			eq(probe.open_signs(), {"temper": temper_id}, "a flare opens only TEMPER")
+			for topic in case_data.topics:
+				var offline := VisitState.new(case_data, rules)
+				var online := VisitState.new(case_data, rules)
+				var readers := [PatientAgent.new(rules, FakeClient.new(), 7), PatientAgent.new(rules, FakeClient.new(), 7)]
+				var randoms := [RandomNumberGenerator.new(), RandomNumberGenerator.new()]
+				for i in 2:
+					readers[i].begin_visit(case_data, "test-ask", 7)
+					readers[i].set_mode("script" if i == 0 else "model")
+					randoms[i].seed = 77
+				for turn in 2:
+					var event := {"type": "ask", "id": topic.id, "text": Lang.t(str(topic.q))}
+					var legal := offline.legal_moves_for_ask(str(topic.id))
+					event.outcome = readers[0].scripted.choose_move(case_data, event, offline.snapshot(), legal)
+					var earned := offline.open_signs(event)
+					if event.outcome == "deflect":
+						eq(earned, {}, "a first dodge opens no gate")
+					elif not case_data.rows.speech.evidence.has("ask:" + str(topic.id)):
+						if not offline.answered.has(topic.id):
+							outside += 1
+							var steady := VisitState.new(normal, rules)
+							if turn > 0:
+								steady.apply_ask(topic.id, "deflect")
+							eq(str(topic.a), str(steady.topic(topic.id).a), "unrevealing questions use the same authored answer")
+							eq(agent.build_payload(event, offline.snapshot(), earned), agent.build_payload(event, steady.snapshot(), steady.open_signs(event)), "no request field reveals the broken sign")
+					else:
+						eq(earned, {"speech": case_data.signs.speech}, "the question opens only tonight's SPEECH")
+					for i in 2:
+						var v: VisitState = offline if i == 0 else online
+						var reader: PatientAgent = readers[i]
+						var d: Dictionary = await reader.decide(event, v.snapshot(), [event.outcome], v.open_signs(event))
+						reader.remember_exchange(event, d)
+						v.apply_ask(topic.id, str(d.move), str(d.line))
+						v.roll_action(randoms[i])
+					eq([offline.patience, offline.seen, offline.notes, offline.last_recorded_speech, offline.actions, randoms[0].state],
+						[online.patience, online.seen, online.notes, online.last_recorded_speech, online.actions, randoms[1].state], "ASK has the same price, proof, quote and random draws")
+					eq(readers[0].conversation_history, readers[1].conversation_history, "authored ASK reaches both conversation histories")
+					eq(readers[1].calls_this_visit, 0, "authored ASK spends no generated reply")
+				var fresh := VisitState.new(case_data, rules)
+				fresh.patience = 0
+				eq(fresh.open_signs({"type": "ask", "id": topic.id, "outcome": "answer"}), {}, "an unaffordable question opens no gate")
+			for tool in VisitState.TOOLS:
+				var script := VisitState.new(case_data, rules)
+				var model := VisitState.new(case_data, rules)
+				for turn in 3:
+					if turn == 2:
+						script.reassure()
+						model.reassure()
+					var legal := script.legal_moves_for_check(tool)
+					var action := {"type": "check", "id": tool}
+					var move := agent.scripted.choose_move(case_data, action, script.snapshot(), legal)
+					var a := script.apply_check(tool, move)
+					var b := model.apply_check(tool, move, true)
+					if a.result == "granted":
+						script.complete_check(tool)
+						model.complete_check(tool)
+					eq([a.result, a.cost, script.notes, script.seen, script.patience], [b.result, b.cost, model.notes, model.seen, model.patience], "matching tool decisions have the same price and proof")
+				var settled := VisitState.new(case_data, rules)
+				settled.reassure()
+				eq(settled.apply_check(tool, "stall", true).result, "granted", "CALM opens any instrument in both modes")
+	eq(outside, 9, "all nine questions outside a broken sign are indistinguishable")
+
+
 ## A generated answer can hide the authored speech clue. Feedback must describe what was heard.
 func test_generated_speech_findings() -> void:
 	var v := visit("vale")
 	var actual := "I prefer to discuss the repair, doctor."
-	v.apply_dialogue("sleep", actual)
+	v.apply_ask("sleep", "answer", "I slept through it.")
+	var repeated := v.apply_ask("sleep", "answer", actual)
+	eq([repeated.cost, v.notes.speech.size(), v.notes.speech.back().text], [0, 1, Lang.tf("Says: %s", [actual])], "a free repeat updates the one note for that topic")
 	v.verdict("refer")
 	v.shutter()
 	var s := v.settlement()
 	var speech: Dictionary = s.rows[3]
-	eq(speech.get("assessment"), "reported", "generated speech is a reported claim, not a fixed finding")
-	eq(speech.get("ok"), null, "an evasive answer is not automatically graded as an abnormal utterance")
+	eq(speech.has("assessment"), false, "generated speech receives normal grading")
+	eq(speech.get("ok"), cases.vale.rows.speech.ok, "the composed case supplies the grade")
 	eq(speech.text, actual, "feedback retains the answer actually heard")
 	ok(speech.text != cases.vale.rows.speech.text, "feedback does not substitute the authored sleep quote")
 	ok(bool(speech.seen), "the recorded answer was heard")
 	eq([s.truth, s.outcome, s.credits], ["drifting", "caught", int(cases.vale.fee) + int(rules.scoring.refer_drifting)], "dialogue does not alter truth, attack or payment")
 	eq([s.rows[0].ok, s.rows[2].ok], [false, false], "physical findings remain fixed")
 	var free := visit("kip")
-	free.apply_dialogue("free", "I want to get back to work.")
+	eq(free.apply_ask("free", "answer").result, "closed", "small talk is not a question")
 	free.verdict("treat")
-	ok(bool(free.settlement().rows[3].seen), "free dialogue is heard even without an authored topic")
+	ok(not bool(free.settlement().rows[3].seen), "small talk leaves SPEECH unseen")
 	eq([free.settlement().truth, free.settlement().credits], ["stable", 250], "free dialogue does not change the diagnosis or fee")
 	var mixed := visit("vale")
-	mixed.apply_dialogue("free", "A generated reply.")
+	mixed.apply_ask("why", "answer", "A generated reply.")
 	mixed.apply_ask("sleep", "answer")
 	mixed.verdict("treat")
 	eq(mixed.settlement().rows[3].text, str(mixed.topic("sleep").a), "a later scripted fallback is recorded accurately")
@@ -880,7 +961,7 @@ func test_generated_speech_findings() -> void:
 	offline.apply_ask("sleep", "answer")
 	offline.verdict("treat")
 	ok(not offline.settlement().rows[3].has("assessment"), "the scripted comparison keeps its authored findings")
-	eq(offline.settlement().rows[3].text, cases.vale.rows.speech.text, "offline feedback still matches its actual script")
+	eq(offline.settlement().rows[3].text, offline.topic("sleep").a, "offline feedback still matches its actual script")
 
 
 ## calls: case id -> "treat" | "refer" | "shutter" | "gave_up" (patience spent, nobody decided).
@@ -1863,7 +1944,9 @@ func test_brain() -> void:
 
 func test_agent() -> void:
 	var client := FakeClient.new()
-	var agent := PatientAgent.new(rules, client, 3)
+	var policy := rules.duplicate(true)
+	policy["agent"]["ask_answers"] = "model"
+	var agent := PatientAgent.new(policy, client, 3)
 	var v := visit("kip")
 	eq(agent.max_calls, int(rules.agent.max_model_calls_per_visit), "call cap comes from the rules")
 	ok(agent.max_calls >= 12, "the cap leaves room for a conversation, not four lines")
@@ -1884,23 +1967,22 @@ func test_agent() -> void:
 	agent.remember_exchange(ev, d)
 	var payload := agent.build_payload({"type": "say", "id": "free", "text": "What would reassure you?"}, v.snapshot())
 	ok(not payload.has("legal_moves"), "no legal moves transmitted")
-	eq(payload.get("signs"), {"speech": str(v.case_data.signs.speech), "temper": str(v.case_data.signs.temper)},
-		"the request names tonight's speech and temper signs")
-	eq(payload.get("signs"), {"speech": "own", "temper": "together"}, "night A's Kip talks and reacts as his normal self")
+	eq(payload.signs, {}, "an unopened visit reveals neither sign")
+	eq(v.open_signs(), {}, "a tool refusal opens no speech or temper gate")
 	ok(not payload.has("truth") and not (payload.state as Dictionary).has("truth") and not JSON.stringify(payload).contains("drifting"),
 		"and never names the patient's truth")
 	var night_vale := PatientAgent.new(rules, client, 3)
 	night_vale.begin_visit(visit("vale").case_data, "test-vale", 3)
-	eq(night_vale.build_payload({"type": "say", "id": "free", "text": "Go on."}, {}).get("signs"), {"speech": "it", "temper": "flat"},
-		"night A's Vale: the rig is 'it', and his face stays level when pushed")
+	eq(night_vale.build_payload({"type": "say", "id": "free", "text": "Go on."}, {}).get("signs"), {},
+		"Vale also begins with both signs hidden")
 	var bare := PatientAgent.new(rules, client, 3)
 	bare.begin_visit({"id": "kip", "version": 3}, "test-bare", 3)
-	eq(bare.model_signs(), {}, "a case with no night's signs names none (the proxy refuses it)")
+	eq(bare.build_payload({}, {}).signs, {}, "no signs are sent by default")
 	ok(JSON.stringify(payload.conversation_history).contains("Not until"), "actual previous speech remembered")
-	client.reply = {"ok": true, "data": {"reply": "My pupils look fine. Why are you worried?", "reaction": "Studies the doctor."}}
-	d = await agent.decide({"type": "ask", "id": "why", "text": "What happened?"}, v.snapshot(), ["answer"])
+	client.reply = {"ok": true, "data": {"reply": "My pupils look fine. Why are you worried?", "reaction": "Studies the doctor.", "cooperates": true}}
+	d = await agent.decide({"type": "ask", "id": "why", "outcome": "answer", "text": "What happened?"}, v.snapshot(), ["answer"])
 	eq(d.reply, "My pupils look fine. Why are you worried?", "novel answer and symptom words survive unchanged")
-	applied = v.apply_dialogue("why", str(d.reply), str(d.reaction))
+	applied = v.apply_ask("why", str(d.move), str(d.reply))
 	eq(applied.line, d.reply, "visit records actual AI words")
 	ok(JSON.stringify(v.notes.speech).contains("My pupils"), "record contains actual speech")
 	ok(not JSON.stringify(v.notes.speech).contains("ate pavement"), "record has no phantom authored evidence")
@@ -1932,7 +2014,6 @@ func test_conversation() -> void:
 		var d: Dictionary = await agent.decide(ev, v.snapshot(), [])
 		eq(d.source, "model", "turn %d answered by the patient model" % i)
 		agent.remember_exchange(ev, d)
-		v.apply_dialogue("free", str(d.reply), str(d.reaction))
 	eq(client.calls, agent.max_calls, "one model call per line said")
 	eq(agent.calls_this_visit, agent.max_calls, "every line counted against the visit")
 	var payload := agent.build_payload({"type": "say", "id": "free", "text": "And now?"}, v.snapshot())
@@ -1943,8 +2024,8 @@ func test_conversation() -> void:
 	ok(sent.contains("Answer number 1,"), "an early exchange is still remembered at the cap")
 	ok(opening > 0 and agent.conversation_history.size() == mini(PatientAgent.MAX_HISTORY, opening + 3 * agent.max_calls),
 		"doctor line, reaction and reply are all remembered")
-	eq(int(v.asked.get("free", 0)), agent.max_calls, "the visit counts free lines")
-	eq(v.ask_cost("free"), 0, "only the first free line costs patience")
+	eq(int(v.asked.get("free", 0)), 0, "conversation history and question counts are separate")
+	eq(v.ask_cost("free"), 0, "small talk never costs patience")
 	var d2: Dictionary = await agent.decide({"type": "say", "id": "free", "text": "One more?"}, v.snapshot(), [])
 	eq(d2.fallback_reason, "call_cap", "past the cap the model is not called")
 	eq(client.calls, agent.max_calls, "and no request leaves the game")
@@ -2199,7 +2280,7 @@ func test_voice() -> void:
 	keys.sort()
 	eq(keys, ["audio", "client", "language", "protocol", "session_id", "visit_id"],
 		"a clip travels with its session, visit and language: no case, state or history")
-	eq([sent.protocol, sent.session_id, sent.visit_id, sent.audio.mime], ["3", "test-session", "voice-visit", "audio/wav"], "in protocol 3, as a WAV")
+	eq([sent.protocol, sent.session_id, sent.visit_id, sent.audio.mime], ["4", "test-session", "voice-visit", "audio/wav"], "in protocol 4, as a WAV")
 	eq(Marshalls.base64_to_raw(str(sent.audio.data)), said, "the samples arrive as they were")
 	eq([agent.calls_this_visit, agent.conversation_history.size()], [0, history], "words written down are not a line said: no dialogue call, nothing remembered")
 	client.reply = {"ok": true, "data": {"text": "Plain words."}}
@@ -2250,13 +2331,13 @@ func test_note_room() -> void:
 	var v := visit("kip")
 	ok(v.add_note("speech", "evidence:a", "Slurs the long words."), "evidence note written")
 	for i in 8:
-		v.apply_dialogue("free", "Chatter %d." % i, "")
+		eq(v.apply_ask("free", "answer", "Chatter %d." % i).result, "closed", "only case questions enter the card")
 	var keys: Array = []
 	for n in v.notes.speech:
 		keys.append(str(n.key))
 	ok(keys.has("evidence:a"), "evidence survives a long conversation")
-	eq(keys.size(), VisitState.MAX_NOTES_PER_ROW, "row stays at its size")
-	ok(JSON.stringify(v.notes.speech).contains("Chatter 7."), "the latest line said is on the card")
+	eq(keys.size(), 1, "small talk takes no room")
+	ok(not JSON.stringify(v.notes.speech).contains("Chatter 7."), "the last small-talk line stays off the card")
 	ok(not JSON.stringify(v.notes.speech).contains("Chatter 0."), "the oldest small talk made room")
 	ok(v.add_note("speech", "evidence:b", "Second finding."), "second evidence note written")
 	ok(v.add_note("speech", "evidence:c", "Third finding."), "third evidence note written")

@@ -260,6 +260,7 @@ static func compose(t: Dictionary, pick: Dictionary) -> Dictionary:
 		rows[row] = {"ok": bool(found["ok"]), "text": str(sign.get("text", "")), "evidence": evidence}
 	c["rows"] = rows
 	c["signs"] = used
+	c["normal_speech_sign"] = str(find_sign(t, "speech").get("sign", {}).get("id", ""))
 	if not drifting:
 		c["attack"] = {"on_refer": false, "telegraph": "", "line": ""}
 	var outcomes: Variant = t.get("outcomes")

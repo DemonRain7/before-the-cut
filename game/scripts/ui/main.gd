@@ -201,9 +201,12 @@ const STOP_BLOW_LINE := "STOPPED AFTER %d BLOW"
 const STOP_BLOWS_LINE := "STOPPED AFTER %d BLOWS"
 const STOP_LAST_LINE := "STOPPED, BUT THE GLASS IS GONE"
 # the title card says whether the patient can be spoken to, and how
-const STATUS_AI_VOICE := "Patient service connected. Hold TAB to speak or press T to type."
-const STATUS_AI_TYPE := "Patient service connected. Press T to type your questions."
-const STATUS_AI_NO_MIC := "Patient service connected. No microphone found. Press T to type."
+const STATUS_AI_VOICE := "AI connected. ASK uses case answers. Hold TAB to speak or press T to type."
+const STATUS_AI_TYPE := "AI connected. ASK uses case answers. Press T to type."
+const STATUS_AI_NO_MIC := "AI connected. ASK uses case answers. No microphone. Press T to type."
+const STATUS_MODEL_VOICE := "AI writes ASK replies. Hold TAB to speak or press T to type."
+const STATUS_MODEL_TYPE := "AI writes ASK replies. Press T to type."
+const STATUS_MODEL_NO_MIC := "AI writes ASK replies. No microphone found. Press T to type."
 const WINDOW_TITLE := "Before the Cut"      # the window's title bar, in the player's language
 const STATUS_CHECKING := "Connecting to the patient service..."
 const STATUS_OFFLINE := "Scripted patient. Choose PATIENT AI in SETTINGS to connect a service."
@@ -244,14 +247,14 @@ const GLASS_OFF_HINT := "GLASS: nobody mends glass at this hour."
 const GLASS_LINE := "The fitter's arm bonds a fresh layer over the frame. %d credits off the till. Glass %d of %d."
 const THINK_HINT := "Still answering. You can look meanwhile, or decide now."
 const THINK_QUIET := 1.6          # how long a look made while the patient is answering stays readable
-const SAY_HINT := "ENTER says it. ESC takes it back."
+const SAY_HINT := "ENTER talks. CTRL+ENTER presses. Questions cost the ASK price."
 const SAY_FULL_HINT := "That is all you can say in one go. ENTER says it."
-const SAY_OFFLINE_HINT := "Offline patient: it only knows its script. ASK lists what it can answer."
+const SAY_SMALL_HINT := "Just talk. Nothing goes on the card."
 const SAY_CHIPS := [{"id": "type", "key": "T", "label": "TYPE"}]
 # push-to-talk: the microphone is open only while this key (or the SPEAK button) is held
 const SPEAK_KEY := KEY_TAB
 const SPEAK_CHIPS := [{"id": "speak", "key": "TAB", "label": "SPEAK"}, {"id": "type", "key": "T", "label": "TYPE"}]
-const SAY_VOICE_HINT := "ENTER says it. ESC takes it back. Hold TAB to speak."
+const SAY_VOICE_HINT := "ENTER talks. CTRL+ENTER presses. ASK prices apply. Hold TAB to speak."
 const MIC_LISTEN_HINT := "Let go to stop. ESC throws it away."
 const MIC_WAIT_HINT := "ESC throws it away."
 const MIC_DONE_HINT := "Check the words. ENTER says it. ESC takes it back."
@@ -597,6 +600,7 @@ func _start_session() -> void:
 	model_client = ModelClient.new()
 	model_client.base_url = agent_url
 	model_client.timeout_ms = int(agent_rules.get("timeout_ms", 4000))
+	model_client.intent_timeout_ms = int(agent_rules.get("intent", {}).get("timeout_ms", 2500))
 	_mic_rules = agent_rules.get("voice", {})
 	model_client.voice_timeout_ms = int(_mic_rules.get("timeout_ms", 7000))
 	mic.max_seconds = float(_mic_rules.get("max_seconds", 10.0))
@@ -853,12 +857,13 @@ func _status_line() -> String:
 		return STATUS_CHECKING
 	if not use_model:
 		return STATUS_OFFLINE
+	var authored := str(rules.get("agent", {}).get("ask_answers", "authored")) == "authored"
 	match _mic_why_not():
 		"":
-			return STATUS_AI_VOICE
+			return STATUS_AI_VOICE if authored else STATUS_MODEL_VOICE
 		"no_mic":
-			return STATUS_AI_NO_MIC
-	return STATUS_AI_TYPE
+			return STATUS_AI_NO_MIC if authored else STATUS_MODEL_NO_MIC
+	return STATUS_AI_TYPE if authored else STATUS_MODEL_TYPE
 
 
 # ================================================================ small helpers
@@ -1762,7 +1767,11 @@ func act_tool(tool: String) -> void:
 		_spent(token)
 		return
 	var before := _note_keys()
-	var d: Dictionary = await _decide({"type": "check", "id": tool}, visit.legal_moves_for_check(tool), str(TOOL_ASK[tool]), token)
+	var event := {"type": "check", "id": tool}
+	var outcome := visit.check_outcome(tool)
+	if outcome != "":
+		event["outcome"] = outcome
+	var d: Dictionary = await _decide(event, visit.legal_moves_for_check(tool), str(TOOL_ASK[tool]), token)
 	if d.is_empty():
 		return
 	var res: Dictionary = visit.apply_check(tool, str(d.get("move", "")), str(d.get("source")) == "model")
@@ -1798,17 +1807,18 @@ func act_tool(tool: String) -> void:
 ## own: ask_line is the doctor's own wording (typed or spoken), sent and shown as it was said;
 ## otherwise it is an authored line, and the patient hears it in the player's language.
 ## Returns {} when the action was cancelled meanwhile (the shutter fell).
-func _decide(event: Dictionary, legal: Array, ask_line: String, token: int, own: bool = false) -> Dictionary:
+func _decide(event: Dictionary, legal: Array, ask_line: String, token: int, own: bool = false, fallback: String = "") -> Dictionary:
 	_thinking = true
 	_lock = true
 	_think_t = 0.0
 	_think_quiet = 0.0
 	if not own:
 		ask_line = Lang.t(ask_line)
-	_doctor_say(ask_line, true)
+	if not own or event.get("type") == "press":
+		_doctor_say(ask_line, true)
 	event = event.duplicate(true)
 	event["text"] = ask_line
-	var d: Dictionary = await agent.decide(event, visit.snapshot(), legal)
+	var d: Dictionary = await agent.decide(event, visit.snapshot(), legal, visit.open_signs(event), fallback)
 	if token != _seq or d.is_empty():
 		return {}
 	_thinking = false
@@ -1820,6 +1830,8 @@ func _decide(event: Dictionary, legal: Array, ask_line: String, token: int, own:
 		if not ok:
 			return {}
 	agent.remember_exchange(event, d)
+	if d.get("source") == "fallback":
+		_base_hint = _fallback_hint(str(d.fallback_reason))
 	_lock = false
 	return _for_display(d)
 
@@ -1993,7 +2005,7 @@ func act_ask_menu() -> void:
 
 
 ## said: the doctor's own wording of the question, when it was typed or spoken.
-func act_ask(id: String, said: String = "") -> void:
+func act_ask(id: String, said: String = "", fallback: String = "") -> void:
 	if not _can_act():
 		return
 	var topic: Dictionary = visit.topic(id)
@@ -2005,14 +2017,15 @@ func act_ask(id: String, said: String = "") -> void:
 		return
 	var before := _note_keys()
 	var question := said if said != "" else str(topic.get("q", ""))
-	var d: Dictionary = await _decide({"type": "ask", "id": id}, visit.legal_moves_for_ask(id), question, token, said != "")
+	var legal := visit.legal_moves_for_ask(id)
+	var event := {"type": "ask", "id": id}
+	event["outcome"] = agent.scripted.choose_move(visit.case_data, event, visit.snapshot(), legal)
+	var d: Dictionary = await _decide(event, [event.outcome], question, token, said != "", fallback)
 	if d.is_empty():
 		return
-	var res: Dictionary
-	if str(d.get("source")) == "model":
-		res = visit.apply_dialogue(id, str(d.reply), str(d.reaction))
-	else:
-		res = visit.apply_ask(id, str(d.get("move", "")))
+	var res := visit.apply_ask(id, str(d.get("move", "")), str(d.get("line", "")))
+	if said != "" and fallback == "":
+		_base_hint = Lang.tf("Asked as: %s", [Lang.t(str(topic.q))])
 	_sync_visit()
 	var result := str(res.get("result", ""))
 	_log("ask", {"topic": id, "move": str(res.get("move", "")), "result": result, "cost": int(res.get("cost", 0)),
@@ -2027,7 +2040,9 @@ func act_ask(id: String, said: String = "") -> void:
 			_roll_surprise()
 			_patient_line(str(res.get("line", "")), token, 0.0)
 		"deflected":
-			_base_hint = "They dodged it. Ask the same thing again and they answer."
+			_base_hint = Lang.t("They dodged it. Ask the same thing again and they answer.")
+			if said != "":
+				_base_hint = Lang.tf("Asked as: %s", [Lang.t(str(topic.q))]) + " " + _base_hint
 			_roll_surprise()
 			_patient_line(str(d.get("line", "")), token, 0.0)
 		"spent":
@@ -2066,13 +2081,18 @@ func act_reassure() -> void:
 
 
 ## Pressure dialogue is autonomous; existing physical attack choreography remains in VisitState.
-func act_press() -> void:
+func act_press(said: String = "") -> void:
 	if not _can_act():
 		return
 	var token := _begin_action()
-	var d: Dictionary = await _decide({"type": "press", "id": "challenge"}, [], str(PRESS_LINES[mini(visit.press_count, PRESS_LINES.size() - 1)]), token)
-	if d.is_empty():
-		return
+	var question := said if said != "" else Lang.t(str(PRESS_LINES[mini(visit.press_count, PRESS_LINES.size() - 1)]))
+	var d := {}
+	if visit.press_breaks():
+		_doctor_say(question, true)
+	else:
+		d = await _decide({"type": "press", "id": "challenge"}, [], question, token, true)
+		if d.is_empty():
+			return
 	var before := _note_keys()
 	var res: Dictionary = visit.press()
 	res["line"] = str(d.get("reply", res.get("line", "")))
@@ -2098,50 +2118,42 @@ func act_press() -> void:
 
 
 ## The doctor says something in their own words: typed, or dictated and then sent.
-## With the patient model the words go to it as they are and it answers for itself; nothing
-## here matches them against prepared answers. The offline comparison has only its script,
-## so there (and only there) the sentence is matched to the questions that case knows.
 func act_say(text: String) -> void:
 	text = text.strip_edges().replace("\n", " ").replace("\r", " ").replace("\t", " ")
 	if not _can_act() or text.is_empty() or text.length() > 500:
 		return
-	var with_model := agent.mode == "model"
-	if not with_model:
-		var known := ScriptedBrain.topic_for_text(visit.case_data, text)
-		if known != "":
-			_log("say", {"source": "script", "topic": known, "chars": text.length()})
-			act_ask(known, text)
-			return
 	var token := _begin_action()
-	if with_model and visit.patience < visit.ask_cost("free"):
-		_spent(token)
+	_thinking = true
+	_lock = true
+	_think_t = 0.0
+	_think_quiet = 0.0
+	_doctor_say(text, true)
+	var reading: Dictionary = await agent.classify(text)
+	if token != _seq or reading.is_empty():
 		return
-	var before := _note_keys()
-	var d: Dictionary = await _decide({"type": "say", "id": "free"}, [], text, token, true)
+	_thinking = false
+	_lock = false
+	_log("intent", {"source": reading.source, "topic": reading.topic, "chars": text.length(), "code": reading.reason})
+	if str(reading.topic) != "":
+		_log("say", {"source": reading.source, "topic": reading.topic, "chars": text.length()})
+		await act_ask(str(reading.topic), text, str(reading.reason))
+		return
+	var d: Dictionary = await _decide({"type": "say", "id": "free"}, [], text, token, true, str(reading.reason))
 	if d.is_empty():
 		return
-	var source := str(d.get("source", ""))
-	_log("say", {"source": source, "chars": text.length(), "patience": visit.patience,
-		"fallback_reason": str(d.get("fallback_reason", ""))})
-	if source != "model":
-		# no answer from a patient model: nothing is charged and nothing goes on the card
-		_base_hint = SAY_OFFLINE_HINT if source == "script" else _fallback_hint(str(d.get("fallback_reason", "")))
-		_patient_line(str(d.get("reply", "")), token, 0.0)
-		return
-	visit.apply_dialogue("free", str(d.reply), str(d.reaction))
-	_sync_visit()
-	_mark_new_notes(before)
+	_log("say", {"source": d.source, "chars": text.length(), "patience": visit.patience, "fallback_reason": d.fallback_reason})
+	if d.source != "fallback":
+		_base_hint = SAY_SMALL_HINT
 	if coach != null:
 		coach.event("talk")
 	if await _show_reaction(d, token):
-		_roll_surprise()
 		_patient_line(str(d.reply), token, 0.0)
 
 
 func _fallback_hint(reason: String) -> String:
 	if reason == "call_cap":
 		return Lang.tf("The patient AI has used its %d replies for this visit. Scripted lines now.", [agent.max_calls])
-	return Lang.tf("The patient AI gave no answer (%s). Scripted line, no charge.", [reason.left(26)])
+	return Lang.tf("The patient AI gave no answer (%s). Using the scripted patient.", [reason.left(26)])
 
 
 ## Opens the typing line under the window.
@@ -2190,11 +2202,13 @@ func _sync_ime() -> void:
 
 
 ## A key while the typing line is open. Everything printable is text, SPACE included.
-func _say_key(keycode: int, unicode: int) -> void:
+func _say_key(keycode: int, unicode: int, control: bool = false) -> void:
 	match keycode:
 		KEY_ENTER, KEY_KP_ENTER:
 			var text := dialogue.input_text.strip_edges()
-			if text == "":
+			if control:
+				act_press(text)
+			elif text == "":
 				act_cancel()
 			else:
 				act_say(text)
@@ -3543,7 +3557,7 @@ func _input(event: InputEvent) -> void:
 		elif key.keycode == SPEAK_KEY and (key.alt_pressed or key.ctrl_pressed or key.meta_pressed):
 			pass      # ALT+TAB and the like belong to the desktop, not to the microphone
 		elif not key.echo or (dialogue.input_open and EDIT_KEYS.has(key.keycode)):
-			key_down(key.keycode, key.unicode)
+			key_down(key.keycode, key.unicode, key.ctrl_pressed)
 
 
 func _notification(what: int) -> void:
@@ -3753,12 +3767,12 @@ func key_up(keycode: int) -> void:
 
 
 ## unicode: the character the key types, when it types one (the typing line needs it).
-func key_down(keycode: int, unicode: int = 0) -> void:
-	_key_press(keycode, unicode)
+func key_down(keycode: int, unicode: int = 0, control: bool = false) -> void:
+	_key_press(keycode, unicode, control)
 	_sync_panels(0.0)
 
 
-func _key_press(keycode: int, unicode: int) -> void:
+func _key_press(keycode: int, unicode: int, control: bool) -> void:
 	if keycode == KEY_F11:
 		act_fullscreen(not fullscreen)
 		return
@@ -3808,7 +3822,7 @@ func _key_press(keycode: int, unicode: int) -> void:
 		if keycode == KEY_F1:
 			act_guide()                 # H is a letter while the doctor is typing; F1 is not
 		else:
-			_say_key(keycode, unicode)      # SPACE and M are letters while the doctor is typing
+			_say_key(keycode, unicode, control)      # SPACE and M are letters while the doctor is typing
 		return
 	match keycode:
 		KEY_SPACE:

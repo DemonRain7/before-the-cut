@@ -23,6 +23,11 @@ func reseed(p_seed: int) -> void:
 
 ## event: {"type": "check" | "ask", "id": tool or topic id}
 func decide(case_data: Dictionary, event: Dictionary, state: Dictionary, legal: Array) -> Dictionary:
+	var chosen := choose_move(case_data, event, state, legal)
+	return {"move": chosen, "line": line_for(case_data, chosen, event, state)}
+
+
+func choose_move(case_data: Dictionary, event: Dictionary, state: Dictionary, legal: Array) -> String:
 	var on := "%s:%s" % [str(event.get("type", "")), str(event.get("id", ""))]
 	var move := ""
 	for r in case_data.get("script", []):
@@ -37,7 +42,7 @@ func decide(case_data: Dictionary, event: Dictionary, state: Dictionary, legal: 
 		break
 	if move == "":
 		move = str(legal[0]) if legal.size() > 0 else "comply"
-	return {"move": move, "line": line_for(case_data, move, event, state)}
+	return move
 
 
 func _holds(cond: Dictionary, state: Dictionary, event: Dictionary) -> bool:
@@ -91,8 +96,8 @@ func line_for(case_data: Dictionary, move: String, event: Dictionary, state: Dic
 
 ## Offline comparison only. The scripted patient cannot answer a sentence it has never seen,
 ## so a typed or spoken line is matched to the questions its case knows, through each
-## topic's "keys" words. Returns the topic id, or "" when nothing fits. Model mode never
-## comes through here: there the patient reads the doctor's own words.
+## topic's "keys" words. Returns the topic id, or "" when nothing fits. A failed intent call also
+## uses these keys when the remote classifier is unavailable.
 ## In another language the catalog adds words of its own (data/lang/<code>: "topics", under the
 ## topic id for every case and under "<case>:<topic>" for one case). Chinese leaves no spaces
 ## between words, so those are looked for anywhere in the sentence.

@@ -82,10 +82,27 @@ async function readCapped(request, cap) {
 	}
 }
 
+// While a paid checkpoint runs, admit only its bearer and its dialogue route.
+function checkpointAccess(request, token) {
+	const deny = (status, code) => Response.json({ error: { code } }, { status, headers: { "cache-control": "no-store" } });
+	if (typeof token !== "string" || !/^[a-f0-9]{64}$/.test(token)) return deny(503, "checkpoint_unconfigured");
+	const supplied = request.headers.get("authorization") || "";
+	const expected = "Bearer " + token;
+	let different = supplied.length ^ expected.length;
+	for (let i = 0; i < expected.length; i++) different |= expected.charCodeAt(i) ^ (supplied.charCodeAt(i) || 0);
+	if (different) return deny(401, "checkpoint_unauthorized");
+	if (new URL(request.url).pathname !== "/v1/patient-dialogue") return deny(403, "checkpoint_dialogue_only");
+	return null;
+}
+
 export function createWorker(countersFor = durableCounters) {
 	return {
 		async fetch(request, env) {
 			const options = serviceSettings(env);
+			if (!options.disabled && env.BTC_CHECK_ONLY === "1" && request.method === "POST") {
+				const denied = checkpointAccess(request, env.BTC_CHECK_TOKEN);
+				if (denied) return denied;
+			}
 			// Only the live environment opts in to provider billing, even with local env overrides.
 			const settings = env.BTC_ALLOW_LIVE === "1" ? env : { BTC_PROVIDER: "mock", BTC_MOCK_FAIL: env.BTC_MOCK_FAIL };
 			const provider = options.disabled

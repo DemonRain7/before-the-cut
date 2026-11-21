@@ -10,7 +10,7 @@ const { cases, rules } = loadGameData();
 let serial = 0;
 const KEY = "fake-test-key";
 const state = () => ({ patience: 6, patience_max: 6, granted: [], refusals: {}, reassured: [], claims: [], asked: {}, press_count: 0, reassure_used: 0, history: [] });
-const line = (type = "ask", id = "why", text = "What happened?") => ({
+const line = (type = "say", id = "free", text = "What happened?") => ({
 	protocol: PROTOCOL, session_id: "openai-session", visit_id: "openai-visit-" + (++serial), case_id: "kip", case_version: 3,
 	signs: { speech: "own", temper: "together" },
 	event: { type, id, text }, state: state(), conversation_history: [], limits: { max_line_chars: 110 },
@@ -73,6 +73,7 @@ test("patient lines go to the Responses API with a strict schema, the key in a h
 	assert.ok(!req.url.includes(KEY), "the key travels in a header, never in the address");
 	assert.equal(req.body.model, "gpt-6-luna");
 	assert.equal(req.body.store, false, "OpenAI is asked not to keep the conversation");
+	assert.equal(req.body.service_tier, "default", "select standard pricing regardless of the project default");
 	assert.deepEqual(req.body.reasoning, { effort: "none" });
 	assert.equal(req.body.max_output_tokens, 256);
 	assert.ok(req.body.instructions.includes("Play this patient"));

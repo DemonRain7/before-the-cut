@@ -7,6 +7,7 @@ extends Node
 
 var base_url: String = ""
 var timeout_ms: int = 4000           # a patient reply; main sets both from rules.json
+var intent_timeout_ms: int = 2500
 var voice_timeout_ms: int = 7000     # the words of a clip: a longer upload, a slower answer
 
 
@@ -20,6 +21,10 @@ func is_configured() -> bool:
 ##                                        network_<n>, bad_json, http_<code>[:<proxy error code>]
 func request_move(payload: Dictionary) -> Dictionary:
 	return await _request("/v1/patient-dialogue", HTTPClient.METHOD_POST, JSON.stringify(payload), timeout_ms)
+
+
+func request_intent(payload: Dictionary) -> Dictionary:
+	return await _request("/v1/patient-intent", HTTPClient.METHOD_POST, JSON.stringify(payload), intent_timeout_ms)
 
 
 ## One push-to-talk clip in, its words out: data is {"text": "...", "meta": {...}}.
@@ -36,7 +41,7 @@ func check_service(expected: Dictionary, wait_ms: int) -> Dictionary:
 	var data: Dictionary = response.data
 	if data.get("disabled") == true:
 		return {"status": "disabled"}
-	if data.get("ok") != true or data.get("protocol") != "3" or typeof(data.get("cases")) != TYPE_ARRAY:
+	if data.get("ok") != true or data.get("protocol") != "4" or typeof(data.get("cases")) != TYPE_ARRAY:
 		return {"status": "version"}
 	var seen := {}
 	for item in data.cases:

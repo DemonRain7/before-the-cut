@@ -1,0 +1,118 @@
+// A six-visit checkpoint. Use the mock first. The live run is restricted to the private Worker.
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
+import { buildPrompt, DEFAULT_LIMITS, PROTOCOL, validateRequest } from "../agent_proxy/src/core.mjs";
+import { loadGameData } from "../agent_proxy/src/dev_server.mjs";
+
+const [mode, address, directory] = process.argv.slice(2);
+if (!["mock", "live"].includes(mode) || !address || !directory) throw Error("Expected mock|live <service-address> <new-evidence-directory>");
+const base = new URL(address);
+const live = mode === "live";
+if (base.username || base.password || base.search || base.hash || base.pathname !== "/") throw Error("Use a plain service origin.");
+if (live && (base.protocol !== "https:" || !/^before-the-cut-agent-live\.[a-z0-9-]+\.workers\.dev$/.test(base.hostname)))
+	throw Error("The live checkpoint requires the deployed live Worker.");
+const token = live ? process.env.BTC_CHECK_TOKEN : "";
+if (live && !/^[a-f0-9]{64}$/.test(token || "")) throw Error("Set the private checkpoint token in the operator environment.");
+const root = path.resolve(directory);
+const approved = fileURLToPath(new URL("../validation/2026-11-21/patient-agent/approved-live", import.meta.url));
+if (live && path.relative(approved, root) !== "") throw Error("Use the existing November 21 authorization directory: validation/2026-11-21/patient-agent/approved-live");
+fs.mkdirSync(root, { recursive: true });
+const ledger = path.join(root, "checkpoint.jsonl");
+const health = await fetch(new URL("/healthz", base), { redirect: "error", signal: AbortSignal.timeout(10000) });
+const info = await health.json();
+assert.equal(info.protocol, PROTOCOL);
+assert.equal(info.disabled, false);
+assert.equal(info.provider, live ? "openai" : "mock");
+if (live) {
+	assert.equal(info.model, "gpt-6-luna");
+	assert.equal(info.speech_to_text, false);
+	// A malformed body cannot reach a provider, even if the gate is misconfigured.
+	const gate = await fetch(new URL("/v1/patient-dialogue", base), { method: "POST", body: "{", redirect: "error", signal: AbortSignal.timeout(8000) });
+	assert.equal(gate.status, 401, "the paid environment must reject anonymous POSTs");
+}
+const { cases, rules } = loadGameData();
+const translations = {};
+for (const id of Object.keys(cases)) {
+	const catalog = new URL("../game/data/lang/zh/cases/" + id + ".json", import.meta.url);
+	Object.assign(translations, JSON.parse(fs.readFileSync(catalog, "utf8")).strings);
+}
+const visits = [["kip","en"],["priya","zh"],["ozzie","en"],["lux","zh"],["dana","en"],["bo","zh"]];
+const session = randomUUID();
+const usage = [], casesSeen = [];
+let reserved = 0, spentBound = 0;
+const maxNanoUsd = 10_000_000; // USD 0.01 in billionths of a dollar
+// The highest standard input rate is a cache write ($0.125/M). Reserve a further 10% for regional pricing.
+const inputNanoUsd = 138;
+const outputNanoUsd = 550;
+const fd = fs.openSync(ledger, "wx"); // Reserve a fresh ledger exclusively. A rerun cannot reset it.
+function record(row) { fs.writeSync(fd, JSON.stringify(row) + "\n"); fs.fsyncSync(fd); }
+try {
+	for (const [i, [id, language]] of visits.entries()) {
+		const c = cases[id], zh = language === "zh";
+		const q = c.topics.find(t => t.id === "sleep") || c.topics[0];
+		const speech = c.signs.speech[i % 2 ? "broken" : "normal"][0];
+		const temper = c.signs.temper[i % 3 ? "normal" : "broken"][0];
+		const hearing = { patience: c.patience, patience_max: c.patience, granted: [], refusals: {}, reassured: [], claims: [], asked: {}, press_count: 0, reassure_used: 0, history: [] };
+		const history = c.opening.map(text => ({ role:"patient", text:zh ? (translations[text] || text) : text }));
+		const actions = [
+			{ type:"check", id:"grip", text:zh ? "请握一下把手。" : "Please hold the handle." },
+			{ type:"ask", id:q.id, outcome:q.first[0] === "deflect" ? "deflect" : "answer", text:zh ? (translations[q.q] || q.q) : q.q },
+			{ type:"say", id:"free", text:zh ? "想聊聊音乐吗？" : "Would you like to talk about music?" },
+			{ type:"press", id:"challenge", text:zh ? "请你说清楚。" : "Give me a straight answer." },
+		];
+		const signs = {};
+		for (const [j, event] of actions.entries()) {
+			if (event.outcome === "answer") signs.speech = !speech.evidence?.length || speech.evidence.includes(q.id) ? speech.id : c.signs.speech.normal[0].id;
+			if (event.type === "press") signs.temper = temper.id;
+			const body = { protocol:PROTOCOL, session_id:session, visit_id:session + "-" + i, case_id:id, case_version:c.version,
+				language, state:hearing, signs, event, conversation_history:history };
+			const checked = validateRequest(body, cases);
+			assert.ok(checked.ok);
+			const prompt = buildPrompt(c,rules,checked.req,zh ? 55 : 110);
+			// Each UTF-8 byte can take at most one token. Include the schema and framing, then reserve the full output limit.
+			const inputBound = Buffer.byteLength(JSON.stringify(prompt)) + 512;
+			const worst = inputBound * inputNanoUsd + DEFAULT_LIMITS.maxOutputTokens * outputNanoUsd;
+			if (reserved >= 24 || spentBound + worst > maxNanoUsd) throw Error("Authorized checkpoint limit reached.");
+			const meta = { index:++reserved, case_id:id, language, event:event.type };
+			record({ ...meta, stage:"reserved", max_nano_usd:worst });
+			const started = performance.now();
+			const response = await fetch(new URL("/v1/patient-dialogue",base), { method:"POST", redirect:"error",
+				headers:{ "content-type":"application/json", ...(live ? {authorization:"Bearer " + token} : {}) },
+				body:JSON.stringify(body), signal:AbortSignal.timeout(9000) });
+			const data = await response.json();
+			const latency = Math.round(performance.now() - started);
+			const input = data.meta?.usage?.input_tokens, output = data.meta?.usage?.output_tokens;
+			const measured = Number.isSafeInteger(input) && input >= 0 && Number.isSafeInteger(output) && output >= 0;
+			spentBound += measured ? input * inputNanoUsd + output * outputNanoUsd : worst;
+			record({ ...meta, stage:"response", status:response.status, code:response.ok ? "ok" : data.error?.code, latency_ms:latency,
+				request_id:data.meta?.request_id, input_tokens:input ?? null, output_tokens:output ?? null });
+			if (!response.ok) throw Error("Checkpoint stopped after HTTP " + response.status + " (" + (data.error?.code || "unknown") + ").");
+			assert.equal(data.meta.mock, !live);
+			assert.ok(measured);
+			assert.ok(typeof data.reply === "string" && data.reply.length > 0);
+			usage.push({ latency, input, output });
+			history.push({role:"doctor",text:event.text});
+			if (data.reaction) history.push({role:"reaction",text:data.reaction});
+			history.push({role:"patient",text:data.reply});
+			if (j === 0) {
+				hearing.patience -= rules.costs.check;
+				if (data.cooperates) hearing.granted.push("grip"); else hearing.refusals.grip = 1;
+			} else if (j === 1) {
+				hearing.asked[q.id] = 1; hearing.patience -= rules.costs.ask;
+			}
+		}
+		casesSeen.push(id);
+	}
+	const latencies = usage.map(r=>r.latency).sort((a,b)=>a-b);
+	const input = usage.reduce((n,r)=>n+r.input,0), output = usage.reduce((n,r)=>n+r.output,0);
+	const summary = { mode, protocol:PROTOCOL, provider:info.provider, model:info.model, dialogue:reserved, transcriptions:0, cases:casesSeen,
+		input_tokens:input, output_tokens:output, estimated_usd:(input*100+output*500)/1e9, conservative_usd:spentBound/1e9,
+		median_ms:(latencies[11]+latencies[12])/2, p90_ms:latencies[21], max_ms:latencies.at(-1) };
+	fs.writeFileSync(path.join(root,"summary.json"), JSON.stringify(summary,null,2) + "\n");
+	console.log(JSON.stringify(summary));
+} finally {
+	fs.closeSync(fd);
+}

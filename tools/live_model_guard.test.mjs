@@ -5,6 +5,13 @@ import os from "node:os";
 import path from "node:path";
 import { createTestGuard, guardedProvider, safeLog, latencySummary } from "./live_model_guard.mjs";
 
+test("the historical supervised guard cannot spend on intent", async (t) => {
+  const { guard } = fixture(t);
+  const base = { generate: () => assert.fail("unexpected upstream call") };
+  await assert.rejects(guardedProvider(base, guard).generate({ intent: true }, new AbortController().signal), /test_route_not_authorized/);
+  assert.equal(guard.state().dialogue, 0);
+});
+
 function fixture(t) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "btc-guard-test-"));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));

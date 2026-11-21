@@ -1,16 +1,13 @@
 extends RefCounted
 ## Autonomous character dialogue with an explicitly labelled offline comparison/fallback.
-## Only the fallback uses ScriptedBrain. Successful model speech is never replaced.
+## The visit owns settled outcomes. ASK can use its authored answer in either mode.
 
 const ScriptedBrain = preload("res://scripts/core/scripted_brain.gd")
 const ResponseValidator = preload("res://scripts/core/move_validator.gd")
 const Lang = preload("res://scripts/core/lang.gd")
-const GAME_VERSION := "0.3.0"
+const GAME_VERSION := "0.4.0"
 const MAX_HISTORY := 48          # turns kept for the model: a whole visit at the call cap
-## The sheet rows whose sign tonight changes how the patient talks and reacts (agent_proxy
-## core.mjs MODEL_ROWS). A request names tonight's sign of each; the proxy gives the model that
-## sign's sentence. The readings of the other rows are the game's and are not sent.
-const MODEL_ROWS := ["speech", "temper"]
+const PROTOCOL := "4"
 
 var rules: Dictionary = {}
 var client: Variant = null
@@ -26,6 +23,8 @@ var languages: Dictionary = {}   # rules.json agent.languages: other numbers in 
 var calls_this_visit: int = 0
 var fallbacks_this_visit: int = 0
 var max_voice_clips: int = 24    # push-to-talk clips sent for their words, per visit
+var intents_this_visit: int = 0
+var max_intents: int = 16
 var voice_clips_this_visit: int = 0
 var last: Dictionary = {}
 var conversation_history: Array = []
@@ -36,6 +35,7 @@ func _init(p_rules: Dictionary = {}, p_client: Variant = null, p_seed: int = 0) 
 	rules = p_rules
 	client = p_client
 	var limits: Dictionary = rules.get("agent", {})
+	max_intents = int(limits.get("intent", {}).get("max_calls_per_visit", 16))
 	max_calls = int(limits.get("max_model_calls_per_visit", 16))
 	max_line_chars = int(limits.get("max_line_chars", 110))
 	max_reply_chars = maxi(max_line_chars, int(limits.get("max_reply_chars", 220)))
@@ -73,6 +73,7 @@ func begin_visit(p_case: Dictionary, p_visit_id: String, p_seed: int) -> void:
 	calls_this_visit = 0
 	fallbacks_this_visit = 0
 	voice_clips_this_visit = 0
+	intents_this_visit = 0
 	last = {}
 	conversation_history = []
 	# the history is what the doctor saw: the authored lines in the player's language
@@ -82,10 +83,13 @@ func begin_visit(p_case: Dictionary, p_visit_id: String, p_seed: int) -> void:
 
 
 ## fallback_options are ONLY for the offline script; never sent to or checked against AI.
-func decide(event: Dictionary, state: Dictionary, fallback_options: Array = []) -> Dictionary:
+func decide(event: Dictionary, state: Dictionary, fallback_options: Array = [], signs: Dictionary = {}, fallback: String = "") -> Dictionary:
 	var base := {"event": event.duplicate(), "move": "", "line": "", "reply": "", "reaction": "",
 		"source": "script", "fallback_reason": "", "latency_ms": 0, "meta": {}}
-	if mode != "model" or client == null:
+	if fallback != "" and mode == "model":
+		base.fallback_reason = fallback
+		return _with_script(base, event, state, fallback_options, true)
+	if mode != "model" or client == null or (event.get("type") == "ask" and rules.get("agent", {}).get("ask_answers", "authored") == "authored"):
 		return _with_script(base, event, state, fallback_options, false)
 	if calls_this_visit >= max_calls:
 		base["fallback_reason"] = "call_cap"
@@ -93,7 +97,7 @@ func decide(event: Dictionary, state: Dictionary, fallback_options: Array = []) 
 	calls_this_visit += 1
 	var generation := _generation
 	var started := Time.get_ticks_msec()
-	var resp: Dictionary = await client.request_move(build_payload(event, state))
+	var resp: Dictionary = await client.request_move(build_payload(event, state, signs))
 	if generation != _generation:
 		return {}
 	base["latency_ms"] = Time.get_ticks_msec() - started
@@ -101,7 +105,7 @@ func decide(event: Dictionary, state: Dictionary, fallback_options: Array = []) 
 		base["fallback_reason"] = str(resp.get("error", "error"))
 		return _with_script(base, event, state, fallback_options, true)
 	var data: Variant = resp.get("data")
-	var checked := ResponseValidator.validate(data, reply_chars(), str(event.get("type")) == "check")
+	var checked := ResponseValidator.validate(data, reply_chars(), str(event.get("type")) == "check", str(event.get("outcome", "")))
 	if not bool(checked.get("ok", false)):
 		base["fallback_reason"] = "invalid:" + str(checked.get("reason"))
 		return _with_script(base, event, state, fallback_options, true)
@@ -113,6 +117,8 @@ func decide(event: Dictionary, state: Dictionary, fallback_options: Array = []) 
 	if str(event.get("type")) == "check":
 		base["cooperates"] = checked.cooperates
 		base["move"] = "comply" if bool(checked.cooperates) else "stall"
+	elif event.get("type") == "ask":
+		base["move"] = str(event.outcome)
 	else:
 		base["move"] = "dialogue"
 	last = base
@@ -187,27 +193,42 @@ func transcribe(wav: PackedByteArray) -> Dictionary:
 
 
 func build_voice_payload(wav: PackedByteArray) -> Dictionary:
-	return {"protocol": "3", "session_id": session_id, "visit_id": visit_id, "language": Lang.code,
+	return {"protocol": PROTOCOL, "session_id": session_id, "visit_id": visit_id, "language": Lang.code,
 		"audio": {"mime": "audio/wav", "data": Marshalls.raw_to_base64(wav)},
 		"client": {"game": "before-the-cut", "version": GAME_VERSION}}
 
 
-## Tonight's sign of each of MODEL_ROWS, {row: sign id}, from the night's case (case_db.gd
-## compose lists the signs it was made with). A case that names none gives {}, which the proxy
-## refuses, so the patient falls back to its offline lines.
-func model_signs() -> Dictionary:
-	var out := {}
-	var signs: Dictionary = case_data.get("signs", {}) if typeof(case_data.get("signs")) == TYPE_DICTIONARY else {}
-	for row in MODEL_ROWS:
-		if typeof(signs.get(row)) == TYPE_STRING:
-			out[row] = str(signs[row])
-	return out
+## Classify only the doctor's line. The intent route never receives a sign, state or history.
+func classify(text: String) -> Dictionary:
+	var fallback := {"topic": ScriptedBrain.topic_for_text(case_data, text), "source": "script", "reason": ""}
+	if mode != "model" or client == null:
+		return fallback
+	fallback.source = "fallback"
+	if calls_this_visit >= max_calls or intents_this_visit >= max_intents or not client.has_method("request_intent"):
+		fallback.reason = "call_cap" if calls_this_visit >= max_calls or intents_this_visit >= max_intents else "not_configured"
+		return fallback
+	var generation := _generation
+	intents_this_visit += 1
+	var payload := {"protocol": PROTOCOL, "session_id": session_id, "visit_id": visit_id, "case_id": case_data.id,
+		"case_version": case_data.version, "language": Lang.code, "text": text}
+	var response: Dictionary = await client.request_intent(payload)
+	if generation != _generation:
+		return {}
+	if response.get("ok") == true:
+		var about: Variant = response.get("data", {}).get("about")
+		if about == "none":
+			return {"topic": "", "source": "model", "reason": ""}
+		for item in case_data.get("topics", []):
+			if item.id == about:
+				return {"topic": about, "source": "model", "reason": ""}
+	fallback.reason = str(response.get("error", "invalid_intent"))
+	return fallback
 
 
-func build_payload(event: Dictionary, state: Dictionary) -> Dictionary:
-	return {"protocol": "3", "session_id": session_id, "visit_id": visit_id,
+func build_payload(event: Dictionary, state: Dictionary, signs: Dictionary = {}) -> Dictionary:
+	return {"protocol": PROTOCOL, "session_id": session_id, "visit_id": visit_id,
 		"case_id": str(case_data.get("id", "")), "case_version": int(case_data.get("version", 2)),
-		"signs": model_signs(),
+		"signs": signs.duplicate(),
 		"event": event.duplicate(true), "state": state.duplicate(true),
 		"conversation_history": conversation_history.duplicate(true),
 		"language": Lang.code,

@@ -695,6 +695,9 @@ func staged_thinking(who: String, question: int) -> void:
 	var stand_in := StandInClient.new()
 	stand_in.tree = self
 	stand_in.hold = 3.0
+	var real_rules: Dictionary = main.agent.rules
+	main.agent.rules = real_rules.duplicate(true)
+	main.agent.rules["agent"]["ask_answers"] = "model"
 	main.agent.client = stand_in
 	main.agent.set_mode("model")
 	if not main.dialogue.has_menu():
@@ -711,6 +714,7 @@ func staged_thinking(who: String, question: int) -> void:
 	await shot(who + "-staged-thinking-hint")
 	reached(await d.until(func() -> bool: return not main._thinking and not main._lock, 10.0),
 		who + ": the authored patient answers after all")
+	main.agent.rules = real_rules
 	main.agent.client = real_client
 	main.agent.set_mode(real_mode)
 	reached(main.agent.mode == real_mode, who + ": the visit goes on as it was")

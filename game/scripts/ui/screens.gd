@@ -681,9 +681,6 @@ func _draw_finding(x0: float, x1: float, y: float, row: Dictionary) -> void:
 	if mark != null:
 		draw_texture(mark, Vector2(x0 + 50.0, y))
 	var x := x0 + FINDING_X
-	if str(row.get("assessment", "")) == "reported":
-		_finding_text(x, x1, y, "PATIENT SAID", Gfx.INKS, Gfx.printable(Lang.t(str(row.get("text", "")))), "")
-		return
 	var ok := bool(row.get("ok", true))
 	var truth := Gfx.tex("ui/truth_ok.png" if ok else "ui/truth_bad.png")
 	if truth != null:

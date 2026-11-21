@@ -93,7 +93,7 @@ try {
         $info.EnvironmentVariables['BTC_PORT'] = '0'
         if ($Patient -eq 'live') {
             $limits = (Get-Content -LiteralPath (Join-Path $gameDir 'data/rules.json') -Raw -Encoding UTF8 | ConvertFrom-Json).agent
-            Write-Host "Live patient dialogue and microphone transcription cost money. The process cap is $($limits.max_provider_calls_per_process) provider calls."
+            Write-Host "Live patient dialogue, topic classification and microphone transcription cost money. The process cap is $($limits.max_provider_calls_per_process) provider calls."
             if ((Read-Host 'Type LIVE to start the paid local service') -cne 'LIVE') { throw 'Live launch cancelled.' }
             $info.Arguments = '--env-file-if-exists=.dev.vars src/dev_server.mjs'
         } else {
@@ -114,7 +114,7 @@ try {
         $AgentUrl = "http://127.0.0.1:$port"
         $health = Invoke-RestMethod -Uri "$AgentUrl/healthz" -TimeoutSec 2
         $expectsMock = $Patient -ne 'live'
-        if ($health.protocol -ne '3' -or $health.disabled -or ($health.provider -eq 'mock') -ne $expectsMock) {
+        if ($health.protocol -ne '4' -or $health.disabled -or ($health.provider -eq 'mock') -ne $expectsMock) {
             throw 'Patient service health does not match the requested mode.'
         }
         $Model = $true

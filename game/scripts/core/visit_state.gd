@@ -24,8 +24,8 @@ extends RefCounted
 ## back with the call-out, and the bill for work on a patient who drifted (credits_for() less
 ## counter_credits_for()).
 ## This class owns the truth, the evidence, patience, attacks and the result. The patient
-## AI supplies original dialogue and decides exam cooperation. The offline script alone
-## uses authored move choices. Physical test readings, scoring and attack timing stay here.
+## AI supplies dialogue and may decide a first open instrument request. Authored case rules
+## settle subsequent access and question outcomes. Physical readings, scoring and attacks stay here.
 ##
 ## Notes are written in the player's language as they are taken (scripts/core/lang.gd): the
 ## words a reading or a reply is filled into are translated first.
@@ -56,7 +56,6 @@ var reassured: Dictionary = {}   # tool -> true: a refusal cleared by reassuranc
 var claims: Array = []           # claim ids the patient has offered
 var asked: Dictionary = {}       # topic id -> times asked
 var answered: Dictionary = {}    # topic id -> true
-var has_generated_speech: bool = false
 var last_recorded_speech: String = ""  # memory only; never written to the event log
 var press_count: int = 0
 var reassure_left: int = 0
@@ -129,21 +128,16 @@ func add_note(row: String, key: String, text: String) -> bool:
 		return false
 	var list: Array = notes[row]
 	for n in list:
-		if str(n["key"]) == key or str(n["text"]) == text:
+		if str(n["key"]) == key:
+			if row == "speech":
+				n["text"] = text  # A free repeat can yield a new quote for the same topic.
+			return false
+		if row != "speech" and str(n["text"]) == text:
 			return false
 	list.append({"key": key, "text": text})
 	while list.size() > MAX_NOTES_PER_ROW:
-		list.remove_at(_oldest_talk(list))
+		list.pop_front()
 	return true
-
-
-## Which note leaves a full row: remembered small talk goes before evidence does. A long
-## conversation must not push a test result or a press reaction off the card.
-static func _oldest_talk(list: Array) -> int:
-	for i in list.size() - 1:      # never the note that was just written
-		if str(list[i]["key"]).begins_with("dialogue:"):
-			return i
-	return 0
 
 
 func is_drifting() -> bool:
@@ -255,12 +249,22 @@ func check_cost(tool: String) -> int:
 	return c
 
 
-func legal_moves_for_check(tool: String) -> Array:
-	if granted.has(tool) or reassured.has(tool):
-		return ["comply"]
+func check_outcome(tool: String) -> String:
+	if granted.has(tool) or reassure_used > 0:
+		return "grant"
 	var spec: Dictionary = case_data.get("checks", {}).get(tool, {})
-	if int(refusals.get(tool, 0)) > 0:
-		return ["comply"] if str(spec.get("insist", "comply")) == "comply" else ["stall"]
+	if str(spec.get("insist", "comply")) == "refuse":
+		return "refuse"
+	return "grant" if int(refusals.get(tool, 0)) > 0 else ""
+
+
+func legal_moves_for_check(tool: String) -> Array:
+	var fixed := check_outcome(tool)
+	if fixed == "grant":
+		return ["comply"]
+	if fixed == "refuse":
+		return ["stall"]
+	var spec: Dictionary = case_data.get("checks", {}).get(tool, {})
 	var out: Array = []
 	var all_claims: Dictionary = case_data.get("claims", {})
 	for m in spec.get("first", ["comply"]):
@@ -291,7 +295,7 @@ func apply_check(tool: String, move: String, autonomous: bool = false) -> Dictio
 		res["result"] = "spent"
 		return res
 	var legal := legal_moves_for_check(tool)
-	if not autonomous and not legal.has(move):
+	if (not autonomous or check_outcome(tool) != "") and not legal.has(move):
 		move = str(legal[0])
 		res["move"] = move
 	patience -= cost
@@ -342,29 +346,22 @@ func release_ms() -> int:
 
 
 # ------------------------------------------------------------------ talk
-## Record actual speech, not a prewritten answer or an inferred diagnosis.
-func apply_dialogue(topic_id: String, reply: String, reaction: String = "") -> Dictionary:
-	var cost := ask_cost(topic_id)
-	if phase != Phase.EXAM:
-		return {"result": "closed"}
-	if patience < cost:
-		return {"result": "spent"}
-	patience -= cost
-	asked[topic_id] = int(asked.get(topic_id, 0)) + 1
-	answered[topic_id] = true
-	seen["ask:" + topic_id] = true
-	has_generated_speech = true
-	last_recorded_speech = reply
-	var key := "dialogue:%s:%d" % [topic_id, int(asked[topic_id])]
-	add_note("speech", key, Lang.tf("Says: %s", [Lang.t(reply)]))
-	if reaction != "":
-		add_note("temper", key, Lang.tf("Reaction: %s", [reaction]))
-	_note("ask:%s:dialogue" % topic_id)
-	return {"result": "answered", "line": reply, "move": "dialogue", "cost": cost}
+## Which signs a dialogue request has earned, including the action being answered now.
+func open_signs(event: Dictionary = {}) -> Dictionary:
+	var result := {}
+	var signs: Dictionary = case_data.get("signs", {})
+	var id := str(event.get("id", ""))
+	var will_answer: bool = event.get("type") == "ask" and event.get("outcome") == "answer" and not topic(id).is_empty() and patience >= ask_cost(id)
+	var evidence: Array = case_data.get("rows", {}).get("speech", {}).get("evidence", [])
+	if signs.has("speech") and (not answered.is_empty() or will_answer):
+		result["speech"] = signs.speech if row_seen("speech") or (will_answer and evidence.has("ask:" + id)) else case_data.get("normal_speech_sign", "")
+	if signs.has("temper") and (row_seen("temper") or event.get("type") == "press"):
+		result["temper"] = signs.temper
+	return result
 
 
 func ask_cost(topic_id: String) -> int:
-	return 0 if answered.has(topic_id) else _cost("ask")
+	return 0 if topic(topic_id).is_empty() or answered.has(topic_id) else _cost("ask")
 
 
 func legal_moves_for_ask(topic_id: String) -> Array:
@@ -380,7 +377,7 @@ func legal_moves_for_ask(topic_id: String) -> Array:
 
 
 ## result: "answered" | "deflected" | "spent" | "closed"
-func apply_ask(topic_id: String, move: String) -> Dictionary:
+func apply_ask(topic_id: String, move: String, spoken: String = "") -> Dictionary:
 	var res := {"result": "closed", "topic": topic_id, "move": move, "cost": 0, "line": "", "new": false}
 	var t := topic(topic_id)
 	if phase != Phase.EXAM or t.is_empty():
@@ -402,9 +399,9 @@ func apply_ask(topic_id: String, move: String) -> Dictionary:
 		answered[topic_id] = true
 		seen["ask:" + topic_id] = true
 		res["result"] = "answered"
-		res["line"] = str(t.get("a", ""))
+		res["line"] = spoken if spoken != "" else str(t.get("a", ""))
 		last_recorded_speech = str(res["line"])
-		res["new"] = add_note("speech", "ask:" + topic_id, str(t.get("note", "")))
+		res["new"] = add_note("speech", "ask:" + topic_id, Lang.tf("Says: %s", [Lang.t(last_recorded_speech)]))
 	_note("ask:%s:%s" % [topic_id, move])
 	return res
 
@@ -805,13 +802,8 @@ func settlement() -> Dictionary:
 			"seen": row_seen(row),
 			"mark": int(marks.get(row, 0)),
 		}
-		# An autonomous answer may evade the authored clue entirely. Do not quote the
-		# script as if it was heard, or turn a patient's claim into a physical reading.
-		if row == "speech" and has_generated_speech:
-			finding["assessment"] = "reported"
-			finding["ok"] = null
+		if row == "speech" and last_recorded_speech != "":
 			finding["text"] = last_recorded_speech
-			finding["seen"] = true
 		rows.append(finding)
 	return {
 		"case_id": str(case_data.get("id", "")),

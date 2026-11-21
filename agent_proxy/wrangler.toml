@@ -36,6 +36,7 @@ type = "durable-object"
 storage = "sqlite"
 
 [env.live.vars]
+BTC_CHECK_ONLY = "1"
 BTC_PROVIDER = "openai"
 BTC_DAILY_BUDGET = "30"
 BTC_DISABLED = "1"

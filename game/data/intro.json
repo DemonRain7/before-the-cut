@@ -169,7 +169,7 @@
       "lines": [
         "The mouse does everything. Right click or ESC puts back what is in your hand.",
         "H or F1: the COUNTER GUIDE, at any time of the night. R: the sheet. L: the list. N: the card. C: the camera. G: glass.",
-        "T types a line to the visitor. With the patient AI running, hold TAB to speak it.",
+        "T types a line. Hold TAB for voice with AI. Asking a listed question costs the ASK price. Small talk is free. CTRL+ENTER sends a PRESS.",
         "SPACE: the shutter. Outside an attack it asks first, so press twice; during one, once is enough.",
         "ENTER buzzes the next visitor in. K ends the first night's training. M mutes; F11 switches full screen.",
         "SETTINGS on the title card: the language, the blood, the sound and the screen."
@@ -252,7 +252,7 @@
       "phase": "exam",
       "until": "next",
       "area": "talk",
-      "text": "TALK: ASK costs {ask_cost}. PRESS costs {press_cost} and tests temper; a second PRESS takes every lamp. CALM gives {calm_gain} back for {calm_cost} credits."
+      "text": "ASK or type a question: {ask_cost}. Small talk is free. PRESS tests temper for {press_cost}. Press again and every lamp goes. CALM: +{calm_gain} for {calm_cost} credits."
     },
     {
       "id": "marks",

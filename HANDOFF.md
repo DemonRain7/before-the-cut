@@ -1,6 +1,31 @@
 # Before the Cut: handoff
 
-## Active checkpoint, November 21, 2026 — patient agent P0
+## Active checkpoint, November 21, 2026 — patient agent P1
+
+**P1 is implemented, including fix 4 of the play-logic review.** The student approved D1–D3 and the proposed public mock, live configuration and paid check, including redeployments for that check. Rules version 11 and protocol 4 are active in Godot and the proxy. The earlier P0 entry below records the state before these decisions.
+
+A typed or confirmed spoken question uses the same ASK, patience, evidence and first dodge as the menu. Small talk is free and leaves the record alone. CTRL+ENTER sends the player's words as PRESS. SPEECH and TEMPER enter the prompt as the player earns them. ASK uses authored answers by default, and either answer mode remembers the exchange. A sealed instrument, insisting and CALM follow the case. Rook's authored exception lets him answer the first mood question immediately after CALM. The final PRESS keeps the case's authored ending.
+
+| Working-checkout check | P0 | P1 |
+| --- | ---: | ---: |
+| Rules | 1,193 | 2,025 |
+| UI, English / Chinese / reduced blood | 1,184 / 1,185 / 1,184 | 1,184 / 1,185 / 1,184 |
+| Proxy tests | 47 | 52 |
+| Godot HTTP / wire assertions | 312 / 96 | 334 / 100 |
+| Lines measured per language, zero problems | 1,620 | 1,623 |
+| Hidden renderer, English / Chinese | 447 / 447 | 447 / 447 |
+
+All these checks passed. The paid-session guard passed its seven tests. On the working checkout the fresh import, both boots, preferences, close, translation and static checks passed. All four dry captures reached their expected 447/447/334/235 moments. Public Worker health and mock tests are recorded in the [November 21 checkpoint](docs/development/live-model-results-2026-11-21.md). A public headless game showed the forced timeout in 3,836 ms. The local equivalent took 3,567 ms. Twenty-four synthetic dialogues passed on the public mock. Genuine provider requests and cost for this build are both zero. Nobody has played it or tested a physical microphone.
+
+An independent export of the proposed commit also passed a cold import, 2,025 rule checks, 1,170 English and 1,171 Chinese scene checks, 334 Godot HTTP and 100 wire assertions, 52 proxy and seven guard tests. It measured 1,621 lines per language with zero problems. The higher working-checkout scene and text totals include the pre-existing November 21 flow edits. Evidence is under `validation/2026-11-21/patient-agent/p1/release-*.log`.
+
+### Next three tasks
+
+1. Use the student's interactive Wrangler login to publish persistent public services and repeat the mock isolation and timeout probes. The one-hour Cloudflare preview passed in all three environments. The course materials accessible here did not identify the instructor's template or independently confirm the November 23 rubric.
+2. On the persistent, disabled live Worker, the student enters the OpenAI project key at the hidden prompt and enables the monthly hard spend limit. The public preview had the kill switch on, returned 503 on POST and contained no provider key.
+3. Use the [private checkpoint procedure](agent_proxy/README.md#deployment-and-rollback) for the approved six visits, 24 dialogues maximum, zero transcriptions and a USD 0.01 ceiling. Record real usage and latency and restore the disabled Worker. The old November 15 ledger is closed. Future phases and their design decisions remain separate.
+
+## Historical checkpoint, November 21, 2026 — patient agent P0
 
 **P0 is complete locally.** Protocol 3 and rules version 10 are in use. The next external milestone is one model call through a deployed service. Deployment, live credentials and a paid check await three independent decisions. The instructor's Worker template and the November 23 rubric have not been confirmed. The earlier November 21 findings below describe the tree before P0.
 

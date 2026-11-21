@@ -46,22 +46,41 @@ function sleep(ms, signal) {
 	});
 }
 
+function mockIntent(topics, text) {
+	const line = text.trim().toLowerCase();
+	if (/^(show|let me|please show)|看一下|让我看|给我看/.test(line)) return "none";
+	const words = line.match(/[a-z]+/g) || [];
+	const chinese = { why: ["为什么来", "怎么了"], sleep: ["睡", "失眠", "休息"], implant: ["不听使唤", "义体"], chrome: ["义体", "零件"], mood: ["心情", "生气"] };
+	let chosen = "none", highest = 0;
+	for (const { id, q, keys } of topics) {
+		if (line === q.toLowerCase()) return id;
+		const score = (keys || []).filter(key => words.includes(key)).length + (chinese[id] || []).filter(key => line.includes(key)).length;
+		if (score > highest) { highest = score; chosen = id; }
+	}
+	return chosen;
+}
+
 /** Synthetic transport fixture. Not intelligent, not a scripted patient comparison. */
 export function createMockProvider({ fail = "" } = {}) {
 	return {
-		name: "mock", model: "mock-dialogue-3",
-		async generate({ req }, signal) {
+		name: "mock", model: "mock-dialogue-4",
+		async generate({ req, intent, topics }, signal) {
 			if (fail === "timeout") await waitUntilAborted(signal);
 			if (fail.startsWith("slow:")) await sleep(Number(fail.slice(5)) || 0, signal);
 			if (fail === "http_error") throw new ProviderError("http_503");
+			if (intent) {
+				const about = fail === "invalid_shape" ? "unknown" : mockIntent(topics, req.text);
+				return { text: fail === "invalid_json" ? "not JSON" : JSON.stringify({ about }), model: "mock-intent-4", mock: true };
+			}
 			let answer = req && req.language === "zh"
 				? { reply: "继续之前，你能先说说这对我的夜班意味着什么吗？", reaction: "盯着医生，掂量这个回答。", cooperates: true }
 				: { reply: "Before we go on, will you explain what this means for my night shift?", reaction: "Watches the doctor, weighing the answer.", cooperates: true };
+			if (req?.event?.outcome) answer.cooperates = ["grant", "answer"].includes(req.event.outcome);
 			if (fail === "long_line") answer.reply = "word ".repeat(80);
 			if (fail === "invalid_shape") answer.reply = 42;
 			if (fail === "readout_line") answer.reply = "My pupils look fine to me. Could the grip reading be wrong?";
 			const text = fail === "invalid_json" ? "not JSON" : JSON.stringify(answer);
-			return { text, model: "mock-dialogue-3", usage: { input_tokens: 0, output_tokens: 0 }, mock: true };
+			return { text, model: "mock-dialogue-4", usage: { input_tokens: 0, output_tokens: 0 }, mock: true };
 		},
 		// The mock cannot hear. It returns one fixed, clearly labelled sentence for any clip.
 		async transcribe(clip, signal) {
@@ -278,6 +297,7 @@ export function createOpenAIProvider({ model, sttModel = "gpt-4o-mini-transcribe
 				text: { format: { type: "json_schema", name: "patient_turn", schema: toOpenAISchema(schema), strict: true } },
 				max_output_tokens: maxOutputTokens + REASONING_ALLOWANCE[effort],
 				store: false,
+				service_tier: "default", // Match the standard rates used for the patient budget.
 			};
 			if (effort !== "") body.reasoning = { effort };
 			const data = await send("/responses", { headers: { ...auth, "content-type": "application/json" }, body: JSON.stringify(body) }, signal);

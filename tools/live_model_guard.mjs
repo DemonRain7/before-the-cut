@@ -58,6 +58,7 @@ export function guardedProvider(base, guard) {
   const provider = { ...base };
   for (const [method, route] of [["generate", "dialogue"], ["transcribe", "transcribe"]]) {
     provider[method] = async (input, signal) => {
+      if (input.intent) throw new ProviderError("test_route_not_authorized");
       let reservation;
       try { reservation = guard.reserve(route); } catch { throw new ProviderError("test_paused_or_capped"); }
       const abort = () => guard.finish(504, reservation);
@@ -70,7 +71,7 @@ export function guardedProvider(base, guard) {
             const answer = JSON.parse(String(result.text).trim());
             // Reuse the core's exact shape check before unlocking the first-call review.
             if (!validateResponse(answer, Math.max(input.maxLineChars, DEFAULT_LIMITS.maxReplyChars),
-              input.req.event.type === "check").ok) status = 422;
+              input.req.event.type === "check", input.req.event.outcome).ok) status = 422;
           } catch { status = 422; }
         }
         guard.finish(status, reservation);

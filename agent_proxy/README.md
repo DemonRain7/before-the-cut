@@ -1,17 +1,8 @@
-# Patient dialogue proxy — protocol 3
+# Patient dialogue proxy — protocol 4
 
-This server gives the patient model its character background, the player's current action
-and the recent conversation. The model generates its own spoken reply and visible reaction.
-There is no answer bank, legal-move enum or substitution of an authored line after generation.
+The proxy gives the patient its character, the doctor's action, the conversation and the signs earned during this visit. The patient writes dialogue and visible reactions. Godot chooses the case outcomes and uses authored ASK answers by default. A separate route classifies a typed or confirmed spoken line against the current case's questions.
 
-It has a second, separate job for push-to-talk: it turns one short spoken clip from the
-player into text. The text goes back to the game's typing line. It is not sent to the patient
-until the player presses ENTER.
-
-The Godot game remains playable offline using the authored comparison. Real AI requires
-a configured provider; the default proxy is a **synthetic mock**, not an intelligent patient
-and not a speech service. The mock cannot hear: it returns the same labelled sentence for any clip,
-in the language the game asks for.
+With voice enabled, push-to-talk sends a short clip for transcription. The player can edit the transcript, send it with ENTER, send it as pressure with CTRL+ENTER, or discard it. The default proxy is a synthetic mock. It produces fixture dialogue and one labelled transcript for any clip. The game can also be played offline.
 
 ## Start the patient
 
@@ -24,13 +15,13 @@ From the repository root on Windows, with Node 22.9+ and Godot 4:
 .\run-game.ps1 -Patient http://127.0.0.1:8787
 ```
 
-The first command selects the authored patient. The next two start a loopback-only Node mock on an OS-assigned port, check its health and stop that child when Godot exits. With `timeout`, open the typing line with T, type a question and press ENTER. Within the game's four-second deadline the corner reads **OFFLINE FALLBACK**, the authored patient answers and the hint gives the timeout reason. The normal mock labels its replies **MOCK TRANSPORT**. To reproduce either demonstration headlessly, add `-CheckPatient`. Each check enters a visit through the title menu and finishes at the slip.
+The first command selects the authored patient. The next two start a loopback-only Node mock on an OS-assigned port, check its health and stop that child when Godot exits. With `timeout`, open the typing line with T, type a line and use CTRL+ENTER for the first PRESS of a visit. This makes one dialogue request. Within the game's four-second deadline the corner reads **OFFLINE FALLBACK**, the authored patient answers and the hint gives the timeout reason. The normal mock labels its replies **MOCK TRANSPORT**. To reproduce either demonstration headlessly, add `-CheckPatient`. Each check enters a visit through the title menu and finishes at the slip.
 
 The address form connects to an existing service. The original `-Model -AgentUrl <address>` also works. To let the player choose in SETTINGS, pass just `-AgentUrl <address>`, or set `BTC_AGENT_URL` before launching. Address precedence is the launch argument, the environment, then `agent.default_url` in the game's rules. The shipped address is empty. PATIENT AI starts OFF and remembers a player selection. An explicit launcher mode overrides the saved preference for one run. Enabling it checks the protocol and all ten case versions with a two-second GET. The settings hint reports the result and the game offers voice only when the connected service supports it.
 
-For a separately managed Node server, run `npm run dev` from `agent_proxy`. It binds to 127.0.0.1:8787 and defaults to mock. The command uses the process environment. `-Patient live` starts the configured local provider only after the operator types `LIVE`. Node then loads the ignored credential file. Both patient replies and transcriptions can cost money and share the 2,000-attempt process cap. For the proposed 24-call course check use a separately approved, bounded test session.
+For a separately managed Node server, run `npm run dev` from `agent_proxy`. It binds to 127.0.0.1:8787 and defaults to mock. The command uses the process environment. `-Patient live` starts the configured local provider only after the operator types `LIVE`. Node then loads the ignored credential file. Patient replies, topic classifications and transcriptions share the 2,000-attempt process cap and can each incur a charge. The approved 24-dialogue course check uses the private Worker procedure below.
 
-`GET /healthz` lists protocol `"3"`, provider, model, case ids and versions, `disabled` and `speech_to_text`. Health checks use zero provider calls. An old protocol receives 409 on a POST.
+`GET /healthz` lists protocol `"4"`, provider, model, case ids and versions, `disabled` and `speech_to_text`. Health checks use zero provider calls. An old protocol receives 409 on a POST.
 
 ## Provider configuration
 
@@ -57,22 +48,19 @@ speech accuracy and the live microphone path remain unverified; Google/Vertex ha
 tested live. See [the dated report](../docs/development/live-model-results-2026-11-15.md).
 
 The local server defaults to 127.0.0.1:8787. `BTC_HOST`, `BTC_PORT`, `BTC_UPSTREAM_TIMEOUT_MS`
-and `BTC_TRANSCRIBE_TIMEOUT_MS` are configurable. The Worker uses durable counters and has been exercised under local Wrangler. The public deployment and its real CPU usage are pending.
+and `BTC_TRANSCRIBE_TIMEOUT_MS` are configurable. The Worker uses durable counters. On November 21 its public preview passed the same isolation and timeout probes as local Wrangler. Production CPU usage has not been measured.
 
-## Patient dialogue: `POST /v1/patient-dialogue`
+## Topic classification
 
-Request: `protocol: "3"`, session/visit/case identifiers, case version, tonight's `signs`,
+`POST /v1/patient-intent` accepts protocol, session, visit, case id and version, language and the typed or confirmed spoken line. Its prompt contains only the question ids, their wording and the doctor's line. The strict answer is one `about` value from that patient's question ids or `none`. The route has its own 16-attempt visit and 240-attempt session ceilings. Each attempt also uses one unit from the UTC-day budget. The upstream deadline is 2 seconds and the game waits up to 2.5 seconds. A failed classifier falls back to the offline keyword matcher.
+
+## Patient dialogue
+
+The request includes `protocol: "4"`, session/visit/case identifiers, case version, tonight's `signs`,
 `event` with `type`, `id` and the doctor's exact `text`, current visit state,
 `conversation_history`, a reply-length limit, and the player's `language`.
 
-`signs` is `{"speech": id, "temper": id}`: the sign each of those two rows shows tonight, as
-the game drew it from the case file's template (`game/data/cases/<id>.json`, `signs`). Both
-are required, no other row is accepted, and each id must be one of that row's normal or broken
-signs for this patient; anything else is refused with `400 bad_request` (message `signs`). The
-prompt adds each sign's `model` sentence after the reason for the visit (`Tonight: ...`). The
-background in `src/character_profiles.mjs` holds on any night, so whether a patient drifts
-reaches the model only through these two sentences; the other rows (eyes, hands, port) are
-the game's readings and are not sent.
+`signs` can contain `speech`, `temper`, both or neither. The game unlocks SPEECH with an answered ASK. A topic outside the broken sign's evidence list gets the character's normal sign until an informative question is answered. PRESS and flares unlock TEMPER. The proxy supplies exactly the corresponding sign sentences. An empty gate omits the entire Tonight line. Instrument readings stay in the game.
 
 `language` is `"en"` or `"zh"`, the language the player chose on the title card. A request
 without it is English; any other value is refused with `400 bad_request` (message
@@ -98,13 +86,10 @@ Response:
 }
 ```
 
-`cooperates` is required only for requested examinations. It lets the AI accept or refuse
-a tool even if the offline case's authored options differ. It never selects the spoken line.
-`reply` and `reaction` are original text. Only JSON shape, display size and control
-characters are checked. Words about symptoms, instruments or implants are allowed.
+`cooperates` is required on a tool request and whenever the game names an outcome. The patient chooses whether to cooperate on its first unsettled tool request. A named `grant` or `answer` requires true, and `refuse` or `deflect` requires false. Contradictory responses trigger scripted fallback. All ASK calls carry their outcome. The default authored ASK requires no dialogue request. The resulting exchange enters conversation history in either mode.
 Instrument readings, attack choreography and scoring are still implemented by the game.
 
-Successful replies reach the dialogue UI and patient record unchanged. Normal display
+Successful replies reach the dialogue strip. An answered ASK writes one SPEECH note for its topic. Only PRESS records a pressure reaction. Normal display
 wrapping and record-column ellipsis do not change the stored text. Failure uses an explicitly
 labelled offline fallback. Mock responses are labelled as mock transport on screen.
 
@@ -116,7 +101,7 @@ Request:
 
 ```json
 {
-  "protocol": "3",
+  "protocol": "4",
   "session_id": "1a2b3c4d",
   "visit_id": "1a2b3c4d-2-rook",
   "audio": {"mime": "audio/wav", "data": "<base64>"},
@@ -171,18 +156,18 @@ These are technical and cost limits, not an answer-selection policy. The game ho
 numbers in `game/data/rules.json` (`agent`, `agent.voice` and `agent.languages`); change both
 together. The Chinese numbers are `DEFAULT_LIMITS.languages.zh` here.
 
-| Limit | Patient lines | Push-to-talk clips |
-| --- | --- | --- |
-| Attempts per visit | 16 | 24 |
-| Attempts per session | 240 | 360 |
-| Provider attempts per UTC day | 1,500 across both routes by default | |
-| Provider attempts per local Node process | 2,000 across both routes, including across dates | |
-| Proxy deadline | 3.5 s | 6 s |
-| Game deadline | 4 s | 7 s |
-| Request size | 32 KiB | 512 KiB (10 s of audio is about 417 KiB in base64) |
-| Output | 256 tokens; reply asked at 110 characters, refused only over 220; reaction up to 110 | 256 tokens; transcript up to 300 characters |
-| Output in Chinese | reply asked at 55 characters, refused only over 110; reaction asked at 55, accepted up to 110 | the same as English |
-| History | 48 most recent entries | none: a clip carries no conversation |
+| Limit | Patient lines | Topic classification | Push-to-talk clips |
+| --- | --- | --- | --- |
+| Attempts per visit | 16 | 16 | 24 |
+| Attempts per session | 240 | 240 | 360 |
+| Proxy deadline | 3.5 s | 2 s | 6 s |
+| Game deadline | 4 s | 2.5 s | 7 s |
+| Request size | 32 KiB | 32 KiB | 512 KiB |
+| Output | 256 tokens. Reply target 110 characters, maximum 220. Reaction maximum 110. | 32 tokens. One topic id or `none`. | 256 tokens, up to 300 characters |
+| Chinese output | Reply target 55 characters, maximum 110. Reaction target 55, maximum 110. | Same topic ids | Up to 300 characters |
+| Conversation history | 48 most recent entries | None | None |
+
+The three routes share the 1,500-attempt daily default and the local Node process's lifetime limit of 2,000 attempts. The deployed live environment has a 30-attempt daily limit. A ten-second clip takes about 417 KiB in base64.
 
 Why they changed on November 14 (previously 4 calls per visit, 60 per session, 2 s / 2.5 s
 deadlines, a hard 110-character reply limit and 24 history entries):
@@ -223,7 +208,7 @@ deadlines, a hard 110-character reply limit and 24 history entries):
 
 ## Test the service
 
-`npm test` in `agent_proxy` runs on Node without Wrangler, an account or a provider key. The November 21 P0 run has **47 passing tests**. From the repository root, `node tools/run_proxy_integration.mjs <Godot-console-path> <evidence-directory>` drives the actual Godot HTTP client against local mocks. **312 game-side and 96 wire checks passed.** For each of ten characters in each language, four requests cross normal/broken SPEECH with normal/broken TEMPER. The wire checks match both sign ids and prompt sentences. Voice inputs are generated tones. These results measure transport, limits and game behavior. Live model dialogue quality and a human player's experience remain unmeasured on this build.
+`npm test` in `agent_proxy` runs on Node without Wrangler, an account or a provider key. The November 21 P1 run has **52 passing tests**. Another 7 pass in `node --test tools/live_model_guard.test.mjs` from the repository root. From the repository root, `node tools/run_proxy_integration.mjs <Godot-console-path> <evidence-directory>` drives the actual Godot HTTP client against local mocks. **334 game-side and 100 wire checks passed.** For each of ten characters in each language, four requests cross normal/broken SPEECH with normal/broken TEMPER. The wire checks match both sign ids and prompt sentences. Voice inputs are generated tones. These results measure transport, limits and game behavior. The current live-model and playtest status is recorded in the [November 21 checkpoint](../docs/development/live-model-results-2026-11-21.md).
 
 For two separate sessions the game supplies a fresh random session id and sends only the current visit's conversation with each action. The proxy constructs a fresh prompt from that request's character, signs, language and history. It stores no conversation. Each night's visit id includes the night number so a returning character starts with a fresh visit allowance.
 
@@ -260,11 +245,32 @@ For the last row, first set `$demoState = Join-Path ([IO.Path]::GetTempPath()) (
 
 The checked-in `wrangler.toml` defines three separate services. The default and `timeout` use the mock. The `live` environment names OpenAI and `gpt-6-luna`, starts disabled and has a 30-call daily ceiling. Voice is off in all three Worker environments. The local Node proxy offers voice. SQLite exports and bindings are specified for each environment. If the instructor supplies a required Worker foundation, compare its entry and bindings before the first deployment. [Cloudflare class exports](https://developers.cloudflare.com/durable-objects/reference/durable-objects-migrations/) · [Wrangler environments](https://developers.cloudflare.com/workers/wrangler/environments/)
 
-1. **Deploy the mocks after approval.** The student runs `npx --yes wrangler@4.166.0 login` interactively. From `agent_proxy`, deploy with `npx --yes wrangler@4.166.0 deploy` and `npx --yes wrangler@4.166.0 deploy --env timeout`. Use the returned addresses for the isolation and timeout probes above. Pass the timeout address to the game for the on-screen demonstration. This fits the Workers and Durable Objects free allowances at the documented demonstration volume. [Worker limits](https://developers.cloudflare.com/workers/platform/limits/) · [Durable Objects pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/)
-2. **Set up live after separate approval.** Deploy the disabled live config with `npx --yes wrangler@4.166.0 deploy --env live`. The student runs `npx --yes wrangler@4.166.0 secret put OPENAI_API_KEY --env live` and types the key at the hidden prompt. This publishes a new Worker version. Keep the key in that environment's secret store. Set the OpenAI project monthly spend limit and enable hard enforcement in the provider dashboard. Health should report disabled. [Cloudflare Worker secrets](https://developers.cloudflare.com/workers/configuration/secrets/) · [OpenAI project limits](https://help.openai.com/en/articles/9186755-managing-projects-in-the-api-platform)
-3. **Enable calls only for the approved run.** Set `BTC_DISABLED = "0"` under `[env.live.vars]` for the approved window, deploy that environment, and check its health. Keep the test to its separately authorized number of attempts. A public service with a day ceiling of 30 can still serve other traffic. A private test window or access restriction is needed to reserve those calls for the class demo. Restore the disabled setting and redeploy immediately after the run. Keep the operator's consent for any later redeployment explicit.
+The student approved both public mocks, the disabled live setup and redeployment for this check on November 21. The three services were deployed and probed on a one-hour Cloudflare preview. Durable deployment under the student's account requires Wrangler login. A temporary account can be claimed within its lifetime or replaced by deployment to the student's authenticated account. Wrangler displays the private claim link in the operator's terminal when repeating `deploy --temporary` before expiry. [Cloudflare claim deployments](https://developers.cloudflare.com/workers/platform/claim-deployments/)
+
+1. **Publish the two mocks.** From `agent_proxy`, sign in with `npx --yes wrangler@4.166.0 login`. Run `npx --yes wrangler@4.166.0 deploy --env-file .env.example` and repeat with `--env timeout`. Use the returned URLs for `node probe.mjs <mock-origin> isolation` and `node probe.mjs <timeout-origin> timeout`. Pass either URL to `run-game.ps1 -Patient <origin>`. [Worker limits](https://developers.cloudflare.com/workers/platform/limits/) · [Durable Objects pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/)
+2. **Prepare the live environment.** Deploy with `npx --yes wrangler@4.166.0 deploy --env live --env-file .env.example`. Verify `/healthz` reports disabled. Set `$liveOrigin` to that deployment's HTTPS origin. The student runs `npx --yes wrangler@4.166.0 secret put OPENAI_API_KEY --env live` and enters the project key at the hidden prompt. In that OpenAI project's Limits, set a monthly spend limit and enable hard enforcement. Provider-side enforcement can lag. The checkpoint also reserves a conservative cost before each request. [Cloudflare Worker secrets](https://developers.cloudflare.com/workers/configuration/secrets/) · [OpenAI project limits](https://help.openai.com/en/articles/9186755-managing-projects-in-the-api-platform)
+3. **Run the approved private check.** The Worker admits only authenticated dialogue POSTs during the test. The runner reserves up to 24 dialogue attempts in six visits, three per language, with zero transcription or classification requests and a USD 0.01 ceiling. It requests standard-tier `gpt-6-luna` with reasoning off. It stops at the first failure and refuses to overwrite its ledger. The generated ASK fixture exercises the service even though the normal game defaults to authored ASK. Use the following in the terminal holding `$liveOrigin`. [Model pricing](https://developers.openai.com/api/docs/models/gpt-6-luna)
+
+   ```powershell
+   $env:BTC_CHECK_TOKEN = node -p "require('node:crypto').randomBytes(32).toString('hex')"
+   try {
+       $env:BTC_CHECK_TOKEN | npx --yes wrangler@4.166.0 secret put BTC_CHECK_TOKEN --env live
+       if ($LASTEXITCODE -ne 0) { throw 'Could not store the checkpoint token.' }
+       npx --yes wrangler@4.166.0 deploy --env live --env-file .env.example --var BTC_DISABLED:0
+       if ($LASTEXITCODE -ne 0) { throw 'Live deployment failed.' }
+       node ../tools/check_patient_checkpoint.mjs live $liveOrigin ../validation/2026-11-21/patient-agent/approved-live
+       if ($LASTEXITCODE -ne 0) { throw 'Checkpoint stopped. Check the existing ledger.' }
+   } finally {
+       npx --yes wrangler@4.166.0 deploy --env live --env-file .env.example
+       Remove-Item Env:BTC_CHECK_TOKEN
+       if ($LASTEXITCODE -ne 0) { throw 'Restore the disabled configuration immediately.' }
+   }
+   ```
+
+   Confirm that `/healthz` again reports `disabled: true`. Use a fresh directory with `node ../tools/check_patient_checkpoint.mjs mock <mock-origin> <evidence-directory>` to rehearse for free.
+
 4. **Inspect and recover.** `npx --yes wrangler@4.166.0 tail --env live` streams request ids, case and session ids, result codes, latency and token counts. The service omits bodies, transcripts and replies. Start with `/healthz`, then inspect codes such as `upstream_timeout` and `budget_exhausted`. Set the kill switch in the affected environment and redeploy to stop POSTs before reading or counting them. For a code rollback use `npx --yes wrangler@4.166.0 deployments list --env live` and `npx --yes wrangler@4.166.0 rollback <known-good-version-id> --env live`. Check the restored switch and health before allowing traffic. Keep the same object bindings and data. Cloudflare restricts rollback across Durable Object class lifecycle changes. [Cloudflare rollbacks](https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/)
 
 `BTC_DAILY_BUDGET` accepts a nonnegative call count (default 1,500). `BTC_DISABLED=1` switches off all POSTs. `BTC_TRANSCRIBE=off` returns 501 before reading a clip. Positive `BTC_UPSTREAM_TIMEOUT_MS` and `BTC_TRANSCRIBE_TIMEOUT_MS` override the provider deadlines. The Worker counts actual bytes from the incoming stream, including bodies without a length header. Desktop Godot requires no CORS headers. The Worker has no Vertex service-account token exchange.
 
-November 21 evidence is local under `validation/2026-11-21/patient-agent/`. All P0 checks were computed or used mocks, including local Wrangler. The [November 15 live results](../docs/development/live-model-results-2026-11-15.md) describe an older build.
+November 21 evidence is local under `validation/2026-11-21/patient-agent/`. P1 includes computed checks, local mocks, public mock visits and a public disabled-live health check. The [November 15 live results](../docs/development/live-model-results-2026-11-15.md) describe an older build.

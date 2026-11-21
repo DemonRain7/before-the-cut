@@ -47,7 +47,7 @@ Controls and rules are in [game/README.md](game/README.md); providers, keys and 
 
 ## Design and verification
 
-The [agent manifest](agent-config.json) and [production-agent artifacts](agent_team/) describe the bounded patient agent and planned development roles. The patient AI creates original replies and reactions from its character context and conversation history. Its normal replies are not selected by a fixed rule table. An offline scripted version must remain playable.
+The [agent manifest](agent-config.json) and [production-agent artifacts](agent_team/) describe the bounded patient agent and planned development roles. The patient AI writes dialogue and reactions from the case, the conversation and the signs the player has uncovered. Typed and confirmed spoken questions follow the ASK menu rules. ASK uses the authored answer by default, and the full game is playable offline.
 
 On November 15, 2026, the first live OpenAI run completed 30 patient requests and ten transcriptions of local synthetic speech, all successful. Twelve dialogue requests were played by an agent in the real window; eighteen were HTTP probes. No human microphone, listening or playtest result is claimed. A feedback bug found during the run was fixed: generated speech now retains what the patient actually said. See the [live report](docs/development/live-model-results-2026-11-15.md).
 

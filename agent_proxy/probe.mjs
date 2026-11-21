@@ -13,7 +13,7 @@ function patient(id, language, session, visit) {
 	return {
 		protocol: PROTOCOL, session_id: session, visit_id: visit, case_id: id, case_version: c.version, language,
 		signs: { speech: c.signs.speech.normal[0].id, temper: c.signs.temper.normal[0].id },
-		event: { type: "ask", id: c.topics[0].id, text: c.topics[0].q },
+		event: { type: "ask", outcome: "answer", id: c.topics[0].id, text: c.topics[0].q },
 		conversation_history: [{ role: "doctor", text: "history-" + session }],
 		state: { patience: 5, patience_max: 6, granted: [], refusals: {}, reassured: [], claims: [],
 			asked: {}, press_count: 0, reassure_used: 0, history: [] },

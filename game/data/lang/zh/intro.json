@@ -85,7 +85,7 @@
 		"PENLIGHT: move the light onto each eye. The readout says what each did; the sheet, what its model should.": "笔灯：把光移到每只眼睛上。读数显示每只眼的反应；参照表写着该型号应有的反应。",
 		"GRIP: hold the mouse till the force gauge fills, then let go to say RELEASE. Steady lets go before the LIMIT mark.": "握力：按住鼠标直到力度表充满，再松开喊“松开”。稳定的人会在上限标记前放手。",
 		"PORT: a close look at the socket. Calm skin is fine. Dark threads spreading from it are not.": "接口：凑近看接口。皮肤正常就没事。若有黑色纹路从中蔓延，就有问题。",
-		"TALK: ASK costs {ask_cost}. PRESS costs {press_cost} and tests temper; a second PRESS takes every lamp. CALM gives {calm_gain} back for {calm_cost} credits.": "交谈：问耗 {ask_cost}。施压耗 {press_cost}，能试出脾气；第二次施压会耗光所有灯。镇静贴花 {calm_cost} 信用点，回 {calm_gain} 点。",
+		"ASK or type a question: {ask_cost}. Small talk is free. PRESS tests temper for {press_cost}. Press again and every lamp goes. CALM: +{calm_gain} for {calm_cost} credits.": "点问或打字提问耗 {ask_cost}。闲聊免费。施压耗 {press_cost}，可试出脾气。再施压会耗光所有灯。镇静贴花 {calm_cost}，回 {calm_gain}。",
 		"Tick or cross each row of the card against the sheet. Your marks help you count: nothing scores them.": "对照参照表，给卡上每一行打勾或打叉。标记只帮你计数：不计分。",
 		"Steady? Pick up TREAT and stamp the card. {threshold} broken lines mean drifting: call TRAUMA TEAM, press twice.": "稳定？拿起治疗章盖在卡上。{threshold} 项异常就是失控：叫创伤小组，按两下。",
 		"From now on a drifting patient may turn on you mid-exam. A red bar: SHUTTER [SPACE], now. A shout with no red bar is only temper.": "从现在起，失控的病人可能在检查中途对你动手。出现红条：立刻卷闸 [SPACE]。没有红条的大吼只是脾气。",
@@ -113,7 +113,7 @@
 		"KEYS": "按键",
 		"The mouse does everything. Right click or ESC puts back what is in your hand.": "鼠标就能做所有事。右键或 ESC 放下手里的东西。",
 		"H or F1: the COUNTER GUIDE, at any time of the night. R: the sheet. L: the list. N: the card. C: the camera. G: glass.": "H 或 F1：柜台指南，夜里随时可看。R：参照表。L：名单。N：接诊卡。C：监控。G：玻璃。",
-		"T types a line to the visitor. With the patient AI running, hold TAB to speak it.": "T：打字对访客说话。病人 AI 开着时，按住 TAB 用语音说。",
+		"T types a line. Hold TAB for voice with AI. Asking a listed question costs the ASK price. Small talk is free. CTRL+ENTER sends a PRESS.": "T 打字。AI 开启时按住 TAB 说话。问到列表里的问题照常扣耐心，闲聊免费。CTRL+ENTER 施压。",
 		"SPACE: the shutter. Outside an attack it asks first, so press twice; during one, once is enough.": "SPACE：卷闸。没有袭击时它会先确认，所以要按两下；袭击中按一下就够。",
 		"ENTER buzzes the next visitor in. K ends the first night's training. M mutes; F11 switches full screen.": "ENTER 放下一位访客进来。K 结束第一晚的教学。M 静音；F11 切换全屏。",
 		"SETTINGS on the title card: the language, the blood, the sound and the screen.": "标题画面的设置里可以改：语言、血腥、声音和画面。"

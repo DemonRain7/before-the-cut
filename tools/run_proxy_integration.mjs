@@ -37,12 +37,11 @@ try {
   for (const [name, fail, limits] of scenarios) {
     const mock = createMockProvider({ fail });
     const provider = { ...mock, async generate(input, signal) {
-      if (name === 'normal') prompts.push({ case_id: input.req.case_id, visit_id: input.req.visit_id, event: input.req.event,
-        language: input.req.language, matrix: input.req.session_id === 'btc-sign-matrix',
+      if (name === 'normal' && !input.intent) prompts.push({ case_id: input.req.case_id, visit_id: input.req.visit_id, event: input.req.event,
+        language: input.req.language, matrix: input.req.session_id === 'btc-sign-matrix', fair: input.req.session_id.startsWith('btc-fair-'),
         matching_prompt: ['speech', 'temper'].every(row => {
           const signs = input.caseData.signs[row];
-          const sign = [...signs.normal, ...signs.broken].find(s => s.id === input.req.signs[row]);
-          return sign && input.system.includes(sign.model);
+          return [...signs.normal, ...signs.broken].every(s => input.system.includes(s.model) === (s.id === input.req.signs[row]));
         }) && input.system.includes(input.req.language === 'zh' ? 'Reply in Simplified Chinese' : 'Reply in English.'),
         history_turns: input.req.conversation_history.length,
         doctor_turns: input.req.conversation_history.filter(t => t.role === 'doctor').map(t => t.text),
@@ -62,7 +61,7 @@ try {
     if (mode === 'outdated') roster[0].version++;
     const answer = () => {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, protocol: mode === 'protocol' ? '2' : '3', cases: roster,
+      res.end(JSON.stringify({ ok: true, protocol: mode === 'protocol' ? '3' : '4', cases: roster,
         provider: 'mock', disabled: mode === 'disabled', speech_to_text: false }));
     };
     if (mode === 'late') setTimeout(answer, 2400);
@@ -86,15 +85,13 @@ try {
   // What actually crossed the wire in the scene test: every typed line of a visit must be in
   // the requests that follow it, and a new patient must start from that patient's opening only.
   const wire = [];
-  const typed = prompts.filter(p => p.event.type === 'say');
+  const typed = prompts.filter(p => !p.fair && p.event.type === 'say');
   const byVisit = new Map();
   for (const p of typed) byVisit.set(p.visit_id, [...(byVisit.get(p.visit_id) || []), p]);
   const visits = [...byVisit.values()];
   wire.push(['three patients were spoken to in typed or spoken lines', visits.length === 3]);
-  // The night's speech and temper signs ride along with every request, and the model hears them
-  wire.push([`every request named tonight's speech and temper signs, and the model heard them (${prompts.length} requests)`,
-    prompts.length > 0 && prompts.every(p => p.signs && typeof p.signs.speech === 'string' && typeof p.signs.temper === 'string'
-      && Object.keys(p.signs).length === 2 && p.tonight)]);
+  wire.push(['each request reveals only the earned sign sentences', prompts.length > 0 && prompts.every(p =>
+    p.matching_prompt && p.tonight === (Object.keys(p.signs).length > 0))]);
   for (const turns of visits) {
     let carried = true;
     for (let i = 1; i < turns.length; i += 1) {
@@ -109,6 +106,12 @@ try {
     wire.push([`patient ${k + 1} never receives an earlier patient's conversation`,
       later.every(p => !p.doctor_turns.some(t => earlier.includes(t)))]);
     wire.push([`patient ${k + 1} starts from its own opening lines only`, later[0].history_turns <= 4 && later[0].doctor_turns.length === 0]);
+  }
+  for (const [language, words] of [['en','Say it clearly.'], ['zh','说清楚。']]) {
+    const fair = prompts.filter(p => p.fair && p.language === language);
+    wire.push([language + ' small talk has no sign sentences', fair.some(p => p.event.type === 'say' && !p.tonight)]);
+    wire.push([language + ' typed pressure reaches the model once with earned signs', fair.filter(p => p.event.type === 'press' &&
+      p.event.text === words && p.signs.temper && p.signs.speech && p.matching_prompt).length === 1]);
   }
   const matrix = prompts.filter(p => p.matrix);
   for (const c of Object.values(cases)) {

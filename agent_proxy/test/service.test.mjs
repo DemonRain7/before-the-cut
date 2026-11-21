@@ -53,6 +53,20 @@ test("the kill switch and voice switch answer before reading or counting", async
 	}
 });
 
+test("the checkpoint window authorizes only its operator's dialogue and fails closed", async () => {
+	const token = "a".repeat(64);
+	const env = { BTC_CHECK_ONLY: "1", BTC_CHECK_TOKEN: token };
+	const post = (route, auth, vars) => worker.fetch(new Request("https://example.test" + route, { method: "POST", body: "{",
+		headers: auth ? { authorization: "Bearer " + auth } : {} }), vars);
+	assert.equal((await post("/v1/patient-dialogue", "", { ...env, BTC_DISABLED: "1" })).status, 503);
+	assert.equal((await post("/v1/patient-dialogue", token, { BTC_CHECK_ONLY: "1" })).status, 503);
+	assert.equal((await post("/v1/patient-dialogue", "", env)).status, 401);
+	assert.equal((await post("/v1/patient-dialogue", "b".repeat(64), env)).status, 401);
+	assert.equal((await post("/v1/patient-intent", token, env)).status, 403);
+	assert.equal((await post("/v1/transcribe", token, env)).status, 403);
+	assert.equal((await post("/v1/patient-dialogue", token, env)).status, 400);
+});
+
 test("the Worker cancels a chunked body as soon as it exceeds its cap, despite a short declared length", async () => {
 	let cancelled = false;
 	let reads = 0;
