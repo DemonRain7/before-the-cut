@@ -1401,6 +1401,12 @@ func wear_nights() -> void:
 								await d.settle()
 				reached(main.visit.row_seen(row), "wear reading " + row)
 				await shot("wear-" + row)
+				if row == "temper":
+					d.move(d.pad_pos("press"))
+					await d.seconds(0.35)
+					reached(main.visit.press_breaks() and main.desk.hover == "press", "the warned second PRESS is available")
+					await shot("second-press-warning")
+					rest()
 				if tool != "":
 					await d.put_away()
 			await d.settle()

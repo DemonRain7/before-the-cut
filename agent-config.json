@@ -1,30 +1,31 @@
 {
   "schema_version": "course-1",
-  "config_version": "0.10.1",
+  "config_version": "0.12.0",
   "project": "Before the Cut",
-  "updated": "2026-11-15",
-  "status": "Protocol 3 runtime tested live with OpenAI on 2026-11-15: 30 patient requests (12 in the real game window, 18 HTTP probes) and ten transcriptions of local synthetic speech, all successful. No human microphone or playtest result is claimed. See docs/development/live-model-results-2026-11-15.md.",
+  "updated": "2026-11-21",
+  "status": "Rules 12 and protocol 4. The game's own service made 1,094 English/Chinese GPT-6 Luna evaluation attempts. Three permanent Workers were checked. The deployed live Worker is disabled. See the full-build section of HANDOFF.md.",
   "ai_use": "Claude authored the game and the initial proxy and added typing, push-to-talk and the OpenAI route. Codex migrated autonomous dialogue and verified the runtime on 2026-11-14. Claude transferred the source into this repository on 2026-11-15. Codex ran the first live OpenAI test and corrected generated-speech feedback on 2026-11-15.",
   "purpose": "Generate the patient's own dialogue and reactions from character context and conversation history.",
   "tools_available": [],
   "context_sources": [
-    "patient background, personality, needs and motives",
-    "what the patient knows",
-    "conversation history and recent observations",
-    "latest player action"
+    "case identity, background, voice, work and reason for visiting",
+    "up to 48 doctor, patient and reaction entries from the current visit",
+    "latest player words or a game event with its required outcome",
+    "earned SPEECH or TEMPER sign when available"
   ],
   "response_contract": {
     "legal_moves": false,
     "fixed_dialogue_tree": false,
     "answer_bank": false,
-    "status": "Implemented in proxy and game UI. Physical readings, attacks and scoring remain engine systems.",
+    "status": "Godot owns physical readings, actions, outcomes, scoring and codes. It validates a named outcome. An open first tool request can be accepted or declined by the patient.",
     "implemented_fields": {
       "reply": "generated speech",
       "reaction": "generated demeanor or intended behavior",
-      "cooperates": "Boolean required for exam requests; model decides tool cooperation, not restricted to authored options."
-    }
+      "cooperates": "Boolean on a tool request or named outcome. It must match a game-owned grant, refusal, answer or dodge."
+    },
+    "graded_ask": "Graded ASK uses the case's authored answer. Other dialogue is generated in character."
   },
-  "validation": "Transport shape, nonempty text, length and timeouts only; do not choose or reject an answer for differing from scripted dialogue.",
+  "validation": "Check JSON, lengths, permitted fields, outcome agreement and deadlines. A foreground failure uses the labelled authored fallback. Optional turns allow silence.",
   "limits": {
     "max_output_tokens": 256,
     "request_timeout_seconds": 4.0,
@@ -35,12 +36,18 @@
     "provider_calls_per_proxy_process": 2000,
     "reply_chars_asked": 110,
     "reply_chars_refused_over": 220,
-    "source": "game/data/rules.json (agent) and agent_proxy/src/core.mjs (DEFAULT_LIMITS); change both together"
+    "source": "game/data/rules.json (agent) and agent_proxy/src/core.mjs (DEFAULT_LIMITS); change both together",
+    "optional_turns": {
+      "per_visit": 3,
+      "idle_per_visit": 2,
+      "idle_after_seconds": 12,
+      "counts_toward_dialogue": true
+    }
   },
   "budgets": {
     "cost_target_usd_per_shift": 0.02,
     "typical_latency_target_ms": 1000,
-    "status": "Targets set before the 16-call cap. A visit at the cap is 16 patient calls and a shift 80, plus one transcription per spoken line. Remeasure in a supervised live run before changing limits."
+    "status": "E1–E4 used 1,094 attempts under a USD 50 approval. Their conservative reservation was USD 0.595195. The intent and dialogue medians were 754 and 1,293 ms."
   },
   "fallback": "Authored offline comparison/fallback, separately labelled in UI and logs; no substitution on successful model replies.",
   "memory_policy": "Last 48 conversation entries in memory per visit; reset for the next patient; no server-side cross-visit transcript.",
@@ -191,27 +198,29 @@
       ]
     },
     "open": [
-      "presentation of generated nonverbal reactions",
-      "support for AI-initiated physical actions",
-      "context length and memory summary",
-      "live provider and measured latency/cost"
+      "whether new patients encourage conversational follow-ups in human play",
+      "human shutter timing and how it affects the value of the second PRESS",
+      "student reading of the synthetic E2 answers and the outside-player E6 comparison"
     ]
   },
   "historical_evidence": "November 12: 269 game, 141 UI, 28 proxy and 73 mock integration checks of the older constrained protocol; no autonomous-dialogue validation is claimed.",
   "prompt_artifact": "agent_team/patient-character-prompt.md",
   "current_verification": {
-    "date": "2026-11-15",
-    "game_checks": 485,
-    "ui_checks": 325,
-    "ui_checks_less_blood": 325,
+    "date": "2026-11-21",
+    "game_checks": 2084,
+    "ui_checks": 1246,
+    "ui_checks_less_blood": 1246,
     "close_checks": 5,
-    "proxy_tests": 38,
-    "http_integration_checks": 179,
-    "http_wire_checks": 15,
-    "text_lines_measured": 301,
-    "live_model_calls": 0,
+    "proxy_tests": 54,
+    "http_integration_checks": 345,
+    "http_wire_checks": 100,
+    "text_lines_measured": 1624,
+    "live_model_calls": 1094,
     "human_playtests": 0,
-    "record": "HANDOFF.md"
+    "record": "HANDOFF.md",
+    "ui_checks_zh": 1247,
+    "live_model_successes": 1047,
+    "drawn_frames_per_language": 464
   },
   "speech_to_text": {
     "route": "POST /v1/transcribe on the same proxy; push-to-talk only, never always-on",
@@ -226,12 +235,28 @@
       "game": 7
     },
     "privacy": "Clips stay in memory and are never written to disk; logs hold lengths and stages, never words or audio.",
-    "status": "Tested with the real microphone and a mock transcript only."
+    "status": "Push-to-talk and review-before-send are available on a voice-capable local service. The November 15 OpenAI run transcribed ten clips of synthetic speech. The November 21 evaluation did not send audio. Public Workers disable transcription."
   },
   "providers": {
-    "default": "mock (fixed labelled line and transcript; no network, no cost)",
+    "default": "The game starts with authored patients. Its menu connects to the permanent public mock when enabled.",
     "google": "Gemini API key, or Vertex AI with an OAuth access token from gcloud application-default credentials; default model gemini-3.5-flash-lite",
     "openai": "API key only (ChatGPT sign-in does not use API credit); default models gpt-6-luna and gpt-4o-mini-transcribe",
-    "status": "Both live routes are tested only against fake networks."
+    "status": "The shipped live launcher selects OpenAI gpt-6-luna. Real OpenAI results for November 15 and 21 are recorded in HANDOFF.md. Google/Vertex only have simulated provider tests."
+  },
+  "intent_routing": {
+    "meanings": [
+      "case_question",
+      "follow_up",
+      "tool_request",
+      "reassurance",
+      "provocation",
+      "social",
+      "personal",
+      "role_probe",
+      "unclear",
+      "other"
+    ],
+    "confirmed_ask": "A paid inference displays the question and price. The player can confirm, speak for free or choose another question.",
+    "pressure": "Only the PRESS action spends pressure lamps."
   }
 }

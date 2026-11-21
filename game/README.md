@@ -40,31 +40,9 @@ Languages, below). Nothing is taken from another game.
 The game is in English or Chinese (中文): choose it under SETTINGS on the title card, or with
 the switch in its top-right corner.
 
-> **What has and has not been checked.** The November 15 live run completed 30 OpenAI
-> patient replies and ten real transcriptions of Windows-synthesized speech. Twelve replies
-> were exercised in the game window; the other eighteen were HTTP probes. See the
-> [live report](../docs/development/live-model-results-2026-11-15.md). That run was made
-> before the changes of November 16 (the lender's line, patients who leave, the counter glass,
-> the opening, the guide, the counter-first screen, glass repair), of November 17, which
-> answer the student's five notes: clearer readings, a CALM that costs money, a first-night
-> training, sudden rage, and the new story with its contact list
-> ([note](../docs/development/story-and-clarity-2026-11-17.md)), of November 18: the
-> language switch with the whole game in Chinese, the opening redrawn for the new story,
-> reference sheets that follow the patient's implant models, right or wrong told only at
-> closing and a night that ends with the doctor, of November 19: drawn nights, the art of
-> every part of every patient, and five new characters, and of November 20: the contact list's
-> words drawn each night, a second PRESS that takes every lamp, and the title card's menu with
-> HOW TO PLAY and SETTINGS. The November 20 build has been checked by the automated tests
-> below, with authored dialogue, a simulated microphone and a stand-in voice service, and by
-> the capture script's frames drawn by the real renderer on a hidden Windows desktop, in English
-> and in Chinese (Screenshots; the run with less blood was only walked dry). No paid service
-> was called for it, and the patient model has never been asked to answer in Chinese. These
-> are automated checks, not a human microphone, listening or playtest result. No play session
-> by a person is recorded in this repository: on November 20 the student played the November 19
-> build and asked the questions that day's changes answer, and that session left no record
-> here. Nobody has read the Chinese in play, typed it with a real input method or reviewed the
-> translation, nobody has played the November 20 build, and the student has not reviewed the
-> changes of November 17 to 20 beyond the opening of the November 17 build and that play.
+> **November 21 verification.** The real Godot client passed the English, Chinese and reduced-blood scene suites and drew 464 frames in each language. The three permanent services passed remote probes and the live Worker is disabled. The game's local HTTP service ran E1–E4 against GPT-6 Luna in both languages. Graded ASK keeps its authored answers after E2 missed its target. No outside player has played this revision. [Full results](../HANDOFF.md#full-build-november-21)
+>
+> On November 15 the earlier build completed 30 real OpenAI patient calls, including 12 in the game window, and ten transcriptions of synthetic speech. The student played the November 19 build and gave feedback on November 20. Physical microphone accuracy, Chinese input-method use and human reactions to the new patient turns still need observation. [November 15 run](../docs/development/live-model-results-2026-11-15.md)
 
 ## Launch
 
@@ -87,13 +65,14 @@ in the editor once.
 
 | Option | Effect |
 | --- | --- |
+| `-Language en`, `-Language zh` | use this language for the run |
 | `-ImportOnly` | import if anything is missing, then stop without starting the game |
 | `-Patient script`, `mock`, `timeout`, `live` or a service URL | choose the patient for this run. Mock and timeout start and stop a local service. Live prompts for a paid launch. See the [proxy runbook](../agent_proxy/README.md). |
 | `-AgentUrl http://127.0.0.1:8787 -Model` | patients speak through the proxy in `../agent_proxy` (start it first: `npm run dev`) |
 | `-LessBlood` | the attack scenes without blood: no splatter, pools or stains, and a clean face, hand, shutter cut and broken glass. The red flash and the red edge of the screen stay |
 | `-Mute` | start with sound off (M toggles it in the game) |
 | `-Seed 123` | fixed seed for the night (who comes, who of them drifts and which signs they show), the order of the visitors, the night's contact list and the small random timings |
-| `-TestNight C` | that test night of `data/nights.json` (A to H) every shift, instead of a drawn night (The patients, below) |
+| `-TestNight C` | that test night of `data/nights.json` (A to J) every shift, instead of a drawn night (The patients, below) |
 
 Without the script, import once (`godot --headless --path game --import`, again if it stops
 with an error), then: `godot --path game -- --agent-url=http://127.0.0.1:8787 --model --less-blood --mute --seed=123 --test-night=C`
@@ -209,7 +188,7 @@ and three to six points, with the night's numbers filled in from `rules.json`
 4. **TONIGHT'S CONTACTS.** Two a night; the list's aliases, clues and codes, new every night;
    SAY, the price of a wrong code, and a drop that says nothing about the patient.
 5. **KEYS.** The mouse, the keys of the papers and the camera, typing and TAB, SPACE twice
-   outside an attack, ENTER, K, M and F11, and the SETTINGS page.
+   outside an attack, ENTER, K, M and F11, plus F10 to confirm leaving a night.
 
 A click, ENTER or RIGHT turns to the next page, and past the last one goes back to the menu;
 LEFT goes back a page; ESC, BACKSPACE, H or a right-click goes back to the menu. H or F1 opens
@@ -359,8 +338,7 @@ patient is about to do.
 | SHUT | right wall | the shutter: ends the visit at once | decision |
 | GLASS | right wall | between patients: one new layer for the counter glass | 40 credits |
 
-A patient may refuse a test or give a reason instead. Insisting costs 1 more; CALM first
-clears the refusal. [Student, November 17: either no CALM, or CALM costs money.] CALM stays
+A patient may refuse a test. Insisting costs one more lamp if it can open the instrument. A sealed instrument explicitly names CALM as the way to open it. Repeating the request while sealed costs nothing. CALM clears the refusal. [Student, November 17: either no CALM, or CALM costs money.] CALM stays
 and costs money: the pad wears its price (`30cr`), the slip prints `CALM -30` and the report
 lists it under the visit. The till may go below zero for it. It was kept rather than removed
 because a patient who runs out of patience leaves unpaid: CALM is now a trade of credits for a
@@ -373,15 +351,7 @@ and the hour is gone. You can still decide while the bar runs. CALM during it gi
 back, for its 30 credits, and keeps them at the counter. The bar stands still while an answer
 is on its way, while a test or the microphone is open, and while the guide is up.
 
-**The push that breaks them takes every lamp.** [Student, November 20: why does a patient with
-1 patience left still walk out after two PRESSes? How is that designed?] The second PRESS breaks
-every patient, whatever their truth: a steady one walks out and a drifting one lunges. Until
-November 20 it cost 2 like the first, so a patient could leave with a lamp still lit and the
-meter said one thing while the counter did another. Now the push that breaks them takes every
-lamp left (`VisitState.press_cost()`, rules version 10), and they go at once, with no LEAVING
-bar. After the first PRESS the pad's badge shows what the second will take (`-4` with four
-lamps left) and its hint says that a second PRESS breaks them. The first PRESS still costs 2,
-and a patient whose last lamp goes any other way still gets the bar.
+**The second PRESS spends every remaining lamp.** Both pushes require at least two lamps. The first costs two. After it the pad reads BREAK and its hint shows what each visitor will do. A steady visitor walks out without a fee. A drifting visitor lunges. Press SPACE to drop the shutter. A successful catch triggered by this push adds 150 to the visit at closing. A visitor who runs out of patience by another action still gets the LEAVING bar.
 
 | Key | Effect |
 | --- | --- |
@@ -390,6 +360,7 @@ and a patient whose last lamp goes any other way still gets the bar.
 | ENTER | the lit item of the title card's menu, next opening card, buzz the next patient in, hurry a line, tear off the slip, turn a report page, new shift; on a quiet strip it opens the typing line |
 | ESC | skip the opening cards; close the guide; on the report, go to the night's totals, and from the totals back to the title card |
 | On the report | a click, ENTER, SPACE or RIGHT turns to the next page, and on the night's totals starts the next night (CLICK FOR THE NEXT NIGHT after a night over the line, CLICK TO TRY AGAIN after one that was lost); BACKSPACE or LEFT goes back a page; ESC or a right-click goes to the totals; ESC on the totals goes back to the title card, where the language and the other settings can be changed (the opening and the training are not played again) |
+| F10 | pause and open the return-to-menu confirmation. ESC resumes. ENTER abandons the current night. |
 | H / F1 | the counter guide |
 | R | the reference sheet: down, or back on its nail |
 | L | tonight's contact list: down, or back on its nail |
@@ -800,12 +771,7 @@ is missing).
 
 ## Saying it in your own words
 
-**Typing.** T (or ENTER on a quiet strip, or the TYPE button on the strip) opens a line of up
-to 120 characters. ENTER sends the line, CTRL+ENTER sends it with PRESS, and ESC takes it back.
-A question about the case follows the same rules as the ASK menu, including the first dodge
-and a free repeat after an answer. The hint identifies the question the patient heard. The game
-recognizes topics by local English or Chinese keywords when offline, or through a short
-classifier when connected. Small talk costs no patience and leaves the card as it was.
+**Typing.** Press T, ENTER on a quiet strip, or TYPE. ENTER submits the line, CTRL+ENTER sends it as PRESS and ESC cancels. The model routes each line into one of ten intents. A plausible case question shows its wording and lamp price before a paid ASK. Choose the listed question, pick free chat, or choose a different question. A repeat after a successful answer is free. Unclear input also offers the free and question-menu choices. The offline patient recognizes English and Chinese keywords. Ordinary talk and insults sent as speech cost no patience and reveal no case evidence.
 
 **Push-to-talk.** Offered only when a patient AI service is connected (`-AgentUrl ... -Model`).
 Hold TAB, or hold the mouse on the SPEAK button, and talk; let go to stop. The title card says
@@ -833,7 +799,7 @@ says what speaking needs.
 ## Patient AI modes
 
 - **Offline comparison** (default): authored lines and choices from the case files. No network.
-- **Model** (`--agent-url=... --model`). A typed or confirmed spoken line goes first to a short topic classifier. A matching question follows the ASK button's price, evidence and possibility of a first dodge. Other conversation costs no patience and makes no note. ASK uses the case's authored answer by default. The model writes other replies and may decide a first request for an unsealed instrument. CTRL+ENTER sends the typing line as PRESS. The corner shows the reply source and the 16-reply allowance.
+- **Model** (`--agent-url=... --model`). A typed or confirmed spoken line goes first to a short topic classifier. A matching question follows the ASK button's price, evidence and possibility of a first dodge. Other conversation costs no patience and makes no note. ASK uses the case's authored answer by default. The model writes other replies and may decide a first request for an unsealed instrument. CTRL+ENTER sends the typing line as PRESS. The corner shows the reply source and the 16-reply allowance. Each response uses this patient's identity, motives, bedside manner and the last 48 entries from this visit. An arrival, a completed instrument check or 12 quiet seconds may prompt a short optional line. Only three optional attempts (including at most two idle attempts) fit inside the 16. A player action cancels a pending optional line.
 - **Codes are game-owned.** Saying a code makes no model call and adds nothing to the
   patient's conversation memory, so the patient AI can never confirm, deny or leak one.
 - **The player's language** goes with every request. In Chinese the model is asked for
@@ -852,7 +818,7 @@ says what speaking needs.
   log). Asking, tools, CALM, PRESS, codes, typing and speaking wait; after 0.8 s the strip says
   "Still answering. You can look meanwhile, or decide now."
 
-The proxy, its limits and what a live setup needs are in `../agent_proxy/README.md`.
+The default SETTINGS endpoint is the permanent public mock. The game starts with PATIENT AI off. For the OpenAI patient use `.\run-game.ps1 -Patient live -Language zh -Seed 41307 -TestNight J` from the repository root and type `LIVE`. [Service runbook](../agent_proxy/README.md)
 
 ## Checks
 
@@ -1159,15 +1125,8 @@ repository; commit them with the assets. (Godot marks the font atlas pictures `s
 
 ## Known limits
 
-- The only live run is the one of November 15 (30 patient replies, ten transcriptions; see the
-  live report linked at the top). It was made before the changes of November 16 to 19, and no
-  paid service has been called since. The thinking pose, the leaving countdown, the hourly line,
-  the counter-first screen, the codes, the flares, the snaps, the drawn nights with the signs the
-  model is told, and the newer five patients have therefore never run against a live model, and
-  one run says little about believability. No model has
-  been asked to answer in Chinese, and no Chinese speech has been transcribed: whether the
-  patients sound right in Chinese, keep to its lengths and keep names in Latin letters is
-  untested.
+- The game's own service ran 1,094 bilingual evaluation requests against GPT-6 Luna on November 21. E2 missed the evidence threshold, especially for normal speech in Chinese, so graded ASK uses its authored answers. The corrected classifier, price confirmation and optional turns have been exercised in Godot. Human role continuity, whether patients prompt follow-ups, physical microphone quality and Chinese transcription accuracy still need outside players. November 15's ten real transcriptions used synthetic speech. [Full results and sample locations](../HANDOFF.md#full-build-november-21)
+
 - The Chinese was written by an assistant and has not been read by a person: not the
   translation, not its fit on screen in play, and not the patients' voices in it
   ([glossary and voices](../docs/development/chinese-translation.md)). Typing Chinese has been

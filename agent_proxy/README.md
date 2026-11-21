@@ -52,7 +52,7 @@ and `BTC_TRANSCRIBE_TIMEOUT_MS` are configurable. The Worker uses durable counte
 
 ## Topic classification
 
-`POST /v1/patient-intent` accepts protocol, session, visit, case id and version, language and the typed or confirmed spoken line. Its prompt contains only the question ids, their wording and the doctor's line. The strict answer is one `about` value from that patient's question ids or `none`. The route has its own 16-attempt visit and 240-attempt session ceilings. Each attempt also uses one unit from the UTC-day budget. The upstream deadline is 2 seconds and the game waits up to 2.5 seconds. A failed classifier falls back to the offline keyword matcher.
+`POST /v1/patient-intent` receives protocol, session, visit, case id and version, language and the typed or confirmed spoken line. The provider sees the current patient's question IDs and wording, and the doctor's actual line. A single-choice schema accepts an `ask_<id>` or one free class. The public result carries `about` (an allowed question ID or `none`) and `intent`. Free classes cover follow-up, tool request, reassurance, provocation, social or personal talk, role probe, unclear and other. An inferred paid ASK shows the question and lamp price before acceptance. A player can choose small talk or the question menu. The route has its own 16-attempt visit and 240-attempt session ceilings. Each attempt also uses one unit from the UTC-day budget. The upstream deadline is 2 seconds and the game waits up to 2.5 seconds. A failed classifier falls back to the offline keyword matcher.
 
 ## Patient dialogue
 
@@ -70,10 +70,7 @@ writes them. A hanzi takes the room of two letters on the dialogue strip, so Chi
 smaller length limits of its own (see Bounds). The language is written to the log with each
 entry; the words are not.
 
-Supported actions: `check`, `ask`, `press`, `reassure`, `say`. `say` carries a sentence the
-player typed (or spoke and then sent) in their own words.
-History entries have role `doctor`, `patient` or `reaction` and literal text.
-The history is reset between patients. No legal-move list is transmitted.
+Foreground events are `check`, `ask`, `press`, `reassure` and `say`. `say` carries the doctor's line and classified intent. Optional `arrive`, `after_check` and `idle` events may return an empty reply and reaction. Both service implementations cap these at three per visit and two idle attempts, within 16 dialogue attempts. Each generation rebuilds the case identity, job, voice and motive from trusted data. Up to 48 recent entries tagged `doctor`, `patient` or `reaction` carry this visit's actual words in the user message. New patients start a fresh history.
 
 Response:
 
@@ -163,7 +160,7 @@ together. The Chinese numbers are `DEFAULT_LIMITS.languages.zh` here.
 | Proxy deadline | 3.5 s | 2 s | 6 s |
 | Game deadline | 4 s | 2.5 s | 7 s |
 | Request size | 32 KiB | 32 KiB | 512 KiB |
-| Output | 256 tokens. Reply target 110 characters, maximum 220. Reaction maximum 110. | 32 tokens. One topic id or `none`. | 256 tokens, up to 300 characters |
+| Output | 256 tokens. Reply target 110 characters, maximum 220. Reaction maximum 110. | 32 tokens. One allowed case question or free intent. | 256 tokens, up to 300 characters |
 | Chinese output | Reply target 55 characters, maximum 110. Reaction target 55, maximum 110. | Same topic ids | Up to 300 characters |
 | Conversation history | 48 most recent entries | None | None |
 
@@ -208,7 +205,7 @@ deadlines, a hard 110-character reply limit and 24 history entries):
 
 ## Test the service
 
-`npm test` in `agent_proxy` runs on Node without Wrangler, an account or a provider key. The November 21 P1 run has **52 passing tests**. Another 7 pass in `node --test tools/live_model_guard.test.mjs` from the repository root. From the repository root, `node tools/run_proxy_integration.mjs <Godot-console-path> <evidence-directory>` drives the actual Godot HTTP client against local mocks. **334 game-side and 100 wire checks passed.** For each of ten characters in each language, four requests cross normal/broken SPEECH with normal/broken TEMPER. The wire checks match both sign ids and prompt sentences. Voice inputs are generated tones. These results measure transport, limits and game behavior. The current live-model and playtest status is recorded in the [November 21 checkpoint](../docs/development/live-model-results-2026-11-21.md).
+`npm test` in `agent_proxy` runs on Node without Wrangler, an account or a provider key. The November 21 P1 run has **52 passing tests**. Another 7 pass in `node --test tools/live_model_guard.test.mjs` from the repository root. From the repository root, `node tools/run_proxy_integration.mjs <Godot-console-path> <evidence-directory>` drives the actual Godot HTTP client against local mocks. **334 game-side and 100 wire checks passed.** For each of ten characters in each language, four requests cross normal/broken SPEECH with normal/broken TEMPER. The wire checks match both sign ids and prompt sentences. Voice inputs are generated tones. These results measure transport, limits and game behavior. The bilingual GPT-6 Luna model results and outside-player comparison status are in the [full-build handoff](../HANDOFF.md#full-build-november-21).
 
 For two separate sessions the game supplies a fresh random session id and sends only the current visit's conversation with each action. The proxy constructs a fresh prompt from that request's character, signs, language and history. It stores no conversation. Each night's visit id includes the night number so a returning character starts with a fresh visit allowance.
 
@@ -273,4 +270,4 @@ The student approved both public mocks, the disabled live setup and redeployment
 
 `BTC_DAILY_BUDGET` accepts a nonnegative call count (default 1,500). `BTC_DISABLED=1` switches off all POSTs. `BTC_TRANSCRIBE=off` returns 501 before reading a clip. Positive `BTC_UPSTREAM_TIMEOUT_MS` and `BTC_TRANSCRIBE_TIMEOUT_MS` override the provider deadlines. The Worker counts actual bytes from the incoming stream, including bodies without a length header. Desktop Godot requires no CORS headers. The Worker has no Vertex service-account token exchange.
 
-November 21 evidence is local under `validation/2026-11-21/patient-agent/`. P1 includes computed checks, local mocks, public mock visits and a public disabled-live health check. The [November 15 live results](../docs/development/live-model-results-2026-11-15.md) describe an older build.
+November 21 service evidence is local under `validation/2026-11-21/patient-agent/finish-M6/`. Paid E1–E4 used the normal game routes through the local service. The blinded E2 judge is restricted to its ephemeral loopback evaluation process. The separate application ledger reserved at most USD 0.595195 across 1,094 attempts. The current question inference was verified with the mock and in Godot after the paid run. [Evaluation and E6 instructions](../tools/eval/README.md). The [November 15 live results](../docs/development/live-model-results-2026-11-15.md) describe an older build.

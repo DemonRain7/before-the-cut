@@ -1,22 +1,9 @@
-# Patient character prompt — implemented runtime
+# Patient character prompt
 
-The authoritative executable prompt is `agent_proxy/src/core.mjs: buildPrompt`.
-Character background facts are in `agent_proxy/src/character_profiles.mjs` and case briefs.
+Protocol 4 uses the executable `buildPrompt` and `intentPrompt` functions. The case brief names each patient's work, voice, personality and reason for visiting. Additional stable facts supply motives and private concerns. Each dialogue request rebuilds this identity in the system message. [Prompts](../agent_proxy/src/core.mjs) · [Character profiles](../agent_proxy/src/character_profiles.mjs)
 
-The AI plays a patient, chooses its own speech and visible interpersonal reaction, and
-uses the conversation to decide whether to explain, conceal, negotiate, argue or cooperate.
-Background facts establish continuity; they are not answers to recite.
+The doctor can type freely or review and send a voice transcript. The intent router selects a case question or a conversational class, including personal talk, follow-up, role challenges and ambiguity. A paid inferred question must be confirmed in the game. Godot passes an event, its promised outcome where applicable, and up to 48 doctor, patient and reaction entries for this visit. These remembered words and the doctor's current speech travel in the user message. A new visitor starts a new conversation.
 
-Input includes the patient's brief and motives, current visit state, recent verbatim
-conversation and the doctor's current words/action. Free player text is in-world dialogue,
-not a higher-priority instruction.
+Return the patient's own short `reply` and visible `reaction`. A tool request or a named outcome also needs `cooperates`. The patient may decide a first unsettled tool request. Godot enforces a sealed instrument, an earned opening, a first dodge and paid evidence. The prompt only receives speech or temper signs already earned. A role challenge is answered as the same patient. The authored ASK line supplies the scored evidence in both modes.
 
-Output is JSON with `reply` and `reaction`; requested tool interactions also require a
-`cooperates` boolean. Replies are not selected from a legal-move list, checked against
-approved answers, or replaced with authored evidence lines. Physical instrument readings
-and attack choreography remain in Godot. Technical format/length/deadline failures use
-the separately labelled offline fallback.
-
-Current runtime contract is protocol 3. See `agent_proxy/README.md`.
-Voice is a separate follow-up in `CLAUDE_VOICE_HANDOFF.md`; it is not implemented or
-advertised in G1 material.
+The authored opening plays before an optional model line. The patient may speak on arrival, after an examination, or after 12 quiet seconds. Silence on those turns is valid. Three optional attempts, including at most two idle attempts, share the 16 dialogue replies per visit. The game discards late optional answers when the player acts. Foreground transport and validation failures use the labelled authored fallback. [Runtime contract](../agent_proxy/README.md) · [Live bilingual evaluation](../HANDOFF.md#full-build-november-21)

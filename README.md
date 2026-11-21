@@ -41,11 +41,13 @@ Windows, PowerShell, from the repository root. The launcher looks for Godot 4.7.
 
 The title menu has START, HOW TO PLAY, SETTINGS and QUIT. SETTINGS keeps the language (English or 中文), blood, sound, screen mode and patient AI choice.
 
-The mock and the forced-timeout demonstration each start the game and a temporary local service:
+The launch commands below take you directly to reproducible demonstration nights. The scripted and mock commands are free. The live command starts the game's local HTTP service, then calls OpenAI GPT-6 Luna after you enter `LIVE`. In SETTINGS, enabling PATIENT AI with no launch flags connects to the public mock.
 
 ```powershell
-.\run-game.ps1 -Patient mock
-.\run-game.ps1 -Patient timeout
+.\run-game.ps1 -Patient script -Language zh -TestNight I -Seed 41307
+.\run-game.ps1 -Patient mock -Language en -TestNight I -Seed 41307
+.\run-game.ps1 -Patient live -Language zh -TestNight J -Seed 41307
+.\run-game.ps1 -Patient timeout -Language en
 ```
 
 Controls and rules are in [game/README.md](game/README.md); providers, keys and limits in [agent_proxy/README.md](agent_proxy/README.md). The source was moved here from the earlier local workspace on November 15, 2026 ([transition record](docs/development/repository-transition.md)).
@@ -53,6 +55,8 @@ Controls and rules are in [game/README.md](game/README.md); providers, keys and 
 ## Design and verification
 
 The [agent manifest](agent-config.json) and [production-agent artifacts](agent_team/) describe the bounded patient agent and planned development roles. The patient AI writes dialogue and reactions from the case, the conversation and the signs the player has uncovered. Typed and confirmed spoken questions follow the ASK menu rules. ASK uses the authored answer by default, and the full game is playable offline.
+
+On November 21, 2026, the game's service sent 1,094 real GPT-6 Luna evaluation requests across English and Chinese. Each generated turn rebuilds the patient's identity and uses the visit's last 48 conversation entries. A semantic router recognizes case questions, follow-ups, tool requests, reassurance, provocations, social or personal talk, role challenges and ambiguous or other input. A paid inferred question shows its price for confirmation. The patient can volunteer a short line on arrival, after a check or in a lull. The evaluation retained authored answers for graded ASK. The three permanent Workers passed deployment checks and live stays disabled. Nobody has played these rules. [Five-minute demonstration, results and limits](HANDOFF.md#full-build-november-21)
 
 On November 15, 2026, the first live OpenAI run completed 30 patient requests and ten transcriptions of local synthetic speech, all successful. Twelve dialogue requests were played by an agent in the real window; eighteen were HTTP probes. No human microphone, listening or playtest result is claimed. A feedback bug found during the run was fixed: generated speech now retains what the patient actually said. See the [live report](docs/development/live-model-results-2026-11-15.md).
 

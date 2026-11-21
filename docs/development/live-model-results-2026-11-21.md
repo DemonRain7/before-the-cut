@@ -1,6 +1,8 @@
 # Patient-agent cloud checkpoint, November 21, 2026
 
-**Public transport verified. Genuine OpenAI dialogue attempts: 0. Transcription attempts: 0. Provider cost: USD 0.** The first two Workers used synthetic patients. The third was deployed with OpenAI configured and its kill switch on. The last genuine provider measurements are from [November 15](live-model-results-2026-11-15.md).
+The permanent account deployment was updated on November 21 at 21:52 UTC. The public mock passed 24 dialogues and session isolation. The timeout returned 504 and the game displayed fallback after 3,823 ms. The public OpenAI Worker remained disabled and returned 503. Genuine *deployed* OpenAI calls in this checkpoint total zero. The separately authorized bilingual evaluation used the game's own local service for 1,094 real GPT-6 Luna attempts under USD 50. Its cost reservation was USD 0.595195. [Full results, deployment IDs and remaining account steps](../../HANDOFF.md#full-build-november-21)
+
+The material below records the earlier one-hour preview.
 
 ## Public preview
 
