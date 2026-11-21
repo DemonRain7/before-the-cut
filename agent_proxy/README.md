@@ -248,25 +248,30 @@ For the last row, first set `$demoState = Join-Path ([IO.Path]::GetTempPath()) (
 
 The checked-in `wrangler.toml` defines three separate services. The default and `timeout` use the mock. The `live` environment names OpenAI and `gpt-6-luna`, starts disabled and has a 30-call daily ceiling. Voice is off in all three Worker environments. The local Node proxy offers voice. SQLite exports and bindings are specified for each environment. If the instructor supplies a required Worker foundation, compare its entry and bindings before the first deployment. [Cloudflare class exports](https://developers.cloudflare.com/durable-objects/reference/durable-objects-migrations/) · [Wrangler environments](https://developers.cloudflare.com/workers/wrangler/environments/)
 
-The student approved both public mocks, the disabled live setup and redeployment for this check on November 21. The three permanent services are in the student's `demonrain777.workers.dev` account. Their service names are `before-the-cut-agent`, `before-the-cut-agent-timeout` and `before-the-cut-agent-live`. See the deployment and acceptance record in [the build handoff](../HANDOFF.md).
+The student approved both public mocks, the disabled live setup and redeployment for this check on November 21. The three permanent services are in the student's `demonrain777.workers.dev` account. Their service names are `before-the-cut-agent`, `before-the-cut-agent-timeout` and `before-the-cut-agent-live`. The private M0 ledger closed after 24 real GPT-6 Luna replies across six visits. Its live binding remains configured and the kill switch is on. The commands below document that completed window. [Measured results](../docs/development/live-model-results-2026-11-21.md#deployed-worker-checkpoint)
 
 1. **Publish the two mocks.** From `agent_proxy`, sign in with `npx --yes wrangler@4.166.0 login`. Run `npx --yes wrangler@4.166.0 deploy --env-file .env.example` and repeat with `--env timeout`. Use the returned URLs for `node probe.mjs <mock-origin> isolation` and `node probe.mjs <timeout-origin> timeout`. Pass either URL to `run-game.ps1 -Patient <origin>`. [Worker limits](https://developers.cloudflare.com/workers/platform/limits/) · [Durable Objects pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/)
-2. **Prepare the live environment.** Deploy with `npx --yes wrangler@4.166.0 deploy --env live --env-file .env.example`. Verify `/healthz` reports disabled. Set `$liveOrigin` to that deployment's HTTPS origin. The student runs `npx --yes wrangler@4.166.0 secret put OPENAI_API_KEY --env live` and enters the project key at the hidden prompt. In that OpenAI project's Limits, set a monthly spend limit and enable hard enforcement. Provider-side enforcement can lag. The checkpoint also reserves a conservative cost before each request. [Cloudflare Worker secrets](https://developers.cloudflare.com/workers/configuration/secrets/) · [OpenAI project limits](https://help.openai.com/en/articles/9186755-managing-projects-in-the-api-platform)
-3. **Run the approved private check.** The Worker admits only authenticated dialogue POSTs during the test. The runner reserves up to 24 dialogue attempts in six visits, three per language, with zero transcription or classification requests and a USD 0.01 ceiling. It requests standard-tier `gpt-6-luna` with reasoning off. It stops at the first failure and refuses to overwrite its ledger. The generated ASK fixture exercises the service even though the normal game defaults to authored ASK. Use the following in the terminal holding `$liveOrigin`. [Model pricing](https://developers.openai.com/api/docs/models/gpt-6-luna)
+2. **Prepare the live environment.** Deploy with `npx --yes wrangler@4.166.0 deploy --env live --env-file .env.example`. Verify `/healthz` reports disabled. Set `$liveOrigin` to that deployment's HTTPS origin. Bind the configured application credential to `OPENAI_API_KEY` using Wrangler's secret input in the live environment. For this run the owner confirmed the project spending limit and delegated the secret binding. The operator used the application's normal environment loader and a private stdin pipe. The checkpoint separately reserves a conservative cost before each request. [Cloudflare Worker secrets](https://developers.cloudflare.com/workers/configuration/secrets/) · [OpenAI project limits](https://help.openai.com/en/articles/9186755-managing-projects-in-the-api-platform)
+3. **Run the approved private check.** The Worker admits only authenticated dialogue POSTs during the test. The runner reserves up to 24 dialogue attempts in six visits, three per language, with zero transcription or classification requests and a USD 0.01 ceiling. It requests standard-tier `gpt-6-luna` with reasoning off. Before opening its ledger, the runner waits for the enabled health response and the private dialogue gate to reach the edge. It retries only those free preflight probes during propagation. Each paid POST is attempted once. The runner stops at the first failed dialogue and opens its ledger exclusively. The generated ASK fixture exercises the service even though the normal game defaults to authored ASK. Use the following in the terminal holding `$liveOrigin`. [Model pricing](https://developers.openai.com/api/docs/models/gpt-6-luna)
 
    ```powershell
    $env:BTC_CHECK_TOKEN = node -p "require('node:crypto').randomBytes(32).toString('hex')"
    try {
-       $env:BTC_CHECK_TOKEN | npx --yes wrangler@4.166.0 secret put BTC_CHECK_TOKEN --env live
+       $env:BTC_CHECK_TOKEN | npx --yes wrangler@4.166.0 secret put BTC_CHECK_TOKEN --env live --env-file .env.example
        if ($LASTEXITCODE -ne 0) { throw 'Could not store the checkpoint token.' }
        npx --yes wrangler@4.166.0 deploy --env live --env-file .env.example --var BTC_DISABLED:0
        if ($LASTEXITCODE -ne 0) { throw 'Live deployment failed.' }
        node ../tools/check_patient_checkpoint.mjs live $liveOrigin ../validation/2026-11-21/patient-agent/approved-live
        if ($LASTEXITCODE -ne 0) { throw 'Checkpoint stopped. Check the existing ledger.' }
    } finally {
-       npx --yes wrangler@4.166.0 deploy --env live --env-file .env.example
-       Remove-Item Env:BTC_CHECK_TOKEN
-       if ($LASTEXITCODE -ne 0) { throw 'Restore the disabled configuration immediately.' }
+       try {
+           npx --yes wrangler@4.166.0 deploy --env live --env-file .env.example
+           if ($LASTEXITCODE -ne 0) { throw 'Restore the disabled configuration immediately.' }
+           npx --yes wrangler@4.166.0 secret delete BTC_CHECK_TOKEN --env live --env-file .env.example
+           if ($LASTEXITCODE -ne 0) { throw 'Check cleanup of the temporary token on the disabled Worker.' }
+       } finally {
+           Remove-Item Env:BTC_CHECK_TOKEN -ErrorAction SilentlyContinue
+       }
    }
    ```
 

@@ -1,6 +1,29 @@
 # Patient-agent cloud checkpoint, November 21, 2026
 
-The permanent account deployment was updated on November 21 at 21:52 UTC. The public mock passed 24 dialogues and session isolation. The timeout returned 504 and the game displayed fallback after 3,823 ms. The public OpenAI Worker remained disabled and returned 503. Genuine *deployed* OpenAI calls in this checkpoint total zero. The separately authorized bilingual evaluation used the game's own local service for 1,094 real GPT-6 Luna attempts under USD 50. Its cost reservation was USD 0.595195. [Full results, deployment IDs and remaining account steps](../../HANDOFF.md#full-build-november-21)
+## Deployed Worker checkpoint
+
+At 6:06 p.m. New York time on November 21, the game's permanent Cloudflare Worker completed **24 out of 24 real OpenAI GPT-6 Luna dialogue requests**. The automated client used the game's public HTTPS dialogue route, with a private bearer for the duration of the check. Kip, Ozzie and Dana each received four turns in English. Priya, Lux and Bo each received four in Chinese. Each appointment exercised a GRIP request, ASK, conversation and PRESS. Each response carried a distinct request ID, the OpenAI provider and model, and token usage. Voice and intent received zero provider calls. [Checkpoint client](../../tools/check_patient_checkpoint.mjs)
+
+| Measured on the deployed service | Result |
+| --- | ---: |
+| End-to-end response latency, median / p90 / maximum | 1.524 / 2.063 / 2.539 s |
+| Input / output tokens | 26,613 / 1,666 |
+| Cached input / cache writes | 3,149 / 16,652 tokens |
+| Replies with a cache read | 3 of 24 |
+| Estimated standard-tier OpenAI usage | USD 0.00362719 |
+| Conservative cost bound / approved ceiling | USD 0.004588894 / USD 0.01 |
+
+OpenAI reported reads and writes on all 24 responses, including zero counts. The estimate values ordinary input, reads, writes and output separately. The conservative figure charges every input token at the upper input rate. Both figures use reported token counts. [OpenAI model pricing](https://developers.openai.com/api/docs/models/gpt-6-luna) · [Prompt cache accounting](https://developers.openai.com/api/docs/guides/prompt-caching)
+
+The owner confirmed the project spending limit. The existing application credential was bound to the live Worker through Wrangler's secret input. During the check an anonymous dialogue POST received 401, and authenticated intent and voice POSTs received 403. One preliminary propagation check encountered the prior disabled edge version and spent zero provider calls. The runner now waits for the private gate before creating its paid ledger.
+
+At 6:07 p.m. New York time, the live service again reported disabled and a dialogue POST returned 503 `service_disabled`. The temporary bearer was removed. The OpenAI project secret remains bound on the live Worker. Its final deployment serves version `efe51909-6088-42ba-9a3e-e0cce995e262` at 100% traffic. The single-use ledger and summary are in `validation/2026-11-21/patient-agent/approved-live/`, and deployment checks are in `cloud-acceptance-ops/` beside it. [Current live health](https://before-the-cut-agent-live.demonrain777.workers.dev/healthz)
+
+The accompanying release passed all 23 local regression groups and nine guard and evaluation tests. Both language captures produced 464 frames. The public mock also completed 24/24 in a separate rehearsal. Local check logs are under `validation/2026-11-21/patient-agent/m0-cloud-green/`.
+
+## Earlier public checks
+
+At 21:52 UTC the permanent account deployment was updated. Its public mock passed 24 dialogues and session isolation. The timeout returned 504 and the game displayed fallback after 3,823 ms. A separate bilingual evaluation had used the game's local service for 1,094 real GPT-6 Luna attempts, with USD 0.595195 reserved. [Full build results](../../HANDOFF.md#full-build-november-21)
 
 The material below records the earlier one-hour preview.
 
@@ -18,12 +41,12 @@ The six-visit checkpoint sent four dialogue requests per visit through the publi
 
 ## Account deployment
 
-The three permanent Workers deployed successfully under `demonrain777.workers.dev` at 20:36 UTC. The default service completed a fresh six-visit public mock check. The live service is disabled and its secret list has no OpenAI project key. The approved cloud check is pending the provider project hard limit and the hidden key entry. Account deployment metadata is in `validation/2026-11-21/patient-agent/p2/account-deploy.json`.
+The three permanent Workers deployed successfully under `demonrain777.workers.dev` at 20:36 UTC. The default service completed a fresh six-visit public mock check. At that point the live service was disabled and its secret list was empty. The deployed checkpoint above records the subsequent binding and paid results. Account deployment metadata is in `validation/2026-11-21/patient-agent/p2/account-deploy.json`.
 
 ## Approved paid check
 
-The student approved both mock deployments, disabled live setup and redeployment for the check. The approved provider is OpenAI, standard-tier `gpt-6-luna`, reasoning off. The allowance is six visits, up to 24 dialogues, zero transcriptions and a ceiling of USD 0.01. At the quoted rates, the earlier estimate was USD 0.00231. Actual live latency, usage and output quality remain unmeasured on this build. [Model prices](https://developers.openai.com/api/docs/models/gpt-6-luna)
+The student approved both mock deployments, disabled live setup and redeployment for the check. The approved provider is OpenAI, standard-tier `gpt-6-luna`, reasoning off. The allowance is six visits, up to 24 dialogues, zero transcriptions and a ceiling of USD 0.01. At the quoted rates, the earlier estimate was USD 0.00231. The deployed checkpoint above records the observed latency, token usage and cost estimate. [Model prices](https://developers.openai.com/api/docs/models/gpt-6-luna)
 
-The first attempt at permanent deployment returned a missing-credentials error. The interactive Wrangler session expired with the browser on Cloudflare's sign-in page. The remaining account steps are the student's Cloudflare login, project key at Wrangler's hidden prompt and monthly enforcement in the provider project. The temporary deployment contains no provider key. After those account steps, the operator can use the already-approved private run and restore the disabled Worker. The single-use ledger records metadata and reserves a conservative amount before each attempt. [Deployment and private-run commands](../../agent_proxy/README.md#deployment-and-rollback)
+The first permanent deployment attempt encountered an expired Wrangler sign-in. The subsequent authenticated deployment and completed checkpoint are recorded above. The single-use ledger reserves a conservative amount before each paid attempt. [Deployment and private-run commands](../../agent_proxy/README.md#deployment-and-rollback)
 
 The executable evidence is under `validation/2026-11-21/patient-agent/`, including `p1/public-checks.json`, `p1/public-game-{mock,timeout}.log`, `p1/temporary-deploy.json`, `p1/worker/results.json` and `p1-verified/checks.json`. All game input was automated. Human play and real microphone input are unverified.

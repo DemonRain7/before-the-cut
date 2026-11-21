@@ -1,16 +1,20 @@
 # Before the Cut: handoff
 
+## Deployed OpenAI checkpoint
+
+M0 is complete. On November 21 the permanent Cloudflare Worker returned 24/24 real GPT-6 Luna replies across six visits, three in English and three in Chinese. Median round-trip time was 1.524 seconds. Reported tokens put the standard-rate estimate at USD 0.00362719 and the conservative bound at USD 0.004588894, inside the approved USD 0.01. The project credential is bound. At 6:07 p.m. New York time the live Worker was closed again, confirmed by disabled health and a 503 on dialogue. Its temporary bearer was removed. [Paid results and cache measurements](docs/development/live-model-results-2026-11-21.md#deployed-worker-checkpoint)
+
 ## One session per appointment
 
 Every arrival creates a new patient session, including a return by the same character. Godot collects the doctor’s committed words, the patient’s displayed words, visible reactions and actions in chronological order. Opening GRIP, completing its squeeze-and-release and applying PRESS are distinct entries. Godot determines which clinical cues are available, charges the lamp cost for ASK and resolves the verdict. A resolved or abandoned visit releases its journal and invalidates late replies. Anonymous game events carry the visit ID. [Visit record](game/scripts/core/visit_record.gd) · [Patient agent](game/scripts/core/patient_agent.gd)
 
 The previous limit of 48 represented three entries for each of 16 replies. An ordinary request now contains the entire appointment. Above 32 KiB, excerpts preserve the opening and the latest exchange, and a summary carries the position of the gap and counts of every action across the visit. The complete record stays in memory until departure. Dialogue, intent and voice share a visit ID. A separate run ID carries aggregate quotas.
 
-The prompt follows Harbour Main’s ordering. Stable character instructions precede the appointment, followed by the current cues and action. GPT-6 Luna can cache the developer prefix and completed history groups. The proxy exposes actual cached-input and cache-write token counts when OpenAI supplies them. Transport tests exercised the prefix, schema, isolation and usage fields with a simulated provider. Live cache-hit rates remain unmeasured for this build. [Prompt assembly and transport](agent_proxy/src/providers.mjs) · [Service contract](agent_proxy/README.md#patient-dialogue)
+The prompt follows Harbour Main’s ordering. Stable character instructions precede the appointment, followed by the current cues and action. GPT-6 Luna can cache the developer prefix and completed history groups. The proxy exposes actual cached-input and cache-write token counts when OpenAI supplies them. Transport tests exercised the prefix, schema, isolation and usage fields with a simulated provider. The deployed checkpoint measured 3,149 cached input tokens across three of 24 replies. [Prompt assembly and transport](agent_proxy/src/providers.mjs) · [Service contract](agent_proxy/README.md#patient-dialogue)
 
 The release passed all 23 local check groups. Godot passed 2,099 rule checks and 1,247 / 1,248 / 1,247 scene checks in English, Chinese and reduced-blood mode. The game-to-service suite passed 354 integration and 102 wire checks, including opening GRIP twice, completing it once, applying PRESS and sending a follow-up. The proxy passed 57 tests, plus nine guard and evaluation tests. All 1,102 mock E1–E4 calls returned 200. Both languages passed 1,624 text measurements and produced 464 frames each. Verification lives in `validation/2026-11-21/patient-agent/visit-record-release/`.
 
-The same three Workers were redeployed. The public mock accepted a 67-entry record and a clean return visit for the same patient. The six-visit checkpoint received 24/24 mock replies. The forced-timeout Worker returned 504 and the Godot client displayed the fallback. The disabled live Worker returned 503. Deployment IDs and public probes are in `validation/2026-11-21/patient-agent/visit-session-cloud/`. The existing M0 account item and human E6 comparison remain open.
+The same three Workers were redeployed. The public mock accepted a 67-entry record and a clean return visit for the same patient. The six-visit checkpoint received 24/24 mock replies. The forced-timeout Worker returned 504 and the Godot client displayed the fallback. The disabled live Worker returned 503. Deployment IDs and public probes are in `validation/2026-11-21/patient-agent/visit-session-cloud/`. The later paid M0 checkpoint is recorded above. The human E6 comparison remains open.
 
 ## Full build, November 21
 
@@ -18,7 +22,7 @@ Rules version 12 and patient protocol 4 are on `main`. The ten patients can conv
 
 | Milestone | Delivered | Commit |
 | --- | --- | --- |
-| M0 | Baseline and account deployment record | `4bc8697` |
+| M0 | Baseline, deployment and paid cloud checkpoint | `4bc8697` and the commit titled *Verify real patient replies through the deployed Worker* |
 | M1 | Earlier flow changes and original briefs | `d4bb069`, `634be3b` |
 | M2 | Rules, fixed nights I/J and closing feedback | `642b2ba` |
 | M3 | P2 character continuity, intent routing and optional turns | `ee5559a` |
@@ -108,7 +112,7 @@ Only synthetic evaluation answers are kept for the student, in the ignored `vali
 
 Three permanent services were updated in the student's existing Cloudflare account. All report protocol 4 and ten compatible cases. Public voice is off. The mock completed six visits and 24 replies. Session A reached 16, was refused on 17, and session B could still speak. The Worker also enforced the separate idle and optional-turn caps. The timeout returned 504 in 3,883 ms. The actual Godot client displayed its authored fallback after 3,823 ms. The disabled live endpoint returned 503 before processing a POST.
 
-| Permanent service | Version |
+| Permanent service | Version at M6 |
 | --- | --- |
 | [Public mock](https://before-the-cut-agent.demonrain777.workers.dev/healthz) | `49c7b037-5ef9-4e5b-bd78-df341a9d3a80` |
 | [Timeout demonstration](https://before-the-cut-agent-timeout.demonrain777.workers.dev/healthz) | `966dcbdc-a15a-4120-9604-2bbb3b775223` |
@@ -127,7 +131,7 @@ Both fresh boots, the cold import and rules, settings write/read, five normal-cl
 
 ### Remaining work with the owner or outside players
 
-The separate M0 checkpoint calls the **deployed** paid Worker for six visits with a maximum of 24 dialogues, zero transcriptions and USD 0.01. Its spending approval already exists. The owner has supplied the local evaluation key and run ceiling. The live Worker has no project secret configured and there is no confirmation of the provider project's monthly hard limit. In the OpenAI project select Limits, set the monthly spend amount and enable hard enforcement. From `agent_proxy` run `npx --yes wrangler@4.166.0 secret put OPENAI_API_KEY --env live` and enter the key at the hidden prompt. The missing confirmation is “已在 OpenAI 项目启用每月 X 美元硬上限，并在 live Worker 的隐藏提示中配置了项目密钥。” The protected checkout command is `node ../tools/check_patient_checkpoint.mjs live $liveOrigin ../validation/2026-11-21/patient-agent/approved-live` inside the runbook's enable/disable block. The instructor's required Worker foundation and the November 23 rubric remain unconfirmed. [Protected checkpoint runbook](agent_proxy/README.md#deployment-and-rollback) · [OpenAI project limits](https://help.openai.com/en/articles/9186755-managing-projects-in-the-api-platform)
+The instructor’s required Worker foundation and November 23 rubric still need confirmation from the course. The account configuration and paid M0 checkpoint are complete.
 
 The other outstanding evidence comes from people. The student can read the 20 replies per language and three outside players can use the E6 kit. No course post, peer reply or grading decision is part of this build.
 
@@ -153,7 +157,7 @@ An independent export of the proposed commit also passed a cold import, 2,025 ru
 ### Next three tasks
 
 1. Use the student's interactive Wrangler login to publish persistent public services and repeat the mock isolation and timeout probes. The one-hour Cloudflare preview passed in all three environments. The course materials accessible here did not identify the instructor's template or independently confirm the November 23 rubric.
-2. On the persistent, disabled live Worker, the student enters the OpenAI project key at the hidden prompt and enables the monthly hard spend limit. The public preview had the kill switch on, returned 503 on POST and contained no provider key.
+2. The permanent live Worker later completed the private six-visit OpenAI checkpoint and was switched off again. [Deployed results](docs/development/live-model-results-2026-11-21.md#deployed-worker-checkpoint)
 3. Use the [private checkpoint procedure](agent_proxy/README.md#deployment-and-rollback) for the approved six visits, 24 dialogues maximum, zero transcriptions and a USD 0.01 ceiling. Record real usage and latency and restore the disabled Worker. The old November 15 ledger is closed. Future phases and their design decisions remain separate.
 
 ## Historical checkpoint, November 21, 2026 — patient agent P0
@@ -1112,7 +1116,7 @@ Seen earlier, not changed:
 The original Braintrust action and its original due date are preserved below.
 
 1. **Braintrust replies** (due **today, November 19, 23:59 New York**, the soonest deadline): the student picks two G1 pitches with fewer than two replies; draft specific, moment-based notes in English for review; the student sends them. Then read the instructor's Approve/Hold comment.
-2. **Deployed paid checkpoint.** Once the owner has set the project hard limit and entered the existing key at Wrangler's hidden prompt, run the six-visit check and restore the kill switch. The amount, model and account steps are in the full-build section above. Confirm the instructor's Worker foundation and November 23 rubric from the course.
+2. **Course checkpoint.** The deployed paid test is complete. Confirm the instructor’s Worker foundation and November 23 rubric from the course. [Paid checkpoint evidence](docs/development/live-model-results-2026-11-21.md#deployed-worker-checkpoint)
 3. **Human evidence.** Read the twenty E2 answers per language and run the prepared E6 scripted/live comparison with at least three outside players. Keep the time, decision, question, follow-up and shutter results. The existing local budget ledger belongs to the completed automated evaluation.
 
 ## Evidence (local, not in Git)

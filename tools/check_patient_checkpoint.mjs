@@ -22,18 +22,33 @@ const approved = fileURLToPath(new URL("../validation/2026-11-21/patient-agent/a
 if (live && path.relative(approved, root) !== "") throw Error("Use the existing November 21 authorization directory: validation/2026-11-21/patient-agent/approved-live");
 fs.mkdirSync(root, { recursive: true });
 const ledger = path.join(root, "checkpoint.jsonl");
-const health = await fetch(new URL("/healthz", base), { redirect: "error", signal: AbortSignal.timeout(10000) });
-const info = await health.json();
-assert.equal(info.protocol, PROTOCOL);
-assert.equal(info.disabled, false);
-assert.equal(info.provider, live ? "openai" : "mock");
-if (live) {
-	assert.equal(info.model, "gpt-6-luna");
-	assert.equal(info.speech_to_text, false);
-	// A malformed body cannot reach a provider, even if the gate is misconfigured.
-	const gate = await fetch(new URL("/v1/patient-dialogue", base), { method: "POST", body: "{", redirect: "error", signal: AbortSignal.timeout(8000) });
-	assert.equal(gate.status, 401, "the paid environment must reject anonymous POSTs");
+async function readyService() {
+	const deadline = Date.now() + 45000;
+	while (true) {
+		const health = await fetch(new URL("/healthz", base), { cache:"no-store", redirect:"error", signal:AbortSignal.timeout(10000) });
+		assert.equal(health.status, 200);
+		const info = await health.json();
+		assert.equal(info.protocol, PROTOCOL);
+		assert.equal(info.provider, live ? "openai" : "mock");
+		if (!live) {
+			assert.equal(info.disabled, false);
+			return info;
+		}
+		assert.equal(info.model, "gpt-6-luna");
+		assert.equal(info.speech_to_text, false);
+		if (!info.disabled) {
+			// This anonymous malformed request cannot reach the model. During propagation
+			// a POST can still hit the disabled version after health sees the enabled one.
+			const gate = await fetch(new URL("/v1/patient-dialogue", base), { method:"POST", body:"{", redirect:"error", signal:AbortSignal.timeout(8000) });
+			const code = (await gate.json()).error?.code;
+			if (gate.status === 401 && code === "checkpoint_unauthorized") return info;
+			assert.ok(gate.status === 503 && code === "service_disabled", "the paid environment must reject anonymous POSTs");
+		}
+		if (Date.now() >= deadline) throw Error("The private checkpoint deployment is still disabled.");
+		await new Promise(resolve => setTimeout(resolve, 1000));
+	}
 }
+const info = await readyService();
 const { cases, rules } = loadGameData();
 const translations = {};
 for (const id of Object.keys(cases)) {
@@ -87,15 +102,22 @@ try {
 			const data = await response.json();
 			const latency = Math.round(performance.now() - started);
 			const input = data.meta?.usage?.input_tokens, output = data.meta?.usage?.output_tokens;
+			const cached = data.meta?.usage?.cached_input_tokens, written = data.meta?.usage?.cache_write_tokens;
 			const measured = Number.isSafeInteger(input) && input >= 0 && Number.isSafeInteger(output) && output >= 0;
+			const reads = measured && Number.isSafeInteger(cached) && cached >= 0 && cached <= input ? cached : null;
+			const writes = measured && Number.isSafeInteger(written) && written >= 0 && written <= input - (reads ?? 0) ? written : null;
 			spentBound += measured ? input * inputNanoUsd + output * outputNanoUsd : worst;
 			record({ ...meta, stage:"response", status:response.status, code:response.ok ? "ok" : data.error?.code, latency_ms:latency,
-				request_id:data.meta?.request_id, input_tokens:input ?? null, output_tokens:output ?? null });
+				request_id:data.meta?.request_id, input_tokens:input ?? null, output_tokens:output ?? null,
+				cached_input_tokens:reads, cache_write_tokens:writes,
+				...(response.ok ? {provider:data.meta?.provider, model:data.meta?.model, mock:data.meta?.mock}
+					: /^[a-z][a-z0-9_]{0,39}$/.test(data.error?.message ?? "") ? {detail:data.error.message} : {}) });
 			if (!response.ok) throw Error("Checkpoint stopped after HTTP " + response.status + " (" + (data.error?.code || "unknown") + ").");
 			assert.equal(data.meta.mock, !live);
+			assert.equal(data.meta.provider, info.provider);
 			assert.ok(measured);
 			assert.ok(typeof data.reply === "string" && data.reply.length > 0);
-			usage.push({ latency, input, output });
+			usage.push({ latency, input, output, cached:reads, written:writes });
 			history.push({role:"doctor",text:event.text});
 			if (data.reaction) history.push({role:"reaction",text:data.reaction});
 			history.push({role:"patient",text:data.reply});
@@ -110,8 +132,12 @@ try {
 	}
 	const latencies = usage.map(r=>r.latency).sort((a,b)=>a-b);
 	const input = usage.reduce((n,r)=>n+r.input,0), output = usage.reduce((n,r)=>n+r.output,0);
+	const reads = usage.filter(r => r.cached !== null), writes = usage.filter(r => r.written !== null);
+	const cached = reads.reduce((n,r)=>n+r.cached,0), written = writes.reduce((n,r)=>n+r.written,0);
 	const summary = { mode, protocol:PROTOCOL, provider:info.provider, model:info.model, dialogue:reserved, transcriptions:0, cases:casesSeen,
-		input_tokens:input, output_tokens:output, estimated_usd:(input*100+output*500)/1e9, conservative_usd:spentBound/1e9,
+		input_tokens:input, output_tokens:output, cache_read_reports:reads.length, cache_write_reports:writes.length,
+		cached_input_tokens:reads.length ? cached : null, cache_write_tokens:writes.length ? written : null,
+		estimated_usd:((input-cached-written)*100+cached*10+written*125+output*500)/1e9, conservative_usd:spentBound/1e9,
 		median_ms:(latencies[11]+latencies[12])/2, p90_ms:latencies[21], max_ms:latencies.at(-1) };
 	fs.writeFileSync(path.join(root,"summary.json"), JSON.stringify(summary,null,2) + "\n");
 	console.log(JSON.stringify(summary));

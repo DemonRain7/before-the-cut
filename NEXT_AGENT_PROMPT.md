@@ -1,6 +1,6 @@
 # Continue Before the Cut
 
-Start with the [appointment memory checkpoint](HANDOFF.md#one-session-per-appointment), then read the [full build](HANDOFF.md#full-build-november-21) and [milestone record](docs/development/full-build-progress.md). The M1–M7 build is on `main`. The only pending M0 item is the account-dependent paid check of the deployed Worker. The version is rules 12, protocol 4. The student selected wear, the warned second PRESS, all repairs, pushing milestones and redeploying the three existing services.
+Start with the [appointment memory checkpoint](HANDOFF.md#one-session-per-appointment), then read the [full build](HANDOFF.md#full-build-november-21) and [milestone record](docs/development/full-build-progress.md). M0–M7 are complete. The deployed Worker returned 24/24 genuine GPT-6 Luna replies and was switched off again. The approved M0 ledger is closed. [Cloud checkpoint evidence](docs/development/live-model-results-2026-11-21.md#deployed-worker-checkpoint) The version is rules 12, protocol 4. The student selected wear, the warned second PRESS, all repairs, pushing milestones and redeploying the three existing services.
 
 ## Run the game
 
@@ -21,7 +21,7 @@ Keep the mock, forced-timeout and disabled-live Workers on their existing names 
 ## Next three tasks
 
 1. The existing Braintrust action belongs to the student. Preserve the original item under “Next three tasks” in HANDOFF. No course post was sent.
-2. Once the owner confirms the monthly hard spend limit and enters the OpenAI key at Wrangler's hidden prompt, run the already-approved deployed checkpoint through the protected enable/disable block in the proxy runbook. Six visits, at most 24 dialogues, zero transcriptions and USD 0.01. Confirm disabled health again. The instructor's required Worker foundation and November 23 rubric still need confirmation from the course.
+2. Confirm the instructor’s required Worker foundation and November 23 rubric from the course. The paid checkpoint evidence and closed ledger are available in the build handoff.
 3. The student reads the 20 synthetic E2 replies per language. Recruit at least three outsiders for the scripted/live E6 comparison on both seeded nights with its own human-session budget. Nobody has played the new build. Review their measured decisions, shutter catches and follow-ups before changing the rules or the ASK default.
 
-Current public deployment evidence is in `validation/2026-11-21/patient-agent/visit-session-cloud/`, local regression and bilingual frames in `visit-record-release/`, and computed play and the November 21 evaluation in `validation/2026-11-21/full-build/`. Keep raw samples and validation local. Credentials are managed by the service. Keep the historical November 15 ledger closed.
+The paid checkpoint ledger and final live deployment evidence are in `validation/2026-11-21/patient-agent/approved-live/` and `cloud-acceptance-ops/`. The session-isolation probes are in `visit-session-cloud/`, local regression and bilingual frames in `visit-record-release/`, and computed play and the November 21 evaluation in `validation/2026-11-21/full-build/`. Keep raw samples and validation local. Credentials are managed by the service. Keep the historical November 15 ledger closed.

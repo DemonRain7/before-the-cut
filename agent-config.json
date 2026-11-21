@@ -3,7 +3,7 @@
   "config_version": "0.12.0",
   "project": "Before the Cut",
   "updated": "2026-11-21",
-  "status": "Rules 12 and protocol 4. The game's own service made 1,094 English/Chinese GPT-6 Luna evaluation attempts. Three permanent Workers were checked. The deployed live Worker is disabled. See the full-build section of HANDOFF.md.",
+  "status": "Rules 12 and protocol 4. The game's own service made 1,094 English/Chinese GPT-6 Luna evaluation attempts. The permanent live Worker then completed 24/24 GPT-6 Luna replies across six visits and returned to its disabled state. See the full-build section of HANDOFF.md.",
   "ai_use": "Claude authored the game and the initial proxy and added typing, push-to-talk and the OpenAI route. Codex migrated autonomous dialogue and verified the runtime on 2026-11-14. Claude transferred the source into this repository on 2026-11-15. Codex ran the first live OpenAI test and corrected generated-speech feedback on 2026-11-15.",
   "purpose": "Generate the patient's own dialogue and reactions from character context and conversation history.",
   "tools_available": [],
