@@ -76,7 +76,7 @@ export function createMockProvider({ fail = "" } = {}) {
 			if (fail === "http_error") throw new ProviderError("http_503");
 			if (intent) {
 				const reading = fail === "invalid_shape" ? { about: "unknown", intent: "other" } : mockIntent(topics, req.text);
-				return { text: fail === "invalid_json" ? "not JSON" : JSON.stringify(reading), model: "mock-intent-4", mock: true };
+				return { text: fail === "invalid_json" ? "not JSON" : JSON.stringify({ choice: reading.about === "none" ? reading.intent : "ask_" + reading.about }), model: "mock-intent-4", mock: true };
 			}
 			let answer = req && req.language === "zh"
 				? { reply: "继续之前，你能先说说这对我的夜班意味着什么吗？", reaction: "盯着医生，掂量这个回答。", cooperates: true }

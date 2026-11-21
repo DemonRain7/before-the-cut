@@ -6,6 +6,7 @@ param(
     [switch]$Mute,
     [string]$Seed = '',
     [string]$TestNight = '',
+    [ValidateSet('en', 'zh')][string]$Language,
     [switch]$ImportOnly,
     [string]$Patient = 'script',
     [switch]$CheckPatient
@@ -126,6 +127,7 @@ try {
     if ($LessBlood) { $gameOptions += '--less-blood' }
     if ($Mute) { $gameOptions += '--mute' }
     if ($Seed) { $gameOptions += "--seed=$Seed" }
+    if ($Language) { $gameOptions += "--lang=$Language" }
     if ($TestNight) { $gameOptions += "--test-night=$($TestNight.ToUpperInvariant())" }
     $gameArguments = @('--path', $gameDir)
     if ($CheckPatient) {

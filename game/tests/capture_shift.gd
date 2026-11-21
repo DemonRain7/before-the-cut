@@ -1368,6 +1368,9 @@ func wear_nights() -> void:
 				main._try_beat("arrive")
 				await d.settle()
 				await shot("optional-patient-turn")
+				main._offer_reading("Arm?", {"topic":"implant", "intent":"case_question", "reason":"", "source":"model"})
+				await shot("confirm-question-price")
+				main.act_cancel()
 				main.agent.set_mode("script")
 				main.agent.client = previous
 				main._service_has_beats = false

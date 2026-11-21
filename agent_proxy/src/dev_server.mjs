@@ -40,13 +40,19 @@ function readBody(req, cap) {
 }
 
 /** Starts the server. Returns {server, url, close()}. Port 0 picks a free port (used by the tests). */
-export function startServer({ provider, limits = {}, disabled = false, transcribeEnabled = true, host = "127.0.0.1", port = 8787, dataDir, log = (entry) => console.log(JSON.stringify(entry)) } = {}) {
+export function startServer({ provider, limits = {}, disabled = false, transcribeEnabled = true, host = "127.0.0.1", port = 8787, dataDir, localJudge, log = (entry) => console.log(JSON.stringify(entry)) } = {}) {
+	if (localJudge && host !== "127.0.0.1") throw Error("Evaluation requires loopback");
 	const { rules, cases } = loadGameData(dataDir);
 	const handle = createHandler({ cases, rules, provider, limits, disabled, transcribeEnabled, log: (entry) => log({ t: new Date().toISOString(), ...entry }) });
 	const server = http.createServer(async (req, res) => {
 		let out;
 		try {
-			out = await handle({ method: req.method, path: req.url, readBody: (cap) => readBody(req, cap) });
+			if (localJudge && req.method === "POST" && req.url === "/evaluation/judge" && req.headers["x-evaluation-run"] === localJudge.nonce) {
+				const body = await readBody(req, 4096);
+				out = body.bodyTooLarge ? { status:413, body:{} } : await localJudge.evaluate(JSON.parse(body.bodyText));
+			} else {
+				out = await handle({ method: req.method, path: req.url, readBody: (cap) => readBody(req, cap) });
+			}
 		} catch {
 			out = { status: 500, body: { error: { code: "internal", message: "internal" } } };
 		}

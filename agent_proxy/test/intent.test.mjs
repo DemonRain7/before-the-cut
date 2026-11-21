@@ -20,7 +20,8 @@ test("intent carries only questions and the submitted line to a strict enum", as
 		assert.equal(r.body.about, expected);
 		const input = inputs.at(-1);
 		assert.deepEqual(JSON.parse(input.user), { questions: cases.kip.topics.map(({ id, q }) => ({ id, q })), line: text });
-		assert.deepEqual(input.schema.properties.about.enum, [...cases.kip.topics.map(t => t.id), "none"]);
+		assert.deepEqual(input.schema.properties.choice.enum.filter(k => k.startsWith("ask_")), cases.kip.topics.map(t => "ask_" + t.id));
+		assert.deepEqual(input.schema.required, ["choice"]);
 		assert.equal(input.caseData, undefined);
 		assert.ok(!JSON.stringify([input.system, input.user]).includes("hidden"));
 		assert.ok(!JSON.stringify(logs).includes(text));

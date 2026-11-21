@@ -9,6 +9,10 @@
 		"REC"
 	],
 	"strings": {
+		"ENTER picks the first line. Click another or ESC to cancel.": "回车选第一项，也可点击其他项。ESC 取消。",
+		"YOUR MEANING": "你想说什么",
+		"Choose a listed question": "选择一个列出的问题",
+		"Say it as small talk": "当作闲聊说",
 		"LIGHT %d  GRIP %d  PORT %d  ASK %d  PRESS %d  CALM %d": "照眼 %d  握力 %d  接口 %d  提问 %d  施压 %d  安抚 %d",
 		"WEAR": "磨损",
 		"asked, but not about this": "问过，但没问这一项",
@@ -164,7 +168,7 @@
 		"Still answering. You can look meanwhile, or decide now.": "还在回答。你可以趁机看看，或者现在就做决定。",
 		"ENTER talks. CTRL+ENTER presses. Questions cost the ASK price.": "ENTER 交谈，CTRL+ENTER 施压。提问照常扣耐心。",
 		"That is all you can say in one go. ENTER says it.": "一次只能说这么多。ENTER 说出。",
-		"Just talk. Nothing goes on the card.": "只是闲聊，不记入病历。",
+		"Small talk. Use ASK to choose a question for the card.": "闲聊。要记在卡上，点提问选择问题。",
 		"Asked as: %s": "识别为提问：%s",
 		"TYPE": "打字",
 		"SPEAK": "说话",

@@ -257,7 +257,7 @@ const THINK_HINT := "Still answering. You can look meanwhile, or decide now."
 const THINK_QUIET := 1.6          # how long a look made while the patient is answering stays readable
 const SAY_HINT := "ENTER talks. CTRL+ENTER presses. Questions cost the ASK price."
 const SAY_FULL_HINT := "That is all you can say in one go. ENTER says it."
-const SAY_SMALL_HINT := "Just talk. Nothing goes on the card."
+const SAY_SMALL_HINT := "Small talk. Use ASK to choose a question for the card."
 const SAY_CHIPS := [{"id": "type", "key": "T", "label": "TYPE"}]
 # push-to-talk: the microphone is open only while this key (or the SPEAK button) is held
 const SPEAK_KEY := KEY_TAB
@@ -326,6 +326,7 @@ var _beat_clock := 0.0
 var _beat_pending := false
 var _beat_opening_done := false
 var _beat_revision := 0
+var _reading_choice: Dictionary = {}
 var _service_has_voice: bool = true
 var _service_is_mock: bool = false
 var start_muted: bool = false
@@ -1058,6 +1059,7 @@ func _answer_pending() -> bool:
 
 ## Every new action puts away whatever was in hand and stops the sequence that was running.
 func _begin_action() -> int:
+	_reading_choice.clear()
 	if state == State.EXAM:
 		_beat_opening_done = true
 	_close_scope(true)
@@ -2192,9 +2194,51 @@ func act_say(text: String) -> void:
 	_lock = false
 	_log("intent", {"source": reading.source, "topic": reading.topic, "chars": text.length(), "code": reading.reason})
 	if str(reading.topic) != "":
+		var cost := visit.ask_cost(str(reading.topic))
+		if agent.mode == "model" and cost > 0:
+			_offer_reading(text, reading)
+			return
 		_log("say", {"source": reading.source, "topic": reading.topic, "chars": text.length()})
 		await act_ask(str(reading.topic), text, str(reading.reason))
 		return
+	if agent.mode == "model" and reading.get("intent") == "unclear":
+		_offer_reading(text, reading)
+		return
+	await _free_conversation(text, reading, token)
+
+
+func _offer_reading(text: String, reading: Dictionary) -> void:
+	_reading_choice = {"text":text, "reading":reading.duplicate(true), "token":_seq}
+	var options: Array = []
+	if reading.topic != "":
+		options.append({"id":"confirm", "label":str(visit.topic(reading.topic).q), "tag":"-%d" % visit.ask_cost(reading.topic)})
+	options.append({"id":"chat", "label":"Say it as small talk", "tag":"0"})
+	options.append({"id":"pick", "label":"Choose a listed question", "tag":""})
+	dialogue.set_menu("YOUR MEANING", options)
+	_base_hint = "ENTER picks the first line. Click another or ESC to cancel."
+
+
+func _choose_reading(id: String) -> void:
+	if _reading_choice.is_empty() or not dialogue.has_menu():
+		return
+	var pending := _reading_choice.duplicate(true)
+	_reading_choice.clear()
+	dialogue.clear_menu()
+	if pending.token != _seq or not _can_act():
+		return
+	var reading: Dictionary = pending.reading
+	match id:
+		"confirm":
+			_log("say", {"source":reading.source, "topic":reading.topic, "chars":str(pending.text).length()})
+			act_ask(reading.topic, pending.text, reading.reason)
+		"chat":
+			reading.intent = "other"
+			_free_conversation(pending.text, reading, _begin_action())
+		"pick":
+			act_ask_menu()
+
+
+func _free_conversation(text: String, reading: Dictionary, token: int) -> void:
 	var d: Dictionary = await _decide({"type": "say", "id": "free", "intent": reading.get("intent", "other")}, [], text, token, true, str(reading.reason))
 	if d.is_empty():
 		return
@@ -3838,6 +3882,9 @@ func key_down(keycode: int, unicode: int = 0, control: bool = false) -> void:
 
 
 func _key_press(keycode: int, unicode: int, control: bool) -> void:
+	if state == State.EXAM and not guide.is_open() and not _reading_choice.is_empty() and dialogue.has_menu() and keycode in [KEY_ENTER, KEY_KP_ENTER]:
+		_choose_reading(dialogue.menu_id(0))
+		return
 	if keycode == KEY_F11:
 		act_fullscreen(not fullscreen)
 		return
@@ -4047,7 +4094,10 @@ func _exam_click(pos: Vector2) -> void:
 	if dialogue.has_menu():
 		var i := dialogue.menu_index_at(pos)
 		if i >= 0:
-			act_ask(dialogue.menu_id(i))
+			if _reading_choice.is_empty():
+				act_ask(dialogue.menu_id(i))
+			else:
+				_choose_reading(dialogue.menu_id(i))
 			return
 	var pad := desk.pad_at(pos)
 	if pad != "":
