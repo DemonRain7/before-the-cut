@@ -2,7 +2,7 @@ extends RefCounted
 ## Format and display limits only. This validator never selects or rewrites patient speech.
 ## Filename retained for existing preloads; model responses have no legal-move list.
 
-static func validate(raw: Variant, max_chars: int, needs_cooperation: bool = false, outcome: String = "") -> Dictionary:
+static func validate(raw: Variant, max_chars: int, needs_cooperation: bool = false, outcome: String = "", allows_silence: bool = false) -> Dictionary:
 	if typeof(raw) != TYPE_DICTIONARY:
 		return {"ok": false, "reason": "not_object"}
 	var data: Dictionary = raw
@@ -10,7 +10,7 @@ static func validate(raw: Variant, max_chars: int, needs_cooperation: bool = fal
 		if typeof(data.get(key)) != TYPE_STRING:
 			return {"ok": false, "reason": key + "_missing"}
 		var value := str(data[key]).strip_edges()
-		if key == "reply" and value.is_empty():
+		if key == "reply" and value.is_empty() and not allows_silence:
 			return {"ok": false, "reason": "reply_empty"}
 		if value.length() > (max_chars if key == "reply" else 110):
 			return {"ok": false, "reason": key + "_too_long"}

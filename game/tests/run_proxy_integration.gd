@@ -90,6 +90,7 @@ func _run() -> void:
 	client.base_url = str(urls.normal)
 	await test_speech_route(db.cases.kip)
 	await test_scene()
+	await test_optional_turns()
 	for language in ["en", "zh"]:
 		await test_talk_rules(language)
 	Lang.pin("en")
@@ -623,9 +624,46 @@ func test_patient_settings(main: MainScript, driver: PlayDriver) -> void:
 
 
 ## Play both languages through the real text box, network classifier, ASK and PRESS.
+func test_optional_turns() -> void:
+	var main: MainScript = load("res://scenes/main.tscn").instantiate()
+	main.authored_order = true
+	main.surprises_enabled = false
+	root.add_child(main)
+	await process_frame
+	var driver := PlayDriver.new(self, main)
+	check(await driver.open_counter() and await driver.buzz_in(), "a visit opens before its optional turns")
+	await driver.settle()
+	main.agent.client = client
+	main.agent.session_id = "scene-beats"
+	main.agent.set_mode("model")
+	main._service_has_beats = true
+	var before: Dictionary = main.visit.snapshot()
+	var draws: int = main._snap_rng.state
+	var memory := main.agent.conversation_history.duplicate(true)
+	client.base_url = str(urls.stt_slow) # replies successfully after 700 ms of wall time
+	main._try_beat("arrive")
+	check(main._beat_pending and not main._lock and not main._thinking, "an outstanding beat never owns the action lock")
+	main.act_say_open()
+	check(main.dialogue.input_open, "the doctor can type immediately during a slow beat")
+	var deadline := Time.get_ticks_msec() + 6000
+	while main._beat_pending and Time.get_ticks_msec() < deadline:
+		await process_frame
+	check(not main._beat_pending, "the slow request resolves")
+	check(main.agent.conversation_history == memory and main.dialogue.input_open, "a late reply neither replaces the input nor enters memory")
+	main.act_cancel()
+	await driver.settle()
+	client.base_url = str(urls.normal)
+	main._try_beat("after_check","penlight")
+	check(await driver.until(func()->bool: return not main._beat_pending, 12.0), "a timely optional turn resolves")
+	check(main.agent.conversation_history.size() == memory.size()+1, "a timely reply appears in the visit")
+	check(main.visit.snapshot() == before and main._snap_rng.state == draws, "a spoken beat leaves the simulation unchanged")
+	await driver.leave()
+
+
 func test_talk_rules(language: String) -> void:
 	Lang.pin(language)
 	var main: MainScript = load("res://scenes/main.tscn").instantiate()
+	main.beats_enabled = false # foreground wire fixtures count each requested exchange
 	main.authored_order = true
 	main.surprises_enabled = false
 	root.add_child(main)
@@ -670,6 +708,7 @@ func test_talk_rules(language: String) -> void:
 func test_launcher(mode: String) -> void:
 	await process_frame
 	var main: MainScript = load("res://scenes/main.tscn").instantiate()
+	main.beats_enabled = false # foreground wire fixtures count each requested exchange
 	root.add_child(main)
 	var driver := PlayDriver.new(self, main)
 	if main._patient_status == "checking":
@@ -712,6 +751,7 @@ func test_launcher(mode: String) -> void:
 func test_scene() -> void:
 	Engine.time_scale = 4.0
 	var main: MainScript = load("res://scenes/main.tscn").instantiate()
+	main.beats_enabled = false # foreground wire fixtures count each requested exchange
 	main.authored_order = true      # the checks below follow the listed order of patients
 	root.add_child(main)
 	await process_frame

@@ -101,6 +101,23 @@ func line_for(case_data: Dictionary, move: String, event: Dictionary, state: Dic
 ## In another language the catalog adds words of its own (data/lang/<code>: "topics", under the
 ## topic id for every case and under "<case>:<topic>" for one case). Chinese leaves no spaces
 ## between words, so those are looked for anywhere in the sentence.
+static var intent_cues: Dictionary = {}
+
+
+static func intent_for_text(case_data: Dictionary, text: String) -> Dictionary:
+	if intent_cues.is_empty():
+		var file := FileAccess.open("res://data/patient_intents.json", FileAccess.READ)
+		if file != null:
+			intent_cues = JSON.parse_string(file.get_as_text())
+	var line := text.strip_edges().to_lower()
+	for kind in intent_cues:
+		for phrase in intent_cues[kind]:
+			if line.contains(phrase):
+				return {"topic":"", "intent":kind}
+	var topic := topic_for_text(case_data, text)
+	return {"topic":topic, "intent":"case_question" if topic != "" else ("unclear" if line.length() < 4 else "other")}
+
+
 static func topic_for_text(case_data: Dictionary, text: String) -> String:
 	var words: Array = []
 	var word := ""

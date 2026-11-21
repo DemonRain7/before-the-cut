@@ -27,13 +27,15 @@ export class SessionCounter {
 		const sql = this.storage.sql;
 		const full = this.storage.transactionSync(() => {
 			sql.exec("CREATE TABLE IF NOT EXISTS counts (key TEXT PRIMARY KEY, n INTEGER NOT NULL)");
-			return entries.findIndex(([key, limit]) => {
-				if (limit === 0) return true;
-				return sql.exec(
-					"INSERT INTO counts VALUES (?, 1) ON CONFLICT(key) DO UPDATE SET n = n + 1 WHERE n < ? RETURNING n",
-					key, limit
-				).toArray().length === 0;
+			const denied = entries.findIndex(([key, limit]) => {
+				const row = sql.exec("SELECT n FROM counts WHERE key = ?", key).toArray()[0];
+				return (row?.n || 0) >= limit;
 			});
+			if (denied >= 0) return denied;
+			for (const [key] of entries) {
+				sql.exec("INSERT INTO counts VALUES (?, 1) ON CONFLICT(key) DO UPDATE SET n = n + 1", key);
+			}
+			return -1;
 		});
 		await this.storage.setAlarm(Date.now() + DEFAULT_LIMITS.counterRetentionDays * 86400000);
 		return Response.json(full);

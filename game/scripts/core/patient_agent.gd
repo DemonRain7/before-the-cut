@@ -24,6 +24,8 @@ var calls_this_visit: int = 0
 var fallbacks_this_visit: int = 0
 var max_voice_clips: int = 24    # push-to-talk clips sent for their words, per visit
 var intents_this_visit: int = 0
+var beats_this_visit := 0
+var idle_beats_this_visit := 0
 var max_intents: int = 16
 var voice_clips_this_visit: int = 0
 var last: Dictionary = {}
@@ -74,6 +76,8 @@ func begin_visit(p_case: Dictionary, p_visit_id: String, p_seed: int) -> void:
 	fallbacks_this_visit = 0
 	voice_clips_this_visit = 0
 	intents_this_visit = 0
+	beats_this_visit = 0
+	idle_beats_this_visit = 0
 	last = {}
 	conversation_history = []
 	# the history is what the doctor saw: the authored lines in the player's language
@@ -200,7 +204,8 @@ func build_voice_payload(wav: PackedByteArray) -> Dictionary:
 
 ## Classify only the doctor's line. The intent route never receives a sign, state or history.
 func classify(text: String) -> Dictionary:
-	var fallback := {"topic": ScriptedBrain.topic_for_text(case_data, text), "source": "script", "reason": ""}
+	var fallback := ScriptedBrain.intent_for_text(case_data, text)
+	fallback.merge({"source":"script","reason":""})
 	if mode != "model" or client == null:
 		return fallback
 	fallback.source = "fallback"
@@ -217,12 +222,36 @@ func classify(text: String) -> Dictionary:
 	if response.get("ok") == true:
 		var about: Variant = response.get("data", {}).get("about")
 		if about == "none":
-			return {"topic": "", "source": "model", "reason": ""}
+			return {"topic": "", "intent": str(response.data.get("intent", "other")), "source": "model", "reason": ""}
 		for item in case_data.get("topics", []):
 			if item.id == about:
-				return {"topic": about, "source": "model", "reason": ""}
+				return {"topic": about, "intent":"case_question", "source":"model", "reason":""}
 	fallback.reason = str(response.get("error", "invalid_intent"))
 	return fallback
+
+
+## Speculative dialogue reserves a reply immediately. Only the director can accept it into memory.
+func can_beat(kind: String) -> bool:
+	var limits: Dictionary = rules.get("agent", {}).get("beats", {})
+	return mode == "model" and client != null and limits.get("enabled", false) and kind in ["arrive", "after_check", "idle"] and calls_this_visit < max_calls and beats_this_visit < int(limits.get("max_per_visit", 0)) and (kind != "idle" or idle_beats_this_visit < int(limits.get("max_idle_per_visit", 0)))
+
+
+func beat(kind: String, tool: String, state: Dictionary, signs: Dictionary) -> Dictionary:
+	if not can_beat(kind):
+		return {}
+	var generation := _generation
+	beats_this_visit += 1
+	calls_this_visit += 1
+	if kind == "idle":
+		idle_beats_this_visit += 1
+	var event := {"type":kind, "id":tool, "text":""}
+	var response: Dictionary = await client.request_move(build_payload(event, state, signs))
+	if generation != _generation or not response.get("ok", false):
+		return {}
+	var result := ResponseValidator.validate(response.get("data"), reply_chars(), false, "", true)
+	if not result.ok or result.reply == "":
+		return {}
+	return result
 
 
 func build_payload(event: Dictionary, state: Dictionary, signs: Dictionary = {}) -> Dictionary:

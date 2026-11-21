@@ -112,7 +112,10 @@ class StandInClient:
 	func is_configured() -> bool:
 		return true
 
-	func request_move(_payload: Dictionary) -> Dictionary:
+	func request_move(payload: Dictionary) -> Dictionary:
+		if payload.event.type in ["arrive", "after_check", "idle"]:
+			var line := "能让我缓口气吗？" if Lang.code == "zh" else "Can I catch my breath a moment?"
+			return {"ok":true, "data":{"reply":line, "reaction":""}}
 		if hold > 0.0 and tree != null:
 			await tree.create_timer(hold, false).timeout
 		return {"ok": false, "error": "stand_in"}
@@ -1357,6 +1360,17 @@ func wear_nights() -> void:
 				continue
 			reached(await d.buzz_in(), "worn visitor arrives")
 			await d.settle()
+			if night == "I" and id == "rook":
+				var previous: Variant = main.agent.client
+				main.agent.client = StandInClient.new()
+				main.agent.set_mode("model")
+				main._service_has_beats = true
+				main._try_beat("arrive")
+				await d.settle()
+				await shot("optional-patient-turn")
+				main.agent.set_mode("script")
+				main.agent.client = previous
+				main._service_has_beats = false
 			for row in CaseDB.ROWS:
 				if c.rows[row].ok:
 					continue

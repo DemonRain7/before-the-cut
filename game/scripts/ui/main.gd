@@ -320,6 +320,12 @@ var use_model: bool = false
 var _patient_override: String = ""
 var _patient_status: String = "off"
 var _patient_check_id: int = 0
+var beats_enabled := true
+var _service_has_beats := false
+var _beat_clock := 0.0
+var _beat_pending := false
+var _beat_opening_done := false
+var _beat_revision := 0
 var _service_has_voice: bool = true
 var _service_is_mock: bool = false
 var start_muted: bool = false
@@ -769,6 +775,7 @@ func _set_patient_ai(on: bool, save_choice: bool) -> void:
 			return
 		_patient_status = str(health.status)
 		use_model = _patient_status == "connected"
+		_service_has_beats = bool(health.get("beats", false))
 		_service_has_voice = bool(health.get("voice", false))
 		_service_is_mock = bool(health.get("mock", false))
 	if save_choice:
@@ -887,6 +894,7 @@ func _coach(id: String, text: String) -> void:
 
 
 func _bump() -> int:
+	_beat_activity()
 	_seq += 1
 	return _seq
 
@@ -1050,6 +1058,8 @@ func _answer_pending() -> bool:
 
 ## Every new action puts away whatever was in hand and stops the sequence that was running.
 func _begin_action() -> int:
+	if state == State.EXAM:
+		_beat_opening_done = true
 	_close_scope(true)
 	dialogue.clear_menu()
 	_drop_stamp(false)
@@ -1680,6 +1690,9 @@ func act_call_next() -> void:
 	visit.surprises = surprises_enabled and not _training_visit      # nobody snaps on the training visit
 	_surprise = ""
 	_snap_rng.seed = hash("surprise:%d:%d" % [shift_seed, _visit_serial])
+	_beat_opening_done = false
+	_beat_pending = false
+	_beat_activity()
 	agent.begin_visit(c, "%s-%d-%d-%s" % [session_id, shift_number, _visit_serial, id], shift_seed + _visit_serial * 7919)
 	_telegraphed = false
 	_attack_t = 0.0
@@ -1748,6 +1761,8 @@ func act_call_next() -> void:
 		ok = await _patient_line(str(line), token, 0.9)
 		if not ok:
 			return
+	_beat_opening_done = true
+	_try_beat("arrive")
 
 
 func _show_upcoming() -> void:
@@ -2018,7 +2033,9 @@ func _after_check(tool: String, text: String, token: int) -> void:
 		return
 	var lines: Dictionary = visit.case_data.get("lines", {})
 	var aside := str(lines.get("after:" + tool, ""))
-	if aside != "" and agent.mode != "model":
+	if agent.mode == "model":
+		_try_beat("after_check", tool)
+	elif aside != "":
 		_patient_line(aside, token, 0.0)
 
 
@@ -2178,7 +2195,7 @@ func act_say(text: String) -> void:
 		_log("say", {"source": reading.source, "topic": reading.topic, "chars": text.length()})
 		await act_ask(str(reading.topic), text, str(reading.reason))
 		return
-	var d: Dictionary = await _decide({"type": "say", "id": "free"}, [], text, token, true, str(reading.reason))
+	var d: Dictionary = await _decide({"type": "say", "id": "free", "intent": reading.get("intent", "other")}, [], text, token, true, str(reading.reason))
 	if d.is_empty():
 		return
 	_log("say", {"source": d.source, "chars": text.length(), "patience": visit.patience, "fallback_reason": d.fallback_reason})
@@ -3603,6 +3620,8 @@ func _input(event: InputEvent) -> void:
 
 
 func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
+		_beat_activity()
 	if what == NOTIFICATION_OS_IME_UPDATE and _ime_on:
 		dialogue.input_compose(DisplayServer.ime_get_text(), DisplayServer.ime_get_selection().x)
 	# the window lost the keyboard, so the key-up will never arrive: the microphone closes now
@@ -3628,6 +3647,8 @@ func _close() -> void:
 
 
 func pointer_move(pos: Vector2) -> void:
+	if pos != _mouse:
+		_beat_activity()
 	_mouse = pos
 
 
@@ -3661,6 +3682,7 @@ func _title_press(pos: Vector2, button: int) -> void:
 
 
 func pointer_down(pos: Vector2, button: int = MOUSE_BUTTON_LEFT) -> void:
+	_beat_activity()
 	_mouse = pos
 	_pointer_press(pos, button)
 	_sync_panels(0.0)      # a paper that was asked for is there for the very next click
@@ -3810,6 +3832,7 @@ func key_up(keycode: int) -> void:
 
 ## unicode: the character the key types, when it types one (the typing line needs it).
 func key_down(keycode: int, unicode: int = 0, control: bool = false) -> void:
+	_beat_activity()
 	_key_press(keycode, unicode, control)
 	_sync_panels(0.0)
 
@@ -4074,7 +4097,41 @@ func _click_pad(pad: String) -> void:
 
 # ================================================================ every frame
 
+func _beat_activity() -> void:
+	_beat_clock = 0.0
+	_beat_revision += 1
+
+
+func _beat_quiet() -> bool:
+	return beats_enabled and _service_has_beats and state == State.EXAM and visit != null and visit.in_exam() and not visit.is_spent() and not _lock and not _thinking and _mic_state == "" and not dialogue.input_open and not dialogue.has_menu() and not dialogue.typing and not guide.is_open() and not _closing
+
+
+func _try_beat(kind: String, tool: String = "") -> void:
+	if not _beat_quiet() or _beat_pending or agent == null or not agent.can_beat(kind):
+		return
+	var revision := _beat_revision
+	var token := _seq
+	var current := visit
+	var speaker := agent
+	_beat_pending = true
+	_beat_clock = 0.0
+	var result: Dictionary = await speaker.beat(kind, tool, current.snapshot(), current.open_signs())
+	if speaker != agent or current != visit:
+		return
+	_beat_pending = false
+	if revision != _beat_revision or token != _seq or not _beat_quiet() or result.is_empty():
+		return
+	# The optional line can be interrupted by any action; it never takes the action lock.
+	speaker.remember_exchange({}, {"reply": result.reply})
+	_log("patient_beat", {"stage": kind, "chars": str(result.reply).length()})
+	_patient_line(str(result.reply), token, 0.0)
+
+
 func _process(delta: float) -> void:
+	if _beat_opening_done and not _beat_pending and _beat_quiet() and not clinic.scope.is_open() and agent.can_beat("idle"):
+		_beat_clock += delta
+		if _beat_clock >= float(rules.agent.beats.idle_seconds):
+			_try_beat("idle")
 	_t += delta
 	_sync_ime()
 	if rig != null:

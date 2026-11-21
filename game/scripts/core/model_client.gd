@@ -53,7 +53,7 @@ func check_service(expected: Dictionary, wait_ms: int) -> Dictionary:
 		seen[id] = true
 	if seen.size() != expected.size():
 		return {"status": "version"}
-	return {"status": "connected", "voice": data.get("speech_to_text") == true, "mock": data.get("provider") == "mock"}
+	return {"status": "connected", "beats": data.get("patient_beats") == true, "voice": data.get("speech_to_text") == true, "mock": data.get("provider") == "mock"}
 
 
 func _request(path: String, method: HTTPClient.Method, body_text: String, wait_ms: int) -> Dictionary:

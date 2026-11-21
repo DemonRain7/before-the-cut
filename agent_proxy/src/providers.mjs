@@ -46,18 +46,24 @@ function sleep(ms, signal) {
 	});
 }
 
+import intentCues from "../../game/data/patient_intents.json" with { type: "json" };
+import chineseTopics from "../../game/data/lang/zh/topics.json" with { type: "json" };
+
 function mockIntent(topics, text) {
 	const line = text.trim().toLowerCase();
-	if (/^(show|let me|please show)|看一下|让我看|给我看/.test(line)) return "none";
+	for (const [intent, phrases] of Object.entries(intentCues)) {
+		if (phrases.some(phrase => line.includes(phrase))) return { about: "none", intent };
+	}
 	const words = line.match(/[a-z]+/g) || [];
 	const chinese = { why: ["为什么来", "怎么了"], sleep: ["睡", "失眠", "休息"], implant: ["不听使唤", "义体"], chrome: ["义体", "零件"], mood: ["心情", "生气"] };
 	let chosen = "none", highest = 0;
 	for (const { id, q, keys } of topics) {
-		if (line === q.toLowerCase()) return id;
-		const score = (keys || []).filter(key => words.includes(key)).length + (chinese[id] || []).filter(key => line.includes(key)).length;
+		if (line === q.toLowerCase()) return { about: id, intent: "case_question" };
+		const score = (keys || []).filter(key => words.includes(key)).length + [...new Set([...(chinese[id] || []), ...(chineseTopics.topics[id] || [])])].filter(key => line.includes(key)).length;
 		if (score > highest) { highest = score; chosen = id; }
+		else if (score > 0 && score === highest) chosen = "none";
 	}
-	return chosen;
+	return { about: chosen, intent: chosen !== "none" ? "case_question" : line.length < 4 || highest ? "unclear" : "other" };
 }
 
 /** Synthetic transport fixture. Not intelligent, not a scripted patient comparison. */
@@ -69,12 +75,15 @@ export function createMockProvider({ fail = "" } = {}) {
 			if (fail.startsWith("slow:")) await sleep(Number(fail.slice(5)) || 0, signal);
 			if (fail === "http_error") throw new ProviderError("http_503");
 			if (intent) {
-				const about = fail === "invalid_shape" ? "unknown" : mockIntent(topics, req.text);
-				return { text: fail === "invalid_json" ? "not JSON" : JSON.stringify({ about }), model: "mock-intent-4", mock: true };
+				const reading = fail === "invalid_shape" ? { about: "unknown", intent: "other" } : mockIntent(topics, req.text);
+				return { text: fail === "invalid_json" ? "not JSON" : JSON.stringify(reading), model: "mock-intent-4", mock: true };
 			}
 			let answer = req && req.language === "zh"
 				? { reply: "继续之前，你能先说说这对我的夜班意味着什么吗？", reaction: "盯着医生，掂量这个回答。", cooperates: true }
 				: { reply: "Before we go on, will you explain what this means for my night shift?", reaction: "Watches the doctor, weighing the answer.", cooperates: true };
+			if (["idle", "arrive", "after_check"].includes(req?.event?.type)) {
+				answer = { reply: req.event.type === "idle" ? "" : req.language === "zh" ? "我能喘口气吗？" : "Can I catch my breath a moment?", reaction: "" };
+			}
 			if (req?.event?.outcome) answer.cooperates = ["grant", "answer"].includes(req.event.outcome);
 			if (fail === "long_line") answer.reply = "word ".repeat(80);
 			if (fail === "invalid_shape") answer.reply = 42;

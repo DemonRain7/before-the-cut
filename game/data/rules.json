@@ -18,7 +18,7 @@
   "report": {"missed_hints": 1, "show_usage": 1},
   "scoring": {"press_catch_bonus": 150, "treat_drifting": -400, "refer_drifting": 0, "false_call": -150, "hit": -300, "false_alarm": -100,
     "note": "In all (version 9): a drifting patient handed over, or caught at the shutter, brings Trauma Team's bounty, the patient's fee plus refer_drifting; the crew pays the fee on account at the counter and refer_drifting comes at closing. Work on a drifting patient takes the fee back and costs treat_drifting more. false_call: the call-out for a steady patient, whose fee Trauma Team takes back at closing. false_alarm: a shutter dropped on a steady patient. hit: a patient who came through the window. A drifting patient shut out before any attack (locked_out) pays nothing."},
-  "agent": {"ask_answers": "authored", "intent": {"max_calls_per_visit": 16, "max_calls_per_session": 240, "timeout_ms": 2500, "upstream_timeout_ms": 2000, "max_output_tokens": 32},
+  "agent": {"ask_answers": "authored", "beats": {"enabled": true, "max_per_visit": 3, "max_idle_per_visit": 2, "idle_seconds": 12}, "intent": {"max_calls_per_visit": 16, "max_calls_per_session": 240, "timeout_ms": 2500, "upstream_timeout_ms": 2000, "max_output_tokens": 32},
     "default_url": "", "health_timeout_ms": 2000, "max_provider_calls_per_day": 1500, "max_provider_calls_per_process": 2000,
     "counter_retention_days": 2, "max_tracked_keys": 2000, "max_body_bytes": 32768, "upstream_timeout_ms": 3500,
     "max_output_tokens": 256, "max_history_turns": 48, "max_model_calls_per_session": 240,

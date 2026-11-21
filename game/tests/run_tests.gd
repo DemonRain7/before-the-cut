@@ -134,6 +134,7 @@ func _initialize() -> void:
 	test_settlement_rows()
 	test_generated_speech_findings()
 	await test_patient_rules_match()
+	await test_patient_beats()
 	test_counter_and_closing()
 	test_shift()
 	test_line()
@@ -853,6 +854,32 @@ func test_counter_and_closing() -> void:
 
 
 ## Compare both patient modes using the actual request builder and visit transitions.
+func test_patient_beats() -> void:
+	var fake := FakeClient.new()
+	var agent := PatientAgent.new(rules, fake, 3)
+	agent.begin_visit(cases.kip, "beat-test", 3)
+	var v := VisitState.new(cases.kip, rules)
+	var before := v.snapshot()
+	eq(await agent.beat("arrive", "", before, {}), {}, "offline beats are silent")
+	agent.set_mode("model")
+	fake.reply = {"ok":true,"data":{"reply":"","reaction":""}}
+	eq(await agent.beat("idle", "", before, {}), {}, "the model may stay silent")
+	fake.reply = {"ok":false,"error":"timeout"}
+	eq(await agent.beat("idle", "", before, {}), {}, "a failed beat is silent")
+	ok(not agent.can_beat("idle") and agent.can_beat("after_check"), "idle cap is two")
+	fake.reply = {"ok":true,"data":{"reply":"A moment, doctor.","reaction":""}}
+	eq((await agent.beat("after_check", "grip", before, {})).get("reply"), "A moment, doctor.", "a timely beat is available to the director")
+	ok(not agent.can_beat("arrive") and agent.calls_this_visit == 3 and agent.last.is_empty(), "three optional turns consume three shared replies and leave the foreground untouched")
+	eq(v.snapshot(), before, "beats change no rule, evidence or lamp")
+	var old: Array = agent.conversation_history.duplicate(true)
+	agent.remember_exchange({}, {"reply":"A moment, doctor."})
+	ok(agent.conversation_history.size() == old.size()+1, "only a displayed beat becomes a memory")
+	agent.begin_visit(cases.rook, "another-seat", 4)
+	ok(not str(agent.conversation_history).contains("A moment, doctor.") and agent.beats_this_visit == 0, "new visitors forget the previous conversation and reset both budgets")
+	agent.calls_this_visit = 16
+	ok(not agent.can_beat("arrive"), "the shared sixteen always wins")
+
+
 func test_patient_rules_match() -> void:
 	var outside := 0
 	for id in templates:
