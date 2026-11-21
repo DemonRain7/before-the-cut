@@ -6,8 +6,11 @@ extends Node
 const DIR := "res://assets/audio/"
 const VOICES := 18
 const DUCK_DB := -18.0           # how far everything drops while the microphone is open
+# SOUND on the title card's SETTINGS page: off, then a quarter, half, three quarters and all of it
+const VOLUME_STEPS := [0.0, 0.25, 0.5, 0.75, 1.0]
 
 var muted: bool = false
+var volume_step: int = 4         # of VOLUME_STEPS; 0 silences the master bus (M mutes on top of it)
 ## Added to every sound started while it is set. The attack runs under it, so the loudest
 ## moment of the night stands out from the room without being pressed into the limiter.
 var trim_db: float = 0.0
@@ -52,7 +55,24 @@ func _process(delta: float) -> void:
 	if is_equal_approx(_duck_db, target):
 		return
 	_duck_db = move_toward(_duck_db, target, delta * 120.0)
-	AudioServer.set_bus_volume_db(0, _duck_db)
+	_apply_bus()
+
+
+## The player's volume (SETTINGS: SOUND), on the master bus under the ducking. Step 0 is off.
+func set_volume_step(step: int) -> void:
+	volume_step = clampi(step, 0, VOLUME_STEPS.size() - 1)
+	_apply_bus()
+
+
+## The master bus's level in dB from the volume alone: 0 at full, and -80 for off.
+func volume_db() -> float:
+	var level := float(VOLUME_STEPS[volume_step])
+	return linear_to_db(level) if level > 0.0 else -80.0
+
+
+func _apply_bus() -> void:
+	AudioServer.set_bus_volume_db(0, _duck_db + (volume_db() if volume_step > 0 else 0.0))
+	AudioServer.set_bus_mute(0, volume_step == 0)
 
 
 ## Every voice still playing `sound` fades to nothing over `seconds` and stops, instead of

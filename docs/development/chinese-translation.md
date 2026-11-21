@@ -69,6 +69,10 @@ that uses it, in the same commit.
 | fee | 诊费 | |
 | credits | 信用点 | 点 alone where room is short (`%dcr` is %d点) |
 | NEXT; SKIP ALL | 下一条; 全部跳过 | the training |
+| START; HOW TO PLAY; SETTINGS; QUIT | 开始; 玩法说明; 设置; 退出 | the title card's menu |
+| SUDDEN ATTACKS | 突然袭击 | the red box under the menu |
+| LANGUAGE; BLOOD; SOUND; SCREEN; BACK | 语言; 血腥; 声音; 画面; 返回 | the rows of SETTINGS |
+| FULL; LESS; OFF; WINDOW; FULL SCREEN; MUTED [M] | 完整; 减少; 关; 窗口; 全屏; 已静音 [M] | their choices: FULL is the blood's, so 完整, never 全屏 |
 | AT THE COUNTER; At the counter | 柜台实收 | the slip, and the report's first money row: what came in during the visit |
 | At closing | 收工结算 | the report's second money row: bounties, bills and the reports on the work |
 | TREATED; HANDED OVER; SHUTTER HELD; SHUTTER DOWN; WALKED OUT; OUT OF PATIENCE | 已治疗; 已移交; 卷闸守住了; 卷闸落下; 转身走了; 耐心耗尽 | the slip's title (`rules.json` `counter`): what was done, never whether it was right |
@@ -119,8 +123,8 @@ voice:
   puts values into `{slots}` and translates a value that is words. The drawing calls in
   `gfx.gd` translate what they draw; their `*_raw` twins draw text as it is (code names, text
   already translated). The rules, the data and the event log stay English.
-- **The choice.** English | 中文 in the title card's top-right corner, saved in
-  `user://settings.cfg` and changed only on the title card. `-- --lang=zh` on the command line
+- **The choice.** LANGUAGE on the title card's SETTINGS page, or English | 中文 in its top-right
+  corner, saved in `user://settings.cfg` and changed only on the title card. `-- --lang=zh` on the command line
   wins over the saved choice; tests and captures pin a language with `Lang.pin()`, and a pinned
   run never saves.
 - **Pictures.** Words painted into pictures live in `tools/art/words.py`; each generator writes
@@ -180,13 +184,15 @@ Run these before a commit that touches any words (`AGENTS.md`, Languages):
 On November 18 all three passed: 0 problems, 616 lines that fit in each language, 954 scene
 checks; on November 19, with the five new characters, 0 problems, 1513 lines in each language
 and 1080 scene checks; on November 20, with the contacts' new codes (aliases stay English),
-0 problems, 1553 lines in each language and 1082 scene checks. That shows that every line has a translation and fits, not that the translation is good.
+0 problems, 1553 lines in each language and 1082 scene checks; late on November 20, with the
+title card's menu, HOW TO PLAY and SETTINGS, 0 problems, 1607 lines in each language and 1117
+scene checks. That shows that every line has a translation and fits, not that the translation is good.
 
 ## Adding a language
 
 1. Add its code to `Lang.CODES`, its own name to `Lang.NAMES` and its pace to `Lang.PER_CHAR`
-   (`game/scripts/core/lang.gd`). The title card's switch lays out every code by itself
-   (`screens.gd` `language_rects()`).
+   (`game/scripts/core/lang.gd`), and to the language row of `screens.gd` `SETTING_OPTIONS`.
+   The switch in the title card's corner lays out every code by itself (`language_rects()`).
 2. Write its catalogs in `game/data/lang/<code>/`, the same files as `zh/`;
    `python tools/check_lang.py --todo <code>` lists what is missing.
 3. Add it to `LANGS` and give every key its words in `tools/art/words.py`, then run the

@@ -79,6 +79,11 @@ static func pin(p_code: String) -> void:
 	use(p_code)
 
 
+## A test run: its language was pinned, and nothing a player chose is read or kept (settings.gd).
+static func is_pinned() -> bool:
+	return _pinned
+
+
 ## The saved choice, or --lang=<code> on the command line, which wins; English when neither.
 ## Does nothing once a language is pinned.
 static func load_saved() -> void:

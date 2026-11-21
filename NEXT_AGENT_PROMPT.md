@@ -16,11 +16,32 @@ November 18 is in 3f1fcbd, pushed; the work of late November 18 is in a487cea, p
 data and the code of random signs are in 5b64d87, the model's night signs in 484ff85, every
 part's art in 813b9d0, the five new characters in e486887 and the launcher's -TestNight option
 in 62a5251 and Vale's redrawn port close-up in 71a7e5d, all pushed; the work of November 20
-(the contact list's words, the push that breaks) is committed after 71a7e5d, together with this
-file. Run git status -sb and git log -3 --oneline:
-anything uncommitted is newer than this file.
+on the contact list's words and the push that breaks is in 80bb202, pushed; the title card's
+menu is committed after 80bb202, together with this file. Run git status -sb and git log -3
+--oneline: anything uncommitted is newer than this file.
 
-Latest checkpoint (November 20): the answers to three questions the student asked after playing
+Latest checkpoint (November 20, evening): the title card's menu the student asked for, built by
+Claude (Opus 5.5) and checked; nobody has played it. The student could not find where the
+language was chosen (a small switch in the title card's corner), found the opening guidance
+still unclear (a new player may not know that a patient can attack without warning) and
+suggested start, guide and settings on the start screen. The title card now has START, HOW TO
+PLAY, SETTINGS and QUIT (UP/DOWN or W/S, the pointer, a click or ENTER; SPACE does nothing
+there) over a red SUDDEN ATTACKS box that names SPACE, and the last opening card names SPACE
+too (intro.json version 8). HOW TO PLAY is five pages from intro.json howto, the rules' numbers
+filled in: the job, an attack (its picture loops the red bar and SPACE dropping the shutter, at
+half speed), patience and the till, tonight's contacts, the keys. SETTINGS holds the language,
+the blood (FULL, LESS), the sound (OFF, 25%, 50%, 75%, 100%) and the screen (WINDOW, FULL
+SCREEN), kept in user://settings.cfg [game] by the new scripts/core/settings.gd; M is not kept,
+F11 is; --less-blood and --mute hold for one run; a run that pins its language neither reads
+nor writes the file. Checks, all passed: run_tests 1193; the scene test 1116, 1117 in Chinese,
+1116 with less blood; the window close 5; the proxy 40; over HTTP 199 and 16 wire checks;
+measure_text 1607 lines in each language; lint 32 scripts; dry captures 446, 446, 334 and 235;
+the capture drawn on a hidden desktop, 446 frames in English and 446 in Chinese, none missed;
+and a scratch run that saved the settings and read them back at the next start. Mock calls
+only; nothing paid. The menu, the pages, their pictures and words and the settings are
+assistant proposals.
+
+Previous checkpoint (November 20): the answers to three questions the student asked after playing
 the November 19 build, built by Claude (Opus 5.5) and checked; nobody has played them. The
 contact list gave each courier the same alias and code every night, in words of their trade
 (LADLE for the noodle cook), and it stamped MISSED, with ALIAS: NO DROP on the slip, when a
@@ -35,10 +56,10 @@ press_cost(); rules.json version 10, no number changed); after the first, the ba
 hint say so. Checks, all passed: run_tests 1193; the scene test 1081, 1082 in Chinese, 1081
 with less blood; the window close 5; the proxy 40; over HTTP 199 and 16 wire checks;
 measure_text 1553 lines in each language; dry captures 439, 439, 334 and 235. Mock calls only;
-nothing paid; nothing drawn on the real renderer. Next, in the same session: the title menu
-(HANDOFF.md, Student decisions, November 20, item 2).
+nothing paid; nothing drawn on the real renderer until the title menu's capture that evening,
+which shows these screens too.
 
-Previous checkpoint (November 19, afternoon): every character's art for each part (813b9d0)
+Earlier checkpoint (November 19, afternoon): every character's art for each part (813b9d0)
 and five new characters (e486887), built by Claude (Opus 5.5) and checked; nobody has played it. Every
 sign a template can draw has its picture (a _t twin with dark threads of every hands layer
 where the bust shows the port, a hands layer for each temper gesture, close-ups of both eyes,
@@ -309,14 +330,15 @@ Next three tasks (first run git status -sb and git log -3 --oneline):
    the student has picked two G1 pitches with fewer than two replies: specific, moment-based
    notes in English for the student's review, never sent unasked. G1 is submitted; leave its
    snapshots, slides and narration alone.
-2. The title menu the student asked for on November 20 (HANDOFF.md, Student decisions,
-   November 20, item 2), being built in the same session after this file: START, GUIDE and
-   SETTINGS on the title card (the language, less blood, sound), and a clear word before the
-   first visit that a patient may attack without warning and that SPACE drops the shutter;
-   both languages, measured and scene-tested.
-3. The student plays and reads (.\run-game.ps1, with headphones): a drawn night in Chinese from
-   a fresh start and a night in English, reading every card, tip, sheet, slip and report page
-   and typing with a real Chinese input method; then the test nights with the newer five
+2. The push that breaks (HANDOFF.md, For the student to decide): when the student answers,
+   keep the rule, or build the alternative (a patient leaves only when the lamps run out, a
+   second PRESS costs 2 like the first, and a steady patient with lamps left stays), changing
+   with it the guide's patience and talk items, the training's talk tip, the PRESS hints and
+   the last point of HOW TO PLAY's attack page; both languages, measured and scene-tested.
+3. The student plays and reads (.\run-game.ps1, with headphones): the title card's HOW TO PLAY
+   and SETTINGS, then a drawn night in Chinese from a fresh start and a night in English,
+   reading every card, tip, sheet, slip and report page and typing with a real Chinese input
+   method; then the test nights with the newer five
    (.\run-game.ps1 -TestNight C, and D to G likewise); then settles the proposals in
    HANDOFF.md under "For the student to decide" (the push that breaks, ON NOTICE, and the five
    themselves). An agent operating the window, or the scene test, is not a substitute. Then

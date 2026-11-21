@@ -669,6 +669,170 @@ def training_rows(intro, numbers):
         rows.append(row[:4] + (flag,))
     return rows
 
+MARK = "►"              # the marker beside the lit item of the menu and the SETTINGS page (bold, drawn raw)
+
+
+def title_rows():
+    """The title card (screens.gd _draw_title, _draw_menu): each menu item centred in its box,
+    clear of the marker that blinks at the box's left; the SUDDEN ATTACKS box, which is as wide
+    as its longer line and must stay 8 px inside the screen; the attack picture's plate; and the
+    keys at the foot of HOW TO PLAY and SETTINGS. The game's own widths count the gap after the
+    last letter, one pixel more than text_width."""
+    rows = []
+    menu_w = number(SCREENS_GD, "MENU_W")
+    mark = text_width(MARK, True) + 1
+    # the name is centred: its left edge must stay right of the marker (box x + 6) with 2 px to spare
+    room = int(menu_w - 2 * (6 + mark + 2))
+    names = table(SCREENS_GD, "MENU_NAMES")
+    if not names:
+        rows.append(("screen", "screens.gd:MENU_NAMES", 0, "", " NO MENU FOUND"))
+    for where, text in names:
+        rows.append(check("menu", "screens.gd:" + where, text, bold=True, limit=room))
+    # the warning box: max(title, text) + 20 wide, centred, 8 px from either edge of the screen at least
+    box_room = LIMITS["screen"] - 20
+    found = dict(consts(SCREENS_GD, r"^WARNING(_TITLE)?$"))
+    if len(found) < 2:
+        rows.append(("screen", "screens.gd:WARNING", 0, "", " NO WARNING FOUND"))
+    if "WARNING_TITLE" in found:
+        rows.append(check("screen", "screens.gd:WARNING_TITLE", found["WARNING_TITLE"], bold=True, limit=box_room))
+    if "WARNING" in found:
+        row = check("screen", "screens.gd:WARNING", found["WARNING"], limit=box_room)
+        if "SPACE" not in row[3]:
+            row = row[:4] + (row[4] + " DOES NOT NAME SPACE",)
+        rows.append(row)
+    for name, text in consts(SCREENS_GD, r"^(HOWTO_KEYS|HOWTO_LAST_KEYS|SETTINGS_KEYS)$"):
+        rows.append(check("screen", "screens.gd:" + name, text))
+    # the attack picture's plate takes the place of a bar as wide as the sill's (screens.gd _draw_demo)
+    for name, text in consts(SCREENS_GD, r"^DEMO_STOPPED$"):
+        rows.append(check("plate", "screens.gd:" + name, text, bold=True))
+    return rows
+
+
+SETTINGS_PANEL = (110, 22, 420, 290)    # screens.gd _draw_settings: p
+
+
+def settings_rows():
+    """The SETTINGS page (screens.gd _draw_settings, setting_rects): each row's name right-aligned
+    at SET_LABEL_RIGHT and clear of the marker; its choices laid out from SET_OPTIONS_X, each as
+    wide as its name plus the padding, all inside the lit band; MUTED [M] after the last volume
+    step; each row's hint wrapped under the rows, above the panel's foot; the page's big title."""
+    rows = []
+    px, py, pw, ph = SETTINGS_PANEL
+    band_right = px + 8 + (pw - 16)
+    label_right = number(SCREENS_GD, "SET_LABEL_RIGHT")
+    options_x = number(SCREENS_GD, "SET_OPTIONS_X")
+    gap = number(SCREENS_GD, "SET_GAP")
+    pad = number(SCREENS_GD, "LANG_PAD")
+    set_y = number(SCREENS_GD, "SET_Y")
+    step = number(SCREENS_GD, "SET_STEP")
+    mark_right = px + 14 + text_width(MARK, True) + 1
+    for name, text in consts(SCREENS_GD, r"^SETTINGS_TITLE$"):
+        rows.append(check("screen", "screens.gd:" + name, text, bold=True, scale=2, limit=pw - 20))
+    for name, text in consts(SCREENS_GD, r"^BACK$"):
+        rows.append(check("screen", "screens.gd:" + name, text, bold=True, limit=pw - 40))
+    labels = dict((k.split(".", 1)[1], v) for k, v in table(SCREENS_GD, "SETTING_NAMES"))
+    option_names = dict((k.split(".", 1)[1], v) for k, v in table(SCREENS_GD, "OPTION_NAMES"))
+    hints_of = dict((k.split(".", 1)[1], v) for k, v in table(SCREENS_GD, "SETTING_HINTS"))
+    languages = dict(re.findall(r'"(\w+)":\s*"([^"]*)"', re.search(r"^const NAMES := \{([^}]*)\}",
+                     source(os.path.join(ROOT, "game", "scripts", "core", "lang.gd")), re.M).group(1)))
+    src = source(SCREENS_GD)
+    order = re.findall(r'"(\w+)"', re.search(r"^const SETTING_ROWS := \[([^\]]*)\]", src, re.M).group(1))
+    body = src[src.index("const SETTING_OPTIONS := {"):]
+    body = body[:body.index("}")]
+    options = {k: re.findall(r'"?(\w+)"?', v) for k, v in re.findall(r'"(\w+)":\s*\[([^\]]*)\]', body)}
+    if not order or not options:
+        rows.append(("setting", "screens.gd:SETTING_ROWS", 0, "", " NO SETTINGS FOUND"))
+    muted = dict(consts(SCREENS_GD, r"^MUTED_NOTE$")).get("MUTED_NOTE", "")
+    for i, row in enumerate(order):
+        y = set_y + step * i
+        hint = hints_of.get(row, "")
+        # the hint under the rows: centred, wrapped to the panel less 20 px a side, above its foot
+        top = set_y + step * len(order) + 14
+        most = int((py + ph - 4 - top) // 11)
+        r = check_lines("setting_hint", "screens.gd:SETTING_HINTS." + row, hint, pw - 40, most)
+        if not hint:
+            r = r[:4] + (r[4] + " NO HINT FOR THIS ROW",)
+        rows.append(r)
+        if row == "back":
+            continue
+        label = labels.get(row, "")
+        room = int(label_right - mark_right - 4)
+        rows.append(check("setting", "screens.gd:SETTING_NAMES." + row, label, bold=True, limit=room)
+                    if label else ("setting", "screens.gd:SETTING_NAMES." + row, 0, "", " NO NAME FOR THIS ROW"))
+        x = options_x
+        shown = []
+        for v in options.get(row, []):
+            name = languages.get(v, v) if row == "language" else tr(option_names.get(v, v))
+            missing = missing_glyphs(name)
+            if missing:
+                rows.append(("setting", "screens.gd:OPTION_NAMES." + v, 0, name, " MISSING GLYPHS %r" % "".join(missing)))
+            x += -(-(text_width(name, True) + 1 + pad * 2 + 4) // 1) + gap
+            shown.append(name)
+        end = x - gap
+        if row == "volume" and muted:
+            end += 8 + tw(muted, True) + 1
+            shown.append(tr(muted))
+        flag = " PAST THE BAND (it ends at %d)" % band_right if end > band_right else ""
+        rows.append(("setting", "screens.gd:_draw_settings " + row, int(end), " | ".join(shown), flag))
+    return rows
+
+
+def howto_rows(intro, numbers):
+    """HOW TO PLAY (screens.gd _draw_howto, howto_points, howto_bottom): each page's big title
+    inside the panel, its header line (HOW TO PLAY on the left, the page count on the right),
+    its points with their numbers in, wrapped to HOWTO_TEXT_W, and the last of them above the
+    panel's foot. A point about the price of glass goes when glass has no price, as in the game."""
+    rows = []
+    pages = intro.get("howto", [])
+    if not pages:
+        rows.append(("howto", "intro.howto", 0, "", " NO HOW TO PLAY PAGES FOUND"))
+        return rows
+    panel = re.search(r"^const HOWTO_PANEL := Rect2\(([0-9.]+), ([0-9.]+), ([0-9.]+), ([0-9.]+)\)", source(SCREENS_GD), re.M)
+    px, py, pw, ph = (float(v) for v in panel.groups())
+    text_w = int(number(SCREENS_GD, "HOWTO_TEXT_W"))
+    art_y = number(SCREENS_GD, "HOWTO_ART_Y")
+    art_h = number(SCREENS_GD, "HOWTO_ART_H")
+    line_h = number(SCREENS_GD, "HOWTO_LINE")
+    gap = number(SCREENS_GD, "HOWTO_GAP")
+    src = source(SCREENS_GD)
+    arts = re.findall(r'"(\w+)"', re.search(r"^const HOWTO_ARTS := \[([^\]]*)\]", src, re.M).group(1))
+    page_of = dict(consts(SCREENS_GD, r"^HOWTO_PAGE$")).get("HOWTO_PAGE", "%d / %d")
+    menu = dict((k.split(".", 1)[1], v) for k, v in table(SCREENS_GD, "MENU_NAMES"))
+    head = tw(menu.get("howto", ""), True) + 1 + 12 + tw(worst_numbers(page_of, [len(pages), len(pages)]), True) + 1
+    rows.append(("howto_title", "screens.gd:_draw_howto head", int(head), tr(menu.get("howto", "")),
+                 " THE HEAD LINE MEETS ITS PAGE COUNT (room %d px)" % (pw - 20) if head > pw - 20 else ""))
+    seen = set()
+    for i, p in enumerate(pages):
+        pid = str(p.get("id", "?"))
+        where = "intro.howto.%d.%s" % (i + 1, pid)
+        row = check("howto_title", where + ".title", p.get("title", ""), bold=True, scale=2, limit=pw - 20)
+        if pid in seen:
+            row = row[:4] + (row[4] + " DUPLICATE ID",)
+        seen.add(pid)
+        art = str(p.get("art", ""))
+        if art and art not in arts:
+            row = row[:4] + (row[4] + " NO PICTURE CALLED %s IN screens.gd" % art,)
+        rows.append(row)
+        y = art_y + (art_h + 8 if art else 2)
+        points = 0
+        for k, line in enumerate(p.get("lines", [])):
+            if "{repair_cost}" in line and int(numbers.get("repair_cost", 0)) <= 0:
+                continue
+            text = fill(line, numbers)
+            r = check_lines("howto", "%s.%d" % (where, k + 1), text, text_w, 6)
+            if "{" in text:
+                r = r[:4] + (r[4] + " AN UNFILLED {NUMBER}",)
+            rows.append(r)
+            y += line_h * r[2] + gap
+            points += 1
+        y -= gap
+        bottom = py + ph - 6
+        flag = " TOO TALL (the panel ends at %d)" % bottom if y > bottom else ""
+        if points < 3:
+            flag += " FEWER THAN THREE POINTS"
+        rows.append(("howto_box", where + ".bottom", int(y), "%d points" % points, flag))
+    return rows
+
 
 def main():
     args = sys.argv[1:]
@@ -805,7 +969,8 @@ def main():
                "repair_cost": repair_cost, "pay": int(contacts.get("pay", 0)), "code_cost": int(contacts.get("wrong_cost", 0)),
                "per_night": int(contacts.get("per_night", 0)), "calm_cost": int(reassure.get("cost", 0)),
                "calm_gain": int(reassure.get("gain", 0)), "ask_cost": int(costs.get("ask", 0)),
-               "press_cost": int(costs.get("press", 0))}
+               "press_cost": int(costs.get("press", 0)), "check_cost": int(costs.get("check", 0)), "glass": glass,
+               "false_alarm": abs(int(rules.get("scoring", {}).get("false_alarm", 0)))}
     contact_data = json.load(open(os.path.join(DATA, "contacts.json"), encoding="utf-8"))
     packages = [str(e.get("package", "")) for e in contact_data.get("pool", [])]
     longest_package = max(packages, key=lambda t: tw(t)) if packages else ""
@@ -866,11 +1031,8 @@ def main():
     # the title card
     for name, text in consts(SCREENS_GD, r"^HELP"):
         rows.append(check("screen", "screens.gd:" + name, text))
-    src = source(SCREENS_GD)
-    block = src[src.index("const TITLE_LINES"):]
-    block = block[:block.index("]")]
-    for i, text in enumerate(re.findall(r'"([^"]*)"', block)):
-        rows.append(check("screen", "screens.gd:TITLE_LINES%d" % i, text))
+    rows += title_rows()
+    rows += settings_rows()
     for name, text in consts(SCREENS_GD, r"^SUBTITLE$"):
         rows.append(check("screen", "screens.gd:" + name, text))
     status = consts(MAIN_GD, r"^STATUS_")
@@ -924,6 +1086,7 @@ def main():
     rows += intro_rows(intro, numbers)
     rows += guide_rows(intro, numbers)
     rows += training_rows(intro, numbers)
+    rows += howto_rows(intro, numbers)
     # the slip's breakdown line under the call (main.gd: _slip_breakdown): the longest it can be
     named = dict(consts(MAIN_GD, r"^SLIP_(DROP|CALM)$"))
     if len(named) < 2:
@@ -953,7 +1116,7 @@ def main():
         by_kind.setdefault(kind, []).append(w)
     for kind, ws in sorted(by_kind.items()):
         unit = "lines" if kind in ("slip_text", "report_text", "visit_text", "strip_text", "card_text", "guide_item",
-                                   "training", "finding") else "px"
+                                   "training", "finding", "howto", "setting_hint") else "px"
         print("%-12s n=%-3d max=%d %s" % (kind, len(ws), max(ws), unit))
     for kind, where, w, text, flag in bad:
         print("!! %s %s (%d)%s: %s" % (kind, where, w, flag, text))

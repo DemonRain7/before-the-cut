@@ -150,6 +150,132 @@ func languages() -> void:
 		"a click on the first language puts everything back")
 
 
+## The title card's menu (the student's note of November 20): START, HOW TO PLAY, SETTINGS and
+## QUIT, the warning about sudden attacks under them, every page of HOW TO PLAY and every row of
+## SETTINGS. The run's language is pinned, so no choice made here reaches user://settings.cfg;
+## each one is put back as it was before the opening starts.
+func title_menu() -> void:
+	section("Title menu")
+	var s: Variant = main.screens
+	var kept_before := FileAccess.get_file_as_string(Lang.SETTINGS) if FileAccess.file_exists(Lang.SETTINGS) else "<none>"
+	check(s.MENU == ["start", "howto", "settings", "quit"] and s.menu_item() == "start",
+		"the menu offers START, HOW TO PLAY, SETTINGS and QUIT, with START lit")
+	var placed := 0
+	for i in s.MENU.size():
+		var r: Rect2 = s.menu_rect(i)
+		if (s.menu_at(r.get_center()) == s.MENU[i] and Rect2(Vector2.ZERO, Gfx.SCREEN).encloses(r)
+				and (i == 0 or not r.intersects(s.menu_rect(i - 1))) and Gfx.text_w(str(s.MENU_NAMES[s.MENU[i]]), true) <= r.size.x - 24.0):
+			placed += 1
+	check(placed == s.MENU.size(), "each item has its own place, under the pointer where it is drawn, wide enough for its name")
+	var warn: Rect2 = s.warning_rect()
+	check(str(s.WARNING).contains("SPACE") and warn.position.y > s.menu_rect(s.MENU.size() - 1).end.y and warn.position.x >= 8.0
+		and warn.end.x <= Gfx.SCREEN.x - 8.0, "the warning about sudden attacks names SPACE and stands under the menu, on the screen")
+	d.move(s.menu_rect(2).get_center())
+	await process_frame
+	await process_frame
+	check(s.menu_item() == "settings" and main._cursor_kind == "hand", "the pointer lights the item it comes onto")
+	d.key(KEY_UP)
+	check(s.menu_item() == "howto", "UP lights the one above it")
+	d.key(KEY_SPACE)
+	check(main.state == MainScript.State.TITLE and s.mode == "title", "SPACE, the shutter's key, does nothing on the title card")
+	d.key(KEY_ENTER)
+	check(s.mode == "howto" and s.howto_page == 0 and s.howto_count() == 5, "ENTER on HOW TO PLAY opens the first of its five pages")
+	var fit := 0
+	for i in s.howto_count():
+		var page: Dictionary = s.howto[i]
+		var art := str(page.get("art", ""))
+		var bad := false
+		for lines in s.howto_points(i):
+			for line in lines:
+				var text := str(line)
+				if text.contains("{") or Gfx.printable(text) != text or Gfx.text_w_raw(text) > s.HOWTO_TEXT_W:
+					bad = true
+		if (not bad and (art == "" or s.HOWTO_ARTS.has(art)) and (s.howto_points(i) as Array).size() >= 3
+				and s.howto_bottom(i) <= s.HOWTO_PANEL.end.y - 6.0 and Gfx.big_w(str(page.get("title", ""))) <= s.HOWTO_PANEL.size.x - 20.0):
+			fit += 1
+		else:
+			print("  a HOW TO PLAY page does not fit its panel: ", page.get("id", "?"))
+	check(fit == s.howto_count(), "every page fits its panel, numbers filled in, with a picture the menu can draw")
+	var attack: Dictionary = s.howto[1]
+	check(str(attack.get("art", "")) == "attack" and JSON.stringify(attack.get("lines", [])).contains("SPACE"),
+		"the second page is the one about attacks: its picture is the red bar, and it names SPACE")
+	d.key(KEY_RIGHT)
+	check(s.howto_page == 1, "RIGHT turns to the next page")
+	d.key(KEY_LEFT)
+	d.key(KEY_LEFT)
+	check(s.howto_page == 0 and s.mode == "howto", "LEFT turns back, and stops at the first page")
+	for i in s.howto_count() - 1:
+		d.click(Vector2(320, 200))
+	check(s.howto_page == s.howto_count() - 1 and s.mode == "howto", "a click turns the pages too, up to the last")
+	d.click(Vector2(320, 200))
+	check(s.mode == "title" and main.state == MainScript.State.TITLE, "past the last page the menu is back")
+	d.key(KEY_H)
+	check(s.mode == "howto" and s.howto_page == 0, "H opens HOW TO PLAY from the menu")
+	d.key(KEY_ESCAPE)
+	check(s.mode == "title", "and ESC puts it away")
+	check(logged("howto").size() == 2, "both openings of HOW TO PLAY are logged")
+
+	# SETTINGS
+	s.menu_index = 0
+	d.key(KEY_DOWN)
+	d.key(KEY_DOWN)
+	check(s.menu_item() == "settings", "DOWN twice lights SETTINGS")
+	d.key(KEY_ENTER)
+	check(s.mode == "settings" and s.setting_row() == "language" and str(s.settings.get("language", "")) == Lang.code,
+		"ENTER opens SETTINGS on its first row, the language in use")
+	var rects: Dictionary = s.setting_rects()
+	var inside := 0
+	for key in rects:
+		if Rect2(Vector2(8, 0), Gfx.SCREEN - Vector2(16, 0)).encloses(rects[key] as Rect2):
+			inside += 1
+	check(inside == rects.size() and rects.has("back") and rects.size() == 2 + 2 + 5 + 2 + 1,
+		"every choice of every row has its button on the screen, and BACK")
+	var first := Lang.code
+	var other := "zh" if first == "en" else "en"
+	d.click((rects["language:" + other] as Rect2).get_center())
+	check(Lang.code == other and str(s.settings.get("language", "")) == other and s.mode == "settings"
+		and art(main.clinic._wall) == twin("booth", other), "LANGUAGE: a click on the other one puts the game in it, painted words too")
+	d.click((s.setting_rects()["language:" + first] as Rect2).get_center())
+	check(Lang.code == first and art(main.clinic._wall) == twin("booth", first), "and a click on the first one puts it back")
+	var was_less: bool = main.less_blood
+	d.click((s.setting_rects()["blood:less"] as Rect2).get_center())
+	check(main.less_blood and main.clinic.less_blood and main.gore.less_blood and str(s.settings.get("blood", "")) == "less",
+		"BLOOD: LESS takes the blood out of the clinic and the gore, as --less-blood does")
+	d.click((s.setting_rects()["blood:full"] as Rect2).get_center())
+	check(not main.less_blood and not main.clinic.less_blood and not main.gore.less_blood, "and FULL brings it back")
+	main._set_less_blood(was_less)
+	s.settings_row = s.SETTING_ROWS.find("volume")
+	d.key(KEY_LEFT)
+	check(main.audio.volume_step == 3 and absf(AudioServer.get_bus_volume_db(0) - linear_to_db(0.75)) < 0.05 and not AudioServer.is_bus_mute(0),
+		"SOUND: LEFT turns the clinic down a step, to three quarters")
+	d.click((s.setting_rects()["volume:0"] as Rect2).get_center())
+	check(main.audio.volume_step == 0 and AudioServer.is_bus_mute(0) and int(s.settings.get("volume", -1)) == 0, "OFF silences it")
+	d.click((s.setting_rects()["volume:4"] as Rect2).get_center())
+	check(main.audio.volume_step == 4 and absf(AudioServer.get_bus_volume_db(0)) < 0.05 and not AudioServer.is_bus_mute(0),
+		"and 100% is the whole of it again")
+	d.key(KEY_M)
+	check(main.audio.muted and bool(s.settings.get("muted", false)), "M mutes on the title card, and SETTINGS says so")
+	d.key(KEY_M)
+	check(not main.audio.muted, "and M again unmutes")
+	d.click((s.setting_rects()["screen:fullscreen"] as Rect2).get_center())
+	check(main.fullscreen and str(s.settings.get("screen", "")) == "fullscreen", "SCREEN: FULL SCREEN fills the screen")
+	d.key(KEY_F11)
+	check(not main.fullscreen and str(s.settings.get("screen", "")) == "window", "and F11 puts the window back, here as anywhere")
+	s.settings_row = s.SETTING_ROWS.find("back")
+	d.key(KEY_ENTER)
+	check(s.mode == "title", "ENTER on BACK goes back to the menu")
+	d.key(KEY_ENTER)
+	check(s.mode == "settings", "ENTER on the lit SETTINGS opens it again")
+	d.right_click()
+	check(s.mode == "title", "and the right button goes back too")
+	# seven changes; under --less-blood the click on LESS changes nothing, and nothing is logged for it
+	check(logged("setting").size() >= (6 if was_less else 7), "every choice made is logged by its row and value")
+	var kept_after := FileAccess.get_file_as_string(Lang.SETTINGS) if FileAccess.file_exists(Lang.SETTINGS) else "<none>"
+	check(kept_after == kept_before, "nothing was saved: a test run never changes what a player chose")
+	main.audio.set_muted(true)      # as the run started
+	s.menu_index = 0
+
+
 ## The picture a painted name has in a language: booth in English, booth_zh in Chinese.
 func twin(name: String, code: String) -> String:
 	return name if code == "en" else name + "_" + code
@@ -581,6 +707,7 @@ func shift_careful() -> void:
 	check(main.data_errors.is_empty(), "the case data loaded without problems")
 	check(main.screens.status_line == main.STATUS_OFFLINE, "the title card says who answers tonight: the authored patient")
 	languages()
+	await title_menu()
 	await the_opening()
 
 	section("Hall camera")
@@ -2287,15 +2414,20 @@ func counter_words() -> void:
 		else:
 			print("  too wide for the bar: ", text)
 	check(fits == plates.size(), "every way a stop can be told fits the bar over the printer slot")
-	var title: Array = [main.STATUS_AI_VOICE, main.STATUS_AI_TYPE, main.STATUS_AI_NO_MIC, main.STATUS_OFFLINE]
-	title.append_array(main.screens.TITLE_LINES)
+	var title: Array = [main.STATUS_AI_VOICE, main.STATUS_AI_TYPE, main.STATUS_AI_NO_MIC, main.STATUS_OFFLINE,
+		main.screens.WARNING, main.screens.HOWTO_KEYS, main.screens.HOWTO_LAST_KEYS, main.screens.SETTINGS_KEYS]
+	title.append_array(main.screens.MENU_NAMES.values())
 	fits = 0
 	for t in title:
 		var text := Lang.t(str(t))
-		if Gfx.printable(text) == text and Gfx.text_w_raw(text) <= 620.0:
+		# printable() also folds runs of spaces, which the key lines keep around their bullets
+		var plain := text
+		while plain.contains("  "):
+			plain = plain.replace("  ", " ")
+		if Gfx.printable(text) == plain and Gfx.text_w_raw(text) <= 620.0:
 			fits += 1
 		else:
-			print("  too wide for the title card: ", text)
+			print("  too wide for the title card, or a letter the font lacks: ", text)
 	check(fits == title.size(), "the title card's lines fit the screen, whoever answers tonight")
 	check(Gfx.text_w(main.intro.FOOT) <= main.intro.TEXT_W, "the opening's key line fits under its text")
 	var narrow := 0

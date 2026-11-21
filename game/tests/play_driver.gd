@@ -246,18 +246,25 @@ func in_exam() -> bool:
 
 
 ## Title or report card -> the hall camera is asking to buzz the first patient in.
-## The report opens on the first visit's page; ESC goes straight to the night's totals, the
-## way a player skips it, and a click there starts the next night.
+## The title card's menu is left by its START, after ESC back to the menu from HOW TO PLAY or
+## SETTINGS. The report opens on the first visit's page; ESC goes straight to the night's
+## totals, the way a player skips it, and a click there starts the next night.
 ## The opening cards play once a session after the title. They are skipped here the way a
 ## player skips them, with ESC. With `watch_intro` the call returns as soon as the cards are
 ## up: the caller steps through them and then waits with wait_for_counter().
 func open_counter(watch_intro: bool = false) -> bool:
-	if main.state == MainScript.State.REPORT:
-		if not main.screens.on_summary():
+	if main.state == MainScript.State.TITLE:
+		if main.screens.mode != "title":
 			key(KEY_ESCAPE)
 			await tree.process_frame
-		await until(func() -> bool: return main.screens.age() >= 0.85, 3.0)
-	click(Vector2(320, 300))
+		click(main.screens.menu_rect(main.screens.MENU.find("start")).get_center())
+	else:
+		if main.state == MainScript.State.REPORT:
+			if not main.screens.on_summary():
+				key(KEY_ESCAPE)
+				await tree.process_frame
+			await until(func() -> bool: return main.screens.age() >= 0.85, 3.0)
+		click(Vector2(320, 300))
 	await tree.process_frame
 	if in_intro():
 		if watch_intro:

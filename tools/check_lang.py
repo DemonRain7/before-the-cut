@@ -75,6 +75,7 @@ SHOWN = {
         ("cards", "*", "labels", "entries", "*", "clues", "*"),
         ("cards", "*", "labels", "entries", "*", "code"),
         ("guide", "*", "title"), ("guide", "*", "items", "*", "text"), ("guide", "*", "closing"),
+        ("howto", "*", "title"), ("howto", "*", "lines", "*"),
         ("training", "*", "text"),
     ],
     "parts.json": [(group, "*", key) for group in ("eyes", "hands", "ports", "voices") for key in _PART_TEXT]

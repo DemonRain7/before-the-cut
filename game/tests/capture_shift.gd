@@ -16,7 +16,9 @@ extends SceneTree
 ## list and its codes, the guide, the booth walls, the hourly meter, the doctor's own marks, a
 ## flare, a snap, a patient who runs out of patience, every way an attack can end, a night that
 ## ends with the doctor, the glass fitter and every patient's weapon are all seen:
-##   shift 1: the opening cards, then the first night's training, one frame a tip: tonight's list
+##   shift 1: the title card, each page of its HOW TO PLAY (the attack page twice: the red bar
+##            filling, then the plate once SPACE is down) and its SETTINGS; the opening cards,
+##            then the first night's training, one frame a tip: tonight's list
 ##            and how to read it, the hall camera's two monitors, Kip's intake card, his code and
 ##            his package, the reference sheet, the three tools with what the sheet expects drawn
 ##            into each close-up, the talk pads with CALM's price, the doctor's tick, the decision
@@ -194,6 +196,7 @@ func first_five(later_nights: int) -> void:
 		await maren_gets_through(true)
 	else:
 		await shot("title")
+		await title_menu_shots()
 		await opening_cards()
 		await d.settle()
 		await training_wait()
@@ -413,6 +416,43 @@ func slip_then_meter(stem: String) -> void:
 
 
 # ================================================================ the opening and the guide
+
+## The title card's menu: each page of HOW TO PLAY (on the attack page, the bar while it fills and
+## the plate once SPACE is down) and the SETTINGS page, then back to the menu with START lit.
+func title_menu_shots() -> void:
+	var s := main.screens
+	s.menu_index = s.MENU.find("howto")
+	d.key(KEY_ENTER)
+	reached(await d.until(func() -> bool: return s.mode == "howto", 2.0), "HOW TO PLAY opens from the menu")
+	var filling := func() -> bool:
+		var t := fmod(s._t, s.DEMO_LOOP)
+		return t > 0.6 and t < s.DEMO_PRESS
+	var stopped := func() -> bool:
+		var t := fmod(s._t, s.DEMO_LOOP)
+		return t > s.DEMO_PRESS + 0.4 and t < s.DEMO_LOOP - 0.8
+	for i in s.howto_count():
+		var page: Dictionary = s.howto[i]
+		var id := str(page.get("id", "page"))
+		reached(s.howto_page == i, "HOW TO PLAY is on page %d" % (i + 1))
+		await d.seconds(0.3)
+		if str(page.get("art", "")) == "attack":
+			reached(await d.until(filling, 4.0), "the attack picture's bar is filling")
+			await shot("howto-%d-%s-bar" % [i + 1, id])
+			reached(await d.until(stopped, 4.0), "and SPACE has dropped the shutter in it")
+		await shot("howto-%d-%s" % [i + 1, id])
+		if i < s.howto_count() - 1:
+			d.key(KEY_RIGHT)
+	d.key(KEY_ESCAPE)
+	reached(await d.until(func() -> bool: return s.mode == "title", 2.0), "ESC goes back to the menu")
+	s.menu_index = s.MENU.find("settings")
+	d.key(KEY_ENTER)
+	reached(await d.until(func() -> bool: return s.mode == "settings", 2.0), "SETTINGS opens from the menu")
+	await d.seconds(0.3)
+	await shot("settings")
+	d.key(KEY_ESCAPE)
+	reached(await d.until(func() -> bool: return s.mode == "title", 2.0), "and ESC goes back to it again")
+	s.menu_index = 0
+
 
 ## The cards between the title and the first shift: one frame each with the words all out and
 ## the picture at rest, the first card also while it is still typing, and the line the shift

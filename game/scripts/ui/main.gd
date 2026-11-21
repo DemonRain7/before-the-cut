@@ -28,6 +28,7 @@ extends Control
 
 const Gfx = preload("res://scripts/ui/gfx.gd")
 const Lang = preload("res://scripts/core/lang.gd")
+const Settings = preload("res://scripts/core/settings.gd")
 const CaseDB = preload("res://scripts/core/case_db.gd")
 const VisitState = preload("res://scripts/core/visit_state.gd")
 const ShiftState = preload("res://scripts/core/shift_state.gd")
@@ -303,7 +304,9 @@ var test_night: String = ""          # --test-night=<name>: that night of data/n
 var agent_url: String = ""
 var use_model: bool = false
 var start_muted: bool = false
-var less_blood: bool = false      # launch option --less-blood: the same scene without the blood
+var less_blood: bool = false      # launch option --less-blood, or BLOOD: LESS in SETTINGS: the same scene without the blood
+var fullscreen: bool = false      # SCREEN in SETTINGS, or F11
+var saved_settings: Dictionary = {}   # what the player chose last time (settings.gd); the defaults on a test run
 var intro_enabled: bool = true    # false (--no-intro): no opening cards, and the guide waits to be asked for
 var intro_data: Dictionary = {}   # data/intro.json: the opening cards and the pages of the counter guide
 var training_enabled: bool = true # false (--no-training): the first night has no training box
@@ -443,13 +446,19 @@ func _ready() -> void:
 	else:
 		data_errors.append("data/intro.json is missing or is not valid JSON.")
 	_read_launch_options()
+	saved_settings = Settings.load_all()
+	if str(saved_settings.get("blood", "full")) == "less":
+		less_blood = true      # --less-blood forces it for the run; the saved choice can only add it
 	if test_night != "" and not nights.has(test_night):
 		data_errors.append("--test-night=%s: data/nights.json has no night '%s'." % [test_night, test_night])
 		cases = {}      # nothing to play: the title card shows the problem and does not start
 	_build()
+	audio.set_volume_step(int(saved_settings.get("volume", AudioBank.VOLUME_STEPS.size() - 1)))
 	_start_session()
 	_apply_language()
 	_show_title()
+	if str(saved_settings.get("screen", "window")) == "fullscreen":
+		_apply_fullscreen(true)
 	get_tree().auto_accept_quit = false      # a close request goes through _close()
 
 
@@ -529,7 +538,9 @@ func _build() -> void:
 	var numbers := {"per_hour": per_hour, "hours": hours, "total": per_hour * hours, "threshold": int(sheet.get("threshold", 0)),
 		"repair_cost": repair_cost, "pay": int(contact_rules.get("pay", 0)), "code_cost": int(contact_rules.get("wrong_cost", 1)),
 		"per_night": int(contact_rules.get("per_night", 0)), "calm_cost": int(calm_rules.get("cost", 0)),
-		"calm_gain": int(calm_rules.get("gain", 1)), "ask_cost": int(costs.get("ask", 1)), "press_cost": int(costs.get("press", 2))}
+		"calm_gain": int(calm_rules.get("gain", 1)), "ask_cost": int(costs.get("ask", 1)), "press_cost": int(costs.get("press", 2)),
+		"check_cost": int(costs.get("check", 1)), "glass": int((rules.get("attack", {}) as Dictionary).get("glass", 3)),
+		"false_alarm": absi(int((rules.get("scoring", {}) as Dictionary).get("false_alarm", 0)))}
 	intro = Intro.new()
 	intro.setup(intro_data.get("cards", []), numbers)
 	add_child(intro)
@@ -544,6 +555,8 @@ func _build() -> void:
 	# a rule set with no price for glass has no fitter for the guide to explain
 	guide.setup(intro_data.get("guide", []), numbers, [] if repair_cost > 0 else ["mend"])
 	add_child(guide)
+	screens.howto = intro_data.get("howto", [])
+	screens.howto_numbers = numbers
 	_held_sprite.centered = false
 	_held_sprite.visible = false
 	add_child(_held_sprite)
@@ -607,6 +620,7 @@ func act_language(p_code: String) -> void:
 	Lang.save()
 	audio.play("click")
 	_apply_language()
+	_sync_settings()
 	_log("language", {"language": Lang.code})
 
 
@@ -620,6 +634,158 @@ func _apply_language() -> void:
 	screens.errors = problems
 	clinic.apply_language()
 	_hang_sheet()
+
+
+# ================================================================ the title card's menu
+
+## START, HOW TO PLAY, SETTINGS or QUIT (student, November 20: settings, start and a guide on
+## the first screen). Only on the title card's menu.
+func act_menu(item: String) -> void:
+	if state != State.TITLE or screens.mode != "title":
+		return
+	match item:
+		"start":
+			act_start()
+		"howto":
+			if screens.howto_count() == 0:
+				return
+			screens.show_howto()
+			audio.play("paper")
+			_log("howto", {"pages": screens.howto_count()})
+		"settings":
+			_sync_settings()
+			screens.show_settings()
+			audio.play("click")
+		"quit":
+			audio.play("click")
+			_close()
+
+
+## UP or DOWN: the menu's next item, or the SETTINGS page's next row. Round at the ends.
+func act_menu_move(step: int) -> void:
+	if state != State.TITLE:
+		return
+	if screens.mode == "title":
+		screens.menu_index = posmod(screens.menu_index + step, screens.MENU.size())
+	elif screens.mode == "settings":
+		screens.settings_row = posmod(screens.settings_row + step, screens.SETTING_ROWS.size())
+	else:
+		return
+	audio.play("click", 1.25, -10.0)
+
+
+## ESC, BACKSPACE or the right button: from HOW TO PLAY or SETTINGS back to the menu.
+func act_menu_back() -> void:
+	if state != State.TITLE or screens.mode == "title" or not screens.on_title():
+		return
+	screens.back_to_menu()
+	audio.play("click", 1.0, -6.0)
+
+
+## A page of HOW TO PLAY on or back. On from the last page is back to the menu.
+func act_howto_turn(step: int) -> void:
+	if state != State.TITLE or screens.mode != "howto":
+		return
+	if screens.turn_howto(step):
+		audio.play("paper", 1.1, -6.0)
+	elif step > 0:
+		act_menu_back()
+
+
+## A choice on the SETTINGS page: it applies at once and is kept for the next start (never on a
+## test run, settings.gd). The language is act_language's, which keeps it the same way.
+func act_setting(row: String, value: Variant) -> void:
+	if state != State.TITLE or screens.mode != "settings":
+		return
+	var options: Array = screens.SETTING_OPTIONS.get(row, [])
+	if not options.has(value):
+		return
+	match row:
+		"language":
+			act_language(str(value))
+			return
+		"blood":
+			if (str(value) == "less") == less_blood:
+				return
+			_set_less_blood(str(value) == "less")
+			Settings.save_value("blood", str(value))
+		"volume":
+			if int(value) == audio.volume_step and not audio.muted:
+				return
+			audio.set_volume_step(int(value))
+			audio.set_muted(false)      # a level chosen is a level to hear
+			Settings.save_value("volume", audio.volume_step)
+		"screen":
+			if (str(value) == "fullscreen") == fullscreen:
+				return
+			act_fullscreen(str(value) == "fullscreen")
+			return
+	audio.play("click")
+	_sync_settings()
+	_log("setting", {"row": row, "value": value})
+
+
+## LEFT or RIGHT on the SETTINGS page: the lit row's choice before or after the one in use.
+func act_setting_step(step: int) -> void:
+	if state != State.TITLE or screens.mode != "settings":
+		return
+	var row := screens.setting_row()
+	var options: Array = screens.SETTING_OPTIONS.get(row, [])
+	if options.is_empty():
+		return
+	var at := options.find(screens.settings.get(row))
+	act_setting(row, options[clampi(at + step, 0, options.size() - 1)])
+
+
+## ENTER on the SETTINGS page: the lit row's next choice, round at the end, or BACK.
+func act_setting_enter() -> void:
+	if state != State.TITLE or screens.mode != "settings":
+		return
+	var row := screens.setting_row()
+	if row == "back":
+		act_menu_back()
+		return
+	var options: Array = screens.SETTING_OPTIONS.get(row, [])
+	if options.is_empty():
+		return
+	act_setting(row, options[(options.find(screens.settings.get(row)) + 1) % options.size()])
+
+
+## M: sound off or on again, anywhere.
+func act_mute() -> void:
+	audio.set_muted(not audio.muted)
+	_sync_settings()
+
+
+## F11 or SCREEN in SETTINGS: full screen or a window, kept for the next start.
+func act_fullscreen(on: bool) -> void:
+	_apply_fullscreen(on)
+	Settings.save_value("screen", "fullscreen" if on else "window")
+	audio.play("click", 1.0, -6.0)
+	_sync_settings()
+	_log("setting", {"row": "screen", "value": "fullscreen" if on else "window"})
+
+
+func _apply_fullscreen(on: bool) -> void:
+	fullscreen = on
+	get_window().mode = Window.MODE_FULLSCREEN if on else Window.MODE_WINDOWED
+
+
+## BLOOD in SETTINGS: what --less-blood does, for the clinic, the gore and every patient from now on.
+func _set_less_blood(on: bool) -> void:
+	less_blood = on
+	clinic.less_blood = on
+	gore.less_blood = on
+	if rig != null:
+		rig.less_blood = on
+
+
+## What the SETTINGS page shows, as things are now.
+func _sync_settings() -> void:
+	if screens == null or audio == null:
+		return
+	screens.settings = {"language": Lang.code, "blood": "less" if less_blood else "full", "volume": audio.volume_step,
+		"screen": "fullscreen" if fullscreen else "window", "muted": audio.muted}
 
 
 func _show_title() -> void:
@@ -1162,7 +1328,7 @@ func _pad_hint(pad: String) -> String:
 # ================================================================ shift flow
 
 func act_start() -> void:
-	if state != State.TITLE or cases.is_empty():
+	if state != State.TITLE or cases.is_empty() or screens.mode != "title":
 		return
 	screens.hide_all()
 	audio.play("click")
@@ -3354,6 +3520,35 @@ func pointer_move(pos: Vector2) -> void:
 	_mouse = pos
 
 
+## A click on the title card or one of its pages. The right button goes back to the menu.
+func _title_press(pos: Vector2, button: int) -> void:
+	if button == MOUSE_BUTTON_RIGHT:
+		act_menu_back()
+		return
+	if button != MOUSE_BUTTON_LEFT:
+		return
+	var code := screens.language_at(pos)
+	if code != "":
+		act_language(code)
+		return
+	match screens.mode:
+		"title":
+			var item := screens.menu_at(pos)
+			if item != "":
+				act_menu(item)
+		"howto":
+			act_howto_turn(1)
+		"settings":
+			var hit := screens.setting_at(pos)
+			if hit == "back":
+				act_menu_back()
+			elif hit != "":
+				var row := hit.get_slice(":", 0)
+				var value := hit.get_slice(":", 1)
+				screens.settings_row = maxi(screens.SETTING_ROWS.find(row), 0)
+				act_setting(row, int(value) if row == "volume" else value)
+
+
 func pointer_down(pos: Vector2, button: int = MOUSE_BUTTON_LEFT) -> void:
 	_mouse = pos
 	_pointer_press(pos, button)
@@ -3380,6 +3575,9 @@ func _pointer_press(pos: Vector2, button: int) -> void:
 			act_report_skip()
 		elif button == MOUSE_BUTTON_LEFT:
 			act_report_next()
+		return
+	if state == State.TITLE:
+		_title_press(pos, button)
 		return
 	# the training box is in front of the booth: its buttons first, and the rest of it is opaque
 	if button == MOUSE_BUTTON_LEFT and coach != null and coach.is_showing():
@@ -3414,12 +3612,6 @@ func _pointer_press(pos: Vector2, button: int) -> void:
 	if button != MOUSE_BUTTON_LEFT:
 		return
 	match state:
-		State.TITLE:
-			var code := screens.language_at(pos)
-			if code != "":
-				act_language(code)
-			else:
-				act_start()
 		State.SLIP:
 			if not _wall_click(pos):
 				act_continue()
@@ -3513,11 +3705,7 @@ func key_down(keycode: int, unicode: int = 0) -> void:
 
 func _key_press(keycode: int, unicode: int) -> void:
 	if keycode == KEY_F11:
-		var w := get_window()
-		if w.mode == Window.MODE_FULLSCREEN or w.mode == Window.MODE_EXCLUSIVE_FULLSCREEN:
-			w.mode = Window.MODE_WINDOWED
-		else:
-			w.mode = Window.MODE_FULLSCREEN
+		act_fullscreen(not fullscreen)
 		return
 	if guide.is_open():
 		# the guide is over everything: LEFT goes back a page, ESC or H closes, any other key turns the page
@@ -3550,6 +3738,9 @@ func _key_press(keycode: int, unicode: int) -> void:
 				act_report_next()
 			KEY_M:
 				audio.set_muted(not audio.muted)
+		return
+	if state == State.TITLE:
+		_title_key(keycode)
 		return
 	if keycode == SPEAK_KEY:
 		act_speak_start("key")
@@ -3588,8 +3779,6 @@ func _key_press(keycode: int, unicode: int) -> void:
 				act_say_open()
 		KEY_ENTER, KEY_KP_ENTER:
 			match state:
-				State.TITLE:
-					act_start()
 				State.WAIT:
 					if clinic.cam_prompt:
 						act_call_next()
@@ -3607,6 +3796,44 @@ func _key_press(keycode: int, unicode: int) -> void:
 					_skip = true
 		KEY_M:
 			audio.set_muted(not audio.muted)
+
+
+## The title card's keys: UP and DOWN choose, ENTER takes it, ESC goes back to the menu. On
+## HOW TO PLAY, LEFT and RIGHT turn the pages; on SETTINGS they change the lit row. H opens HOW
+## TO PLAY. SPACE does nothing here: it is the shutter's key, and the warning says so.
+func _title_key(keycode: int) -> void:
+	match keycode:
+		KEY_M:
+			act_mute()
+		KEY_UP, KEY_W:
+			act_menu_move(-1)
+		KEY_DOWN, KEY_S:
+			act_menu_move(1)
+		KEY_LEFT, KEY_A:
+			if screens.mode == "howto":
+				act_howto_turn(-1)
+			elif screens.mode == "settings":
+				act_setting_step(-1)
+		KEY_RIGHT, KEY_D:
+			if screens.mode == "howto":
+				act_howto_turn(1)
+			elif screens.mode == "settings":
+				act_setting_step(1)
+		KEY_ENTER, KEY_KP_ENTER:
+			match screens.mode:
+				"title":
+					act_menu(screens.menu_item())
+				"howto":
+					act_howto_turn(1)
+				"settings":
+					act_setting_enter()
+		KEY_ESCAPE, KEY_BACKSPACE:
+			act_menu_back()
+		KEY_H, KEY_F1:
+			if screens.mode == "title":
+				act_menu("howto")
+			elif screens.mode == "howto":
+				act_menu_back()
 
 
 ## Right-click or ESC: put away whatever is in hand. With empty hands, what is out in front of
@@ -3829,6 +4056,12 @@ func _update_hover() -> void:
 	screens.hover_language = screens.language_at(pos)      # "" off the title card
 	if screens.hover_language != "":
 		_cursor_kind = "hand"
+		return
+	if state == State.TITLE:
+		screens.hover_menu_item(screens.menu_at(pos))
+		screens.hover_setting_item(screens.setting_at(pos))
+		if screens.hover_menu != "" or screens.hover_setting != "":
+			_cursor_kind = "hand"
 		return
 	if _coach_hover(pos):
 		return
