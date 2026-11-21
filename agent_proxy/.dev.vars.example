@@ -1,11 +1,11 @@
 # Settings for the patient-dialogue proxy. Copy this file to ".dev.vars" and edit the copy.
 # ".dev.vars" is ignored by Git. Never commit real keys and never put them in the Godot project.
-# "npm run dev" loads .dev.vars if it exists. Wrangler reads the same file for local Worker runs.
+# The confirmed -Patient live launcher lets Node load this file. For local Wrangler use --env-file .env.example.
 
 # mock   = a transport fixture. It returns one fixed, labelled patient line and one fixed, labelled
 #          transcript. It is not intelligent and it cannot hear. No network, no key, no cost. Default.
 # google = Gemini through the Gemini API or Vertex AI. Never called against the live service yet.
-# openai = OpenAI through an API key. Never called against the live service yet.
+# openai = OpenAI through an API key. The historical live test is dated November 15.
 BTC_PROVIDER=mock
 
 # The patient's lines come from BTC_MODEL. Defaults: gemini-3.5-flash-lite for google,

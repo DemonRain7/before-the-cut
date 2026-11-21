@@ -32,6 +32,7 @@ var d: PlayDriver = null
 var passed: int = 0
 var failed: int = 0
 var group: String = ""
+var visit_ids := {}
 
 
 ## A patient service that takes its time and then has no answer. While it is asked, the patient
@@ -228,8 +229,17 @@ func title_menu() -> void:
 	for key in rects:
 		if Rect2(Vector2(8, 0), Gfx.SCREEN - Vector2(16, 0)).encloses(rects[key] as Rect2):
 			inside += 1
-	check(inside == rects.size() and rects.has("back") and rects.size() == 2 + 2 + 5 + 2 + 1,
+	check(inside == rects.size() and rects.has("back") and rects.size() == 2 + 2 + 5 + 2 + 2 + 1,
 		"every choice of every row has its button on the screen, and BACK")
+	s.settings_row = s.SETTING_ROWS.find("patient_ai")
+	check(s.settings.patient_ai == "off" and not main.use_model, "patient AI starts switched off")
+	d.click((rects["patient_ai:on"] as Rect2).get_center())
+	check(not main.use_model and s.settings.patient_ai == "off" and s.setting_hint() == s.PATIENT_HINTS.no_url,
+		"with no address the row stays OFF and explains how to connect")
+	for hint in s.PATIENT_HINTS.values():
+		var translated := Lang.t(str(hint))
+		check((Lang.code == "en" or translated != hint) and Gfx.wrap_text(str(hint), 380.0).size() <= 4,
+			"patient service hint is translated and fits its panel")
 	var first := Lang.code
 	var other := "zh" if first == "en" else "en"
 	d.click((rects["language:" + other] as Rect2).get_center())
@@ -437,6 +447,8 @@ func plan_is(blows_ms: Array, through_ms: int) -> bool:
 func enter(id: String, keep_guide: bool = false) -> VisitState:
 	var ok: bool = await d.buzz_in(keep_guide)
 	check(ok, "%s comes to the counter" % id)
+	check(not visit_ids.has(main.agent.visit_id), "a returning patient gets a fresh visit budget on a later night")
+	visit_ids[main.agent.visit_id] = true
 	var v: VisitState = main.visit
 	check(v != null and str(v.case_data.get("id", "")) == id, "the visit is %s's" % id)
 	return v
@@ -2414,7 +2426,7 @@ func counter_words() -> void:
 		else:
 			print("  too wide for the bar: ", text)
 	check(fits == plates.size(), "every way a stop can be told fits the bar over the printer slot")
-	var title: Array = [main.STATUS_AI_VOICE, main.STATUS_AI_TYPE, main.STATUS_AI_NO_MIC, main.STATUS_OFFLINE,
+	var title: Array = [main.STATUS_AI_VOICE, main.STATUS_AI_TYPE, main.STATUS_AI_NO_MIC, main.STATUS_CHECKING, main.STATUS_OFFLINE,
 		main.screens.WARNING, main.screens.HOWTO_KEYS, main.screens.HOWTO_LAST_KEYS, main.screens.SETTINGS_KEYS]
 	title.append_array(main.screens.MENU_NAMES.values())
 	fits = 0

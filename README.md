@@ -30,17 +30,17 @@ This repository was renamed from `before-the-cut-g1` to `before-the-cut` so late
 Windows, PowerShell, from the repository root. The launcher looks for Godot 4.7.2 in `$env:GODOT_BIN`, then `%LOCALAPPDATA%\CodexTools\Godot\4.7.2\`, then on `PATH` (or pass `-GodotPath <exe>`). In a fresh clone its first run imports the pictures, fonts and sounds before the game starts (a few seconds; `-ImportOnly` does only that).
 
 ```powershell
-.\run-game.ps1                 # offline: authored patients, no network
+.\run-game.ps1                 # saved settings, initially the scripted patient
 .\run-game.ps1 -LessBlood      # the attack scenes without blood
 ```
 
-The title card has a menu: START, HOW TO PLAY (five short pages, sudden attacks among them) and SETTINGS, where the language (English | 中文, also at the top right), less blood, the sound and full screen are picked and kept for the next start; the first start is in English.
+The title menu has START, HOW TO PLAY, SETTINGS and QUIT. SETTINGS keeps the language (English or 中文), blood, sound, screen mode and patient AI choice.
 
-With the patient-AI proxy (Node.js; a mock unless `agent_proxy/.dev.vars` names a provider):
+The mock and the forced-timeout demonstration each start the game and a temporary local service:
 
 ```powershell
-cd agent_proxy; npm run dev
-.\run-game.ps1 -Model -AgentUrl http://127.0.0.1:8787    # second terminal, repository root
+.\run-game.ps1 -Patient mock
+.\run-game.ps1 -Patient timeout
 ```
 
 Controls and rules are in [game/README.md](game/README.md); providers, keys and limits in [agent_proxy/README.md](agent_proxy/README.md). The source was moved here from the earlier local workspace on November 15, 2026 ([transition record](docs/development/repository-transition.md)).

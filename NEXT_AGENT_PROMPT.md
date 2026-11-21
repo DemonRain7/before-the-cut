@@ -1,5 +1,14 @@
 # Continue Before the Cut
 
+**Resume after patient-agent P0 (November 21, 2026).** P0 was implemented and verified locally on top of the previous sessions' uncommitted work. Use the active P0 checkpoint at the top of HANDOFF.md for current results and the proxy README for commands. Earlier instructions below to begin P0 describe the previous checkpoint. Inspect `git status -sb` before pulling or staging.
+
+- Launch a local demo with `.\run-game.ps1 -Patient mock` or `-Patient timeout`. Add `-CheckPatient` for the headless visit. SETTINGS offers PATIENT AI in both languages. The shipped default is scripted with an empty URL. Rules version 10, protocol 3 and 16 replies per visit still apply.
+- Current working-tree results are 1193 rule checks, 1184/1185/1184 scene checks, 47 proxy tests, 312 Godot HTTP and 96 wire checks, 1620 measured lines per language, zero translation issues and zero findings in 32 scripts. Hidden captures produced 447/447 frames. The full before/after table, isolated preference checks and engine exit notes are in HANDOFF.md.
+- On local Wrangler, call 17 was refused while the second session continued. A day budget of three survived a restart, an oversized stream got 413, disabled POSTs got 503 and the failing mock got 504. In the actual headless game the timeout label appeared after 3,574 ms. All three Worker bundles were built locally. These are computed and mock results. Nobody played the current build or called a live provider. Evidence is under `validation/2026-11-21/patient-agent/`.
+- An independent export of the P0 commit also passed its rule, English and Chinese scene, HTTP, wire and proxy tests. The first cold Godot import on that export exited with `0xC0000005` after writing the cache. Repeating the import exited 0. See HANDOFF.md and `snapshot-*.log` for the results.
+- The next three tasks each require their own answer. (1) Confirm the instructor's foundation/rubric, then deploy and probe the mocks only after approval and the student's login. (2) After live-setup approval, have the student enter the secret in the disabled live environment, enable a hard provider spend limit and decide future redeployment authority. (3) After spending approval, use a fresh 24-dialogue/0-transcription allowance for OpenAI `gpt-6-luna`, six bilingual visits, estimated USD 0.00231 with a proposed USD 0.01 ceiling. The November 15 ledger stays closed.
+- Stop before P1. D1, D2 and D3 propose ASK-equivalent typed questions, pressure through PRESS only and game-owned case promises respectively. Each defaults to yes and awaits the student. Course posting and the play-logic proposals remain separate.
+
 Updated November 20, 2026. Work on main in this repository, the only active checkout;
 pull first. The sibling fathom directory is an archive. Do not write there or copy its Git history.
 

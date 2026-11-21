@@ -74,18 +74,28 @@ const DEMO_LOOP := 3.4
 const DEMO_BLOWS := [0.3, 0.55, 0.8]
 const DEMO_STOPPED := "STOPPED CLEAN: THE GLASS HOLDS"     # main.gd STOP_CLEAN_LINE, as the plate says it
 # SETTINGS: a row's name, and its choices to the right of it
-const SETTING_ROWS := ["language", "blood", "volume", "screen", "back"]
-const SETTING_NAMES := {"language": "LANGUAGE", "blood": "BLOOD", "volume": "SOUND", "screen": "SCREEN"}
+const SETTING_ROWS := ["language", "blood", "volume", "screen", "patient_ai", "back"]
+const SETTING_NAMES := {"language": "LANGUAGE", "blood": "BLOOD", "volume": "SOUND", "screen": "SCREEN", "patient_ai": "PATIENT AI"}
 const SETTING_OPTIONS := {"language": ["en", "zh"], "blood": ["full", "less"], "volume": [0, 1, 2, 3, 4],
-	"screen": ["window", "fullscreen"]}
+	"screen": ["window", "fullscreen"], "patient_ai": ["off", "on"]}
 const OPTION_NAMES := {"full": "FULL", "less": "LESS", "window": "WINDOW", "fullscreen": "FULL SCREEN",
-	"0": "OFF", "1": "25%", "2": "50%", "3": "75%", "4": "100%"}
+	"off": "OFF", "on": "ON", "0": "OFF", "1": "25%", "2": "50%", "3": "75%", "4": "100%"}
 const SETTING_HINTS := {
 	"language": "Every word of the game, in this language. Kept for the next start.",
 	"blood": "LESS: the attacks without blood, splatter or stains. The red flash stays.",
 	"volume": "How loud the clinic is. M mutes and unmutes it at any time.",
 	"screen": "F11 switches between the two at any time.",
+	"patient_ai": "Choose ON to connect the patient service.",
 	"back": "Back to the title card. Every change is kept for the next start.",
+}
+const PATIENT_HINTS := {
+	"no_url": "No patient service address. Start the game with a service address to connect.",
+	"checking": "Checking the patient service...",
+	"connected": "Connected. The patient service will answer.",
+	"mock": "Connected to the mock service. Replies are test dialogue.",
+	"disabled": "The service is switched off. The scripted patient will answer.",
+	"version": "Game and service versions differ. The scripted patient will answer.",
+	"unreachable": "No answer from the service. The scripted patient will answer.",
 }
 const SETTINGS_TITLE := "SETTINGS"
 const BACK := "BACK"
@@ -520,7 +530,14 @@ func _draw_demo(r: Rect2) -> void:
 		draw_texture(lever, Vector2(bar.end.x + 24.0, floorf(r.position.y + (r.size.y - lever.get_height()) / 2.0)))
 
 
-## LANGUAGE, BLOOD, SOUND, SCREEN and BACK: the lit row has a marker, the value in use is lit,
+func setting_hint() -> String:
+	var row := setting_row()
+	if row == "patient_ai":
+		return str(PATIENT_HINTS.get(settings.get("patient_status", "off"), SETTING_HINTS.patient_ai))
+	return str(SETTING_HINTS.get(row, ""))
+
+
+## The settings rows and BACK: the lit row has a marker, the value in use is lit,
 ## and what the lit row does is said under them.
 func _draw_settings() -> void:
 	draw_rect(Rect2(Vector2.ZERO, Gfx.SCREEN), Color(Gfx.INK0, 0.94))
@@ -560,7 +577,7 @@ func _draw_settings() -> void:
 			var last: Rect2 = rects["volume:4"]
 			Gfx.text(self, Vector2(last.end.x + 8.0, y + 2.0), MUTED_NOTE, Gfx.RED3, true)
 	var hy := SET_Y + SET_STEP * float(SETTING_ROWS.size()) + 14.0
-	for line in Gfx.wrap_text(str(SETTING_HINTS.get(setting_row(), "")), p.size.x - 40.0):
+	for line in Gfx.wrap_text(setting_hint(), p.size.x - 40.0):
 		Gfx.text_center_raw(self, 320.0, hy, line, Gfx.TEAL6)      # wrap_text translated it
 		hy += HOWTO_LINE
 	Gfx.text_center(self, 320.0, 338.0, SETTINGS_KEYS, Gfx.TEAL4)

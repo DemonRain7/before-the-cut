@@ -753,6 +753,9 @@ def settings_rows():
         if not hint:
             r = r[:4] + (r[4] + " NO HINT FOR THIS ROW",)
         rows.append(r)
+        if row == "patient_ai":
+            for key, text in table(SCREENS_GD, "PATIENT_HINTS"):
+                rows.append(check_lines("setting_hint", key, text, pw - 40, most))
         if row == "back":
             continue
         label = labels.get(row, "")

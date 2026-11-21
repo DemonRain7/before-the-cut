@@ -449,6 +449,9 @@ func title_menu_shots() -> void:
 	reached(await d.until(func() -> bool: return s.mode == "settings", 2.0), "SETTINGS opens from the menu")
 	await d.seconds(0.3)
 	await shot("settings")
+	d.move(Vector2(88, 330))
+	s.settings_row = s.SETTING_ROWS.find("patient_ai")
+	await shot("settings-patient-ai")
 	d.key(KEY_ESCAPE)
 	reached(await d.until(func() -> bool: return s.mode == "title", 2.0), "and ESC goes back to it again")
 	s.menu_index = 0

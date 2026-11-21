@@ -27,7 +27,10 @@ func _initialize() -> void:
 		if parts.size() == 2:
 			urls[parts[0]] = parts[1]
 	create_timer(170.0, true, false, true).timeout.connect(func(): quit(2))
-	_run()
+	if urls.has("launch-check"):
+		test_launcher(str(urls["launch-check"]))
+	else:
+		_run()
 
 func check(value: bool, label: String) -> void:
 	if value:
@@ -71,6 +74,7 @@ func _run() -> void:
 		var result := v.apply_check("grip", str(d.move), true)
 		check(result.result == "granted", "AI cooperation reaches tool state")
 		check(a.conversation_history.size() >= 3, "visit history carries actual conversation")
+	await test_sign_matrix(db)
 	for scenario in ["timeout", "invalid", "slow"]:
 		client.base_url = str(urls[scenario])
 		var a := new_agent(db.cases.kip)
@@ -88,6 +92,26 @@ func _run() -> void:
 	await process_frame
 	print("RESULT: %d passed, %d failed" % [passed, failed])
 	quit(1 if failed else 0)
+
+## Cross every pair of speech and temper conditions for every patient in both languages.
+func test_sign_matrix(db: Dictionary) -> void:
+	for language in ["en", "zh"]:
+		Lang.pin(language)
+		for id in db.templates:
+			var template: Dictionary = db.templates[id]
+			for speech in ["normal", "broken"]:
+				for temper in ["normal", "broken"]:
+					var signs := {"speech": template.signs.speech[speech][0].id, "temper": template.signs.temper[temper][0].id}
+					var c := CaseDB.compose(template, {"signs": signs, "truth": "stable" if speech == "normal" and temper == "normal" else "drifting"})
+					var a := new_agent(c)
+					a.session_id = "btc-sign-matrix"
+					var topic: Dictionary = c.topics[0]
+					var action := {"type": "ask", "id": topic.id, "text": Lang.t(str(topic.q))}
+					var d: Dictionary = await a.decide(action, VisitState.new(c, rules).snapshot(), ["answer"])
+					check(d.source == "model" and d.meta.get("mock") == true and not str(d.reply).is_empty()
+						and (str(d.reply) == NOVEL) == (language == "en"), "HTTP mock reply for %s/%s/%s/%s" % [id, language, speech, temper])
+	Lang.pin("en")
+
 
 ## The speech route over real HTTP, below the screen: a clip's words, and each way it can fail.
 ## The clips are generated tones. No microphone is opened and no speech service is called.
@@ -554,6 +578,83 @@ func meanwhile(main: MainScript, driver: PlayDriver) -> void:
 	client.base_url = str(urls.normal)
 
 
+## Test the actual SETTINGS inputs against HTTP and wait for their visible result in both languages.
+func test_patient_settings(main: MainScript, driver: PlayDriver) -> void:
+	main.act_menu("settings")
+	main.screens.settings_row = main.screens.SETTING_ROWS.find("patient_ai")
+	for language in ["zh", "en"]:
+		main.act_language(language)
+		for pair in [["disabled", "disabled"], ["protocol", "version"], ["outdated", "version"], ["missing", "version"],
+				["duplicate", "version"], ["late", "unreachable"], ["text", "mock"]]:
+			main.agent_url = str(urls.health) + "/" + str(pair[0])
+			main.model_client.base_url = main.agent_url
+			driver.click(main.screens.setting_rects()["patient_ai:on"].get_center())
+			check(main.screens.setting_hint() == main.screens.PATIENT_HINTS.checking, "SETTINGS shows the pending connection")
+			await main.patient_check_finished
+			var connected: bool = pair[1] == "mock"
+			check(main.use_model == connected and main.screens.settings.patient_ai == ("on" if connected else "off")
+				and main.screens.setting_hint() == main.screens.PATIENT_HINTS[pair[1]], "SETTINGS resolves " + str(pair[0]) + " in " + language)
+		check(not main.screens.voice, "a text-only service offers typing")
+		driver.click(main.screens.setting_rects()["patient_ai:off"].get_center())
+	main.agent_url = str(urls.health) + "/delayed"
+	main.model_client.base_url = main.agent_url
+	main.act_setting("patient_ai", "on")
+	main.act_setting("patient_ai", "off")
+	await create_timer(0.35, true, false, true).timeout
+	check(not main.use_model and main.screens.settings.patient_ai == "off", "an old health response cannot undo OFF")
+	main.agent_url = str(urls.normal)
+	main.model_client.base_url = main.agent_url
+	main.mic.simulated = true
+	driver.key(KEY_RIGHT)
+	await main.patient_check_finished
+	check(main.use_model and main.screens.voice and main.screens.status_line == main.STATUS_AI_VOICE,
+		"the mock connects by keyboard and the title offers its voice route")
+	main.act_menu_back()
+
+
+## Both launcher demos use the actual startup options and patient scene.
+func test_launcher(mode: String) -> void:
+	await process_frame
+	var main: MainScript = load("res://scenes/main.tscn").instantiate()
+	root.add_child(main)
+	var driver := PlayDriver.new(self, main)
+	if main._patient_status == "checking":
+		await main.patient_check_finished
+	check(main.use_model and main._service_is_mock and main._patient_override == "on", "launcher connected to its mock service")
+	if not main.use_model or not main._service_is_mock:
+		await driver.leave()
+		quit(1)
+		return
+	Engine.time_scale = 4.0
+	check(await driver.open_counter() and await driver.buzz_in(), "launcher visit begins")
+	await driver.settle()
+	Engine.time_scale = 1.0
+	var started := Time.get_ticks_msec()
+	driver.key(KEY_T, 116)
+	driver.type_text("Can we talk about my shift?")
+	driver.key(KEY_ENTER)
+	var label := "OFFLINE FALLBACK" if mode == "timeout" else "MOCK TRANSPORT"
+	var source := "fallback" if mode == "timeout" else "model"
+	check(await driver.until(func() -> bool:
+		return main.agent.last.get("source") == source and main.clinic.corner_text.contains(label), 5.0), "corner shows reply source")
+	var elapsed := Time.get_ticks_msec() - started
+	check(elapsed < main.model_client.timeout_ms and main.agent.calls_this_visit == 1, "one bounded attempt")
+	if mode == "timeout":
+		check(main.agent.last.get("fallback_reason") == "http_504:upstream_timeout", "proxy deadline triggers the scripted reply")
+		check(await driver.until(func() -> bool: return main._base_hint.contains("upstream_timeout") and main.dialogue.speaker == main._patient_name(), 2.0), "scripted reply and timeout reason are visible")
+	else:
+		check(await driver.until(func() -> bool: return " ".join(main.dialogue.lines) == NOVEL, 8.0),
+			"generated mock line is displayed")
+	print("LAUNCH mode=%s source=%s label_ms=%d calls=%d" % [mode, source, elapsed, main.agent.calls_this_visit])
+	Engine.time_scale = 4.0
+	await driver.settle()
+	await driver.stamp("treat")
+	check(await driver.wait_for_slip(), "launcher visit reaches its slip")
+	await driver.leave()
+	print("RESULT: %d passed, %d failed" % [passed, failed])
+	quit(1 if failed else 0)
+
+
 func test_scene() -> void:
 	Engine.time_scale = 4.0
 	var main: MainScript = load("res://scenes/main.tscn").instantiate()
@@ -563,11 +664,12 @@ func test_scene() -> void:
 	main.audio.set_muted(true)
 	main.mic.simulated = true      # an automated run never opens a microphone
 	var driver := PlayDriver.new(self, main)
+	await test_patient_settings(main, driver)
 	check(await driver.open_counter(), "scene opens")
 	check(await driver.buzz_in(), "patient arrives")
+	check(main.agent.mode == "model" and main.agent.client == main.model_client, "the SETTINGS selection reaches the new visit")
+	# The failure scenarios later in this scene change this client\'s base address.
 	main.agent.client = client
-	main.agent.set_mode("model")
-	main.use_model = true
 	main.event_log.write("automated_run", {"runner":"autonomous-http-scene"})
 	main.act_ask("why")
 	check(await driver.until(func() -> bool: return main.dialogue.lines.size() > 0 and " ".join(main.dialogue.lines) == NOVEL, 20.0), "actual dialogue UI displays generated reply")

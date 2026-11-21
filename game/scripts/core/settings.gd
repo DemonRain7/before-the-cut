@@ -1,6 +1,6 @@
 extends RefCounted
 ## The player's other choices, kept beside the language (lang.gd) in user://settings.cfg, in its
-## [game] section: the blood, the sound and the screen. They are changed on the title card's
+## [game] section: blood, sound, screen and patient AI. They are changed on the title card's
 ## SETTINGS page, and the screen with F11 as well. A test run pins its language (Lang.pin), and
 ## then nothing is read from the file or written to it: a test never sees, or changes, what a
 ## player chose.
@@ -9,8 +9,8 @@ extends RefCounted
 const Lang = preload("res://scripts/core/lang.gd")
 
 # volume: a step of AudioBank.VOLUME_STEPS, 0 (off) to 4 (full)
-const DEFAULTS := {"blood": "full", "volume": 4, "screen": "window"}
-const CHOICES := {"blood": ["full", "less"], "volume": [0, 1, 2, 3, 4], "screen": ["window", "fullscreen"]}
+const DEFAULTS := {"blood": "full", "volume": 4, "screen": "window", "patient_ai": "off"}
+const CHOICES := {"blood": ["full", "less"], "volume": [0, 1, 2, 3, 4], "screen": ["window", "fullscreen"], "patient_ai": ["off", "on"]}
 
 
 ## What was saved, each value checked against CHOICES; the default wherever nothing usable was

@@ -7,6 +7,9 @@ export const DEFAULT_LIMITS = Object.freeze({
 	maxBodyBytes: 32768,       // request body size
 	maxCallsPerVisit: 16,     // same number as rules.json: agent.max_model_calls_per_visit
 	maxCallsPerSession: 240,  // three five-patient shifts with every visit at its cap
+	maxCallsPerDay: 1500,     // UTC day across dialogue and voice
+	counterRetentionDays: 2,  // Worker storage expires after inactivity
+	healthTimeoutMs: 2000,    // game's connection check
 	maxCallsTotal: 2000,      // cost ceiling for one proxy process
 	maxTrackedKeys: 2000,     // size of the in-memory counter table
 	upstreamTimeoutMs: 3500,  // keep below the game's 4000 ms client timeout
@@ -327,21 +330,51 @@ export function validateResponse(raw, maxChars = DEFAULT_LIMITS.maxReplyChars, n
 
 // ---------------------------------------------------------------- counters
 
-/** Per-process call counters. Good enough for one dev server; a deployed Worker needs shared storage. */
-export function createMemoryCounters(maxKeys = DEFAULT_LIMITS.maxTrackedKeys) {
-	const map = new Map();
+/** Session counters may be evicted locally. Budget counters live for the entire Node process. */
+export function createMemoryCounters(maxKeys = DEFAULT_LIMITS.maxTrackedKeys, maxTotal = DEFAULT_LIMITS.maxCallsTotal) {
+	const counts = new Map();
+	const days = new Map();
+	let total = 0;
 	return {
-		incr(key) {
-			const n = (map.get(key) || 0) + 1;
-			map.delete(key);
-			map.set(key, n);
-			if (map.size > maxKeys) map.delete(map.keys().next().value);
-			return n;
+		takeSession(session, entries) {
+			return entries.findIndex(([key, limit]) => {
+				const id = session + ":" + key;
+				const count = counts.get(id) || 0;
+				if (count >= limit) return true;
+				counts.delete(id);
+				counts.set(id, count + 1);
+				if (counts.size > maxKeys) counts.delete(counts.keys().next().value);
+				return false;
+			});
 		},
-		peek(key) {
-			return map.get(key) || 0;
+		takeDay(day, limit) {
+			const used = days.get(day) || 0;
+			if (total >= maxTotal || used >= limit) return false;
+			days.set(day, used + 1);
+			total += 1;
+			return true;
 		},
 	};
+}
+
+/** Parse only the service settings shared by Wrangler bindings and the Node environment. */
+export function serviceSettings(env) {
+	const disabled = env.BTC_DISABLED === "1";
+	const transcribeEnabled = env.BTC_TRANSCRIBE !== "off";
+	const limits = {};
+	if (disabled) return { limits, disabled, transcribeEnabled };
+	for (const [name, key, min] of [
+		["BTC_DAILY_BUDGET", "maxCallsPerDay", 0],
+		["BTC_UPSTREAM_TIMEOUT_MS", "upstreamTimeoutMs", 1],
+		["BTC_TRANSCRIBE_TIMEOUT_MS", "transcribeTimeoutMs", 1],
+	]) {
+		if (env[name] === undefined) continue;
+		const value = Number(env[name]);
+		if (!/^\d+$/.test(String(env[name])) || !Number.isSafeInteger(value) || value < min || value > 2147483647)
+			throw new Error("Invalid service setting: " + name);
+		limits[key] = value;
+	}
+	return { limits, disabled, transcribeEnabled };
 }
 
 // ---------------------------------------------------------------- handler
@@ -360,10 +393,27 @@ function errorBody(code, message) {
  * `log` receives one metadata object per request: ids, codes, numbers. Never prompts, lines, audio or transcripts.
  * A provider may also have transcribe({audioBase64, mimeType, seconds}, signal) -> {text, model, usage, mock?}.
  */
-export function createHandler({ cases, rules, provider, limits = {}, counters = null, log = () => {}, now = () => Date.now(), newId = () => crypto.randomUUID() }) {
+export function createHandler({ cases, rules, provider, limits = {}, counters = null, disabled = false, transcribeEnabled = true, log = () => {}, now = () => Date.now(), newId = () => crypto.randomUUID() }) {
 	const lim = { ...DEFAULT_LIMITS, ...limits };
-	const ctr = counters || createMemoryCounters(lim.maxTrackedKeys);
-	let total = 0;
+	const ctr = counters || createMemoryCounters(lim.maxTrackedKeys, lim.maxCallsTotal);
+
+	async function reserve(req, voice) {
+		const kind = voice ? "voice" : "dialogue";
+		const entries = [
+			[kind + ":" + req.visit_id, voice ? lim.maxTranscribesPerVisit : lim.maxCallsPerVisit],
+			[kind, voice ? lim.maxTranscribesPerSession : lim.maxCallsPerSession],
+		];
+		try {
+			const full = await ctr.takeSession(req.session_id, entries);
+			if (full === 0) return bad(429, voice ? "visit_transcribe_cap" : "visit_call_cap", "visit limit reached");
+			if (full === 1) return bad(429, voice ? "session_transcribe_cap" : "session_call_cap", "session limit reached");
+			const day = new Date(now()).toISOString().slice(0, 10);
+			if (!await ctr.takeDay(day, lim.maxCallsPerDay)) return bad(429, "budget_exhausted", "provider call budget exhausted");
+		} catch {
+			return bad(503, "counter_unavailable", "call budget could not be verified");
+		}
+		return null;
+	}
 
 	async function patientMove(bodyText, bodyTooLarge) {
 		const started = now();
@@ -388,25 +438,18 @@ export function createHandler({ cases, rules, provider, limits = {}, counters = 
 		const checked = validateRequest(parsed, cases);
 		if (!checked.ok) return finish(checked.status, errorBody(checked.code, checked.message));
 		const req = checked.req;
+		const fixedId = { say: "free", press: "challenge", reassure: "calm" }[req.event.type];
 		Object.assign(entry, {
 			session_id: req.session_id,
 			visit_id: req.visit_id,
 			case_id: req.case_id,
 			language: req.language,
-			event: `${req.event.type}:${req.event.id}`,
+			event: `${req.event.type}:${fixedId ?? req.event.id}`,
 		});
 
 		// Every attempt counts, including ones that fail later. The game counts the same way.
-		if (ctr.incr(`v:${req.session_id}:${req.visit_id}`) > lim.maxCallsPerVisit) {
-			return finish(429, errorBody("visit_call_cap", `at most ${lim.maxCallsPerVisit} model calls per visit`));
-		}
-		if (ctr.incr(`s:${req.session_id}`) > lim.maxCallsPerSession) {
-			return finish(429, errorBody("session_call_cap", `at most ${lim.maxCallsPerSession} model calls per session`));
-		}
-		total += 1;
-		if (total > lim.maxCallsTotal) {
-			return finish(429, errorBody("budget_exhausted", "this proxy process has used its call budget"));
-		}
+		const denied = await reserve(req, false);
+		if (denied) return finish(denied.status, errorBody(denied.code, denied.message));
 
 		const c = cases[req.case_id];
 		// The model is asked for maxLineChars. Models miss a character count by a little, so a
@@ -499,16 +542,8 @@ export function createHandler({ cases, rules, provider, limits = {}, counters = 
 			return finish(501, errorBody("transcription_unavailable", "this provider has no speech-to-text"));
 		}
 
-		if (ctr.incr(`tv:${req.session_id}:${req.visit_id}`) > lim.maxTranscribesPerVisit) {
-			return finish(429, errorBody("visit_transcribe_cap", `at most ${lim.maxTranscribesPerVisit} clips per visit`));
-		}
-		if (ctr.incr(`ts:${req.session_id}`) > lim.maxTranscribesPerSession) {
-			return finish(429, errorBody("session_transcribe_cap", `at most ${lim.maxTranscribesPerSession} clips per session`));
-		}
-		total += 1;      // the same process budget as patient replies: both are provider calls
-		if (total > lim.maxCallsTotal) {
-			return finish(429, errorBody("budget_exhausted", "this proxy process has used its call budget"));
-		}
+		const denied = await reserve(req, true);
+		if (denied) return finish(denied.status, errorBody(denied.code, denied.message));
 
 		const controller = new AbortController();
 		let timer = null;
@@ -554,26 +589,27 @@ export function createHandler({ cases, rules, provider, limits = {}, counters = 
 		});
 	}
 
-	return async function handle({ method, path, bodyText = "", bodyTooLarge = false }) {
+	return async function handle({ method, path, bodyText = "", bodyTooLarge = false, readBody }) {
 		const route = String(path || "/").split("?")[0].replace(/\/+$/, "") || "/";
+		if (disabled && method === "POST") return reply(503, errorBody("service_disabled", "patient service is switched off"));
 		if (route === "/healthz") {
 			if (method !== "GET") return reply(405, errorBody("method_not_allowed", "use GET"));
 			return reply(200, {
 				ok: true,
 				protocol: PROTOCOL,
+				disabled,
 				provider: provider.name,
 				model: provider.model,
-				speech_to_text: typeof provider.transcribe === "function",
+				speech_to_text: !disabled && transcribeEnabled && typeof provider.transcribe === "function",
 				cases: Object.keys(cases).map((id) => ({ id, version: cases[id].version })),
 			});
 		}
-		if (route === "/v1/transcribe") {
+		const voice = route === "/v1/transcribe";
+		if (voice || route === "/v1/patient-dialogue") {
 			if (method !== "POST") return reply(405, errorBody("method_not_allowed", "use POST"));
-			return transcribe(bodyText, bodyTooLarge);
-		}
-		if (route === "/v1/patient-dialogue") {
-			if (method !== "POST") return reply(405, errorBody("method_not_allowed", "use POST"));
-			return patientMove(bodyText, bodyTooLarge);
+			if (voice && !transcribeEnabled) return reply(501, errorBody("transcription_unavailable", "voice is switched off"));
+			if (readBody) ({ bodyText, bodyTooLarge } = await readBody(voice ? lim.maxAudioBodyBytes : lim.maxBodyBytes));
+			return voice ? transcribe(bodyText, bodyTooLarge) : patientMove(bodyText, bodyTooLarge);
 		}
 		return reply(404, errorBody("not_found", "unknown path"));
 	};

@@ -83,6 +83,7 @@ in the editor once.
 | Option | Effect |
 | --- | --- |
 | `-ImportOnly` | import if anything is missing, then stop without starting the game |
+| `-Patient script`, `mock`, `timeout`, `live` or a service URL | choose the patient for this run. Mock and timeout start and stop a local service. Live prompts for a paid launch. See the [proxy runbook](../agent_proxy/README.md). |
 | `-AgentUrl http://127.0.0.1:8787 -Model` | patients speak through the proxy in `../agent_proxy` (start it first: `npm run dev`) |
 | `-LessBlood` | the attack scenes without blood: no splatter, pools or stains, and a clean face, hand, shutter cut and broken glass. The red flash and the red edge of the screen stay |
 | `-Mute` | start with sound off (M toggles it in the game) |
@@ -210,11 +211,12 @@ LEFT goes back a page; ESC, BACKSPACE, H or a right-click goes back to the menu.
 HOW TO PLAY from the title card. A point about the price of glass is left out under rules with
 no price for it.
 
-**SETTINGS** has four rows and BACK: LANGUAGE (English, 中文), BLOOD (FULL, LESS), SOUND (OFF,
-25%, 50%, 75%, 100%) and SCREEN (WINDOW, FULL SCREEN). UP and DOWN light a row; LEFT and RIGHT
+**SETTINGS** offers LANGUAGE (English, 中文), BLOOD (FULL, LESS), SOUND (OFF, 25%, 50%, 75%, 100%),
+SCREEN (WINDOW, FULL SCREEN), PATIENT AI (OFF, ON) and BACK. PATIENT AI checks the service
+address, protocol and case versions before the next visit. With no compatible service, the scripted patient answers. UP and DOWN light a row; LEFT and RIGHT
 or a click choose, and ENTER takes the next choice (on BACK, it goes back); a line under the
 rows says what the lit row does. Each choice applies at once and is kept for the next start in
-`user://settings.cfg` (section `[game]`: `language`, `blood`, `volume` from 0 to 4, `screen`;
+`user://settings.cfg` (section `[game]`: `language`, `blood`, `volume` from 0 to 4, `screen`, `patient_ai`;
 `scripts/core/settings.gd`). M mutes and unmutes anywhere and is not kept; while it is on,
 MUTED [M] stands beside the sound row, and choosing a level there unmutes. F11 switches the
 screen anywhere, and that is kept. `--less-blood` and `--mute` (`-LessBlood`, `-Mute`) hold

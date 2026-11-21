@@ -19,16 +19,39 @@ func is_configured() -> bool:
 ##   {"ok": false, "error": "<reason>"}   reason: not_configured, request_failed, timeout,
 ##                                        network_<n>, bad_json, http_<code>[:<proxy error code>]
 func request_move(payload: Dictionary) -> Dictionary:
-	return await _post("/v1/patient-dialogue", payload, timeout_ms)
+	return await _request("/v1/patient-dialogue", HTTPClient.METHOD_POST, JSON.stringify(payload), timeout_ms)
 
 
 ## One push-to-talk clip in, its words out: data is {"text": "...", "meta": {...}}.
 ## The same result shape and error words as request_move.
 func request_transcript(payload: Dictionary) -> Dictionary:
-	return await _post("/v1/transcribe", payload, voice_timeout_ms)
+	return await _request("/v1/transcribe", HTTPClient.METHOD_POST, JSON.stringify(payload), voice_timeout_ms)
 
 
-func _post(path: String, payload: Dictionary, wait_ms: int) -> Dictionary:
+## Verify the complete roster before offering a model patient. One GET, no provider call.
+func check_service(expected: Dictionary, wait_ms: int) -> Dictionary:
+	var response: Dictionary = await _request("/healthz", HTTPClient.METHOD_GET, "", wait_ms)
+	if not response.get("ok", false):
+		return {"status": "unreachable"}
+	var data: Dictionary = response.data
+	if data.get("disabled") == true:
+		return {"status": "disabled"}
+	if data.get("ok") != true or data.get("protocol") != "3" or typeof(data.get("cases")) != TYPE_ARRAY:
+		return {"status": "version"}
+	var seen := {}
+	for item in data.cases:
+		if typeof(item) != TYPE_DICTIONARY:
+			return {"status": "version"}
+		var id: Variant = item.get("id")
+		if typeof(id) != TYPE_STRING or not expected.has(id) or seen.has(id) or item.get("version") != expected[id].version:
+			return {"status": "version"}
+		seen[id] = true
+	if seen.size() != expected.size():
+		return {"status": "version"}
+	return {"status": "connected", "voice": data.get("speech_to_text") == true, "mock": data.get("provider") == "mock"}
+
+
+func _request(path: String, method: HTTPClient.Method, body_text: String, wait_ms: int) -> Dictionary:
 	if base_url == "":
 		return {"ok": false, "error": "not_configured"}
 	# One HTTPRequest node per call, so a cancelled visit can never receive another visit's answer.
@@ -38,7 +61,7 @@ func _post(path: String, payload: Dictionary, wait_ms: int) -> Dictionary:
 	http.body_size_limit = 16384
 	var url: String = base_url.rstrip("/") + path
 	var headers := PackedStringArray(["Content-Type: application/json"])
-	var err: int = http.request(url, headers, HTTPClient.METHOD_POST, JSON.stringify(payload))
+	var err: int = http.request(url, headers, method, body_text)
 	if err != OK:
 		http.queue_free()
 		return {"ok": false, "error": "request_failed"}

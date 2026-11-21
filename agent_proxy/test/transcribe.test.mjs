@@ -2,7 +2,7 @@
 // fake fetch: no speech service and no model has heard anything. The clips are synthetic tones.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { AUDIO_RATE, DEFAULT_LIMITS, PROTOCOL, cleanTranscript, createHandler, validateTranscribeRequest } from "../src/core.mjs";
+import { AUDIO_RATE, DEFAULT_LIMITS, PROTOCOL, cleanTranscript, createHandler, createMemoryCounters, validateTranscribeRequest } from "../src/core.mjs";
 import { MOCK_TRANSCRIPT, TRANSCRIBE_INSTRUCTION, createGoogleProvider, createMockProvider } from "../src/providers.mjs";
 import { loadGameData, startServer } from "../src/dev_server.mjs";
 
@@ -189,6 +189,24 @@ test("only whitespace is tidied in a transcript; the words and their punctuation
 	assert.equal((await handler(createMockProvider()).post(clip())).body.text, MOCK_TRANSCRIPT);
 });
 
+test("dialogue and voice share a UTC-day budget across sessions and handlers, including failed attempts", async () => {
+	let instant = Date.UTC(2026, 10, 21, 23, 59, 59);
+	const counters = createMemoryCounters();
+	function app(provider) {
+		const handle = createHandler({ cases, rules, provider, counters, now: () => instant, limits: { maxCallsPerDay: 2 } });
+		return (path, body) => handle({ method: "POST", path, bodyText: JSON.stringify(body) });
+	}
+	const first = app(createMockProvider({ fail: "http_error" }));
+	const second = app(createMockProvider());
+	assert.equal((await first("/v1/transcribe", clip())).status, 502);
+	assert.equal((await second("/v1/patient-dialogue", dialogue("day-visit"))).status, 200);
+	const denied = await second("/v1/transcribe", { ...clip(), session_id: "other-session" });
+	assert.equal(denied.status, 429);
+	assert.equal(denied.body.error.code, "budget_exhausted");
+	instant += 1000;
+	assert.equal((await first("/v1/transcribe", clip())).status, 502);
+});
+
 test("clips have their own caps; they do not use up the patient's replies, and the patient's replies do not use up clips", async () => {
 	const a = handler(listener(), { maxTranscribesPerVisit: 2 });
 	const first = clip();
@@ -309,7 +327,7 @@ test("real HTTP server: a full-length clip passes on its own route, and each rou
 });
 
 test("Worker entry serves the same transcribe contract in Node", async () => {
-	const worker = (await import("../src/worker.mjs")).default;
+	const worker = (await import("../src/worker.mjs")).createWorker(() => createMemoryCounters());
 	const env = { BTC_PROVIDER: "mock" };
 	const res = await worker.fetch(new Request("https://local.test/v1/transcribe", { method: "POST", body: JSON.stringify(clip()) }), env);
 	const data = await res.json();

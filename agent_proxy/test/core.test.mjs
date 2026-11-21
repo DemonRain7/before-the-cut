@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_LIMITS, PROTOCOL, buildPrompt, createHandler, validateResponse, validateRequest } from "../src/core.mjs";
+import { DEFAULT_LIMITS, PROTOCOL, buildPrompt, createHandler, createMemoryCounters, validateResponse, validateRequest } from "../src/core.mjs";
 import { MOCK_TRANSCRIPT_ZH, createGoogleProvider, createMockProvider } from "../src/providers.mjs";
 import { loadGameData, startServer } from "../src/dev_server.mjs";
 const { cases, rules } = loadGameData();
@@ -15,6 +15,17 @@ function handler(provider=fixture(),limits={}) {
 }
 test("ten current cases and matching game limits",()=>{
  assert.equal(Object.keys(cases).length,10); assert.equal(DEFAULT_LIMITS.maxCallsPerVisit,rules.agent.max_model_calls_per_visit);
+ const game = rules.agent;
+ const mirrored = {
+  maxCallsPerDay: game.max_provider_calls_per_day, maxCallsTotal: game.max_provider_calls_per_process,
+  healthTimeoutMs: game.health_timeout_ms, counterRetentionDays: game.counter_retention_days,
+  maxTrackedKeys: game.max_tracked_keys, maxBodyBytes: game.max_body_bytes, upstreamTimeoutMs: game.upstream_timeout_ms,
+  maxCallsPerSession: game.max_model_calls_per_session, maxHistoryTurns: game.max_history_turns,
+  maxOutputTokens: game.max_output_tokens, maxAudioBodyBytes: game.voice.max_body_bytes,
+  maxTranscribesPerSession: game.voice.max_clips_per_session, transcribeTimeoutMs: game.voice.upstream_timeout_ms,
+  maxTranscriptChars: game.voice.max_transcript_chars,
+ };
+ for (const [key, value] of Object.entries(mirrored)) assert.equal(DEFAULT_LIMITS[key], value, key);
  assert.equal(DEFAULT_LIMITS.maxLineChars,rules.agent.max_line_chars); assert.ok(DEFAULT_LIMITS.upstreamTimeoutMs<rules.agent.timeout_ms);
  assert.equal(DEFAULT_LIMITS.maxReplyChars,rules.agent.max_reply_chars); assert.ok(DEFAULT_LIMITS.maxReplyChars>=DEFAULT_LIMITS.maxLineChars);
  assert.ok(DEFAULT_LIMITS.maxCallsPerSession>=DEFAULT_LIMITS.maxCallsPerVisit*rules.shift_order.length);
@@ -174,10 +185,22 @@ test("real HTTP server returns protocol 3 response with mock label",async()=>{
  const data=await res.json();assert.equal(res.status,200);assert.equal(data.meta.mock,true);assert.ok(data.reply.length);
  }finally{await server.close();}
 });
+test("a missing durable binding refuses the attempt before calling the provider", async () => {
+ const worker = (await import("../src/worker.mjs")).default;
+ const res = await worker.fetch(new Request("https://example.test/v1/patient-dialogue", { method: "POST", body: JSON.stringify(body()) }), {});
+ assert.equal(res.status, 503);
+ assert.equal((await res.json()).error.code, "counter_unavailable");
+});
+test("unrestricted event ids cannot introduce player text into a service log", async () => {
+ const { post, logs } = handler();
+ assert.equal((await post(body("say", "private arbitrary text"))).status, 200);
+ assert.equal(logs[0].event, "say:free");
+ assert.ok(!JSON.stringify(logs).includes("private arbitrary text"));
+});
 test("Worker entry imports the current ten cases and serves the same contract in Node",async()=>{
- const worker=(await import("../src/worker.mjs")).default;
+ const worker=(await import("../src/worker.mjs")).createWorker(() => createMemoryCounters());
  const health=await worker.fetch(new Request("https://local.test/healthz"),{BTC_PROVIDER:"mock"});
- const data=await health.json();assert.equal(data.protocol,"3");assert.equal(data.cases.length,10);
+ const data=await health.json();assert.equal(data.protocol,"3");assert.deepEqual(data.cases.sort((a,b)=>a.id.localeCompare(b.id)), Object.values(cases).map(({id,version})=>({id,version})).sort((a,b)=>a.id.localeCompare(b.id)));
  const res=await worker.fetch(new Request("https://local.test/v1/patient-dialogue",{method:"POST",body:JSON.stringify(body())}),{BTC_PROVIDER:"mock"});
  const reply=await res.json();assert.equal(res.status,200);assert.equal(reply.meta.mock,true);
 });

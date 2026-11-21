@@ -8,7 +8,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "node --test test/core.test.mjs test/transcribe.test.mjs test/openai.test.mjs",
-    "dev": "node --env-file-if-exists=.dev.vars src/dev_server.mjs"
+    "test": "node --test test/core.test.mjs test/transcribe.test.mjs test/openai.test.mjs test/service.test.mjs",
+    "dev": "node src/dev_server.mjs"
   }
 }

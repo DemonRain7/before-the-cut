@@ -7,7 +7,7 @@ import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { createHandler, DEFAULT_LIMITS } from "./core.mjs";
+import { createHandler, serviceSettings } from "./core.mjs";
 import { providerFromSettings } from "./providers.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -32,24 +32,21 @@ function readBody(req, cap) {
 		req.on("data", (chunk) => {
 			size += chunk.length;
 			if (size <= cap) chunks.push(chunk);
+			else if (size - chunk.length <= cap) resolve({ bodyText: "", bodyTooLarge: true });
 		});
-		req.on("end", () => resolve({ text: size <= cap ? Buffer.concat(chunks).toString("utf8") : "", tooLarge: size > cap }));
-		req.on("error", () => resolve({ text: "", tooLarge: false }));
+		req.on("end", () => resolve({ bodyText: size <= cap ? Buffer.concat(chunks).toString("utf8") : "", bodyTooLarge: size > cap }));
+		req.on("error", () => resolve({ bodyText: "", bodyTooLarge: false }));
 	});
 }
 
 /** Starts the server. Returns {server, url, close()}. Port 0 picks a free port (used by the tests). */
-export function startServer({ provider, limits = {}, host = "127.0.0.1", port = 8787, dataDir, log = (entry) => console.log(JSON.stringify(entry)) } = {}) {
+export function startServer({ provider, limits = {}, disabled = false, transcribeEnabled = true, host = "127.0.0.1", port = 8787, dataDir, log = (entry) => console.log(JSON.stringify(entry)) } = {}) {
 	const { rules, cases } = loadGameData(dataDir);
-	const lim = { ...DEFAULT_LIMITS, ...limits };
-	const handle = createHandler({ cases, rules, provider, limits: lim, log: (entry) => log({ t: new Date().toISOString(), ...entry }) });
+	const handle = createHandler({ cases, rules, provider, limits, disabled, transcribeEnabled, log: (entry) => log({ t: new Date().toISOString(), ...entry }) });
 	const server = http.createServer(async (req, res) => {
 		let out;
 		try {
-			// a push-to-talk clip is far larger than a line of dialogue: each route has its own cap
-			const cap = String(req.url || "").split("?")[0].replace(/\/+$/, "") === "/v1/transcribe" ? lim.maxAudioBodyBytes : lim.maxBodyBytes;
-			const body = req.method === "POST" ? await readBody(req, cap) : { text: "", tooLarge: false };
-			out = await handle({ method: req.method, path: req.url, bodyText: body.text, bodyTooLarge: body.tooLarge });
+			out = await handle({ method: req.method, path: req.url, readBody: (cap) => readBody(req, cap) });
 		} catch {
 			out = { status: 500, body: { error: { code: "internal", message: "internal" } } };
 		}
@@ -71,17 +68,17 @@ export function startServer({ provider, limits = {}, host = "127.0.0.1", port = 
 const startedDirectly = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (startedDirectly) {
 	const env = process.env;
-	const limits = {};
-	if (env.BTC_UPSTREAM_TIMEOUT_MS) limits.upstreamTimeoutMs = Number(env.BTC_UPSTREAM_TIMEOUT_MS);
-	if (env.BTC_TRANSCRIBE_TIMEOUT_MS) limits.transcribeTimeoutMs = Number(env.BTC_TRANSCRIBE_TIMEOUT_MS);
+	const options = serviceSettings(env);
 	let provider;
 	try {
-		provider = providerFromSettings(env);
+		provider = options.disabled ? { name: env.BTC_PROVIDER || "mock", model: env.BTC_MODEL || "" } : providerFromSettings(env);
 	} catch (err) {
 		console.error(String(err.message));
 		process.exit(1);
 	}
-	const running = await startServer({ provider, limits, host: env.BTC_HOST || "127.0.0.1", port: Number(env.BTC_PORT || 8787) });
+	const running = await startServer({ provider, ...options, host: env.BTC_HOST || "127.0.0.1", port: Number(env.BTC_PORT || 8787) });
+	// The launcher asks Node to bind port zero, then learns the actual port of this child.
+	if (env.BTC_READY_FILE) fs.writeFileSync(env.BTC_READY_FILE, String(new URL(running.url).port), "ascii");
 	console.error(`patient-dialogue proxy on ${running.url}  provider=${provider.name}  model=${provider.model}`);
 	console.error("Point the game at it:  godot --path game -- --agent-url=" + running.url + " --model");
 }

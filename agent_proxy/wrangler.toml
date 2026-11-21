@@ -1,0 +1,55 @@
+name = "before-the-cut-agent"
+main = "src/worker.mjs"
+compatibility_date = "2026-11-01"
+
+[vars]
+BTC_PROVIDER = "mock"
+BTC_DAILY_BUDGET = "1500"
+BTC_DISABLED = "0"
+BTC_TRANSCRIBE = "off"
+BTC_UPSTREAM_TIMEOUT_MS = "3500"
+BTC_TRANSCRIBE_TIMEOUT_MS = "6000"
+
+[[durable_objects.bindings]]
+name = "SESSIONS"
+class_name = "SessionCounter"
+
+[exports.SessionCounter]
+type = "durable-object"
+storage = "sqlite"
+
+[env.timeout.vars]
+BTC_PROVIDER = "mock"
+BTC_DAILY_BUDGET = "1500"
+BTC_DISABLED = "0"
+BTC_TRANSCRIBE = "off"
+BTC_UPSTREAM_TIMEOUT_MS = "3500"
+BTC_TRANSCRIBE_TIMEOUT_MS = "6000"
+BTC_MOCK_FAIL = "timeout"
+
+[[env.timeout.durable_objects.bindings]]
+name = "SESSIONS"
+class_name = "SessionCounter"
+
+[env.timeout.exports.SessionCounter]
+type = "durable-object"
+storage = "sqlite"
+
+[env.live.vars]
+BTC_PROVIDER = "openai"
+BTC_DAILY_BUDGET = "30"
+BTC_DISABLED = "1"
+BTC_TRANSCRIBE = "off"
+BTC_UPSTREAM_TIMEOUT_MS = "3500"
+BTC_TRANSCRIBE_TIMEOUT_MS = "6000"
+BTC_ALLOW_LIVE = "1"
+BTC_MODEL = "gpt-6-luna"
+BTC_REASONING_EFFORT = "none"
+
+[[env.live.durable_objects.bindings]]
+name = "SESSIONS"
+class_name = "SessionCounter"
+
+[env.live.exports.SessionCounter]
+type = "durable-object"
+storage = "sqlite"

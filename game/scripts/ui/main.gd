@@ -19,7 +19,7 @@ extends Control
 ##   --test-night=B                      play that test night of data/nights.json every shift, instead of drawing one
 ##   --authored-order                    test night A every shift: the night as written (tests, captures)
 ##   --agent-url=http://127.0.0.1:8787   patient-agent proxy (or environment BTC_AGENT_URL)
-##   --model                             autonomous patient dialogue through the proxy
+##   --model / --script-patient          select the patient for this run without saving the choice
 ##   --mute                              start with sound off
 ##   --less-blood                        the attack scenes without the blood
 ##   --no-intro                          skip the opening cards, the first-night training and the first showing of the counter guide
@@ -201,11 +201,12 @@ const STOP_BLOW_LINE := "STOPPED AFTER %d BLOW"
 const STOP_BLOWS_LINE := "STOPPED AFTER %d BLOWS"
 const STOP_LAST_LINE := "STOPPED, BUT THE GLASS IS GONE"
 # the title card says whether the patient can be spoken to, and how
-const STATUS_AI_VOICE := "Patient AI on: every reply is written live. Hold TAB to speak, or press T to type."
-const STATUS_AI_TYPE := "Patient AI on: every reply is written live. Press T to type your own questions."
-const STATUS_AI_NO_MIC := "Patient AI on: every reply is written live. No microphone found, so press T to type."
+const STATUS_AI_VOICE := "Patient service connected. Hold TAB to speak or press T to type."
+const STATUS_AI_TYPE := "Patient service connected. Press T to type your questions."
+const STATUS_AI_NO_MIC := "Patient service connected. No microphone found. Press T to type."
 const WINDOW_TITLE := "Before the Cut"      # the window's title bar, in the player's language
-const STATUS_OFFLINE := "Patient AI off: the authored patient answers. Start the patient service to talk freely."
+const STATUS_CHECKING := "Connecting to the patient service..."
+const STATUS_OFFLINE := "Scripted patient. Choose PATIENT AI in SETTINGS to connect a service."
 # the crew is an authored outcome: these lines are fixed, they never come from the patient model
 const DISPATCH_LINE := "Trauma Team dispatch. A unit is rolling to your counter. Keep them there."
 const CREW_LINE := "Trauma Team. Step back from the glass. You are coming with us."
@@ -302,7 +303,14 @@ var has_fixed_seed: bool = false
 var authored_order: bool = false     # true (--authored-order): test night A every shift, never drawn
 var test_night: String = ""          # --test-night=<name>: that night of data/nights.json every shift
 var agent_url: String = ""
+signal patient_check_finished
+
 var use_model: bool = false
+var _patient_override: String = ""
+var _patient_status: String = "off"
+var _patient_check_id: int = 0
+var _service_has_voice: bool = true
+var _service_is_mock: bool = false
 var start_muted: bool = false
 var less_blood: bool = false      # launch option --less-blood, or BLOOD: LESS in SETTINGS: the same scene without the blood
 var fullscreen: bool = false      # SCREEN in SETTINGS, or F11
@@ -457,6 +465,8 @@ func _ready() -> void:
 	_start_session()
 	_apply_language()
 	_show_title()
+	var choice := str(saved_settings.patient_ai) if _patient_override == "" else _patient_override
+	_set_patient_ai(choice == "on", false)
 	if str(saved_settings.get("screen", "window")) == "fullscreen":
 		_apply_fullscreen(true)
 	get_tree().auto_accept_quit = false      # a close request goes through _close()
@@ -464,6 +474,8 @@ func _ready() -> void:
 
 func _read_launch_options() -> void:
 	agent_url = OS.get_environment("BTC_AGENT_URL").strip_edges()
+	if agent_url == "":
+		agent_url = str(rules.agent.get("default_url", "")).strip_edges()
 	for arg in OS.get_cmdline_user_args():
 		var a := str(arg)
 		if a.begins_with("--seed="):
@@ -472,7 +484,9 @@ func _read_launch_options() -> void:
 		elif a.begins_with("--agent-url="):
 			agent_url = a.substr(12).strip_edges()
 		elif a == "--model":
-			use_model = true
+			_patient_override = "on"
+		elif a == "--script-patient":
+			_patient_override = "off"
 		elif a == "--mute":
 			start_muted = true
 		elif a == "--less-blood":
@@ -487,8 +501,6 @@ func _read_launch_options() -> void:
 			training_enabled = false
 		elif a == "--no-surprises":
 			surprises_enabled = false
-	if agent_url == "":
-		use_model = false
 
 
 func _build() -> void:
@@ -578,7 +590,7 @@ func _build() -> void:
 
 func _start_session() -> void:
 	_boot_rng.randomize()
-	session_id = "%08x" % _boot_rng.randi()
+	session_id = Crypto.new().generate_random_bytes(16).hex_encode()
 	event_log = EventLog.new()
 	event_log.open(session_id)
 	var agent_rules: Dictionary = rules.get("agent", {})
@@ -595,7 +607,7 @@ func _start_session() -> void:
 		"game_version": PatientAgent.GAME_VERSION,
 		"rules_version": str(rules.get("version", "")),
 		"model_endpoint_set": agent_url != "",
-		"model_requested": use_model,
+		"model_requested": _patient_override == "on" or (_patient_override == "" and saved_settings.patient_ai == "on"),
 		"voice_offered": screens.voice,
 		"language": Lang.code,
 		"engine": str(Engine.get_version_info().get("string", "")),
@@ -704,6 +716,11 @@ func act_setting(row: String, value: Variant) -> void:
 		"language":
 			act_language(str(value))
 			return
+		"patient_ai":
+			audio.play("click")
+			_log("setting", {"row": row, "value": value})
+			_set_patient_ai(value == "on", _patient_override == "")
+			return
 		"blood":
 			if (str(value) == "less") == less_blood:
 				return
@@ -723,6 +740,35 @@ func act_setting(row: String, value: Variant) -> void:
 	audio.play("click")
 	_sync_settings()
 	_log("setting", {"row": row, "value": value})
+
+
+## The preference is intent across launches. Each launch rechecks the service before any visit.
+func _set_patient_ai(on: bool, save_choice: bool) -> void:
+	_patient_check_id += 1
+	var check_id := _patient_check_id
+	use_model = false
+	_service_is_mock = false
+	_patient_status = "no_url" if agent_url == "" else "off"
+	if on and agent_url != "":
+		_patient_status = "checking"
+		_sync_patient_status()
+		var health: Dictionary = await model_client.check_service(templates, int(rules.agent.health_timeout_ms))
+		if check_id != _patient_check_id or _closing:
+			return
+		_patient_status = str(health.status)
+		use_model = _patient_status == "connected"
+		_service_has_voice = bool(health.get("voice", false))
+		_service_is_mock = bool(health.get("mock", false))
+	if save_choice:
+		Settings.save_value("patient_ai", "on" if use_model else "off")
+	_sync_patient_status()
+	patient_check_finished.emit()
+
+
+func _sync_patient_status() -> void:
+	screens.status_line = _status_line()
+	screens.voice = _mic_why_not() == ""
+	_sync_settings()
 
 
 ## LEFT or RIGHT on the SETTINGS page: the lit row's choice before or after the one in use.
@@ -785,7 +831,9 @@ func _sync_settings() -> void:
 	if screens == null or audio == null:
 		return
 	screens.settings = {"language": Lang.code, "blood": "less" if less_blood else "full", "volume": audio.volume_step,
-		"screen": "fullscreen" if fullscreen else "window", "muted": audio.muted}
+		"screen": "fullscreen" if fullscreen else "window", "muted": audio.muted,
+		"patient_ai": "on" if use_model or _patient_status == "checking" else "off",
+		"patient_status": "mock" if _service_is_mock else _patient_status}
 
 
 func _show_title() -> void:
@@ -801,6 +849,8 @@ func _show_title() -> void:
 
 ## What the title card says about talking to the patient in this session.
 func _status_line() -> String:
+	if _patient_status == "checking":
+		return STATUS_CHECKING
 	if not use_model:
 		return STATUS_OFFLINE
 	match _mic_why_not():
@@ -1330,6 +1380,10 @@ func _pad_hint(pad: String) -> String:
 func act_start() -> void:
 	if state != State.TITLE or cases.is_empty() or screens.mode != "title":
 		return
+	if _patient_status == "checking":
+		await patient_check_finished
+		if state != State.TITLE or screens.mode != "title" or _closing:
+			return
 	screens.hide_all()
 	audio.play("click")
 	if intro_enabled and not _intro_seen and intro.has_cards():
@@ -1587,7 +1641,7 @@ func act_call_next() -> void:
 	visit.surprises = surprises_enabled and not _training_visit      # nobody snaps on the training visit
 	_surprise = ""
 	_snap_rng.seed = hash("surprise:%d:%d" % [shift_seed, _visit_serial])
-	agent.begin_visit(c, "%s-%d-%s" % [session_id, _visit_serial, id], shift_seed + _visit_serial * 7919)
+	agent.begin_visit(c, "%s-%d-%d-%s" % [session_id, shift_number, _visit_serial, id], shift_seed + _visit_serial * 7919)
 	_telegraphed = false
 	_attack_t = 0.0
 	_blows = 0
@@ -2177,11 +2231,12 @@ func _say_key(keycode: int, unicode: int) -> void:
 
 ## Why speaking cannot be offered, or "": "off" | "no_service" | "no_mic".
 func _mic_why_not() -> String:
-	if not bool(_mic_rules.get("enabled", false)):
+	if not bool(_mic_rules.get("enabled", false)) or not _service_has_voice:
 		return "off"
 	# speaking exists only where the patient AI does: the offline comparison never touches the network
-	var client: Variant = agent.client if agent != null else model_client
-	var with_model: bool = (agent.mode == "model") if agent != null else use_model
+	var in_visit := agent != null and state != State.TITLE
+	var client: Variant = agent.client if in_visit else model_client
+	var with_model: bool = (agent.mode == "model") if in_visit else use_model
 	if not with_model or client == null or not client.has_method("request_transcript") or not client.is_configured():
 		return "no_service"
 	if mic == null or mic.problem() != "":
@@ -4025,7 +4080,7 @@ func _process(delta: float) -> void:
 	dialogue.chips = chips
 	dialogue.chips_dim = not _can_act()
 	if use_model and agent != null:
-		var label := "AI DIALOGUE"
+		var label := "MOCK TRANSPORT" if _service_is_mock else "AI DIALOGUE"
 		if str(agent.last.get("source", "")) == "fallback":
 			label = "OFFLINE FALLBACK"
 		elif bool(agent.last.get("meta", {}).get("mock", false)):

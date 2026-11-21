@@ -1,5 +1,50 @@
 # Before the Cut: handoff
 
+## Active checkpoint, November 21, 2026 — patient agent P0
+
+**P0 is complete locally.** Protocol 3 and rules version 10 are in use. The next external milestone is one model call through a deployed service. Deployment, live credentials and a paid check await three independent decisions. The instructor's Worker template and the November 23 rubric have not been confirmed. The earlier November 21 findings below describe the tree before P0.
+
+In Windows PowerShell, `.\run-game.ps1 -Patient mock` starts the game and a temporary local mock. `.\run-game.ps1 -Patient timeout` deliberately triggers a labelled scripted reply. Both take `-CheckPatient` for an automated visit. An existing address, scripted mode and a confirmed paid local launch are also supported. English and Chinese SETTINGS offer PATIENT AI. With a compatible address, ON is saved after a successful connection. The next launch checks the service again. The default address is empty.
+
+The Worker has SQLite-backed Durable Object counters for each session and UTC day, a pre-body kill switch, a streaming body cap and optional transcription. The mock is the default. The timeout mock and the disabled live environment have their own bindings. The operating and rollback commands are in the [proxy runbook](agent_proxy/README.md).
+
+### Measured on the working checkout
+
+The first column of results was recorded before P0 on `361baa7` with the earlier, uncommitted November 21 work present. The final column uses that same work plus P0. All tests in the table passed. Evidence, commands and the original working diff are under `validation/2026-11-21/patient-agent/`, especially `p0-baseline/checks.json` and `p0-verified/checks.json`.
+
+| Computed or mock check | Baseline | P0 |
+| --- | ---: | ---: |
+| Game rules | 1193 | 1193 |
+| Real-scene checks, English / Chinese / less blood | 1130 / 1131 / 1130 | 1184 / 1185 / 1184 |
+| Proxy unit tests | 40 | 47 |
+| Real Godot HTTP / wire assertions against mocks | 199 / 16 | 312 / 96 |
+| Translation problems | 0 | 0 |
+| Text lines measured per language | 1609 | 1620 |
+| GDScript files linted / findings | 32 / 0 | 32 / 0 |
+| Capture dry run, English / Chinese / attacks with less blood / weapon nights | 446 / 446 / 334 / 235 | 447 / 447 / 334 / 235 |
+| Real renderer on hidden desktops, English / Chinese | 446 / 446 | 447 / 447 |
+| Normal close / legacy settings persistence assertions | 5 / 15 | 5 / 15 |
+| Empty-cache import / imported files / rule assertions on the copy | 1 / 1354 / 1193 | 1 / 1354 / 1193 |
+| Boot with scripted patients / unreachable model address | exit 0 / 0 | exit 0 / 0 |
+
+Each text measure had zero problems. No capture moment was missed and no test window appeared on the student's desktop. Both extra SETTINGS frames were inspected. The forced `--quit-after` boots emitted the existing ObjectDB warning. The normal-close test had no ObjectDB warning and printed the same single unclaimed engine string name, BAYER, in both runs.
+
+- **Local Wrangler 4.166.0 and workerd.** The game contract returned ten case versions. Session A reached 16 and got 429 on call 17 while session B, using the same visit id in another language, got 200. A three-call budget admitted exactly three of four concurrent attempts and still returned 429 after restarting the Worker on the same SQLite storage. Observed 503 on disabled POSTs, 501 for Worker voice, 413 on a chunked oversized body and 504 on the forced timeout. All three configurations built with `deploy --dry-run`. No account was used. See `worker/results.json`.
+- **Godot and mock proof.** The 80 wire combinations cover ten patients, two languages and all four pairs of normal/broken SPEECH and TEMPER. Tests check the selected sign sentences at the provider boundary. The bilingual settings tests cover connection, no address, disabled service, bad protocol, changed/missing/duplicate cases, no answer and turning OFF during an outstanding check. Two actual launcher visits reached the slip. Normal mock showed MOCK TRANSPORT in 55 ms (6 assertions). Forced timeout showed OFFLINE FALLBACK in 3,574 ms against a 4,000 ms deadline (7 assertions). The measured interval starts with ENTER. The script also checked the timeout reason and the spoken line on screen. See `windows-mock.log` and `windows-timeout.log`.
+- **Persistence and cleanup.** A disposable game copy exercised nine starts with the player's settings system, 39 assertions and an additional check that the child port closed on a simulated game failure. It covered both preference values across restarts, URL precedence, one-run overrides, the legacy flags and the game exit code. A first scratch attempt failed to enable a service. It did not record the health result. The full scratch sequence subsequently passed. See `preference-test/results.json`. The real player's settings were kept separate.
+- **Findings while implementing.** The previous client reused a visit id when a patient returned in the same slot on a later shift. The new ids include the shift and a 128-bit random session id. The prior integration writer included synthetic doctor text inside `event`. The evidence writer now emits only ids, codes, lengths and counts. Node keeps its original 2,000-call lifetime ceiling in addition to the UTC-day limit. For Wrangler development the runbook pins the CLI and supplies a comment-only env file to bypass automatic local secret loading.
+- **Limits of the evidence.** Mock responses, headless input and automated rendering are the only current results. No deployed call, live dialogue, real microphone, human play or translation review was performed. Live CPU time, latency, model quality and the actual bill remain unknown. The November 15 ledger is closed. The local live launcher was not invoked. P1–P3 and the play-logic proposals await the student's decisions.
+
+An independent export contained only the files proposed for the P0 commit. It passed 1,193 rule checks, 1,170 English and 1,171 Chinese scene checks, 47 Node tests, 312 game HTTP checks and 96 wire assertions. The scene totals exclude the earlier, uncommitted flow checks. Each language measured 1,618 lines, with zero translation and lint issues. Its first empty-cache Godot import exited with `0xC0000005` after creating the cache. Running the import again exited 0. The two full working-checkout imports in the table succeeded on their first attempt. See `snapshot-*.log`.
+
+### Next three patient-agent tasks
+
+1. Confirm any instructor foundation or revised rubric. With explicit approval to deploy the mocks, the student logs in, then deploy the default and timeout environments and repeat the isolation and fallback demonstrations at their returned addresses.
+2. With separate approval for live setup, deploy the disabled live environment. The student enters the OpenAI project key at Wrangler's secret prompt and enables a hard project spend limit. Record who can authorize future redeployments.
+3. With separate approval for OpenAI `gpt-6-luna`, reasoning `none`, do 24 dialogue calls across six visits (three English and three Chinese), zero transcriptions and no retries. Include at least three newer patients and both broken signs. At the earlier mean of 697.23 input and 53.23 output tokens, those 24 calls are approximately USD 0.00231 at current standard rates. The proposed approval ceiling is USD 0.01. Use a new evidence directory and a 24/0 run allowance. The historical guard's 40/15 defaults are too high for this check. Only an approved deployment can supply a deployed result. [OpenAI model pricing](https://developers.openai.com/api/docs/models/gpt-6-luna)
+
+Before P1, D1 proposes ASK-equivalent cost and evidence for a matching typed or spoken question and free small talk. D2 proposes pressure only when sent through PRESS. D3 proposes keeping the case's sealed tools, insist/CALM guarantees and first dodge with the model on. The defaults are yes to each. The student has not selected them.
+
 Updated **November 20, 2026**, evening: the title card's menu the student asked for, with HOW TO PLAY, SETTINGS and a warning about sudden attacks (first section). Earlier on November 20, after the student's questions about the November 19 build (second section): tonight's contact list draws each entry's alias and code for the night, says nothing during the night about a drop that was missed, and the push that breaks a patient takes every lamp. On November 19: every character's art for each part and five new characters (the next section): the cast is ten, each night draws five of them, who of them drift and which sign each of their parts shows, every sign has its picture and every patient turns with a weapon of their own. Earlier on November 19: the data and the code of random signs, with fixed test nights besides, and the patient model told the night's speech and temper signs. Late on November 18: right or wrong told only at closing, and a night that ends when the doctor is killed. Earlier on November 18: a language option with the whole game in Chinese, the opening redrawn for the new story, and reference sheets that follow each patient's implant models. Communicate with the student in Chinese; write game text, code comments and project files in English. The game itself is bilingual, and a change to its English is a change to its Chinese in the same commit (student, November 18; `AGENTS.md`, Languages).
 
 **This repository is the only active checkout.** On November 15 the game, the patient-AI proxy and the tools were moved here from the legacy `fathom` workspace and checked here ([transition record](docs/development/repository-transition.md)). `fathom` is an archive; its long layered handoffs (`HANDOFF.md`, `CODEX_RUNTIME_HANDOFF.md`, `CLAUDE_VOICE_HANDOFF.md`, `CODEX_NEXT_HANDOFF.md`) are history, not instructions.
