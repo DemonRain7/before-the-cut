@@ -171,7 +171,7 @@
         "H or F1: the COUNTER GUIDE, at any time of the night. R: the sheet. L: the list. N: the card. C: the camera. G: glass.",
         "T types a line. Hold TAB for voice with AI. Asking a listed question costs the ASK price. Small talk is free. CTRL+ENTER sends a PRESS.",
         "SPACE: the shutter. Outside an attack it asks first, so press twice; during one, once is enough.",
-        "ENTER buzzes the next visitor in. K ends the first night's training. M mutes; F11 switches full screen.",
+        "ENTER buzzes a visitor in. K ends training. M mutes. F11 switches full screen. F10 pauses to return to the menu.",
         "SETTINGS on the title card: the language, the blood, the sound and the screen. ESC on the night's totals goes back to the title card."
       ]
     }

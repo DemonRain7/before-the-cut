@@ -483,7 +483,7 @@ func report() -> Dictionary:
 		if entry.has("line_held") and bool(entry["line_held"]) != line_held:
 			continue
 		title = str(entry.get("title", ""))
-		text = str(entry.get("text", ""))
+		text = str(entry.get("last_visitor_text", entry.get("text", ""))) if died and unseen().is_empty() else str(entry.get("text", ""))
 		break
 	var line_text: Dictionary = rules.get("line_text", {})
 	var drops := 0

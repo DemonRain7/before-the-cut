@@ -991,6 +991,8 @@ def main():
     for t in rules.get("titles", []):
         rows.append(check("report_title", "rules.titles." + t["title"], t["title"], bold=True, scale=2))
         rows.append(check_lines("report_text", "rules.titles." + t["title"] + ".lines", t["text"], LIMITS["report_line"], REPORT_LINES))
+        if "last_visitor_text" in t:
+            rows.append(check_lines("report_text", "rules.titles.last_visitor", t["last_visitor_text"], LIMITS["report_line"], REPORT_LINES))
     line_text = rules.get("line_text", {})
     if not line_text:
         rows.append(("report_line", "rules.line_text", 0, "", " NO METER LINES FOUND"))

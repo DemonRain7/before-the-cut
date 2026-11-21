@@ -29,7 +29,7 @@
       "max_body_bytes": 524288, "upstream_timeout_ms": 6000, "max_transcript_chars": 300, "silence_peak": 0.012}},
   "titles_note": "The first entry that fits is used. died, where an entry has it, must equal whether the night ended with the doctor killed, so LIGHTS OUT comes first. min_correct counts right calls (out of five). max_injuries is optional. line_held, where an entry has it, must equal the night's last meter reading: a night that ended under the line is THE CUT whatever else went right, and a night that hurt you is not given a title that says it went well.",
   "titles": [
-    {"min_correct": 0, "died": true, "title": "LIGHTS OUT", "text": "The shutter came too late. Trauma Team found you on the clinic floor. Whoever was still waiting in the hall went home unseen."},
+    {"min_correct": 0, "died": true, "title": "LIGHTS OUT", "last_visitor_text": "The shutter came too late. Trauma Team found you on the clinic floor.", "text": "The shutter came too late. Trauma Team found you on the clinic floor. Whoever was still waiting in the hall went home unseen."},
     {"min_correct": 0, "line_held": false, "title": "THE CUT", "text": "Under the line at closing. Harrow Credit sends two quiet people to collect on the debt. They start with the hands."},
     {"min_correct": 5, "max_injuries": 0, "line_held": true, "title": "STEADY HANDS", "text": "Five patients, five right calls. The sheet goes back on its nail. You open again tomorrow."},
     {"min_correct": 4, "max_injuries": 0, "line_held": true, "title": "A GOOD NIGHT'S WORK", "text": "One visit went wrong. Most nights are like that. The rest went the way they should."},

@@ -1367,6 +1367,9 @@ func wear_nights() -> void:
 				main._service_has_beats = true
 				main._try_beat("arrive")
 				await d.settle()
+				d.key(KEY_F10)
+				await shot("return-menu-confirm")
+				d.key(KEY_ESCAPE)
 				await shot("optional-patient-turn")
 				main._offer_reading("Arm?", {"topic":"implant", "intent":"case_question", "reason":"", "source":"model"})
 				await shot("confirm-question-price")

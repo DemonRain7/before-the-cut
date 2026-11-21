@@ -9,6 +9,10 @@
 		"REC"
 	],
 	"strings": {
+		"ENTER  LEAVE": "回车  离开",
+		"ESC  KEEP PLAYING": "ESC  继续本夜",
+		"Returning to the menu loses this night.": "回到主菜单将丢失本夜进度。",
+		"LEAVE THE CLINIC?": "离开诊所？",
 		"ENTER picks the first line. Click another or ESC to cancel.": "回车选第一项，也可点击其他项。ESC 取消。",
 		"YOUR MEANING": "你想说什么",
 		"Choose a listed question": "选择一个列出的问题",

@@ -80,7 +80,7 @@ SHOWN = {
     ],
     "parts.json": [(group, "*", key) for group in ("eyes", "hands", "ports", "voices") for key in _PART_TEXT]
                   + [("eyes_mixed", "*")],
-    "rules.json": [("titles", "*", "title"), ("titles", "*", "text"), ("line_text", "*"),
+    "rules.json": [("titles", "*", "title"), ("titles", "*", "text"), ("titles", "*", "last_visitor_text"), ("line_text", "*"),
                    ("counter", "*", "title"), ("counter", "*", "text")],
     "sheet.json": [
         ("title",), ("title_none",), ("rows", "*", "label"), ("rows", "*", "normal"), ("rows", "*", "ordinary"),

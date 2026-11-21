@@ -314,6 +314,8 @@ var has_fixed_seed: bool = false
 var authored_order: bool = false     # true (--authored-order): test night A every shift, never drawn
 var test_night: String = ""          # --test-night=<name>: that night of data/nights.json every shift
 var agent_url: String = ""
+signal night_frame
+signal night_resumed
 signal patient_check_finished
 
 var use_model: bool = false
@@ -352,6 +354,7 @@ var guide: Guide = null           # the counter guide: H or F1
 var coach: Coach = null           # the first-night training: one tip at a time, pointing at the booth
 var rig: PatientRig = null
 
+var _quit_night := preload("res://scripts/ui/quit_night_dialog.gd").new()
 var _world := Node2D.new()
 var _mess := Node2D.new()         # dried blood on our own side of the counter, after a hit
 var _slip_clip := Control.new()
@@ -448,6 +451,7 @@ var _db: Dictionary = {}          # CaseDB.load_all(): what the night draw reads
 # ================================================================ setup
 
 func _ready() -> void:
+	get_tree().process_frame.connect(_forward_night_frame)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	Lang.load_saved()      # before anything puts words together: the sheet is filled as it is hung
 	var db: Dictionary = CaseDB.load_all()
@@ -522,6 +526,8 @@ func _read_launch_options() -> void:
 
 
 func _build() -> void:
+	add_child(_quit_night)
+	_quit_night.choice.connect(_answer_quit_night)
 	add_child(_world)
 	clinic = ClinicView.new()
 	_world.add_child(clinic)
@@ -903,7 +909,7 @@ func _bump() -> int:
 func _wait(seconds: float, token: int) -> bool:
 	var left := seconds
 	while left > 0.0:
-		await get_tree().process_frame
+		await night_frame
 		if token != _seq:
 			return false
 		left -= get_process_delta_time()
@@ -914,7 +920,7 @@ func _wait(seconds: float, token: int) -> bool:
 func _run_line(token: int, hold: float) -> bool:
 	_skip = false
 	while dialogue.typing:
-		await get_tree().process_frame
+		await night_frame
 		if token != _seq:
 			return false
 		if _skip:
@@ -923,7 +929,7 @@ func _run_line(token: int, hold: float) -> bool:
 	dialogue.waiting = hold >= 0.5
 	var left := hold
 	while left > 0.0:
-		await get_tree().process_frame
+		await night_frame
 		if token != _seq:
 			return false
 		if _skip:
@@ -998,7 +1004,7 @@ func _fade_to(target: float, time: float) -> void:
 	var from := screens.fade
 	var t := 0.0
 	while t < time:
-		await get_tree().process_frame
+		await night_frame
 		t += get_process_delta_time()
 		screens.fade = lerpf(from, target, clampf(t / time, 0.0, 1.0))
 	screens.fade = target
@@ -1650,7 +1656,7 @@ func _begin_wait(reading: Dictionary = {}) -> void:
 	clinic.line = shift.line_at(shift.index + 1)
 	# nobody is called while the shutter is still down
 	while clinic.shutter_pos > 0.02:
-		await get_tree().process_frame
+		await night_frame
 		if token != _seq:
 			return
 	if clinic.cam_id != id:
@@ -1726,7 +1732,7 @@ func act_call_next() -> void:
 	var t := 0.0
 	var next_step := 0.0
 	while t < dur:
-		await get_tree().process_frame
+		await night_frame
 		if token != _seq:
 			return
 		var dt := get_process_delta_time()
@@ -1755,7 +1761,7 @@ func act_call_next() -> void:
 	if intro_enabled and not _guide_seen and not _trained and guide.has_pages():
 		act_guide(false)
 		while guide.is_open():
-			await get_tree().process_frame
+			await night_frame
 			if token != _seq:
 				return
 	var opening: Array = c.get("opening", [])
@@ -1873,6 +1879,8 @@ func _decide(event: Dictionary, legal: Array, ask_line: String, token: int, own:
 	event = event.duplicate(true)
 	event["text"] = ask_line
 	var d: Dictionary = await agent.decide(event, visit.snapshot(), legal, visit.open_signs(event), fallback)
+	if _quit_night.visible:
+		await night_resumed
 	if token != _seq or d.is_empty():
 		return {}
 	_thinking = false
@@ -2188,6 +2196,8 @@ func act_say(text: String) -> void:
 	_think_quiet = 0.0
 	_doctor_say(text, true)
 	var reading: Dictionary = await agent.classify(text)
+	if _quit_night.visible:
+		await night_resumed
 	if token != _seq or reading.is_empty():
 		return
 	_thinking = false
@@ -2443,6 +2453,8 @@ func act_speak_stop() -> void:
 	var wav: PackedByteArray = clip.get("wav", PackedByteArray())
 	clip.clear()
 	var res: Dictionary = await agent.transcribe(wav)
+	if _quit_night.visible:
+		await night_resumed
 	if token != _mic_token or res.is_empty():
 		return      # thrown away meanwhile, or the patient has gone: late words go nowhere
 	var waited := int(res.get("latency_ms", 0))
@@ -2691,7 +2703,7 @@ func _team_takes(token: int) -> bool:
 	clinic.team_to(0.0, 0.5)
 	var next_step := 0.0
 	while clinic.team_moving():
-		await get_tree().process_frame
+		await night_frame
 		if token != _seq:
 			return false
 		next_step -= get_process_delta_time()
@@ -2717,7 +2729,7 @@ func _team_takes(token: int) -> bool:
 	var t := 0.0
 	next_step = 0.0
 	while t < dur and rig != null:
-		await get_tree().process_frame
+		await night_frame
 		var dt := get_process_delta_time()
 		t += dt
 		var k := clampf(t / dur, 0.0, 1.0)
@@ -2735,7 +2747,7 @@ func _team_takes(token: int) -> bool:
 	# their lights pull away down the street
 	var fade := 0.7
 	while fade > 0.0:
-		await get_tree().process_frame
+		await night_frame
 		fade -= get_process_delta_time()
 		clinic.strobe = maxf(0.0, fade / 0.7)
 	clinic.team_clear()
@@ -2766,7 +2778,7 @@ func _leave(dir: float, fast: bool) -> void:
 	var t := 0.0
 	var next_step := 0.0
 	while t < dur and rig != null:
-		await get_tree().process_frame
+		await night_frame
 		var dt := get_process_delta_time()
 		t += dt
 		var k := clampf(t / dur, 0.0, 1.0)
@@ -2875,7 +2887,7 @@ func _attack_sequence(lead_line: String, token: int, lead_s: float = -1.0) -> vo
 	_log("attack", {"cause": visit.attack_cause, "beat_ms": int(beat * 1000.0), "glass": shift.glass,
 		"blows_due": blows_ms.size(), "through_ms": int(plan.get("through_ms", 1800))})
 	while _attack_t < through:
-		await get_tree().process_frame
+		await night_frame
 		if token != _seq:
 			return
 		var dt := get_process_delta_time()
@@ -3238,7 +3250,7 @@ func _pop_to(target: float, time: float, ease_out: bool = false) -> void:
 	var from := rig.pop if rig != null else target
 	var t := 0.0
 	while t < time:
-		await get_tree().process_frame
+		await night_frame
 		t += get_process_delta_time()
 		var k := clampf(t / time, 0.0, 1.0)
 		if ease_out:
@@ -3331,7 +3343,7 @@ func _caught(token: int) -> void:
 		var spark_in := 0.0
 		var biting := false
 		while clinic.cut_active() and token == _seq:
-			await get_tree().process_frame
+			await night_frame
 			spark_in -= get_process_delta_time()
 			if clinic.cut_biting() and not biting:      # it bites (a cleaver or a spike, once for each hack or hole)
 				audio.play(str(style["bite"]), 1.0, 2.0)
@@ -3408,7 +3420,7 @@ func act_shutter() -> void:
 	gore.flare_off()
 	clinic.shutter_to(1.0, 0.16)
 	while not clinic.shutter_closed():
-		await get_tree().process_frame
+		await night_frame
 	audio.play("shutter_slam")
 	_shake(4.0, 0.25)
 	audio.stop_loop("alarm")
@@ -3726,6 +3738,10 @@ func _title_press(pos: Vector2, button: int) -> void:
 
 
 func pointer_down(pos: Vector2, button: int = MOUSE_BUTTON_LEFT) -> void:
+	if _quit_night.visible:
+		if button == MOUSE_BUTTON_LEFT:
+			_quit_night.click(pos)
+		return
 	_beat_activity()
 	_mouse = pos
 	_pointer_press(pos, button)
@@ -3882,6 +3898,12 @@ func key_down(keycode: int, unicode: int = 0, control: bool = false) -> void:
 
 
 func _key_press(keycode: int, unicode: int, control: bool) -> void:
+	if _quit_night.visible:
+		_quit_night.key(keycode)
+		return
+	if keycode == KEY_F10 and state not in [State.TITLE, State.REPORT]:
+		_offer_quit_night()
+		return
 	if state == State.EXAM and not guide.is_open() and not _reading_choice.is_empty() and dialogue.has_menu() and keycode in [KEY_ENTER, KEY_KP_ENTER]:
 		_choose_reading(dialogue.menu_id(0))
 		return
@@ -4147,13 +4169,68 @@ func _click_pad(pad: String) -> void:
 
 # ================================================================ every frame
 
+func _forward_night_frame() -> void:
+	if is_inside_tree() and not get_tree().paused:
+		night_frame.emit()
+
+
+func _offer_quit_night() -> void:
+	if state in [State.TITLE, State.REPORT] or _closing:
+		return
+	_beat_activity()
+	if _mic_state == "listening":
+		act_speak_cancel()
+	_quit_night.show()
+	get_tree().paused = true
+
+
+func _answer_quit_night(discard: bool) -> void:
+	if not _quit_night.visible:
+		return
+	_quit_night.hide()
+	get_tree().paused = false
+	if discard:
+		var was_intro := state == State.INTRO
+		_bump()
+		state = State.TITLE
+		if was_intro:
+			intro.skip_all()
+		_mic_drop("menu")
+		_beat_pending = false
+		_beat_opening_done = false
+		_reading_choice.clear()
+		_thinking = false
+		_lock = false
+		if guide.is_open():
+			guide.close()
+		if coach.is_running():
+			coach.stop(false)
+		_close_scope(false)
+		_drop_stamp(false)
+		_disarm()
+		_close_say()
+		dialogue.clear()
+		_remove_rig()
+		_slip_data = {}
+		_slip_mode = "hidden"
+		_slip.hide()
+		clinic.team_clear()
+		clinic.under_glow = 0.0
+		_log("night_abandoned", {"shift":shift_number})
+		_reset_booth()
+		clinic.line = 0
+		clinic.set_glass_left(clinic.glass_max, clinic.glass_max)
+		_show_title()
+	night_resumed.emit()
+
+
 func _beat_activity() -> void:
 	_beat_clock = 0.0
 	_beat_revision += 1
 
 
 func _beat_quiet() -> bool:
-	return beats_enabled and _service_has_beats and state == State.EXAM and visit != null and visit.in_exam() and not visit.is_spent() and not _lock and not _thinking and _mic_state == "" and not dialogue.input_open and not dialogue.has_menu() and not dialogue.typing and not guide.is_open() and not _closing
+	return not _quit_night.visible and beats_enabled and _service_has_beats and state == State.EXAM and visit != null and visit.in_exam() and not visit.is_spent() and not _lock and not _thinking and _mic_state == "" and not dialogue.input_open and not dialogue.has_menu() and not dialogue.typing and not guide.is_open() and not _closing
 
 
 func _try_beat(kind: String, tool: String = "") -> void:

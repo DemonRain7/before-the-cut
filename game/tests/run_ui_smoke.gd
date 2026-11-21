@@ -108,6 +108,7 @@ func _run() -> void:
 	counter_words()
 	check_log(six, nine)
 	await shift_wear()
+	await shift_abandon()
 	untranslated_words()
 	print("")
 	print("RESULT: %d passed, %d failed" % [passed, failed])
@@ -484,6 +485,7 @@ func lights_out(label: String, unseen: Array) -> void:
 	check(main._slip_data.is_empty() and main._slip_mode == "hidden", "%s: no slip prints for it" % label)
 	check(main.visit == null and main.rig == null, "%s: the counter is empty" % label)
 	check(main.shift.died and main.shift.is_done() and main.shift.current_id() == "", "%s: nobody else comes in tonight" % label)
+	check(str(main.screens.report.get("text", "")).contains("hall") == (not unseen.is_empty()), "the death text mentions the hall only when somebody was left")
 	check(main.shift.unseen() == unseen, "%s: still in the hall: %s" % [label, str(unseen)])
 	var r: Dictionary = main.screens.report
 	var said: Dictionary = main.rules.get("line_text", {})
@@ -2286,6 +2288,31 @@ func typing_line(v: VisitState) -> void:
 ## and leaves its own marks: Kip's bike lock and Juno's ten picks are stopped at the shutter
 ## after two blows, and Rook's loader fist is let through. Vale's saw and Maren's torch are
 ## played in the earlier shifts.
+func shift_abandon() -> void:
+	check(await d.open_counter(), "a night can be started from the report")
+	d.key(KEY_F10)
+	check(main._quit_night.visible and paused, "F10 pauses even between patients")
+	d.key(KEY_ESCAPE)
+	check(not paused and main.state == MainScript.State.WAIT, "ESC returns to the same shift")
+	var patient: VisitState = await enter(str(main.shift.current_id()))
+	await d.settle()
+	d.key(KEY_T)
+	d.type_text("Evening")
+	d.key(KEY_F10)
+	check(main._quit_night.visible and main.dialogue.input_text == "Evening", "F10 works while typing")
+	d.key(KEY_ESCAPE)
+	check(main.dialogue.input_open and main.dialogue.input_text == "Evening", "cancelling preserves typed words")
+	d.key(KEY_ESCAPE)
+	var before := patient.snapshot()
+	d.key(KEY_F10)
+	await process_frame
+	await process_frame
+	check(patient.snapshot() == before, "the paused visit spends no lamp or action")
+	d.key(KEY_ENTER)
+	check(not paused and main.state == MainScript.State.TITLE and main.visit == null and main.rig == null, "leave confirms, clears the chair and returns to the menu")
+	check(await d.open_counter() and main.shift.records.is_empty() and main.shift.index == 0, "START opens a clean night after abandoning it")
+
+
 func shift_wear() -> void:
 	main.surprises_enabled = false
 	main.training_enabled = false

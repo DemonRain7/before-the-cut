@@ -2,6 +2,7 @@
 	"note": "Chinese for rules.json: the end-of-night titles, the meter line and what the slip says at the counter. Keyed by the exact English; tools/check_lang.py keeps it in step with the game.",
 	"keep": [],
 	"strings": {
+		"The shutter came too late. Trauma Team found you on the clinic floor.": "卷闸落得太晚了。创伤小组在诊所的地板上找到了你。",
 		"LIGHTS OUT": "熄灯",
 		"The shutter came too late. Trauma Team found you on the clinic floor. Whoever was still waiting in the hall went home unseen.": "卷闸落得太晚了。创伤小组在诊所的地板上找到了你。走廊里还在等的人，都没见到医生就回去了。",
 		"Under the line at closing. Harrow Credit sends two quiet people to collect on the debt. They start with the hands.": "收工时低于红线。哈罗信贷派了两个沉默的人来收债。他们先从这双手下手。",
