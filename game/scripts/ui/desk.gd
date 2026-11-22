@@ -14,12 +14,12 @@ extends Node2D
 const Gfx = preload("res://scripts/ui/gfx.gd")
 
 const PADS := [
-	{"id": "penlight", "rect": Rect2(0, 301, 40, 58), "icon": "ui/tool_light.png", "label": "LIGHT"},
-	{"id": "grip", "rect": Rect2(40, 301, 40, 58), "icon": "ui/tool_grip.png", "label": "GRIP"},
-	{"id": "port", "rect": Rect2(80, 301, 40, 58), "icon": "ui/tool_port.png", "label": "PORT"},
-	{"id": "ask", "rect": Rect2(520, 301, 40, 58), "icon": "ui/talk_ask.png", "label": "ASK"},
-	{"id": "complain", "rect": Rect2(560, 301, 40, 58), "icon": "ui/talk_ask.png", "label": "TALK"},
-	{"id": "press", "rect": Rect2(600, 301, 40, 58), "icon": "ui/talk_press.png", "label": "PRESS"},
+	{"id": "penlight", "rect": Rect2(0, 308, 30, 52), "icon": "ui/tool_light.png", "label": "LIGHT"},
+	{"id": "grip", "rect": Rect2(30, 308, 30, 52), "icon": "ui/tool_grip.png", "label": "GRIP"},
+	{"id": "port", "rect": Rect2(60, 308, 30, 52), "icon": "ui/tool_port.png", "label": "PORT"},
+	{"id": "ask", "rect": Rect2(521, 335, 117, 23), "icon": "ui/talk_ask.png", "label": "Listed questions"},
+	{"id": "complain", "rect": Rect2(521, 310, 117, 23), "icon": "ui/talk_ask.png", "label": "What's bothering you?"},
+	{"id": "press", "rect": Rect2(90, 308, 30, 52), "icon": "ui/talk_press.png", "label": "PRESS"},
 	{"id": "treat", "rect": Rect2(546, 190, 40, 54), "icon": "ui/stamp_treat.png", "label": "TREAT"},
 	# the second decision: hand the patient over to Trauma Team (the id stays "refer" in the data)
 	{"id": "refer", "rect": Rect2(594, 190, 40, 54), "icon": "ui/call_team.png", "label": "TRAUMA"},
@@ -101,6 +101,9 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
+	Gfx.text(self, Vector2(3, 297), "TESTS", Gfx.TEAL6, true)
+	Gfx.text(self, Vector2(523, 298), "TALK", Gfx.TEAL6, true)
+	Gfx.text(self, Vector2(549, 178), "CALL", Gfx.TEAL6, true)
 	for o in OBJECTS:
 		var obj: Dictionary = o
 		_draw_object(obj)
@@ -152,12 +155,18 @@ func _draw_pad(pad: Dictionary) -> void:
 	var w := r.size.x
 	var on := is_enabled(id)
 	var hot := on and hover == id
-	var low := r.size.y < 58.0      # a key on the wall plate: a little shorter than a desk mat
+	if id in ["ask", "complain"]:
+		draw_rect(r, Gfx.TEAL3 if hot else Gfx.INK1)
+		draw_rect(r, Gfx.TEAL5 if hot else Gfx.TEAL3, false, 1)
+		Gfx.text_center(self, r.get_center().x, y + 6, str(pad.label), Gfx.WARM7 if on else Gfx.TEAL4)
+		return
+	var instrument := id in ["penlight", "grip", "port", "press"]
+	var low := not instrument      # a key on the wall plate: a little shorter than a desk mat
 	var base := "ui/pad_w" if low else "ui/pad40"
 	var throb := (pulse == id or armed == id) and fmod(_t, 0.4) < 0.2
 	var pad_tex := Gfx.tex(base + ("_hot.png" if (hot or throb) else ".png"))
 	if pad_tex != null:
-		draw_texture(pad_tex, r.position, Color(1, 0.5, 0.45) if throb else Color.WHITE)
+		draw_texture_rect(pad_tex, r, false, Color(1, 0.5, 0.45) if throb else Color.WHITE)
 	var icon_path := str(pad["icon"])
 	if id == "shutter" and lever_down:
 		icon_path = "ui/lever_down.png"
@@ -177,21 +186,26 @@ func _draw_pad(pad: Dictionary) -> void:
 		var tint := Color.WHITE
 		if not on:
 			tint = Color(0.45, 0.5, 0.55, 0.55)
-		draw_texture(icon, Vector2(x + floorf((w - 36.0) / 2.0), y + (2.0 if low else 3.0) + lift), tint)
-	var label := str(pad["label"])
+		if instrument:
+			draw_texture_rect(icon, Rect2(x + 2, y + 8 + lift, 26, 28), false, tint)
+		else:
+			draw_texture(icon, Vector2(x + floorf((w - 36.0) / 2.0), y + 2 + lift), tint)
+	var label := "BREAK" if id == "press" and warn.get("press", false) else str(pad["label"])
 	var col: Color = Gfx.TEAL6
 	if not on:
 		col = Gfx.TEAL3
 	elif hot:
 		col = Gfx.WARM7
-	elif warn.has(id):
+	elif warn.get(id, false):
 		col = Gfx.AMBER
 	elif armed == id:
 		col = Gfx.RED3
 	elif out or gone:
 		col = Gfx.CYAN2
-	Gfx.text_center(self, x + w / 2.0, y + (42.0 if low else 45.0), label, col)
+	Gfx.text_center(self, x + w / 2.0, y + (42.0 if low else 38.0), label, col)
 	var badge := str(badges.get(id, ""))
+	if id == "press" and warn.get(id, false):
+		badge = "?" if badge.contains("?") else ""
 	if badge != "":
 		var bw := Gfx.text_w(badge) + 4.0
 		var bx := x + w - bw - 1.0

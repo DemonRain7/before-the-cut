@@ -192,7 +192,6 @@
 		"TRAUMA TEAM: for the drifting. Press twice. They come and take the patient.": "创伤小组：给失控的人。按两下。他们会来带走病人。",
 		"SHUTTER [SPACE]: ends the visit at once. Only for danger.": "卷闸 [SPACE]：立刻结束就诊。只在危险时用。",
 		"METER": "计费表",
-		"Noted on the card.": "已记在卡上。",
 		"Pick a question. Right-click closes the list.": "挑一个问题。右键关闭列表。",
 		"asked": "已问",
 		"The patient AI has used its %d replies for this visit. Scripted lines now.": "病人 AI 本次就诊的 %d 次回复已用完。现在改用预写台词。",
@@ -323,6 +322,9 @@
 		"No lamps. Leaving in %d s of idle time.": "灯已用完。空等 %d 秒后离开。",
 		"ENTER sends. Talking is free.": "回车发送。交谈免费。",
 		"ENTER sends for free. Hold TAB to speak.": "回车免费发送。按住 TAB 说话。",
-		"TALK": "交谈"
+		"TALK": "交谈",
+		"Listed questions": "问诊问题",
+		"TESTS": "检查",
+		"CALL": "处置"
 	}
 }

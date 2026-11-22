@@ -42,6 +42,7 @@ enum Grip { IDLE, SQUEEZE, HOLDING_ON, OPEN }
 var tool: String = ""
 var audio: Node = null
 var caption: String = ""
+var selected_mark := 0
 var result: String = ""
 var done: bool = false
 var standard: String = ""         # the sheet's normal line for this tool (set before open)
@@ -106,6 +107,8 @@ func open(p_tool: String, p_case: Dictionary, already_done: bool, p_result: Stri
 		"grip":
 			_build_grip()
 			caption = "Hold the mouse: they squeeze."
+		"press":
+			caption = ""
 		"port":
 			_build_port()
 			caption = ""
@@ -356,6 +359,18 @@ func _process(delta: float) -> void:
 	_hud.queue_redraw()
 
 
+func mark_rect(value: int) -> Rect2:
+	return Rect2(Gfx.WINDOW.end.x - 84 + (value - 1) * 39, Gfx.WINDOW.end.y - 52, 36, 15)
+
+
+func mark_at(pos: Vector2) -> int:
+	if done and is_open():
+		for value in [1, 2]:
+			if mark_rect(value).has_point(pos):
+				return value
+	return 0
+
+
 func _draw_hud() -> void:
 	if tool == "" or _tear_t > 0.0:
 		return
@@ -372,6 +387,14 @@ func _draw_hud() -> void:
 				var eye: Dictionary = _eyes[i]
 				var ok := float(eye["lit"]) >= LIT_NEEDED
 				Gfx.text(_hud, Vector2(plate.end.x - 22.0 + 9.0 * float(i), plate.position.y + 1.0), "●" if ok else "○", Gfx.WARM6 if ok else Gfx.TEAL4)
+	if done:
+		for value in [1, 2]:
+			var rect := mark_rect(value)
+			_hud.draw_rect(rect, Gfx.TEAL3 if selected_mark == value else PLATE)
+			_hud.draw_rect(rect, Gfx.WARM6 if selected_mark == value else Gfx.TEAL5, false, 1)
+			var icon := Gfx.tex("ui/mark_tick.png" if value == 1 else "ui/mark_cross.png")
+			if icon != null:
+				_hud.draw_texture(icon, rect.position + Vector2(12, 2))
 	if tool == "grip":
 		_draw_grip_readout()
 	if tool == "penlight":

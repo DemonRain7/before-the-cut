@@ -469,6 +469,8 @@ func _draw_notes() -> void:
 	for i in ROWS.size():
 		var id := str(ROWS[i])
 		var y := _row_frame(i, id)
+		if visit.complaints_told.has(id):
+			Gfx.text(_card_n, Vector2(427, y + 13.0), "?", Gfx.WARM3, true)
 		_draw_mark(Vector2(410, y + 13.0), int(marks.get(id, 0)), hover_mark == id)
 		var list: Array = notes.get(id, [])
 		# Notes nine rows apart, three to a row. Where a line fills its box (Gfx.tall_lines) two notes

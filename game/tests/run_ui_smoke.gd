@@ -686,8 +686,8 @@ func guide_layout() -> void:
 		"team": main.desk.pad_rect("refer"),
 		"shutter": main.desk.pad_rect("shutter"),
 		"mend": main.desk.pad_rect("glass"),
-		"tools": main.desk.pad_rect("penlight").merge(main.desk.pad_rect("port")),
-		"talk": main.desk.pad_rect("ask").merge(main.desk.pad_rect("press")),
+		"tools": main.desk.pad_rect("penlight").merge(main.desk.pad_rect("press")),
+		"talk": main.desk.pad_rect("ask").merge(main.desk.pad_rect("complain")),
 		"say": buttons,
 	}
 	var around := 0
@@ -777,10 +777,21 @@ func shift_careful() -> void:
 	check(not v.row_seen("eyes") and v.patience == 2, "a glance only highlights the instrument")
 	await d.complain()
 	check(v.complaints_told.size() == 1 and not v.row_seen(v.complaints_told[0]), "the first complaint is guidance")
+	var part: String = v.complaints_told[0]
+	var target: String = main.CaseDB.ROW_TOOL.get(part, "press")
+	check(main.desk.badges[target].contains("?"), "the named test has a question mark")
+	check(main.desk.pad_rect("calm") == Rect2() and not v.has_method("reassure"), "no CALM in the desk or the rules")
+	check(main.desk.pad_rect("press").end.x <= Gfx.DIALOGUE.position.x and main.desk.pad_rect("complain").position.x >= Gfx.DIALOGUE.end.x, "talk and tests fit on opposite sides of the dialogue strip")
 	var status: String = await d.request_tool("penlight")
 	check(status == "open" and v.patience == 1, "LIGHT costs one")
 	var done: bool = await d.sweep_eyes()
 	check(done and v.row_seen("eyes"), "the close-up earns the eyes reading")
+	check(main.clinic.scope.standard == main._sheet_normal("eyes") and main.clinic.scope.result != "", "reading and reference are in the same close-up")
+	for value in [1, 2, 1]:
+		d.click(main.clinic.scope.mark_rect(value).get_center())
+		check(v.marks.eyes == value and main.clinic.scope.selected_mark == value, "scope and card share the same mark")
+	v.cycle_mark("eyes")
+	v.cycle_mark("eyes")
 	await d.put_away()
 	await d.settle()
 	await d.ask(0)

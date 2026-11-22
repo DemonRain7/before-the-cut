@@ -813,7 +813,7 @@ func test_scene() -> void:
 	main.act_press()
 	check(await driver.until(func() -> bool: return main.visit.press_count == 1 and not main._lock and not main._thinking, 20.0), "pressure uses same model pipeline")
 	await driver.settle()
-	main.act_say("Could you explain why you pulled your hand away?")
+	main.act_say("Could you explain why you looked away?")
 	check(await driver.until(func() -> bool: return main.agent.calls_this_visit == 3 and not main._thinking and not main._lock, 20.0), "free player text reaches dialogue")
 	check(main.agent.calls_this_visit == 3, "only the three generated replies call the model")
 	check(main.agent.fallbacks_this_visit == 0, "successful UI interactions do not fall back")

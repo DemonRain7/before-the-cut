@@ -14,5 +14,6 @@
 		"Anger, swearing, walking out.": "发火、骂人、甩手走人。",
 		"Two broken lines = drifting: call TRAUMA TEAM.": "两项异常 = 失控：叫创伤小组。",
 		"Strange is not sick. A refusal is not a sign.": "古怪不等于有病。拒绝不算征兆。"
-	}
+	},
+	"part_words": {"eyes": ["眼", "视力", "视线", "笔灯", "照灯"], "hands": ["手", "握力", "指头"], "port": ["接口", "插口", "插槽", "插孔"], "temper": ["脾气", "情绪", "心情"]}
 }

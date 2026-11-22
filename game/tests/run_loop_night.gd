@@ -47,6 +47,12 @@ func run() -> void:
 			check(await d.until(func()->bool: return not main._thinking and not main._lock, 30.0), "chat returns")
 			await d.settle()
 			check(v.patience == lamps, "chat is free")
+		if idx == 0:
+			var before := v.patience
+			for phrase in ["Hello.", "What hurts?", "How have you slept?", "Check your port.", "Idiot.", "哪里不舒服？", "能看看你的手吗？", "昨晚睡得如何？"]:
+				main.act_say(phrase)
+				await d.settle(30.0)
+				check(v.patience == before and v.press_count == 0 and v.in_exam(), "free text never controls the examination")
 		await d.ask(0)
 		await d.settle()
 		check(v.answered.has(v.case_data.topics[0].id), "listed question receives an answer")

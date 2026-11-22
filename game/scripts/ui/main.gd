@@ -1097,7 +1097,7 @@ func _sync_visit() -> void:
 		var tag := "? " if visit.complaints_told.has(row) else ""
 		desk.badges[tool] = tag + ("-%d" % visit.check_cost(tool) if not visit.granted.has(tool) else "")
 	desk.warn["press"] = visit.press_breaks()
-	desk.badges["press"] = Lang.t("BREAK") if visit.press_breaks() else ("? " if "temper" in visit.complaints_told else "") + "-%d" % visit.press_cost()
+	desk.badges["press"] = ("?" if "temper" in visit.complaints_told else "") + Lang.t("BREAK") if visit.press_breaks() else ("? " if "temper" in visit.complaints_told else "") + "-%d" % visit.press_cost()
 	clinic.till = _till_now()
 
 
@@ -1955,7 +1955,13 @@ func _open_scope(tool: String) -> void:
 	var already := visit.seen.has("check:" + tool)
 	clinic.scope.standard = _sheet_normal(str(VisitState.TOOL_ROW.get(tool, "")))      # what the sheet calls steady
 	clinic.scope.limit_s = _grip_limit_s()
-	clinic.scope.open(tool, visit.case_data, already, "Noted on the card." if already else "")
+	var row: String = VisitState.TOOL_ROW[tool]
+	var reading := ""
+	for note in visit.notes[row]:
+		if note.key == "check:" + tool:
+			reading = str(note.text)
+	clinic.scope.selected_mark = int(visit.marks[row])
+	clinic.scope.open(tool, visit.case_data, already, reading)
 	clinic.scope.pointer_screen(_mouse)
 	_papers_aside()      # the close-up fills the window
 	desk.active = tool
@@ -1987,7 +1993,7 @@ func _on_scope_completed(tool: String) -> void:
 	var res: Dictionary = visit.complete_check(tool)
 	if not bool(res.get("ok", false)):
 		return
-	clinic.scope.set_result("Noted on the card.")
+	clinic.scope.set_result(str(res.text))
 	_mark_new_notes(before)
 	_log("check_done", {"tool": tool})
 	if coach != null:
@@ -2113,6 +2119,10 @@ func act_press(confirmed: bool = false) -> void:
 				rig.react(str(res.get("face", "")), str(res.get("hands", "")))
 			audio.play("sting")
 			_mark_new_notes(before)
+			clinic.scope.standard = _sheet_normal("temper")
+			clinic.scope.selected_mark = int(visit.marks.temper)
+			clinic.scope.open("press", visit.case_data, true, str(res.note))
+			_papers_aside()
 			_roll_surprise()
 			_patient_line(str(res.get("line", "")), token, 0.0)
 		"walkout":
@@ -2140,6 +2150,14 @@ func act_say(text: String) -> void:
 	_thinking = false
 	_lock = false
 	_log("intent", {"source": reading.source, "topic": reading.topic, "chars": text.length(), "code": reading.reason})
+	var part := ScriptedBrain.part_for_text(text)
+	if reading.get("intent") == "tool_request":
+		var tool: String = CaseDB.ROW_TOOL.get(part, "press" if part == "temper" else "")
+		if tool != "":
+			desk.pulse = tool
+	elif ScriptedBrain.is_complaint(text) or (part != "" and str(reading.topic) == ""):
+		act_complain(part, text)
+		return
 	if str(reading.topic) != "":
 		_log("say", {"source": reading.source, "topic": reading.topic, "chars": text.length()})
 		await act_ask(str(reading.topic), text, str(reading.reason))
@@ -2445,11 +2463,12 @@ func _mic_settle(hint: String) -> void:
 ## The player's own tick or cross on a record row. Nothing scores it; the record keeps a tally
 ## of the crosses against the house rule on the reference sheet, and the hint row says where
 ## that stands. It is the player's reading of the patient, never the game's.
-func act_mark(row: String) -> void:
+func act_mark(row: String, chosen: int = 0) -> void:
 	if state != State.EXAM or visit == null:
 		return
 	var before := visit.crossed()
-	var value := visit.cycle_mark(row)
+	var value := visit.cycle_mark(row) if chosen == 0 else chosen
+	visit.marks[row] = value
 	audio.play("pencil", 1.3, -6.0)
 	var crossed := visit.crossed()
 	var need := int(sheet.get("threshold", 0))
@@ -4007,6 +4026,12 @@ func _exam_click(pos: Vector2) -> void:
 			return
 	# the open close-up owns the window
 	if clinic.scope.is_open() and Gfx.WINDOW.has_point(pos):
+		var mark := clinic.scope.mark_at(pos)
+		if mark > 0:
+			var row: String = VisitState.TOOL_ROW.get(clinic.scope.tool, "temper")
+			act_mark(row, mark)
+			clinic.scope.selected_mark = mark
+			return
 		clinic.scope.pointer_screen(pos)
 		clinic.scope.button(true)
 		return

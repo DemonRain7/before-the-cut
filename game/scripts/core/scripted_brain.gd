@@ -104,6 +104,44 @@ func line_for(case_data: Dictionary, move: String, event: Dictionary, state: Dic
 static var intent_cues: Dictionary = {}
 
 
+static var part_words: Dictionary = {}
+static var complaint_questions: Array = []
+
+
+static func part_for_text(text: String) -> String:
+	if part_words.is_empty():
+		for file in ["res://data/sheet.json", "res://data/lang/zh/sheet.json"]:
+			var catalog: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(file))
+			complaint_questions.append_array(catalog.get("complaint_questions", []))
+			for row in catalog.part_words:
+				if not part_words.has(row):
+					part_words[row] = []
+				part_words[row].append_array(catalog.part_words[row])
+	var line := text.to_lower()
+	var words := PackedStringArray()
+	var word := ""
+	for letter in line + " ":
+		if letter >= "a" and letter <= "z":
+			word += letter
+		elif word != "":
+			words.append(word)
+			word = ""
+	for row in part_words:
+		for term in part_words[row]:
+			if (Lang.has_cjk(term) and line.contains(term)) or term in words:
+				return row
+	return ""
+
+
+static func is_complaint(text: String) -> bool:
+	if part_words.is_empty():
+		part_for_text("")
+	for term in complaint_questions:
+		if text.to_lower().contains(term):
+			return true
+	return false
+
+
 static func intent_for_text(case_data: Dictionary, text: String) -> Dictionary:
 	if intent_cues.is_empty():
 		var file := FileAccess.open("res://data/patient_intents.json", FileAccess.READ)
