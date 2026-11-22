@@ -1,5 +1,16 @@
 {
   "id": "dana",
+  "intake": {
+    "terms": ["off duty","on duty","raid","下班","执勤","突袭"],
+    "part": "eyes",
+    "filed": "Right optic service requested off duty.",
+    "slip": "Private work order opened after the raid.",
+    "account": "It started on duty. During the raid.",
+    "clear": "The overlay stuck on duty. I waited until I was off the clock to put in a private order.",
+    "gap": "I filed it on the raid. No, we hadn't deployed yet and the raid was over. I can't fix that timeline.",
+    "firm": "One question at a time, doctor. You have my answer.",
+    "flat": "Question received. Continue."
+  },
   "version": 3,
   "name": "Dana Kirsch",
   "role": "Off-duty cop",

@@ -1,5 +1,16 @@
 {
   "id": "rook",
+  "intake": {
+    "terms": ["gate two","gate 2","lift four","lift 4","二号门","2号门","四号吊机","4号吊机"],
+    "part": "hands",
+    "filed": "Right arm repair logged at Gate Two.",
+    "slip": "Tow slip: lift four to Gate Two.",
+    "account": "Lift four. That's where my arm locked.",
+    "clear": "My arm locked at lift four. They towed the rig to gate two. That's where I signed.",
+    "gap": "I signed at lift four. Gate two was shut. But I signed at two before the tow. That can't be right.",
+    "firm": "I've given you my account. How many times do I have to say it?",
+    "flat": "Whatever you say, doc. The slip's right there."
+  },
   "version": 3,
   "name": "Rook Dunmore",
   "role": "Dock loader",

@@ -1,5 +1,16 @@
 {
   "id": "bo",
+  "intake": {
+    "terms": ["coach","booking fee","教练","预约费"],
+    "part": "hands",
+    "filed": "Fist tune-up booked in the coach's name.",
+    "slip": "Corner receipt: coach paid Bo's booking fee.",
+    "account": "My coach paid, pal. I'm the one wearing the thing.",
+    "clear": "He used his name at the till. Look at the receipt. I'm the fighter the fee was for.",
+    "gap": "Coach was in the ring wearing my fist. I was in there too. How'd we both have it on?",
+    "firm": "Easy, pal. You can ask me straight without shouting.",
+    "flat": "Okay, pal. Keep asking."
+  },
   "version": 3,
   "name": "Bo Kowalski",
   "role": "Pit fighter",

@@ -1,5 +1,16 @@
 {
   "id": "maren",
+  "intake": {
+    "terms": ["morning shift","night shift","handover","早班","夜班","交班","天亮"],
+    "part": "hands",
+    "filed": "Wrist servo flagged on the morning shift.",
+    "slip": "Handover sheet: night welder signed at dawn.",
+    "account": "I was on nights, dear. I always weld on nights.",
+    "clear": "I felt it on nights. The morning crew had taken over by the time I signed their sheet.",
+    "gap": "I signed before the night shift started. But the morning crew had just relieved me. Which shift was that?",
+    "firm": "Dear, I came here after a full shift. Please let me finish.",
+    "flat": "Ask again if you need to, dear."
+  },
   "version": 3,
   "name": "Maren Holt",
   "role": "Night-shift welder",

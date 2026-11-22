@@ -2,7 +2,7 @@
 
 The proxy gives the patient its character, the doctor's action, the conversation and the signs earned during this visit. The patient writes dialogue and visible reactions. Godot chooses the case outcomes and uses authored ASK answers by default. A separate route classifies a typed or confirmed spoken line against the current case's questions.
 
-With voice enabled, push-to-talk sends a short clip for transcription. The player can edit the transcript, send it with ENTER, send it as pressure with CTRL+ENTER, or discard it. The mock fixture produces synthetic dialogue and one labelled transcript for any clip. The game can also be played offline.
+With voice enabled, push-to-talk sends a short clip for transcription. The player can edit the transcript, send it with ENTER or discard it. A committed PRESS on the desk spends a lamp. The mock fixture produces synthetic dialogue and one labelled transcript for any clip. The game can also be played offline.
 
 ## Start the patient
 
@@ -15,7 +15,7 @@ From the repository root on Windows, with Node 22.9+ and Godot 4:
 .\run-game.ps1 -Patient http://127.0.0.1:8787
 ```
 
-The first command selects the authored patient. The next two start a loopback-only Node mock on an OS-assigned port, check its health and stop that child when Godot exits. With `timeout`, open the typing line with T, type a line and use CTRL+ENTER for the first PRESS of a visit. This makes one dialogue request. Within the game's four-second deadline the corner reads **OFFLINE FALLBACK**, the authored patient answers and the hint gives the timeout reason. The normal mock labels its replies **MOCK TRANSPORT**. To reproduce either demonstration headlessly, add `-CheckPatient`. Each check enters a visit through the title menu and finishes at the slip.
+The first command selects the authored patient. The next two start a loopback-only Node mock on an OS-assigned port, check its health and stop that child when Godot exits. With `timeout`, ask the patient about the intake file and click PRESS beneath the window. This makes one dialogue request. Within the game's four-second deadline the corner reads **OFFLINE FALLBACK**, the authored patient answers and the hint gives the timeout reason. The normal mock labels its replies **MOCK TRANSPORT**. To reproduce either demonstration headlessly, add `-CheckPatient`. Each check enters a visit through the title menu and finishes at the slip.
 
 The address form connects to an existing service. The original `-Model -AgentUrl <address>` also works. To let the player choose in SETTINGS, pass just `-AgentUrl <address>`, or set `BTC_AGENT_URL` before launching. Address precedence is the launch argument, the environment, then `agent.default_url` in the game's rules. The shipped address is `http://127.0.0.1:8787`. Pass `-Patient https://before-the-cut-agent.demonrain777.workers.dev` for the hosted mock. PATIENT AI starts OFF and remembers a player selection. An explicit launcher mode overrides the saved preference for one run. Enabling it checks the protocol and all ten case versions with a two-second GET. The settings hint reports the result and the game offers voice only when the connected service supports it.
 
@@ -56,13 +56,17 @@ and `BTC_TRANSCRIBE_TIMEOUT_MS` are configurable. The Worker uses durable counte
 
 `POST /v1/patient-intent` receives protocol, run id, visit/session id, case id and version, language and the typed or confirmed spoken line. The provider sees the current patient's question IDs and wording, and the doctor's actual line. A single-choice schema accepts an `ask_<id>` or one free class. The public result carries `about` (an allowed question ID or `none`) and `intent`. Free classes cover complaints, follow-up, tool request, reassurance, provocation, social or personal talk, role probe, unclear and other. A listed question receives its free answer immediately. The complaint class asks about discomfort in general or a particular body part. Tool requests can point at an instrument. Text and confirmed dictation never spend a lamp. The route has its own 16-attempt visit and 240-attempt run ceilings. Each attempt also uses one unit from the UTC-day budget. The upstream deadline is 2 seconds and the game waits up to 2.5 seconds. A failed classifier falls back to the offline keyword matcher.
 
+Clients that send the optional boolean `intake_focus` also receive three listed topic choices for giving an account, explaining it or correcting an unsupported assertion. The classifier sees the printed entry and slip. The flag says whether the preceding displayed exchange concerned this file, so a short follow-up can refer back to it. The game handles explicit file questions locally. Successful remote classifications are reusable within the same visit, language and focus. Clients that omit the flag use the original question list.
+
 ## Patient dialogue
 
 The request includes `protocol: "5"`, run, session, visit and case identifiers, case version, tonight's `signs`,
 `event` with `type`, `id` and the doctor's exact `text`, current visit state,
 `conversation_history`, a reply-length limit, and the player's `language`.
 
-`signs` can contain `speech`, `temper`, both or neither. The game unlocks SPEECH with an answered ASK. A topic outside the broken sign's evidence list gets the character's normal sign until an informative question is answered. PRESS and flares unlock TEMPER. The proxy supplies exactly the corresponding sign sentences. An empty gate omits the `earned_cues` field. Instrument readings stay in the game.
+`signs` can contain `speech`, `temper`, both or neither. The game unlocks SPEECH with an answered ASK or a completed comparison of an intake account with its supporting slip. A topic outside the broken sign's evidence list gets the character's normal sign until an informative question is answered. PRESS and flares unlock TEMPER. The proxy supplies exactly the corresponding sign sentences. An empty gate omits the `earned_cues` field. Instrument readings stay in the game.
+
+An optional `state.intake_stage` is zero at arrival, one after the account and two after the explanation. The current dialogue turn receives `discussed_intake` at stages one and two. Only stage two includes the explanation actually heard. A standard `press` with ID `intake` adds the current temperament's pressure line as a reference for the model. An invalid instrument result or an explicit admission of drift detected on that turn routes to the character's authored pressure line. Questions that produce graded file evidence use the same authored lines across providers.
 
 `language` is `"en"` or `"zh"`, the language the player chose on the title card. A request
 without it is English; any other value is refused with `400 bad_request` (message

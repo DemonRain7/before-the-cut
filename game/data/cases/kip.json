@@ -1,5 +1,16 @@
 {
   "id": "kip",
+  "intake": {
+    "terms": ["ninth","tenth","9th","10th","第九街","第十街","九街","十街","9街","10街"],
+    "part": "eyes",
+    "filed": "Left lens damage filed at Tenth Street.",
+    "slip": "Dispatch slip: fall on Ninth, call from Tenth.",
+    "account": "Ninth. My bike went down on Ninth, doc.",
+    "clear": "I fell on Ninth. I walked the bike to Tenth to find a working call box.",
+    "gap": "I called from Ninth before I fell. Wait, that was Tenth. I can't put those stops in order.",
+    "firm": "I'm trying, doc! Give me a second to get the streets straight.",
+    "flat": "Sure, doc. Ask it again if you like."
+  },
   "version": 3,
   "name": "Kip Marlow",
   "role": "Bike courier",

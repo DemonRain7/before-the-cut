@@ -321,6 +321,14 @@ static func check_picks(t: Dictionary, threshold: int) -> Array:
 ## picks is listed once, with the first pick it was found in.
 static func validate_template(t: Dictionary, rules: Dictionary, sheet: Dictionary = {}, parts: Dictionary = {}) -> Array:
 	var errors: Array = []
+	var intake: Variant = t.get("intake")
+	if typeof(intake) != TYPE_DICTIONARY or intake.get("part") not in ["eyes", "hands", "voice", "port", "reflex"]:
+		errors.append("intake.part needs the implant named in the registration.")
+	if typeof(intake) != TYPE_DICTIONARY or typeof(intake.get("terms")) != TYPE_ARRAY or intake.terms.is_empty():
+		errors.append("intake.terms needs the names players can quote from the documents.")
+	for key in ["filed", "slip", "account", "clear", "gap", "firm", "flat"]:
+		if typeof(intake) != TYPE_DICTIONARY or typeof(intake.get(key)) != TYPE_STRING or str(intake[key]).strip_edges().is_empty():
+			errors.append("intake.%s needs a line for the patient's file." % key)
 	if int(t.get("version", 0)) != 3:
 		errors.append("version must be 3 (a character whose signs each night draws).")
 	if t.has("truth"):

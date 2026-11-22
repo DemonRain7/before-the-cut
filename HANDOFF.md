@@ -1,5 +1,9 @@
 # Before the Cut: handoff
 
+## Cross-checking a patient's registration
+
+November 22, 2026. All ten patients now bring a registration entry and a supporting slip. On K, ask Rook about Gate Two and lift four. On Juno's visit, compare June on the booking with the stage name on the permit. Both the chart button and the patient's conversation accept a follow-up. The explanation gives one SPEECH finding. Applying PRESS observes a separate TEMPER sign. For the next playtest, watch where a newcomer finds the file, which detail settles their interpretation, and whether the pressure response changes their judgment. [Verification and play instructions](docs/development/play-loop-redesign/PROGRESS.md#cross-checking-the-intake-file)
+
 ## Local GPT-6 Luna play and appointment history
 
 Kip recalled the doctor's nickname and Rook started fresh in a check of eight typed turns. Five of seven generated lines timed out on the first pass. Two repeats met the usual deadlines, though a question about the foreman's laugh sometimes went to Rook's general anger answer. [Chinese dialogue check](docs/development/live-model-results-2026-11-21.md#chinese-dialogue-at-the-counter)

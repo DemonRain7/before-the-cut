@@ -5,6 +5,13 @@
 		"Marlow"
 	],
 	"strings": {
+		"Left lens damage filed at Tenth Street.": "左眼镜片损坏，报修地点为第十街。",
+		"Dispatch slip: fall on Ninth, call from Tenth.": "调度单：第九街摔车，第十街来电。",
+		"Ninth. My bike went down on Ninth, doc.": "第九街。医生，我是在第九街摔的。",
+		"I fell on Ninth. I walked the bike to Tenth to find a working call box.": "我摔在第九街。推车到第十街才找到能打的电话。",
+		"I called from Ninth before I fell. Wait, that was Tenth. I can't put those stops in order.": "我摔之前在第九街打的电话。等等，是第十街。我说不清先到哪儿了。",
+		"I'm trying, doc! Give me a second to get the streets straight.": "医生，我在想！给我一秒，街名得理清楚。",
+		"Sure, doc. Ask it again if you like.": "好啊，医生。你想问就再问一遍。",
 		"Bike courier": "自行车快递员",
 		"Swap cracked left optic": "更换碎裂的左义眼",
 		"A kid in a courier jacket, bouncing on his heels and checking the time.": "一个穿快递夹克的年轻人，踮着脚跳来跳去，不停看时间。",

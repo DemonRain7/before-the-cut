@@ -1,5 +1,16 @@
 {
   "id": "ozzie",
+  "intake": {
+    "terms": ["tuesday","wednesday","周二","周三","星期二","星期三"],
+    "part": "hands",
+    "filed": "Cart hand reported slipping on Wednesday.",
+    "slip": "Cart log: near miss Tue, repair call Wed.",
+    "account": "Tuesday, chief. I remember the pot I was stirring.",
+    "clear": "It slipped Tuesday over the soup. I called on Wednesday when my lad could mind the cart.",
+    "gap": "I closed the cart to call Tuesday. No, I took the call there Wednesday before Tuesday's soup. Hang on.",
+    "firm": "Chief, the soup can wait. Let me get a word in!",
+    "flat": "Mm. It's written down, chief."
+  },
   "version": 3,
   "name": "Ozzie Brandt",
   "role": "Noodle-cart cook",

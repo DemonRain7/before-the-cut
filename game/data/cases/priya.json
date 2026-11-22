@@ -1,5 +1,16 @@
 {
   "id": "priya",
+  "intake": {
+    "terms": ["ward two","ward three","ward 2","ward 3","二病区","三病区","2病区","3病区"],
+    "part": "eyes",
+    "filed": "Left optic ticket opened on Ward Two.",
+    "slip": "Handover: noticed on Three, filed on Two.",
+    "account": "Ward Three is where I first noticed it, doctor.",
+    "clear": "I noticed it on Three. At handover I used the terminal on Two to log it. Both wards are on the slip.",
+    "gap": "I never left Three. I used the fixed terminal on Two myself. I can't tell you how I got there.",
+    "firm": "Doctor, ask one thing at a time. I've just come off a double.",
+    "flat": "Noted, doctor. Continue."
+  },
   "version": 3,
   "name": "Priya Nair",
   "role": "Night-ward nurse",

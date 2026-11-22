@@ -90,6 +90,59 @@ static var intent_cues: Dictionary = {}
 
 static var part_words: Dictionary = {}
 static var complaint_questions: Array = []
+static var intake_words: Dictionary = {}
+
+
+## Free clinical questions, ordinary chat and registration share the same text box.
+## Short references only carry weight immediately after a displayed intake answer.
+static func intake_topic(text: String, focused: bool, file: Dictionary) -> String:
+	if intake_words.is_empty():
+		intake_words = JSON.parse_string(FileAccess.get_file_as_string("res://data/intake_language.json"))
+	var words := text.strip_edges().to_lower().replace("’", "'").replace("，", " ").replace(",", " ")
+	words = words.rstrip("?？.。!！… ").strip_edges()
+	if _has_phrase(words, intake_words.exclude):
+		return ""
+	var document: bool = words in intake_words.short_document or _has_phrase(words, intake_words.document)
+	var cites_entry := focused and _has_phrase(words, file.terms)
+	var about_story := focused and _has_phrase(words, intake_words.story)
+	var comparison := (document or cites_entry or about_story) and _has_phrase(words, intake_words.compare)
+	var explain: bool = comparison or ((document or cites_entry) and _has_phrase(words, intake_words.probe)) or (focused and words in intake_words.follow)
+	if not document and not (focused and explain):
+		return ""
+	if _has_phrase(words, intake_words.other):
+		return "intake_redirect"
+	var tokens := _english_words(words)
+	for body_part in intake_words.parts:
+		if body_part == file.part:
+			continue
+		for term in intake_words.parts[body_part]:
+			if term in tokens or (Lang.has_cjk(term) and words.contains(term)):
+				return "intake_redirect"
+	var filed_side := str(file.filed).get_slice(" ", 0).to_lower()
+	var left := _has_phrase(words, intake_words.left)
+	var right := _has_phrase(words, intake_words.right)
+	if document and left != right and ((left and filed_side == "right") or (right and filed_side == "left")):
+		return "intake_redirect"
+	return "intake_explain" if explain else "intake_account"
+
+
+static func _has_phrase(line: String, phrases: Array) -> bool:
+	for phrase in phrases:
+		if line.contains(str(phrase)):
+			return true
+	return false
+
+
+static func _english_words(line: String) -> PackedStringArray:
+	var tokens := PackedStringArray()
+	var word := ""
+	for letter in line.to_lower() + " ":
+		if letter >= "a" and letter <= "z":
+			word += letter
+		elif not word.is_empty():
+			tokens.append(word)
+			word = ""
+	return tokens
 
 
 static func part_for_text(text: String) -> String:
@@ -102,14 +155,7 @@ static func part_for_text(text: String) -> String:
 					part_words[row] = []
 				part_words[row].append_array(catalog.part_words[row])
 	var line := text.to_lower()
-	var words := PackedStringArray()
-	var word := ""
-	for letter in line + " ":
-		if letter >= "a" and letter <= "z":
-			word += letter
-		elif word != "":
-			words.append(word)
-			word = ""
+	var words := _english_words(line)
 	for row in part_words:
 		for term in part_words[row]:
 			if (Lang.has_cjk(term) and line.contains(term)) or term in words:
@@ -152,17 +198,7 @@ static func intent_for_text(case_data: Dictionary, text: String) -> Dictionary:
 
 
 static func topic_for_text(case_data: Dictionary, text: String) -> String:
-	var words: Array = []
-	var word := ""
-	for i in text.length():
-		var ch := text[i].to_lower()
-		if ch >= "a" and ch <= "z":
-			word += ch
-		elif word != "":
-			words.append(word)
-			word = ""
-	if word != "":
-		words.append(word)
+	var words := _english_words(text)
 	var best := ""
 	var best_score := 0
 	var case_id := str(case_data.get("id", ""))

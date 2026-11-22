@@ -5,6 +5,13 @@
 		"Holt"
 	],
 	"strings": {
+		"Wrist servo flagged on the morning shift.": "腕部伺服器在早班报修。",
+		"Handover sheet: night welder signed at dawn.": "交班单：夜班焊工于天亮时签字。",
+		"I was on nights, dear. I always weld on nights.": "亲爱的，我上夜班。我一直是夜里焊活的。",
+		"I felt it on nights. The morning crew had taken over by the time I signed their sheet.": "夜班时我就觉得手不对劲。签交班单的时候，早班的人已经接手了。",
+		"I signed before the night shift started. But the morning crew had just relieved me. Which shift was that?": "我在夜班开始前签的。可早班那时候刚接我的班。那到底是哪一班？",
+		"Dear, I came here after a full shift. Please let me finish.": "亲爱的，我熬了一整班才来。请让我把话说完。",
+		"Ask again if you need to, dear.": "你要是还想问，就问吧，亲爱的。",
 		"Night-shift welder": "夜班焊工",
 		"Tune welding-arm servos": "调校焊接臂伺服",
 		"An older woman in work gear, waiting very patiently. Her gloves are still on.": "一位穿着工装的年长女人，非常耐心地等着。手套还戴着。",

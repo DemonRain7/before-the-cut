@@ -1222,6 +1222,8 @@ func act_card(on: int = -1) -> void:
 	if want == _card_wanted:
 		return
 	_card_wanted = want
+	if not want:
+		clipboard.file_open = false
 	_card_back = false
 	audio.play("paper", 1.0 if want else 0.85, -5.0)
 	_log("panel", {"panel": "card", "open": want})
@@ -2090,6 +2092,34 @@ func act_complain(row: String = "", said: String = "", idle: bool = false) -> vo
 	_patient_line(str(response.reply), token, 0.0)
 
 
+func act_intake(topic: String, said: String = "") -> void:
+	if not _can_act():
+		return
+	var token := _begin_action()
+	act_card(1)
+	clipboard.file_open = true
+	var explain := topic == "intake_explain" and visit.intake_stage > 0
+	var redirect := topic == "intake_redirect"
+	var question := "How does that fit with the attached slip?" if explain else "What happened in the incident on this form?"
+	var event := {"type":"intake", "id":"redirect" if redirect else ("explain" if explain else "account")}
+	var line := visit.intake_line(explain)
+	if redirect:
+		line = Lang.tf("My entry reads: %s", [Lang.t(str(visit.case_data.intake.filed))])
+	var decision: Dictionary = await _decide(event, [line], said if said != "" else question, token, said != "")
+	if decision.is_empty():
+		return
+	var before := _note_keys()
+	if not redirect:
+		visit.record_intake(explain)
+	if explain:
+		_mark_new_notes(before, false)
+		if coach != null:
+			coach.event("listed_answer")
+	_sync_visit()
+	_log("intake", {"stage":event.id})
+	_patient_line(decision.reply, token, 0.0)
+
+
 ## Pressure dialogue is autonomous; existing physical attack choreography remains in VisitState.
 func act_press(confirmed: bool = false) -> void:
 	if not _can_act():
@@ -2106,7 +2136,12 @@ func act_press(confirmed: bool = false) -> void:
 		visit.record.append("doctor", question)
 		_doctor_say(question, true)
 	else:
-		d = await _decide({"type": "press", "id": "challenge"}, [], question, token, true)
+		var on_file := agent.intake_in_focus()
+		var options := []
+		if on_file:
+			question = Lang.t("Look at the slip again. Do you stand by what you told me?")
+			options.append(visit.case_data.intake["firm" if visit.case_data.rows.temper.ok else "flat"])
+		d = await _decide({"type":"press", "id":"intake" if on_file else "challenge"}, options, question, token, true)
 		if d.is_empty():
 			return
 	var before := _note_keys()
@@ -2157,6 +2192,9 @@ func act_say(text: String) -> void:
 	_thinking = false
 	_lock = false
 	_log("intent", {"source": reading.source, "topic": reading.topic, "chars": text.length(), "code": reading.reason})
+	if reading.topic in ["intake_account", "intake_explain", "intake_redirect"]:
+		await act_intake(str(reading.topic), text)
+		return
 	var part := ScriptedBrain.part_for_text(text)
 	var intent := str(reading.get("intent", "other"))
 	var part_question := ScriptedBrain.is_part_name(text, part)
@@ -2515,6 +2553,7 @@ func act_pick_stamp(kind: String) -> void:
 	else:
 		_begin_action()
 	_held = kind
+	clipboard.file_open = false
 	desk.held = kind
 	clipboard.armed = kind
 	_held_sprite.texture = Gfx.tex("ui/stamp_%s.png" % kind)
@@ -3765,6 +3804,10 @@ func _wall_click(pos: Vector2) -> bool:
 	if not _panels_live():
 		return false
 	match clipboard.tab_at(pos):
+		"file":
+			clipboard.file_open = not clipboard.file_open
+			audio.play("paper")
+			return true
 		"sheet":
 			act_sheet(0)
 			return true
@@ -4022,6 +4065,12 @@ func _exam_click(pos: Vector2) -> void:
 		"card":
 			if _held != "":
 				act_stamp_record()
+			elif clipboard.file_open and clipboard.file_question_rect().has_point(pos):
+				if visit.intake_stage == 2:
+					clipboard.file_open = false
+					_base_hint = "Mark SPEECH for how the explanation fits the paperwork."
+				else:
+					act_intake("intake_explain" if visit.intake_stage > 0 else "intake_account")
 			else:
 				var box := clipboard.mark_at(pos)
 				if box != "":
@@ -4339,6 +4388,8 @@ func _wall_hover(pos: Vector2) -> bool:
 		_cursor_kind = "hand"
 		if tab == "swap":
 			_hover_hint = SWAP_SHEET_HINT if clipboard.list_open else SWAP_LIST_HINT
+		elif tab == "file":
+			_hover_hint = "Turn the card over to compare the intake entry with the patient's account."
 		else:
 			_hover_hint = str(TAB_HINT[tab])
 		return true
@@ -4415,6 +4466,10 @@ func _hover_exam(pos: Vector2) -> void:
 			return
 	if _held != "":
 		_cursor_kind = "none"
+		return
+	if paper == "card" and clipboard.file_open and clipboard.file_question_rect().has_point(pos):
+		_cursor_kind = "hand"
+		_hover_hint = "Mark SPEECH for how the explanation fits the paperwork." if visit.intake_stage == 2 else "Ask about the paperwork. Talking is free."
 		return
 	var mark := clipboard.mark_at(pos)
 	if mark != "":

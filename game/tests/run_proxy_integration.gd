@@ -78,6 +78,7 @@ func _run() -> void:
 		check(result.result == "granted", "AI cooperation reaches tool state")
 		check(a.record.entries.size() >= 3, "visit history carries actual conversation")
 	await test_sign_matrix(db)
+	await test_intake_pressure(db)
 	for scenario in ["timeout", "invalid", "slow"]:
 		client.base_url = str(urls[scenario])
 		var v := VisitState.new(db.cases.kip, rules)
@@ -100,6 +101,34 @@ func _run() -> void:
 	await process_frame
 	print("RESULT: %d passed, %d failed" % [passed, failed])
 	quit(1 if failed else 0)
+
+func test_intake_pressure(db: Dictionary) -> void:
+	var t: Dictionary = db.templates.rook
+	for language in ["en", "zh"]:
+		Lang.pin(language)
+		for scenario in ["normal", "timeout"]:
+			client.base_url = str(urls[scenario])
+			var pick := {"truth":"drifting", "signs":{"speech":t.signs.speech.broken[0].id, "temper":t.signs.temper.broken[0].id}}
+			var v := VisitState.new(CaseDB.compose(t, pick), rules)
+			var a := new_agent(v)
+			for id in ["account", "explain"]:
+				var d: Dictionary = await a.decide({"type":"intake", "id":id, "text":"Compare the file."}, v.snapshot(), [v.intake_line(id == "explain")])
+				v.record_intake(id == "explain")
+				v.record.append("patient", Lang.t(str(d.reply)))
+				check(d.source == "script" and a.calls_this_visit == 0 and a.intake_in_focus(), "graded testimony stays available in both service modes")
+			var event := {"type":"press", "id":"intake", "text":"Do you stand by that?"}
+			var response: Dictionary = await a.decide(event, v.snapshot(), [t.intake.flat], v.open_signs(event))
+			check(response.source == ("model" if scenario == "normal" else "fallback") and Lang.t(response.reply) == Lang.t(t.intake.flat),
+				"targeted pressure works over HTTP and on a real proxy timeout in " + language)
+			check(v.press().result == "react" and v.patience == 1 and v.intake_line(true) == t.intake.gap, "a resistant patient keeps the same disputed detail")
+			v.record.append("patient", Lang.t(str(response.reply)))
+			var follow: Dictionary = await a.classify("哪一个？" if language == "zh" else "Which one is it?")
+			check(follow.get("topic") == "intake_explain", "a displayed pressure response keeps the file in focus over HTTP")
+			a.end_visit()
+			check(v.record.entries.is_empty() and not a.intake_in_focus(), "closing releases the file conversation")
+	client.base_url = str(urls.normal)
+	Lang.pin("en")
+
 
 ## Cross every pair of speech and temper conditions for every patient in both languages.
 func test_sign_matrix(db: Dictionary) -> void:
@@ -454,6 +483,23 @@ func spoken_conversation(main: MainScript, driver: PlayDriver) -> void:
 	check(settled, "ENTER sends the words as they came back")
 	var now := JSON.stringify(main.agent.record.entries)
 	check(now.contains(MOCK_TRANSCRIPT) and not now.contains("Does the arm ever move"), "its history holds its own spoken line and nothing from the last patient")
+
+	await driver.settle()
+	await driver.speak()
+	settled = await driver.until(func() -> bool: return main._mic_state == "" and box.input_text == MOCK_TRANSCRIPT, 20.0)
+	check(settled and main.visit.intake_stage == 0, "reviewing a transcript leaves the registration untouched")
+	for i in box.input_text.length():
+		driver.key(KEY_BACKSPACE)
+	driver.type_text("What did you put on the intake form?")
+	driver.key(KEY_ENTER)
+	check(await driver.until(func() -> bool: return main.visit.intake_stage == 1 and main.agent.intake_in_focus(), 20.0),
+		"confirmed dictation takes the same registration route as the card")
+	await driver.settle()
+	await driver.say("Which one is it?")
+	check(await driver.until(func() -> bool: return main.visit.intake_stage == 2 and main.agent.intake_in_focus(), 20.0),
+		"a typed follow-up can refer back to the reviewed voice exchange")
+	await driver.hang_card()
+	await driver.settle()
 
 	# -- the log: stages and numbers, never words or sound
 	var stages := {}

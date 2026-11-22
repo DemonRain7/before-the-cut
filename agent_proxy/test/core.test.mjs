@@ -13,6 +13,55 @@ function handler(provider=fixture(),limits={}) {
  const logs=[]; const handle=createHandler({cases,rules,provider,limits,log:e=>logs.push(e)});
  return {handle,logs,post:b=>handle({method:"POST",path:"/v1/patient-dialogue",bodyText:JSON.stringify(b)})};
 }
+test("only disclosed intake testimony reaches the patient and the physical pressure cue stays independent", () => {
+	for (const c of Object.values(cases)) {
+		for (const language of ["en", "zh"]) {
+			for (const speech of ["normal", "broken"]) {
+				for (const temper of ["normal", "broken"]) {
+					const b = { ...body("say", "free", "How did that feel?"), case_id: c.id, language, signs: {} };
+					const turn = () => {
+						const result = validateRequest(b, cases);
+						assert.equal(result.ok, true);
+						return buildPrompt(c, rules, result.req, 110).currentTurn;
+					};
+					assert.equal(turn().discussed_intake, undefined);
+					b.state.intake_stage = null;
+					assert.equal(validateRequest(b, cases).ok, false);
+					b.state.intake_stage = 1;
+					const first = turn().discussed_intake;
+					assert.deepEqual(Object.keys(first), ["filed", "attachment", "account"]);
+					b.state.intake_stage = 2;
+					assert.equal(validateRequest(b, cases).ok, false);
+					b.signs.speech = c.signs.speech[speech][0].id;
+					const explanation = turn().discussed_intake.explanation;
+					if (language === "en") assert.equal(explanation, c.intake[speech === "normal" ? "clear" : "gap"]);
+					else assert.match(explanation, /\p{Script=Han}/u);
+					b.event = { type: "press", id: "intake", text: "Do you stand by that?" };
+					assert.equal(validateRequest(b, cases).ok, false);
+					b.signs.temper = c.signs.temper[temper][0].id;
+					const pressed = turn();
+					assert.equal(pressed.discussed_intake.explanation, explanation);
+					if (language === "en") assert.equal(pressed.pressure_reference, c.intake[temper === "normal" ? "firm" : "flat"]);
+					else assert.match(pressed.pressure_reference, /\p{Script=Han}/u);
+					assert.equal(pressed.discussed_intake.truth, undefined);
+				}
+			}
+		}
+	}
+});
+test("pressure on the intake file keeps the player's readings and diagnosis out of the response", async () => {
+	const request = body("press", "intake", "Do you stand by the slip?");
+	request.state.intake_stage = 1;
+	for (const reply of ["The gauge shows damage.", "I'm a cyberpsycho.", "我就是个赛博疯子。", "握力检查结果显示异常。"]) {
+		const out = await handler(fixture({ reply, reaction: "" })).post(request);
+		assert.equal(out.status, 422);
+		assert.equal(out.body.error.message, "intake_pressure_wording");
+	}
+	for (const reply of ["I'm angry about the ticket.", "我看过那张单了，医生。"]) {
+		const out = await handler(fixture({ reply, reaction: "" })).post(request);
+		assert.equal(out.body.reply, reply);
+	}
+});
 test("ten current cases and matching game limits",()=>{
  assert.equal(Object.keys(cases).length,10); assert.equal(DEFAULT_LIMITS.maxCallsPerVisit,rules.agent.max_model_calls_per_visit);
  const game = rules.agent;

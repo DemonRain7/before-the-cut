@@ -59,7 +59,8 @@ SHOWN = {
         ("topics", "*", "q"), ("topics", "*", "deflect"),
         ("lines", "*"), ("lines", "*", "*"), ("press_end", "*"),
         ("attack", "telegraph"), ("attack", "line"), ("exit", "*"),
-    ] + [("signs", "*", "*", "*", key) for key in ("text", "note", "look", "after")]
+    ] + [("intake", key) for key in ("filed", "slip", "account", "clear", "gap", "firm", "flat")]
+      + [("signs", "*", "*", "*", key) for key in ("text", "note", "look", "after")]
       + [("signs", "*", "*", "*", "answers", "*", key) for key in ("a", "note")]
       + [("signs", "*", "*", "*", part, key) for part in ("press", "flare") for key in ("line", "note")]
       + [("outcomes", "*", "*", key) for key in ("title", "text")],

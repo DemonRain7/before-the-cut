@@ -48,9 +48,31 @@ function sleep(ms, signal) {
 
 import { mentionedPart } from "./complaints.mjs";
 import intentCues from "../../game/data/patient_intents.json" with { type: "json" };
+import intakeWords from "../../game/data/intake_language.json" with { type: "json" };
 import chineseTopics from "../../game/data/lang/zh/topics.json" with { type: "json" };
 
-function mockIntent(topics, text) {
+function mockFileTopic(text, focused, file) {
+	const line = text.trim().toLowerCase().replaceAll("’", "'").replace(/[,，]/g, " ").replace(/[?？.!。！… ]+$/u, "").trim();
+	const hasAny = phrases => phrases.some(phrase => line.includes(phrase));
+	if (hasAny(intakeWords.exclude)) return "";
+	const document = intakeWords.short_document.includes(line) || hasAny(intakeWords.document);
+	const citesEntry = focused && hasAny(file.terms);
+	const aboutStory = focused && hasAny(intakeWords.story);
+	const comparison = (document || citesEntry || aboutStory) && hasAny(intakeWords.compare);
+	const explain = comparison || ((document || citesEntry) && hasAny(intakeWords.probe)) || (focused && intakeWords.follow.includes(line));
+	if (!document && !(focused && explain)) return "";
+	const tokens = line.match(/[a-z]+/g) || [];
+	const wrongPart = Object.entries(intakeWords.parts).some(([id, terms]) => id !== file.part &&
+		terms.some(term => tokens.includes(term) || (/\p{Script=Han}/u.test(term) && line.includes(term))));
+	const left = hasAny(intakeWords.left), right = hasAny(intakeWords.right);
+	const wrongSide = document && left !== right && ((left && file.filed.startsWith("Right ")) || (right && file.filed.startsWith("Left ")));
+	if (wrongPart || wrongSide || hasAny(intakeWords.other)) return "intake_redirect";
+	return explain ? "intake_explain" : "intake_account";
+}
+
+function mockIntent(topics, text, focused, file) {
+	const fileTopic = typeof focused === "boolean" && file ? mockFileTopic(text, focused, file) : "";
+	if (fileTopic) return { about: fileTopic, intent: "case_question" };
 	const line = text.trim().toLowerCase();
 	for (const [intent, phrases] of Object.entries(intentCues)) {
 		if (intent !== "complaint" && phrases.some(phrase => line.includes(phrase))) return { about: "none", intent };
@@ -73,12 +95,12 @@ function mockIntent(topics, text) {
 export function createMockProvider({ fail = "" } = {}) {
 	return {
 		name: "mock", model: "mock-dialogue-5",
-		async generate({ req, intent, topics, currentTurn }, signal) {
+		async generate({ req, intent, topics, intakeFile, currentTurn }, signal) {
 			if (fail === "timeout") await waitUntilAborted(signal);
 			if (fail.startsWith("slow:")) await sleep(Number(fail.slice(5)) || 0, signal);
 			if (fail === "http_error") throw new ProviderError("http_503");
 			if (intent) {
-				const reading = fail === "invalid_shape" ? { about: "unknown", intent: "other" } : mockIntent(topics, req.text);
+				const reading = fail === "invalid_shape" ? { about: "unknown", intent: "other" } : mockIntent(topics, req.text, req.intake_focus, intakeFile);
 				return { text: fail === "invalid_json" ? "not JSON" : JSON.stringify({ choice: reading.about === "none" ? reading.intent : "ask_" + reading.about }), model: "mock-intent-5", mock: true };
 			}
 			let answer = req && req.language === "zh"
@@ -88,6 +110,7 @@ export function createMockProvider({ fail = "" } = {}) {
 				answer = { reply: req.event.type === "idle" ? "" : req.language === "zh" ? "我能喘口气吗？" : "Can I catch my breath a moment?", reaction: "" };
 			}
 			if (req?.event?.type === "complain") answer = { reply: currentTurn.voice_now.join(" "), reaction: "" };
+			if (currentTurn?.pressure_reference) answer = { reply: currentTurn.pressure_reference, reaction: "" };
 			if (req?.event?.outcome) answer.cooperates = ["grant", "answer"].includes(req.event.outcome);
 			if (fail === "long_line") answer.reply = "word ".repeat(80);
 			if (fail === "invalid_shape") answer.reply = 42;

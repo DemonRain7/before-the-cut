@@ -68,6 +68,7 @@ var hover_mark: String = ""
 var counter_text: String = ""     # "2 / 5"
 var sheet_open: bool = false      # the reference sheet is down from its board
 var card_open: bool = false       # the intake card is down from its board
+var file_open := false           # the intake entry and attachment on the reverse of this card
 var list_open: bool = false       # tonight's contact list is down from its board
 var tab_hover: String = ""        # "sheet" | "list" | "card" | "swap": the tab under the pointer
 var contacts: Array = []          # tonight's entries, as ShiftState drew them
@@ -101,6 +102,7 @@ func _ready() -> void:
 
 func set_visit(p_visit: VisitState, p_counter: String) -> void:
 	visit = p_visit
+	file_open = false
 	counter_text = p_counter
 	mode = "exam" if p_visit != null else "blank"
 	imprint = ""
@@ -177,6 +179,14 @@ func card_tab() -> Rect2:
 	return Rect2(Gfx.RECORD.position.x - TAB.x, Gfx.RECORD.position.y + TAB_DROP, TAB.x, TAB.y)
 
 
+func file_tab() -> Rect2:
+	return Rect2(Gfx.RECORD.position + Vector2(-34, 38), Vector2(34, 15))
+
+
+func file_question_rect() -> Rect2:
+	return Rect2(Vector2(412, 339) + _card_shift(), Vector2(214, 15))
+
+
 ## "sheet", "list" or "card" if the pointer is on the tab of a paper that is out, "swap" on the
 ## tab that trades the sheet and the list, else "".
 func tab_at(pos: Vector2) -> String:
@@ -188,12 +198,14 @@ func tab_at(pos: Vector2) -> String:
 		return "swap"
 	if card_open and card_tab().has_point(pos):
 		return "card"
+	if card_open and mode == "exam" and visit != null and visit.in_exam() and armed == "" and file_tab().has_point(pos):
+		return "file"
 	return ""
 
 
 ## The record row under the pointer, or "".
 func record_row_at(pos: Vector2) -> String:
-	if not in_record(pos):
+	if not in_record(pos) or file_open:
 		return ""
 	var i := int(floor((pos.y - _card_shift().y - REC_ROW_Y) / REC_ROW_H))
 	if i < 0 or i >= ROWS.size():
@@ -416,6 +428,14 @@ func _draw_card_paper() -> void:
 	if rec_tex != null:
 		n.draw_texture(rec_tex, CARD_HOME)
 	_draw_tab(n, CARD_HOME + Vector2(-TAB.x, TAB_DROP), false, tab_hover == "card")
+	if mode == "exam" and visit != null and visit.in_exam() and armed == "":
+		var tab := Rect2(file_tab().position - _card_shift(), file_tab().size)
+		n.draw_rect(tab, Gfx.PAPER3 if tab_hover == "file" else Gfx.PAPER2)
+		n.draw_rect(tab, Gfx.PRINT, false, 1.0)
+		Gfx.text_center(n, tab.get_center().x, tab.position.y + 2, "CHART" if file_open else "FILE", Gfx.INKT, true)
+		if file_open:
+			_draw_intake_file()
+			return
 	match mode:
 		"exam":
 			_draw_header()
@@ -423,6 +443,30 @@ func _draw_card_paper() -> void:
 		_:
 			_draw_blank()
 	_draw_decision()
+
+
+func _draw_intake_file() -> void:
+	var file: Dictionary = visit.case_data.intake
+	_card_n.draw_rect(Rect2(408, 176, 224, 179), Gfx.PAPER3)
+	Gfx.text(_card_n, Vector2(412, 181), str(visit.case_data.name), Gfx.INKT, true)
+	_file_field(196, "FILED AT INTAKE", file.filed)
+	_file_field(230, "ATTACHED SLIP", file.slip)
+	if visit.intake_stage >= 1:
+		_file_field(264, "PATIENT'S ACCOUNT", file.account)
+	if visit.intake_stage == 2:
+		_file_field(296, "FOLLOW-UP", visit.intake_line(true))
+	var button := Rect2(file_question_rect().position - _card_shift(), file_question_rect().size)
+	_card_n.draw_rect(button, Gfx.INKT)
+	var labels := ["Ask for their account", "Ask how it fits", "Mark SPEECH on the chart"]
+	var label: String = labels[visit.intake_stage]
+	Gfx.text_center(_card_n, button.get_center().x, button.position.y + 2, label, Gfx.PAPER3, true)
+
+
+func _file_field(y: float, label: String, value: String) -> void:
+	Gfx.text(_card_n, Vector2(412, y), label, Gfx.PRINT, true)
+	for line in Gfx.wrap_text(value, 214):
+		y += 10
+		Gfx.text_raw(_card_n, Vector2(412, y), line, Gfx.INKT)
 
 
 func _draw_blank() -> void:

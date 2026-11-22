@@ -5,6 +5,13 @@
 		"Kirsch"
 	],
 	"strings": {
+		"Right optic service requested off duty.": "右眼义体在勤务结束后申请检修。",
+		"Private work order opened after the raid.": "私人修理单于突袭任务结束后开立。",
+		"It started on duty. During the raid.": "是在执勤时出的毛病。突袭期间。",
+		"The overlay stuck on duty. I waited until I was off the clock to put in a private order.": "叠层在执勤时卡住。我等到下班，才用个人名义开修理单。",
+		"I filed it on the raid. No, we hadn't deployed yet and the raid was over. I can't fix that timeline.": "我执行突袭时填的。不，我们还没出发，突袭又已经结束了。这个顺序我说不通。",
+		"One question at a time, doctor. You have my answer.": "一次问一个，医生。我已经回答了。",
+		"Question received. Continue.": "问题收到。请继续。",
 		"Off-duty cop": "休班警察",
 		"Fix stuck target overlay": "修好卡住的瞄准叠加层",
 		"A woman in a plain raincoat, a badge on her belt. She has already counted the exits.": "一个穿着普通雨衣的女人，腰带上别着警徽。她已经数过出口了。",

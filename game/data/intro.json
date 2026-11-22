@@ -98,7 +98,7 @@
       "id": "right",
       "title": "THE RIGHT WALL",
       "items": [
-        {"key": "record", "text": "INTAKE CARD [N]. Your notes on the patient, written as you work; tick or cross a row yourself. {threshold} crosses: drifting, by the house rule. The call stays yours. Whether it was right, you learn at closing."},
+        {"key": "record", "text": "INTAKE CARD [N]. Open FILE to read the entry and slip. Ask for their account, then how it fits. Mark SPEECH yourself. An unexplained detail counts on one row. The house rule takes {threshold} crosses."},
         {"key": "booklet", "text": "COUNTER GUIDE [H]. These pages. On your first night a TRAINING box points at one thing at a time; SKIP ALL [K] ends it."},
         {"key": "treat", "text": "TREAT. Pick up the stamp and stamp the card. For the steady."},
         {"key": "team", "text": "TRAUMA TEAM. Press twice and they take the patient away. For the drifting."},

@@ -5,6 +5,13 @@
 		"Vale"
 	],
 	"strings": {
+		"Reflex rig submitted by Kessler stores.": "反射装置由凯斯勒库房送件。",
+		"Dispatch copy: stores issued it to A. Vale.": "出库联：库房将设备交给 A. Vale。",
+		"I brought the rig in myself, doctor.": "医生，装置是我亲自带来的。",
+		"Stores issued the equipment. I signed for it and carried it here. Both signatures are on the copy.": "库房负责发放，我签收后带来这里。副联上有两个签名。",
+		"Stores still has it. I signed it out myself. I cannot account for it being in both places.": "装置还在库房。我亲自签字领了。为什么两个地方都有，我无法解释。",
+		"I have supplied the dispatch copy. Lower your voice, doctor.": "出库联已经给你了。医生，请小声一点。",
+		"You may repeat the question, doctor.": "医生，你可以重复这个问题。",
 		"Corporate security": "企业安保",
 		"Remove reflex-rig limiter": "拆除反射义体限制器",
 		"A man in a pressed suit, standing very straight. He has not moved in a while.": "一个西装笔挺的男人，站得笔直。他已经很久没动过了。",

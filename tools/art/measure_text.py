@@ -869,6 +869,13 @@ def main():
         cid = c["id"]
         rows.append(check("name", cid + ".name", c["name"], bold=True))
         rows.append(check("request", cid + ".request", c["request"]))
+        for field, sentence in c["intake"].items():
+            if field in ("part", "terms"):
+                continue
+            if field in ("firm", "flat"):
+                rows.append(check_lines("intake", cid + "." + field, sentence, STRIP_WIDTH, 2))
+            else:
+                rows.append(check_lines("intake", cid + "." + field, sentence, 214, 3 if field in ("clear", "gap") else 2))
         for z, t in c["complaints"].items():
             rows.append(check_lines("complaint", cid + ".complaints." + z, t, 360, 2))
         # every sign of every row (case data version 3): the night picks one sign a row, so any of

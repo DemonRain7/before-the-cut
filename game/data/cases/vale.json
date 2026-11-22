@@ -1,5 +1,16 @@
 {
   "id": "vale",
+  "intake": {
+    "terms": ["stores","dispatch copy","库房","出库联","签收"],
+    "part": "reflex",
+    "filed": "Reflex rig submitted by Kessler stores.",
+    "slip": "Dispatch copy: stores issued it to A. Vale.",
+    "account": "I brought the rig in myself, doctor.",
+    "clear": "Stores issued the equipment. I signed for it and carried it here. Both signatures are on the copy.",
+    "gap": "Stores still has it. I signed it out myself. I cannot account for it being in both places.",
+    "firm": "I have supplied the dispatch copy. Lower your voice, doctor.",
+    "flat": "You may repeat the question, doctor."
+  },
   "version": 3,
   "name": "Adrian Vale",
   "role": "Corporate security",

@@ -19,6 +19,7 @@ func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
 	var out := FileAccess.open(args[0], FileAccess.WRITE)
 	var nights := int(args[1]) if args.size() > 1 else 25000
+	var use_intake := args.has("--intake")
 	for seed_id in range(1, nights + 1):
 		var n := Shift.draw_night(db, seed_id, true)
 		var ids := DB.night_order(n)
@@ -43,8 +44,12 @@ func _initialize() -> void:
 			for k in order:
 				if k not in first:
 					first.append(k)
-			for topic in c.topics:
-				v.apply_ask(topic.id)
+			if use_intake:
+				v.record_intake(false)
+				v.record_intake(true)
+			else:
+				for topic in c.topics:
+					v.apply_ask(topic.id)
 			while v.complaints_told.size() < pick.complaints.size():
 				v.complain()
 			var mask := 0

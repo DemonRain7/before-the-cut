@@ -113,7 +113,7 @@ func decide(event: Dictionary, state: Dictionary, fallback_options: Array = [], 
 	var reason := fallback if mode == "model" else ""
 	var authored_ask: bool = event.get("type") == "ask" and rules.get("agent", {}).get("ask_answers", "authored") == "authored"
 	var authored_complaint: bool = event.get("type") == "complain" and not voice_complaints
-	var generate := mode == "model" and client != null and not authored_ask and not authored_complaint
+	var generate: bool = mode == "model" and client != null and not authored_ask and not authored_complaint and event.get("type") != "intake"
 	if generate and reason == "" and calls_this_visit >= max_calls:
 		reason = "call_cap"
 	# The current line travels as the event. It enters memory before a concurrent look or reply.
@@ -156,7 +156,7 @@ func decide(event: Dictionary, state: Dictionary, fallback_options: Array = [], 
 func _with_script(base: Dictionary, event: Dictionary, state: Dictionary, options: Array, fallback: bool) -> Dictionary:
 	var kind := str(event.get("type", ""))
 	var pick := {"move": "dialogue", "line": "I don't know how to answer that. Can we talk about why I came in?"}
-	if kind == "complain" and not options.is_empty():
+	if kind in ["intake", "complain"] and not options.is_empty():
 		pick.line = str(options[0])
 	elif kind == "check" or kind == "ask":
 		pick = scripted.decide(case_data, event, state, options)
@@ -165,7 +165,9 @@ func _with_script(base: Dictionary, event: Dictionary, state: Dictionary, option
 		pick["line"] = str(case_data.get("complaints", {}).get("none", pick.line))
 	elif kind == "press":
 		var reactions: Array = case_data.get("press", [])
-		if not reactions.is_empty():
+		if event.get("id") == "intake" and not options.is_empty():
+			pick.line = str(options[0])
+		elif not reactions.is_empty():
 			pick["line"] = str(reactions[mini(int(state.get("press_count", 0)), reactions.size() - 1)].get("line", ""))
 	base["move"] = pick.move
 	base["line"] = pick.line
@@ -210,7 +212,19 @@ func build_voice_payload(wav: PackedByteArray) -> Dictionary:
 	return payload
 
 
-## Classify only the doctor's line. The intent route never receives a sign, state or history.
+func intake_in_focus() -> bool:
+	if record == null or record.entries.is_empty():
+		return false
+	var event: Dictionary = last.get("event", {})
+	var intake_answer: bool = event.get("type") == "intake" and event.get("id") in ["account", "explain"]
+	var intake_press: bool = event.get("type") == "press" and event.get("id") == "intake"
+	if not (intake_answer or intake_press):
+		return false
+	var entry: Dictionary = record.entries.back()
+	return entry.role == "patient" and entry.text == Lang.t(str(last.reply))
+
+
+## The classifier gets the line and whether its immediately preceding exchange concerned the file.
 func classify(text: String) -> Dictionary:
 	if record == null:
 		return {}
@@ -218,11 +232,16 @@ func classify(text: String) -> Dictionary:
 	for topic in case_data.get("topics", []):
 		if text == topic.q or text == Lang.t(str(topic.q)):
 			return {"topic": topic.id, "intent": "case_question", "source": "listed", "reason": ""}
+	var focused := intake_in_focus()
+	var has_file := case_data.has("intake")
+	var file_topic := ScriptedBrain.intake_topic(text, focused, case_data.intake) if has_file else ""
+	if file_topic != "":
+		return {"topic":file_topic, "intent":"case_question", "source":"intake", "reason":""}
 	var fallback := ScriptedBrain.intent_for_text(case_data, text)
 	fallback.merge({"source":"script","reason":""})
 	if mode != "model" or client == null:
 		return fallback
-	var key := Lang.code + ":" + text.sha256_text()
+	var key := Lang.code + (":file:" if focused else ":") + text.sha256_text()
 	if _intent_cache.has(key):
 		var hit: Dictionary = _intent_cache[key].duplicate()
 		hit.source = "cache"
@@ -235,6 +254,8 @@ func classify(text: String) -> Dictionary:
 	intents_this_visit += 1
 	var payload := _identity()
 	payload.merge({"case_id": case_data.id, "case_version": case_data.version, "text": text})
+	if has_file:
+		payload["intake_focus"] = focused
 	var response: Dictionary = await client.request_intent(payload)
 	if generation != _generation:
 		return {}
@@ -245,6 +266,8 @@ func classify(text: String) -> Dictionary:
 			var kind := str(response.data.get("intent", ""))
 			if kind in ["unclear", "other"] or ScriptedBrain.intent_cues.has(kind):
 				result = {"topic": "", "intent": kind, "source": "model", "reason": ""}
+		elif has_file and about in ["intake_account", "intake_explain", "intake_redirect"]:
+			result = {"topic": about, "intent": "case_question", "source": "model", "reason": ""}
 		else:
 			for item in case_data.get("topics", []):
 				if item.id == about:

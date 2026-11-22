@@ -5,6 +5,13 @@
 		"Nair"
 	],
 	"strings": {
+		"Left optic ticket opened on Ward Two.": "左眼义体的报修单开在二病区。",
+		"Handover: noticed on Three, filed on Two.": "交班记录：三病区发现问题，二病区报修。",
+		"Ward Three is where I first noticed it, doctor.": "医生，我最早是在三病区发现的。",
+		"I noticed it on Three. At handover I used the terminal on Two to log it. Both wards are on the slip.": "我在三病区发现问题。交班时用二病区的终端报修，记录上两个病区都有。",
+		"I never left Three. I used the fixed terminal on Two myself. I can't tell you how I got there.": "我没离开过三病区。可二病区的固定终端是我亲自用的。我说不清怎么过去的。",
+		"Doctor, ask one thing at a time. I've just come off a double.": "医生，一次问一件事。我刚连上了两个班。",
+		"Noted, doctor. Continue.": "记下了，医生。请继续。",
 		"Night-ward nurse": "夜班病房护士",
 		"Tune scanner eye": "调校扫描义眼",
 		"A nurse in scrubs under a raincoat. One of her eyes glows a soft red.": "雨衣下穿着刷手服的护士。她的一只眼睛泛着柔和的红光。",

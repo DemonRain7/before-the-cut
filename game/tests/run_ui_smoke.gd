@@ -2134,6 +2134,7 @@ func shift_wear() -> void:
 		var v: VisitState = await enter(id)
 		await d.settle()
 		if id == "rook":
+			await check_intake_at_counter(v)
 			check(await d.request_tool("penlight") == "open" and await d.sweep_eyes(), "Rook's worn lens can be read in the chair")
 			await d.put_away()
 			await d.settle()
@@ -2141,6 +2142,33 @@ func shift_wear() -> void:
 		await finish_visit(id)
 	check(await d.wait_for_report() and main.screens.report.visits[1].rows[0].wear, "closing identifies the worn lens")
 	main.test_night = ""
+
+
+func check_intake_at_counter(v: VisitState) -> void:
+	await d.take_card()
+	d.click(main.clipboard.file_tab().get_center())
+	check(main.clipboard.file_open and v.intake_stage == 0, "turning the card over gives both documents and no testimony")
+	d.click(main.clipboard.file_question_rect().get_center())
+	check(await d.until(func() -> bool: return v.intake_stage == 1 and main.agent.intake_in_focus(), 10.0), "one click takes the patient's own account")
+	check(v.notes.speech.is_empty() and not v.row_seen("speech"), "hearing a different location still leaves SPEECH open")
+	await d.settle()
+	await d.say("那你怎么解释？" if Lang.code == "zh" else "Which one is it?")
+	check(await d.until(func() -> bool: return v.intake_stage == 2 and main.agent.intake_in_focus(), 10.0), "a typed reference to the last reply opens the explanation")
+	check(v.last_recorded_speech == v.case_data.intake.clear and v.notes.speech.size() == 1 and v.patience == 2, "Rook reconciles the locations without spending a lamp")
+	await d.settle()
+	d.click(main.clipboard.file_question_rect().get_center())
+	check(not main.clipboard.file_open and v.notes.speech.size() == 1 and v.crossed() == 0, "the file returns to the chart and leaves the mark to the doctor")
+	await d.hang_card()
+	await d.press()
+	check(await d.until(func() -> bool: return v.press_count == 1 and main.agent.last.get("event", {}).get("id") == "intake", 10.0), "the actual PRESS challenges the testimony in focus")
+	check(v.patience == 1 and v.row_seen("temper") and v.last_recorded_speech == v.case_data.intake.clear, "pressure opens TEMPER and preserves the earlier account")
+	await d.put_away()
+	await d.settle()
+	await d.say("那你怎么解释？" if Lang.code == "zh" else "Which one is it?")
+	check(await d.until(func() -> bool: return main.clipboard.file_open and main.agent.intake_in_focus(), 10.0), "after the pressure close-up a short follow-up still refers to the file")
+	check(v.notes.speech.size() == 1 and v.patience == 1, "following up on PRESS costs no extra lamp or finding")
+	await d.settle()
+	await d.hang_card()
 
 
 func shift_attack_styles() -> void:

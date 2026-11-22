@@ -33,7 +33,8 @@ var idle_complaints: int = 0
 var claims: Array = []           # claim ids the patient has offered
 var asked: Dictionary = {}       # topic id -> times asked
 var answered: Dictionary = {}    # topic id -> true
-var last_recorded_speech: String = ""  # memory only; never written to the event log
+var intake_stage := 0            # 1 after hearing the account, 2 after checking its explanation
+var last_recorded_speech: String = ""  # the quote used in this appointment's closing report
 var press_count: int = 0
 var attack_cause: String = ""    # "refer", "press" or "snap"
 var blows_taken: int = 0         # blows that reached the glass before the shutter was down
@@ -170,6 +171,7 @@ func snapshot() -> Dictionary:
 		"claims": claims.duplicate(),
 		"asked": asked.duplicate(),
 		"press_count": press_count,
+		"intake_stage": intake_stage,
 	}
 
 
@@ -278,6 +280,26 @@ func release_ms() -> int:
 
 
 # ------------------------------------------------------------------ talk
+## Both documents and the initial account are identical for every visit by this character.
+## Only the follow-up reads SPEECH. A worn speech row uses the same account as a drifting one.
+func intake_line(explain: bool) -> String:
+	var file: Dictionary = case_data.get("intake", {})
+	if not explain or intake_stage == 0:
+		return str(file.get("account", ""))
+	return str(file.get("clear" if case_data.rows.speech.ok else "gap", ""))
+
+
+func record_intake(explain: bool) -> void:
+	explain = explain and intake_stage > 0
+	var line := intake_line(explain)
+	if not in_exam() or line.is_empty():
+		return
+	intake_stage = maxi(intake_stage, 2 if explain else 1)
+	if explain:
+		last_recorded_speech = line
+		add_note("speech", "intake", Lang.tf("Says: %s", [Lang.t(line)]))
+
+
 ## Which signs a dialogue request has earned, including the action being answered now.
 func open_signs(event: Dictionary = {}) -> Dictionary:
 	var result := {}
@@ -285,7 +307,7 @@ func open_signs(event: Dictionary = {}) -> Dictionary:
 	var id := str(event.get("id", ""))
 	var will_answer: bool = event.get("type") == "ask" and event.get("outcome") == "answer" and not topic(id).is_empty()
 	var evidence: Array = case_data.get("rows", {}).get("speech", {}).get("evidence", [])
-	if signs.has("speech") and (not answered.is_empty() or will_answer):
+	if signs.has("speech") and (not answered.is_empty() or will_answer or intake_stage == 2):
 		result["speech"] = signs.speech if row_seen("speech") or (will_answer and evidence.has("ask:" + id)) else case_data.get("normal_speech_sign", "")
 	if signs.has("temper") and (row_seen("temper") or event.get("type") == "press"):
 		result["temper"] = signs.temper
@@ -557,6 +579,8 @@ func cycle_mark(row: String) -> int:
 
 
 func row_seen(row: String) -> bool:
+	if row == "speech" and intake_stage == 2:
+		return true
 	if row == "temper" and seen.has("flare"):
 		return true      # a flare shows the temper as plainly as pressure does
 	var spec: Dictionary = case_data.get("rows", {}).get(row, {})
@@ -671,8 +695,11 @@ func settlement() -> Dictionary:
 			"seen": row_seen(row),
 			"mark": int(marks.get(row, 0)),
 		}
-		if row == "speech" and last_recorded_speech != "":
-			finding["text"] = last_recorded_speech
+		if row == "speech":
+			if intake_stage == 2:
+				finding["text"] = intake_line(true)
+			elif last_recorded_speech != "":
+				finding["text"] = last_recorded_speech
 		finding["wear"] = not is_drifting() and not finding.ok
 		if not finding.ok and not finding.seen and int(_rule("report", "missed_hints", 1)) > 0:
 			var how := {"eyes": "LIGHT", "hands": "GRIP", "port": "PORT", "temper": "PRESS"}
@@ -688,7 +715,7 @@ func settlement() -> Dictionary:
 	if int(_rule("report", "show_usage", 1)) > 0:
 		for tool in TOOLS:
 			usage[tool] = granted.has(tool)
-		usage["ask"] = not asked.is_empty()
+		usage["ask"] = intake_stage > 0 or not asked.is_empty()
 		usage["press"] = press_count > 0
 	return {
 		"complaints_told": complaints_told.duplicate(), "tests_in_order": tests_in_order.duplicate(), "complaints_followed": complaints_followed.duplicate(),

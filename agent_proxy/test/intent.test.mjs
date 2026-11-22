@@ -3,12 +3,30 @@ import test from "node:test";
 import { createHandler, PROTOCOL } from "../src/core.mjs";
 import { loadGameData } from "../src/dev_server.mjs";
 import { createMockProvider } from "../src/providers.mjs";
+import intakeInputs from "../../game/tests/fixtures/intake_inputs.json" with { type: "json" };
 
 const { cases, rules } = loadGameData();
 const intent = (text, visit = "test-visit") => ({ protocol: PROTOCOL, session_id: "test-session",
 	visit_id: visit, case_id: "kip", case_version: cases.kip.version, language: "en", text });
 const post = (handle, route, body) => handle({ method: "POST", path: "/v1/" + route, bodyText: JSON.stringify(body) });
 const read = (handle, body) => post(handle, "patient-intent", body);
+
+test("file comparison input classes use public paperwork and current conversational focus", async () => {
+	const mock = createMockProvider();
+	let prompt;
+	const provider = { ...mock, generate(input, signal) { prompt = input; return mock.generate(input, signal); } };
+	const handle = createHandler({ cases, rules, provider });
+	for (const [index, [line, focus, expected]] of intakeInputs.entries()) {
+		const req = { ...intent(line, "file-visit-" + index), case_id: "rook", intake_focus: focus };
+		const { status, body } = await read(handle, req);
+		assert.equal(status, 200);
+		assert.equal(body.about.startsWith("intake_") ? body.about : "", expected, line);
+		assert.equal(JSON.parse(prompt.user).previous_turn_about_intake, focus);
+		assert.ok(prompt.system.includes(cases.rook.intake.filed));
+		assert.ok(!prompt.system.includes(cases.rook.intake.gap));
+	}
+	assert.equal((await read(handle, { ...intent("Hello"), intake_focus: "true" })).status, 400);
+});
 
 test("intent carries only questions and the submitted line to a strict enum", async () => {
 	const mock = createMockProvider(), logs = [], inputs = [];

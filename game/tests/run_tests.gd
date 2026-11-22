@@ -136,6 +136,7 @@ func _initialize() -> void:
 	test_complaints()
 	test_checks()
 	test_talk()
+	test_intake()
 	test_press_and_attack()
 	test_shutter()
 	test_patience_walkout()
@@ -166,6 +167,45 @@ func _initialize() -> void:
 	test_bad_data()
 	print("RESULT: %d passed, %d failed" % [passed, failed])
 	quit(1 if failed > 0 else 0)
+
+
+func test_intake() -> void:
+	var inputs: Array = CaseDB.load_json("res://tests/fixtures/intake_inputs.json")
+	for item in inputs:
+		eq(ScriptedBrain.intake_topic(item[0], item[1], templates.rook.intake), item[2], "intake input %d" % inputs.find(item))
+	for id in templates:
+		var t: Dictionary = templates[id]
+		for speech in ["normal", "broken"]:
+			for temper in ["normal", "broken"]:
+				for truth in ["stable", "drifting"]:
+					if truth == "stable" and speech == "broken" and temper == "broken":
+						continue
+					var signs := {"speech":t.signs.speech[speech][0].id, "temper":t.signs.temper[temper][0].id}
+					if truth == "drifting":
+						for row in ["eyes", "hands"]:
+							signs[row] = t.signs[row].broken[0].id
+					var v := VisitState.new(CaseDB.compose(t, {"signs":signs, "truth":truth}), rules)
+					var label := "%s %s %s %s" % [id, truth, speech, temper]
+					eq(v.intake_line(true), t.intake.account, label + " starts with the same account even if challenged first")
+					v.record_intake(true)
+					eq([v.intake_stage, v.row_seen("speech"), v.open_signs(), v.notes.speech.size()], [1, false, {}, 0], label + " initial discrepancy proves nothing")
+					var explanation := v.intake_line(true)
+					eq(explanation, t.intake.clear if speech == "normal" else t.intake.gap, label + " explanation follows only the speech row")
+					v.record_intake(true)
+					v.record_intake(false)
+					v.record_intake(true)
+					eq([v.intake_stage, v.open_signs(), v.notes.speech.size(), v.patience, v.actions, v.crossed(), v.tests_in_order.size()],
+						[2, {"speech":signs.speech}, 1, 2, 0, 0, 0], label + " repeats cost nothing, mark nothing, and earn one row")
+					eq(v.press().note, t.signs.temper[temper][0].press.note, label + " the body's pressure response comes from its independent sign")
+					eq([v.intake_line(true), v.patience, v.tests_in_order], [explanation, 1, ["temper"]], label + " PRESS spends one lamp and preserves the testimony")
+					if temper == "normal":
+						v.apply_ask(str(t.topics[0].id))
+					v.verdict("treat")
+					ok(v.settlement().usage.get("ask", false), label + " the closing report counts the interview as asking")
+					var finding: Dictionary = v.settlement().rows[3]
+					eq([finding.seen, finding.ok, finding.text], [true, speech == "normal", explanation], label + " closing shows the spoken finding")
+					v.record_intake(false)
+					eq(v.intake_stage, 2, label + " closed examination ignores later talk")
 
 
 func test_data() -> void:
@@ -2033,6 +2073,25 @@ func test_visit_intent_cache() -> void:
 	client.reply = {"ok": true, "data": {"about": "mood"}}
 	result = await agent.classify(line)
 	eq([result.source, result.topic, client.calls], ["model", "mood", 4], "a failed classification can be retried")
+	agent.max_intents = 16
+	var current := visit("rook")
+	agent.begin_visit(current, "file-cache", 3)
+	result = await agent.classify(line)
+	eq(result.topic, "mood", "ordinary conversation has its own cached classification")
+	var heard: Dictionary = await agent.decide({"type":"intake", "id":"account", "text":"Compare the file."}, current.snapshot(), [current.intake_line(false)])
+	current.record_intake(false)
+	current.record.append("patient", Lang.t(heard.reply))
+	client.reply = {"ok":true, "data":{"about":"intake_explain", "intent":"case_question"}}
+	result = await agent.classify(line)
+	eq([result.source, result.topic, client.calls], ["model", "intake_explain", 6], "semantic file routing gets a separate lookup when the preceding answer changes its meaning")
+	result = await agent.classify(line)
+	eq(result.source, "cache", "repeated semantic questions within that context are reused")
+	current.record.append("patient", "Time to change the subject.")
+	result = await agent.classify(line)
+	eq([result.source, result.topic], ["cache", "mood"], "an intervening line restores the ordinary meaning")
+	agent.calls_this_visit = agent.max_calls
+	result = await agent.classify("登记单和你说的不一致")
+	eq([result.topic, client.calls], ["intake_explain", 6], "the explicit file route stays open at the model cap")
 	agent.end_visit()
 	ok(agent._intent_cache.is_empty(), "closing clears the visit's routing results")
 	Lang.pin(language)

@@ -1,5 +1,16 @@
 {
   "id": "lux",
+  "intake": {
+    "terms": ["bench a","bench b","工位a","工位b","a台","b台","a 台","b 台"],
+    "part": "port",
+    "filed": "Deck jack returned to bench B.",
+    "slip": "Bench tag: pulled at A, received at B.",
+    "account": "Bench A. I pulled the jack at A myself.",
+    "clear": "Pulled it at A, walked it across to B. The tag has a box for each end of the trip.",
+    "gap": "It never left A. I handed it in at B without moving it. Yeah, I heard what I just said.",
+    "firm": "I gave you the bench tag. Want me to spell out both letters?",
+    "flat": "Of course. Read it back as often as you like."
+  },
   "version": 3,
   "name": "Lux Ferreira",
   "role": "Net diver",

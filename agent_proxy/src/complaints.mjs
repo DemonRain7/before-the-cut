@@ -24,8 +24,11 @@ export function mentionedPart(text) {
 
 export function complaintLine(c, language, row) {
 	if (row === "all") return language === "zh" ? "我想说的就这些。" : "That's all I wanted to mention.";
-	const sentence = c.complaints[row];
-	return language === "zh" ? chinese[c.id].strings[sentence] : sentence;
+	return caseLine(c, language, c.complaints[row]);
+}
+
+export function caseLine(c, language, sentence) {
+	return language === "zh" ? (chinese[c.id]?.strings[sentence] ?? sentence) : sentence;
 }
 
 const bodyWords = {

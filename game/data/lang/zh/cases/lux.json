@@ -5,6 +5,13 @@
 		"Ferreira"
 	],
 	"strings": {
+		"Deck jack returned to bench B.": "设备接口交回 B 号工作台。",
+		"Bench tag: pulled at A, received at B.": "工位签：在 A 台拆下，由 B 台接收。",
+		"Bench A. I pulled the jack at A myself.": "A 台。接口是我亲自在 A 台拆的。",
+		"Pulled it at A, walked it across to B. The tag has a box for each end of the trip.": "我在 A 台拆，再拿到 B 台送修。工位签上拆件和收件各有一栏。",
+		"It never left A. I handed it in at B without moving it. Yeah, I heard what I just said.": "它没离开过 A 台。我没动它就交到了 B 台。行，我也听见自己说的了。",
+		"I gave you the bench tag. Want me to spell out both letters?": "工位签都给你了。要我把那俩字母一个一个念吗？",
+		"Of course. Read it back as often as you like.": "当然。你想念几遍都行。",
 		"Net diver": "潜网者",
 		"Swap burnt deck jack": "更换烧坏的潜网插口",
 		"A thin kid in a baggy hoodie, one eye a screen and one a lens. Her temple smells burnt.": "一个穿着宽大连帽衫的瘦姑娘，一只眼是屏幕，一只是镜头。她的太阳穴有股焦味。",

@@ -1,5 +1,16 @@
 {
   "id": "juno",
+  "intake": {
+    "terms": ["stage name","tip jar","june","艺名","小费罐"],
+    "part": "voice",
+    "filed": "Voice unit booked under the name June.",
+    "slip": "Busking permit: Juno Reyes, stage name June.",
+    "account": "June's me onstage. On a clinic form I go by Juno.",
+    "clear": "One singer, two names. I booked after a set and used the name on my tip jar.",
+    "gap": "June booked it. Different singer. No, that's my signature. I don't remember handing her the pen.",
+    "firm": "It's a stage name. Why are you making me audition for my own appointment?",
+    "flat": "Sure. Whatever name you want on it."
+  },
   "version": 3,
   "name": "Juno Reyes",
   "role": "Street singer",
