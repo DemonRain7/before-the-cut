@@ -25,6 +25,8 @@ Record one row per appointment. Join the anonymous session and visit IDs to its 
 | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: |
 | | | | | | | | | | |
 
+On the first arrival, note the first action taken without help and the time from the patient reaching the chair to the first question or examination. If the observer points out a control, record when. On L also note what the player chooses after Juno's neutral answer. After the night, ask what led them from the patient's words to their first test.
+
 After each condition rate each statement from 1 (strongly disagree) to 5 (strongly agree). Use the same wording for everyone.
 
 1. I felt I was examining a person with their own reason for visiting. / 我感觉自己在给一个有自己来意的人看诊。

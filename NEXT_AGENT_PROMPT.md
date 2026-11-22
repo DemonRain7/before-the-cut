@@ -2,6 +2,8 @@
 
 Rules 13 and patient protocol 5 are released on main. Each visitor has two lamps. Asking what hurts tags possible tests. Talk is free, and only a fresh test or PRESS can trigger a surprise. The warning before BREAK names SPACE. The first visitor teaches the loop and the second teaches the contact list. [Full release, measurements and acceptance sheet](docs/development/play-loop-redesign/PROGRESS.md)
 
+One steady desk light indicates a possible next action based on what the patient has said. All tests remain available under the two-lamp rules. On K, watch where an unfamiliar player looks after Kip mentions his eyes. On L, Juno has no specific complaint. [Current desk guidance](docs/development/play-loop-redesign/PROGRESS.md#guidance-at-the-counter)
+
 ## Run the game
 
 ```powershell

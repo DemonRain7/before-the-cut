@@ -39,6 +39,8 @@ func run() -> void:
 		check(await d.buzz_in(), "enter appointment")
 		var v := main.visit
 		await d.settle()
+		if night in ["K", "L"]:
+			check(main.desk.lead_pad == "complain", "a fresh visit suggests only the opening question")
 		var lamps := v.patience
 		if idx == 0:
 			d.pad("complain")
@@ -57,6 +59,34 @@ func run() -> void:
 				var line := Main.Lang.t(str(v.case_data.complaints[v.complaints_told[0]]))
 				check(str(main.agent.last.get("reply", "")).contains(line), "mock and scripted fallback audibly name the delivered part")
 		check(v.patience == lamps, "complaint is free")
+		if night in ["K", "L"] and not v.complaints_told.is_empty():
+			var pad: String = Main.CaseDB.ROW_TOOL.get(v.complaints_told[0], "press")
+			check(main.desk.lead_pad == pad, "only a reported body part guides the next check")
+		if night == "L" and idx == 3:
+			check(v.complaints_told.is_empty() and main.desk.lead_pad == "ask", "a neutral report suggests a free question")
+		if night in ["K", "L"] and idx == 2:
+			await d.complain()
+			check(v.complaints_told == ["eyes", "hands"] and main.desk.lead_pad == "penlight"
+				and main.desk.badges.grip.contains("?"), "the first part spoken gets the light and both keep their marks")
+			check(await d.request_tool("grip") == "open" and await d.squeeze_and_release(), "the doctor can freely examine the other part first")
+			await d.put_away()
+			await d.settle()
+			check(main.desk.lead_pad == "penlight", "only the outstanding part is suggested after closing the scope")
+			check(await d.request_tool("penlight") == "open" and await d.sweep_eyes(), "the remaining part can be examined")
+			await d.put_away()
+			await d.settle()
+			check(v.patience == 0 and main.desk.lead_pad == "", "no test or decision is recommended at zero lamps")
+		if night == "K" and idx == 4:
+			check(await d.request_tool("port") == "open" and await d.watch_port(), "the first reported part can be read")
+			await d.put_away()
+			await d.settle()
+			check(main.desk.lead_pad == "press" and v.patience == 1, "the light moves to the second reported part after the first reading")
+		if night == "L" and idx == 4:
+			await d.press()
+			await d.settle()
+			await d.put_away()
+			await d.settle()
+			check(v.press_breaks() and v.patience == 1 and main.desk.lead_pad == "", "a temper complaint never recommends BREAK")
 		if idx == 0:
 			main.act_say("Lovely music tonight.")
 			check(await d.until(func()->bool: return not main._thinking and not main._lock, 30.0), "chat returns")
@@ -73,6 +103,8 @@ func run() -> void:
 		await d.ask(0)
 		await d.settle()
 		check(v.answered.has(v.case_data.topics[0].id), "listed question receives an answer")
+		if night == "L" and idx == 3:
+			check(main.desk.lead_pad == "", "the free question dismisses the neutral complaint suggestion")
 		await d.stamp("treat")
 		check(await d.wait_for_slip() and await d.take_slip(), "settlement advances")
 	check(main.state == Main.State.REPORT and main.screens.report.visits.size() == 5, "closing lists the entire night")

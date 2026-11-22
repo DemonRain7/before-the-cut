@@ -8,6 +8,8 @@ The engine measured 100,000 later visits in 25,000 seeded five-patient nights. A
 
 OpenAI GPT-6 Luna returned 400/400 responses. L1 listed questions scored 118/120, L2 complaints 79/80, L3 social controls 80/80, L4 voiced complaints 77/80 with zero stated results detected, and L5 40/40 without a detected invented symptom. The standard-rate estimate was USD 0.0293384 and the conservative reservation was USD 1.0216562. All five targets held. Unclear complaint wording uses the authored sentence. The public mock and forced-timeout Workers are available, and the public live kill switch returned 503 after its single update. Each Worker speaks protocol 5. [Release evidence and versions](docs/development/play-loop-redesign/PROGRESS.md#deployed-services)
 
+The follow-up desk cue first points to the free complaint question. After a reply it points to one reported part the doctor can still examine. On an empty report it points to the free listed questions. The medical sheet and contact list are available on their hooks. On the first night the training box takes priority. [Desk cues and outside-player observation](docs/development/play-loop-redesign/PROGRESS.md#guidance-at-the-counter)
+
 ### Next three play tasks
 
 1. Try night K in Chinese with scripted and mock patients, including the first two visitors and the seven skippable tips.

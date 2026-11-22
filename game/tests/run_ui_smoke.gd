@@ -1398,7 +1398,7 @@ func shift_walls_and_glass() -> void:
 	check(opened, "a sixth shift starts")
 	check(main.shift_number == 6 and main.shift.glass == 3 and main.clinic.glass_state == 0, "with a new pane")
 	check(not d.sheet_down() and not d.card_down() and not d.cam_on(), "and with everything back on the walls")
-	check(main.desk.nudge.has("sheet") and not main._sheet_seen, "the reference sheet has not been down all session, and still asks to be looked at")
+	check(main.desk.lead_pad == "" and main._base_hint == main.WAIT_HINT, "between patients only the hall camera asks for input")
 	check(not main.desk.is_enabled("glass") and not main.desk.badges.has("glass"), "the GLASS key is dark while the pane is whole")
 	d.move(d.pad_pos("glass"))
 	await process_frame
@@ -1410,7 +1410,7 @@ func shift_walls_and_glass() -> void:
 	check(main.shift.repairs.is_empty() and main.shift.total() == 0 and logged("glass_repair").is_empty(), "and neither a click nor G buys anything")
 	d.key(KEY_R)
 	check(d.sheet_down() and bool(main.desk.taken.get("sheet", false)), "R takes the reference sheet down: its place on the wall is empty")
-	check(main._sheet_seen and not main.desk.nudge.has("sheet"), "and it stops asking")
+	check(main.desk.object_at(main.desk.object_rect("sheet").get_center()) == "", "the paper can only be picked up from its current position")
 	d.key(KEY_N)
 	check(d.card_down() and main.clipboard.mode == "blank", "N takes the intake card down: blank, with nobody at the counter")
 	d.key(KEY_C)
@@ -1695,7 +1695,7 @@ func shift_couriers() -> void:
 	check(int(listed.get("entries", 0)) == 2 and (listed.get("ids", []) as Array).has(kip_id) and not bool(listed.get("training", true)),
 		"the log has tonight's list by its entry ids, on a night with no training")
 	await process_frame
-	check(main.desk.nudge.has("list") and not main._list_seen, "the list asks to be looked at")
+	check(main.desk.object_at(main.desk.object_rect("list").get_center()) == "list" and main.desk.lead_pad == "", "the contact list is available while the hall camera is the next action")
 
 	section("Kip: the list, a wrong code, the right one, and a CALM that costs")
 	var v: VisitState = await enter("kip")
@@ -1704,8 +1704,8 @@ func shift_couriers() -> void:
 	await d.settle()
 	var before: int = logged("panel").size()
 	d.key(KEY_L)
-	check(d.list_down() and bool(main.desk.taken.get("list", false)) and main._list_seen and not main.desk.nudge.has("list"),
-		"L takes the list down: its place on the wall is empty, and it stops asking")
+	check(d.list_down() and bool(main.desk.taken.get("list", false)) and main.desk.lead_pad == "",
+		"L opens the list and puts the exam suggestion aside while reading")
 	var panels: Array = logged("panel")
 	var last: Dictionary = panels[panels.size() - 1]
 	check(panels.size() == before + 1 and str(last.get("panel", "")) == "list" and bool(last.get("open", false)), "the log has it: the list, down")
@@ -1912,8 +1912,10 @@ func shift_training() -> void:
 			return
 		if main.shift.index == 0:
 			check(main.coach.current() == "ask", "tip 2: the arrival leads to the free complaint")
-			await d.complain()
-			check(main.coach.current() == "test", "tip 3: the complaint points at a test")
+			d.pad("complain")
+			await d.settle(30.0)
+			check(main.coach.current() == "test" and main.desk.lead_pad == ""
+				and main.dialogue.hint != "What's bothering you?", "tip 3 points at the test without repeating the question under the pointer")
 			check(await d.request_tool("penlight") == "open" and await d.sweep_eyes(), "the named eye test works during training")
 			await d.settle()
 			check(main.coach.current() == "mark", "tip 4: compare and mark inside the close-up")
@@ -2279,10 +2281,11 @@ func voice_words() -> void:
 ## is drawn.
 func counter_words() -> void:
 	section("The counter's words fit where they are drawn")
-	var hints: Array = [main.FIRST_HINT, main.SHORT_HINT, main.LEAVING_HINT, main.LEAVING_LAST_HINT, main.NOTE_COACH_HINT,
+	var hints: Array = [main.SHORT_HINT, main.LEAVING_HINT, main.LEAVING_LAST_HINT, main.NOTE_COACH_HINT,
 		main.NOTE_OPEN_COACH_HINT, main.LAMP_COACH_HINT, main.GLASS_COACH_HINT, main.WAIT_HINT, main.CAM_HINT, main.CAM_PEEK_HINT,
 		main.CAM_OFF_HINT, main.THINK_HINT, Lang.tf(main.GLASS_HINT, 40), Lang.tf(main.GLASS_HINT, 999), main.GLASS_BUSY_HINT, main.GLASS_WHOLE_HINT,
 		main.GLASS_OFF_HINT, Lang.tf(main.CROSS_SOME_HINT, [1, 2]), Lang.tf(main.CROSS_SOME_HINT, [4, 5]), Lang.tf(main.CROSS_RULE_HINT, 2), Lang.tf(main.CROSS_RULE_HINT, 5)]
+	hints.append_array(main.LEAD_HINT.values())
 	hints.append_array(main.OBJECT_HINT.values())
 	hints.append_array(main.TAB_HINT.values())
 	# The current lamp, PRESS and BREAK hints fit the strip in each language.

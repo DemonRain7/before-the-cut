@@ -45,7 +45,7 @@ var warn: Dictionary = {}        # id -> true: draws the label in amber (a refus
 var pulse: String = ""           # id of a pad that should draw the eye (the shutter in danger)
 var armed: String = ""           # id of a pad waiting for its second press (the open call line)
 var taken: Dictionary = {}       # object id -> true while that paper is down from the wall
-var nudge: Dictionary = {}       # object id -> true: a wall object that wants to be looked at
+var lead_pad: String = ""        # one available question or test connected to the conversation
 
 var _t: float = 0.0
 
@@ -123,8 +123,6 @@ func _draw_object(obj: Dictionary) -> void:
 		draw_texture(art, r.position + Vector2(0.0, -1.0 if hot else 0.0))
 	if hot:
 		_corners(r.grow(1.0), Gfx.CYAN2)
-	elif nudge.has(id) and fmod(_t, 0.9) < 0.5:
-		_corners(r.grow(1.0), Gfx.WARM6)
 	var badge := str(badges.get(id, ""))
 	if badge != "":
 		var bw := Gfx.text_w(badge, true) + 5.0
@@ -134,7 +132,7 @@ func _draw_object(obj: Dictionary) -> void:
 		Gfx.text(self, at + Vector2(3, 1), badge, Gfx.WARM7, true)
 
 
-## Brackets round something that can be taken off the wall.
+## A steady bracket for a paper under the pointer or a suggested desk action.
 func _corners(r: Rect2, col: Color) -> void:
 	var a := 6.0
 	for corner in [[r.position.x, r.position.y, 1.0, 1.0], [r.end.x, r.position.y, -1.0, 1.0],
@@ -155,10 +153,16 @@ func _draw_pad(pad: Dictionary) -> void:
 	var w := r.size.x
 	var on := is_enabled(id)
 	var hot := on and hover == id
+	var lead := on and id == lead_pad
 	if id in ["ask", "complain"]:
-		draw_rect(r, Gfx.TEAL3 if hot else Gfx.INK1)
+		var face := Gfx.TEAL2 if lead else Gfx.INK1
+		var ink := Gfx.WARM7 if on else Gfx.TEAL4
+		draw_rect(r, Gfx.TEAL3 if hot else face)
 		draw_rect(r, Gfx.TEAL5 if hot else Gfx.TEAL3, false, 1)
-		Gfx.text_center(self, r.get_center().x, y + 6, str(pad.label), Gfx.WARM7 if on else Gfx.TEAL4)
+		if lead:
+			_corners(r, Gfx.CYAN2)
+			ink = Gfx.CYAN2
+		Gfx.text_center(self, r.get_center().x, y + 6, str(pad.label), ink)
 		return
 	var instrument := id in ["penlight", "grip", "port", "press"]
 	var low := not instrument      # a key on the wall plate: a little shorter than a desk mat
@@ -190,6 +194,8 @@ func _draw_pad(pad: Dictionary) -> void:
 			draw_texture_rect(icon, Rect2(x + 2, y + 8 + lift, 26, 28), false, tint)
 		else:
 			draw_texture(icon, Vector2(x + floorf((w - 36.0) / 2.0), y + 2 + lift), tint)
+	if lead:
+		_corners(r.grow(-1.0), Gfx.CYAN2)
 	var label := "BREAK" if id == "press" and warn.get("press", false) else str(pad["label"])
 	var col: Color = Gfx.TEAL6
 	if not on:
@@ -200,7 +206,7 @@ func _draw_pad(pad: Dictionary) -> void:
 		col = Gfx.AMBER
 	elif armed == id:
 		col = Gfx.RED3
-	elif out or gone:
+	elif lead or out or gone:
 		col = Gfx.CYAN2
 	Gfx.text_center(self, x + w / 2.0, y + (42.0 if low else 38.0), label, col)
 	var badge := str(badges.get(id, ""))
@@ -210,4 +216,4 @@ func _draw_pad(pad: Dictionary) -> void:
 		var bw := Gfx.text_w(badge) + 4.0
 		var bx := x + w - bw - 1.0
 		draw_rect(Rect2(bx, y + 2.0, bw, 10.0), Gfx.INK1)
-		Gfx.text(self, Vector2(bx + 2.0, y + 2.0), badge, Gfx.AMBER if warn.has(id) else (Gfx.TEAL6 if on else Gfx.TEAL4))
+		Gfx.text(self, Vector2(bx + 2.0, y + 2.0), badge, Gfx.AMBER if warn.get(id, false) else (Gfx.TEAL6 if on else Gfx.TEAL4))

@@ -132,3 +132,13 @@ The student can check these nine observations:
 9. With the mock patient, a typed "哪里不舒服" and a typed question about one part both bring the complaint.
 
 Record the visitor, the action and what happened. Capture evidence for both K and L is in the M5final frames-en and frames-zh directories; the numbered sequence reaches both closing reports.
+
+## Guidance at the counter
+
+November 21, 2026. In night K, Kip said his eye stung while the hint immediately underneath directed the doctor to open the intake card. Two unread papers could flash at the same time. The counter now gives one steady cue. It starts on the free opening question. When the patient names a part, the matching instrument and a short line such as “They mentioned their eyes. Try LIGHT.” take over. With two complaints, the first one spoken gets the cue and both keep their chart marks. A player can examine either one first. A neutral general answer offers a free listed question. While the doctor reads a paper, uses an instrument, decides or follows the training box, that action has the screen. The sheet and contact list can still be opened directly.
+
+In *Strange Horticulture*, a customer's request narrows the search and examining the plant resolves it. We used the same division between choosing where to look and interpreting what the player sees. The designers of *The Case of the Golden Idol* describe giving players enough context to express a deduction without needing to guess an input phrase. Here the opening question is available with one click, and players can also ask it in their own words. [Bad Viking's design account](https://news.xbox.com/en-us/2023/08/04/strange-horticulture-a-detective-game-about-plants/) · [Interview with designer Andrejs Klavins](https://www.gamedeveloper.com/design/case-of-the-golden-idol)
+
+All 23 local check groups passed. K passed 59 checks and L passed 53 in scripted, mock and forced-timeout runs. Both languages passed 1,602 text-width measurements and produced 281 frames each. Two additional Chinese captures show the actual training box pointing to the opening question and then the penlight. The accelerated test driver now allows the real-time proxy timeout to finish before it attempts the instrument. Evidence is in `validation/2026-11-21/play-loop/counter-focus-release/`.
+
+The observation sheet now records a first-time player's first unaided action, the time to their first question or examination, and which part of the patient's answer guided their choice. Human observations are pending. [Outside-player sheet](../../../tools/eval/README.md#e6-outside-player-session)

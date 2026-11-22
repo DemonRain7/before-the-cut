@@ -373,7 +373,7 @@ def visit_money(rules, fees, pay, calm_most):
     return sorted(out)
 
 
-HINT_TABLES = ("MIC_HINTS", "OBJECT_HINT", "TAB_HINT", "SCOPE_HINT")
+HINT_TABLES = ("MIC_HINTS", "OBJECT_HINT", "TAB_HINT", "SCOPE_HINT", "LEAD_HINT")
 
 
 def hints():

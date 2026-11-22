@@ -312,7 +312,9 @@ func look(zone: String) -> void:
 func request_tool(tool: String) -> String:
 	pad(tool)
 	await tree.process_frame
-	await until(func() -> bool: return not main._thinking and main.dialogue.speaker != "YOU", 12.0)
+	# The proxy timeout runs in real time even when the test speeds up the game clock.
+	if not await until(func() -> bool: return not main._thinking and main.dialogue.speaker != "YOU"):
+		return "stuck"
 	if main.visit == null:
 		return "gone"
 	if main.visit.granted.has(tool):
