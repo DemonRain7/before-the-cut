@@ -885,7 +885,7 @@ func _status_line() -> String:
 ## waits for the hint row to be free, and the next action takes it away again. One that never
 ## got its moment is dropped, and is offered again the next time the same thing happens.
 func _coach(id: String, text: String) -> void:
-	if _coached.has(id):
+	if _coached.has(id) or (_training_visit and coach != null and coach.is_running() and id != "break"):
 		return
 	_coach_id = id
 	_coach_next = text
@@ -2160,11 +2160,15 @@ func act_say(text: String) -> void:
 	_lock = false
 	_log("intent", {"source": reading.source, "topic": reading.topic, "chars": text.length(), "code": reading.reason})
 	var part := ScriptedBrain.part_for_text(text)
-	if reading.get("intent") == "tool_request":
+	var intent := str(reading.get("intent", "other"))
+	var part_question := ScriptedBrain.is_part_name(text, part)
+	if part != "" and intent in ["unclear", "other"]:
+		part_question = part_question or ScriptedBrain.intent_for_text(visit.case_data, text).intent == "complaint"
+	if intent == "tool_request":
 		var tool: String = CaseDB.ROW_TOOL.get(part, "press" if part == "temper" else "")
 		if tool != "":
 			desk.pulse = tool
-	elif reading.get("intent") == "complaint":
+	elif intent == "complaint" or part_question:
 		act_complain(part, text)
 		return
 	if str(reading.topic) != "":

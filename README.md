@@ -2,8 +2,7 @@
 
 ## Current counter rules
 
-The student selected wear and the warned second PRESS on November 21. Half of steady visitors can show one worn row. The protected opening visitor has none. Two broken rows establish drift. The second PRESS needs two lamps, takes all lamps and pays 150 at closing for a successful shutter catch. Reopened tools and correct codes are free and safe. CALM and actions that take a lamp can trigger surprises. Closing reveals the diagnosis. These rules have been measured by simulation and await outside players.
-
+Ask what hurts, test the named part, then decide. Every visitor has two lamps. Talking and asking questions are free. Each new test uses one lamp. Two broken rows mean drift. One could be wear. BREAK is free after PRESS or with no lamp left. Press SPACE on a lunge to earn the fee plus 50. The diagnosis is revealed at closing. Start the teaching night with `.\run-game.ps1 -Patient script -Language zh -TestNight K`. [Rules 13, protocol 5 and measured results](docs/development/play-loop-redesign/PROGRESS.md)
 
 A Godot 4 game about examining patients before cybernetic surgery. You compare a patient's appearance and responses with a reference sheet of the normal states of the implants that patient wears, choose examinations or dialogue in any order, and decide whether to approve surgery or call in Trauma Team. Every examination is optional. Defend yourself if threatened. Fired by a megacorp and deep in debt, the doctor works the counter of a street gang's back-street clinic, where two of each night's visitors are contacts to be picked out from tonight's list and given the right code. The game is in English or Chinese (中文); the switch is on the title card.
 

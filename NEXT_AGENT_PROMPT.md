@@ -1,29 +1,25 @@
 # Continue Before the Cut
 
-Follow the [play loop milestones](docs/development/play-loop-redesign/PROGRESS.md) for the November 21 redesign.
-
-Start with the [appointment memory checkpoint](HANDOFF.md#one-session-per-appointment), then read the [full build](HANDOFF.md#full-build-november-21) and [milestone record](docs/development/full-build-progress.md). M0–M7 are complete. The deployed Worker returned 24/24 genuine GPT-6 Luna replies and was switched off again. The approved M0 ledger is closed. [Cloud checkpoint evidence](docs/development/live-model-results-2026-11-21.md#deployed-worker-checkpoint) The version is rules 12, protocol 4. The student selected wear, the warned second PRESS, all repairs, pushing milestones and redeploying the three existing services.
+Rules 13 and patient protocol 5 are released on main. Each visitor has two lamps. Asking what hurts tags possible tests. Talk is free, and only a fresh test or PRESS can trigger a surprise. The warning before BREAK names SPACE. The first visitor teaches the loop and the second teaches the contact list. [Full release, measurements and acceptance sheet](docs/development/play-loop-redesign/PROGRESS.md)
 
 ## Run the game
 
 ```powershell
-.\run-game.ps1 -Patient script -Language zh -Seed 41307 -TestNight I
-.\run-game.ps1 -Patient mock -Language en -Seed 41307 -TestNight I
-.\run-game.ps1 -Patient live -Language zh -Seed 41307 -TestNight J
+.\run-game.ps1 -Patient script -Language zh -Seed 41307 -TestNight K
+.\run-game.ps1 -Patient mock -Language zh -Seed 41307 -TestNight K
+.\run-game.ps1 -Patient script -Language zh -Seed 41307 -TestNight L
 ```
-
-The first command uses authored patients, the second uses labelled fixtures, and the third starts the game's local HTTP service and calls OpenAI GPT-6 Luna after the operator enters `LIVE`. SETTINGS starts with patient AI off. Its default endpoint is the permanent public mock. Night I shows physical wear and night J shows speech and temper wear. F10 pauses a night and opens the return-to-menu confirmation.
 
 ## Working contract
 
-Use the patient's own identity, work, motive and voice on every generated turn. Handle free-form speech through the ten-class semantic router. Each appointment owns one session for the doctor, patient, visible reactions and observable actions. Keep the persona prefix stable and put the current event last. See the appointment memory entry in HANDOFF. Speech and temper cues enter only after their game-owned evidence gate opens. Godot owns physical state, patience, verdicts and payout. An inferred paid question shows its price before it spends a lamp. ASK uses case-authored answers. Optional arrival, after-check and idle turns share the 16 dialogue replies and have their own three-attempt limit. Late turns are dropped.
+Every appointment opens a new session. Keep identity and personality stable, maintain its ordered dialogue and actions, and send only already earned facts. The game owns which complaints, tests and notes exist. Every listed question is answered free. The character can use their own words for a complaint and the patient's authored sentence backs up failed wording or transport. Only an actual test or PRESS spends an examination lamp, and a wrong contact code costs one. All optional dialogue fits within the 16-reply limit.
 
-Keep the mock, forced-timeout and disabled-live Workers on their existing names in `demonrain777.workers.dev`. The separate local paid E1–E4 ledger contains 1,094 GPT-6 Luna attempts, with a conservative reservation of USD 0.595195. The evaluation left authored ASK in place. The post-evaluation schema and price confirmation have Godot and mock coverage. The public M6 probes passed and the live Worker replies with 503. See [service operations](agent_proxy/README.md) and [evaluation and the E6 sheet](tools/eval/README.md).
+All 11 engine relations and five paid language targets held. The 400 responses came from OpenAI GPT-6 Luna through the same HTTP service as the game, with a USD 0.0293384 standard-rate estimate. The public mock and forced-timeout Workers were checked after their single update and the public live kill switch is on. [Evidence and versions](docs/development/play-loop-redesign/PROGRESS.md)
 
 ## Next three tasks
 
 1. The existing Braintrust action belongs to the student. Preserve the original item under “Next three tasks” in HANDOFF. No course post was sent.
 2. Confirm the instructor’s required Worker foundation and November 23 rubric from the course. The paid checkpoint evidence and closed ledger are available in the build handoff.
-3. The student reads the 20 synthetic E2 replies per language. Recruit at least three outsiders for the scripted/live E6 comparison on both seeded nights with its own human-session budget. Nobody has played the new build. Review their measured decisions, shutter catches and follow-ups before changing the rules or the ASK default.
+3. Use the ten-minute acceptance sheet for night K, then observe outsiders on K and L. Record whether their next test followed a complaint, their one-cross decisions and shutter catches. Any paid human-session comparison has its own budget.
 
-The paid checkpoint ledger and final live deployment evidence are in `validation/2026-11-21/patient-agent/approved-live/` and `cloud-acceptance-ops/`. The session-isolation probes are in `visit-session-cloud/`, local regression and bilingual frames in `visit-record-release/`, and computed play and the November 21 evaluation in `validation/2026-11-21/full-build/`. Keep raw samples and validation local. Credentials are managed by the service. Keep the historical November 15 ledger closed.
+Current evidence is in `validation/2026-11-21/play-loop/`. The cloud probes are in `workers/`, and the closed L1–L5 ledger in `slim-live/`. Keep historical paid ledgers and local evidence in place.

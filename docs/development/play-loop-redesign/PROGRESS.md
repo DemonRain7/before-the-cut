@@ -2,7 +2,7 @@
 
 Codex keeps this file during the run described in [KICKOFF.md](KICKOFF.md). The design is [01-design.md](01-design.md).
 
-Status on November 21, 2026: M5 verified. M0 tagged 31c8dbd as loop-v12.
+Status on November 21, 2026: M0–M6 complete and verified. M0 tagged 31c8dbd as loop-v12.
 
 ## Milestones
 
@@ -12,9 +12,9 @@ Status on November 21, 2026: M5 verified. M0 tagged 31c8dbd as loop-v12.
 - [x] M3 Teaching and words (tips, HOW TO PLAY, guide, KEYS, closing report, both languages)
 - [x] M4 The generated patient, protocol 5 (`complaint` class, voiced complaints, prompt rules, mock fixtures)
 - [x] M5 Evidence (final tables, captures, live evaluation and redeploy if approved, acceptance sheet)
-- [ ] M6 Handoff (`HANDOFF.md`, `NEXT_AGENT_PROMPT.md`, `AGENTS.md`, last report)
+- [x] M6 Handoff (`HANDOFF.md`, `NEXT_AGENT_PROMPT.md`, `AGENTS.md`, last report)
 
-For each ticked milestone: the commit, the date, and one line on what it holds.
+All seven releases are on main. November 21 (New York): M0 `a351a21`, M1 `37c90b8`, M2 `526c469`, M3 `31aec41`, M4 `f8bccdf`, M5 `5cdaece`. M6 is the commit titled *Hand off the verified two-lamp counter*.
 
 ## What the student's message approved
 
@@ -60,6 +60,8 @@ M5, November 21. Commit *Verify the slim patient evaluation and publish protocol
 
 Correction to the earlier milestone counts. The independent paid-session guard passed. One assertion in the accompanying **historical E4 corpus** suite expected 58 rude controls but enumerated 60 after Vale's port became available. This was missed in M1–M4. The old 174-case corpus is now explicit, independent of current gameplay. All ten guard/evaluation checks, including the new 400-call/5-dollar budget regression, passed at M5. The historical E-series and November 15 paid ledgers stayed closed.
 
+M6, November 21. Updated the current rules, agent contract, play instructions, release handoff and next three tasks. During acceptance a bare body-part name such as “Eyes.” or “眼睛。” was found to need a local row match even when the router chose ordinary conversation. The client now uses the sheet vocabulary in both languages, including short Chinese part names. The seven first-visitor training tips now suppress incidental duplicate coaching. The final fixed K run passed 42 checks in each of script, mock and forced-timeout modes. The standalone Godot import crashed once on an earlier disposable copy. Two subsequent clean imports passed. All 23 final check groups passed, along with the ten guard checks and the independent six-appointment mock checkpoint. See `M6verified/`, `M6verified-guard.log` and `M6verified-modes.log`. The client refinements affect no Worker or paid request.
+
 ## The relations
 
 Source of every figure: the engine, with the date and the number of visits. The scratch values are from `validation/2026-11-21/play-loop-scratch/`, which is not the engine.
@@ -72,7 +74,7 @@ Source of every figure: the engine, with the date and the number of visits. The 
 | R4 | The routine is 86 % to 93 % right | 89.0 | 88.817% | held |
 | R5 | One-cross endings 25 % to 35 % of visits, 25 % to 45 % of them drifting | 30.8, 34.3 | 31.024 / 34.512% | held |
 | R6 | Two crosses: TRAUMA TEAM at least BREAK with a 90 % shutter, every fee | 220/213, 400/375, 600/555 | 220/213, 400/375, 600/555 credits | held |
-| R7 | One cross: BREAK at least TRAUMA TEAM; above TREAT at the lowest fee, below at the highest | see design | 220: 6.03 / -22.31 / 73.51; 600: 254.88 / 108.84 / 191.54 credits | held |
+| R7 | One cross: BREAK at least TRAUMA TEAM; above TREAT at the lowest fee, below at the highest | 220: 7.3 / −23.0 / 73.1; 600: 256.9 / 107.3 / 190.4 | 220: 6.03 / -22.31 / 73.51; 600: 254.88 / 108.84 / 191.54 credits | held |
 | R8 | Each test is worth at least 1 point and is first in at least 10 % of visits | not modelled | eyes: −1.57 pp, 25.22% first, hands: −1.55 pp, 25.08% first, port: −1.41 pp, 24.75% first, temper: −1.57 pp, 24.96% first | held |
 | R9 | TREAT, TRAUMA TEAM or BREAK for everyone earns at most 60 % of the routine | 0, 125, 187 / 312 | −13.58 / 111.37 / 175.24 vs 304.11 credits | held |
 | R10 | A drifting visitor turns before the call in 10 % to 20 % of visits; never after talk or a code | about 17 % | 12.468% of drift; 7.433% flare across all; zero rolls on speech or codes | held |

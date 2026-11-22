@@ -64,10 +64,12 @@ func run() -> void:
 			check(v.patience == lamps, "chat is free")
 		if idx == 0:
 			var before := v.patience
-			for phrase in ["Hello.", "What hurts?", "How have you slept?", "Check your port.", "Idiot.", "哪里不舒服？", "能看看你的手吗？", "昨晚睡得如何？"]:
+			for phrase in ["Eyes.", "眼睛。", "Hello.", "What hurts?", "How have you slept?", "Check your port.", "Idiot.", "哪里不舒服？", "能看看你的手吗？", "昨晚睡得如何？"]:
 				main.act_say(phrase)
 				await d.settle(30.0)
 				check(v.patience == before and v.press_count == 0 and v.in_exam(), "free text never controls the examination")
+				if phrase in ["Eyes.", "眼睛。"]:
+					check(main.agent.last.get("event", {}).get("type") == "complain" and main.agent.last.event.id == "eyes", "the game maps a body part spoken alone to its own row")
 		await d.ask(0)
 		await d.settle()
 		check(v.answered.has(v.case_data.topics[0].id), "listed question receives an answer")

@@ -117,6 +117,11 @@ static func part_for_text(text: String) -> String:
 	return ""
 
 
+static func is_part_name(text: String, part: String) -> bool:
+	var word := text.strip_edges().to_lower().trim_suffix("?").trim_suffix("？").trim_suffix(".").trim_suffix("。").strip_edges()
+	return part != "" and (word in part_words.get(part, []) or (Lang.has_cjk(word) and word.length() <= 3))
+
+
 static func is_complaint(text: String) -> bool:
 	if part_words.is_empty():
 		part_for_text("")
@@ -140,7 +145,8 @@ static func intent_for_text(case_data: Dictionary, text: String) -> Dictionary:
 				return {"topic":"", "intent":kind}
 	var topic := topic_for_text(case_data, text)
 	var question := line.ends_with("?") or line.ends_with("？") or line.get_slice(" ", 0) in ["how", "what", "does", "do", "any", "is", "are"]
-	if is_complaint(line) or (topic == "" and question and part_for_text(line) != ""):
+	var part := part_for_text(line)
+	if is_part_name(line, part) or is_complaint(line) or (topic == "" and question and part != ""):
 		return {"topic":"", "intent":"complaint"}
 	return {"topic":topic, "intent":"case_question" if topic != "" else ("unclear" if line.length() < 4 else "other")}
 

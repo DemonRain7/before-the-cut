@@ -2,7 +2,19 @@
 
 ## Play loop redesign · November 21, 2026
 
-In progress. The student wrote, “就我觉得这块的逻辑应该是需要好好考量的，现在这样肯定不行，选择太多没有引导性、然后还会有patience次数限制，又加上我们还有agent、会让整个input复杂度指数提升，目前设计的包括玩起来都会很不合理。” The new loop gives every visitor two lamps, free conversation and complaints that guide tests. [Design and milestone results](docs/development/play-loop-redesign/PROGRESS.md)
+The student wrote, “就我觉得这块的逻辑应该是需要好好考量的，现在这样肯定不行，选择太多没有引导性、然后还会有patience次数限制，又加上我们还有agent、会让整个input复杂度指数提升，目前设计的包括玩起来都会很不合理。” M0–M6 are complete on main. Rules 13 introduce two lamps, free talk and complaint-led examinations for all ten patients. Protocol 5 voices only facts disclosed in that appointment. The `loop-v12` tag preserves the previous rules.
+
+The engine measured 100,000 later visits in 25,000 seeded five-patient nights. All R1–R11 held with the defaults. Following complaints produced 90.183% correct calls with the best simple rule, compared with 83.044% using the same resources without hearing them. One cross remained on 31.024% of visits and 34.512% of those visitors were drifting. The evidence describes a computed strategy. No outsider has played these rules. [Full methods, baseline and results](docs/development/play-loop-redesign/PROGRESS.md)
+
+OpenAI GPT-6 Luna returned 400/400 responses. L1 listed questions scored 118/120, L2 complaints 79/80, L3 social controls 80/80, L4 voiced complaints 77/80 with zero stated results detected, and L5 40/40 without a detected invented symptom. The standard-rate estimate was USD 0.0293384 and the conservative reservation was USD 1.0216562. All five targets held. Unclear complaint wording uses the authored sentence. The public mock and forced-timeout Workers are available, and the public live kill switch returned 503 after its single update. Each Worker speaks protocol 5. [Release evidence and versions](docs/development/play-loop-redesign/PROGRESS.md#deployed-services)
+
+### Next three play tasks
+
+1. Try night K in Chinese with scripted and mock patients, including the first two visitors and the seven skippable tips.
+2. Observe outside players playing K and L. Record complaint IDs, the order of tests and whether their next test followed a complaint. Keep entry mode, seed and language paired. [Observer sheet](tools/eval/README.md#e6-outside-player-session)
+3. Use their one-cross decisions, shutter catches and actual use of free input to review difficulty and patient voice. A future paid human comparison needs its own budget. The 400-request authorization is closed.
+
+The following entries record earlier releases and their original acceptance evidence.
 
 ## Deployed OpenAI checkpoint
 
