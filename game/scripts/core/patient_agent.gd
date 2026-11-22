@@ -113,7 +113,8 @@ func decide(event: Dictionary, state: Dictionary, fallback_options: Array = [], 
 	var reason := fallback if mode == "model" else ""
 	var authored_ask: bool = event.get("type") == "ask" and rules.get("agent", {}).get("ask_answers", "authored") == "authored"
 	var authored_complaint: bool = event.get("type") == "complain" and not voice_complaints
-	var generate: bool = mode == "model" and client != null and not authored_ask and not authored_complaint and event.get("type") != "intake"
+	var authored_push: bool = event.get("type") == "press" and event.get("stage") in ["push", "warning"]
+	var generate: bool = mode == "model" and client != null and not authored_ask and not authored_complaint and not authored_push and event.get("type") != "intake"
 	if generate and reason == "" and calls_this_visit >= max_calls:
 		reason = "call_cap"
 	# The current line travels as the event. It enters memory before a concurrent look or reply.
@@ -165,10 +166,12 @@ func _with_script(base: Dictionary, event: Dictionary, state: Dictionary, option
 		pick["line"] = str(case_data.get("complaints", {}).get("none", pick.line))
 	elif kind == "press":
 		var reactions: Array = case_data.get("press", [])
-		if event.get("id") == "intake" and not options.is_empty():
+		if event.get("stage") in ["push", "warning"]:
+			pick.line = str(case_data.press_words[event.stage])
+		elif not options.is_empty():
 			pick.line = str(options[0])
 		elif not reactions.is_empty():
-			pick["line"] = str(reactions[mini(int(state.get("press_count", 0)), reactions.size() - 1)].get("line", ""))
+			pick.line = str(reactions.front().get("line", ""))
 	base["move"] = pick.move
 	base["line"] = pick.line
 	base["reply"] = pick.line

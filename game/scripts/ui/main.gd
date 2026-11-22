@@ -170,7 +170,7 @@ const LEAD_HINT := {
 	"press": "They mentioned their temper. Try PRESS.",
 }
 # a patient with no patience left gives one last wait and then leaves by themselves
-const SHORT_HINT := "No lamps left. Talk, BREAK, or make the call."
+const SHORT_HINT := "No lamps left. You can still talk, press or decide."
 const LEAVING_HINT := "They are leaving. Talk to them or make the call."
 const LEAVING_LAST_HINT := "They are leaving. Decide now, or let them go."
 # coaching: each of these is offered once in a session, when the thing it explains first happens
@@ -184,6 +184,8 @@ const SAY_CODE_HINT := "SAY the code. A matching contact hands over a package. A
 const CODE_BLANK_HINT := "Wrong code: a blank look, -%d lamp. Keep examining them."
 # BREAK is available after PRESS or with no lamps.
 const PRESS_HINT := "PRESS tests temper for %d lamp. Compare the reaction with the TEMPER line."
+const PUSH_HINT := "Keep pushing. The patient may end the visit."
+const PRESS_WARNING_HINT := "You can make your call now. Pushing again ends the visit."
 const PRESS_LAST_HINT := "BREAK is free. Steady: walks unpaid. Drift: lunges. SPACE to catch them (+%d)."
 const TRAINING_SKIP_HINT := "SKIP ALL [K]: end the training. H opens the counter guide any time."
 const TRAINING_NEXT_HINT := "NEXT: on to the next tip."
@@ -1096,13 +1098,16 @@ func _sync_visit() -> void:
 		var tag := "? " if visit.complaints_told.has(row) else ""
 		desk.badges[tool] = tag + ("-%d" % visit.check_cost(tool) if not visit.granted.has(tool) else "")
 	desk.warn["press"] = visit.press_breaks()
-	desk.badges["press"] = ("?" if "temper" in visit.complaints_told else "") + Lang.t("BREAK") if visit.press_breaks() else ("? " if "temper" in visit.complaints_told else "") + "-%d" % visit.press_cost()
+	if visit.press_breaks():
+		desk.badges["press"] = Lang.t("BREAK")
+	elif visit.press_stage() == "test":
+		desk.badges["press"] = ("? " if "temper" in visit.complaints_told else "") + "-%d" % visit.press_cost()
 	_offer_break_tip()
 	clinic.till = _till_now()
 
 
 func _offer_break_tip() -> void:
-	if visit != null and visit.in_exam() and visit.patience == 0 and visit.crossed() == 1:
+	if visit != null and visit.in_exam() and visit.press_breaks() and visit.crossed() == 1:
 		_coach("break", Lang.tf("One cross: wear or drift? BREAK sends a steady patient away unpaid. If they lunge, SPACE. Catch: fee +%d.", [int(rules.scoring.press_catch_bonus)]))
 
 
@@ -1368,6 +1373,8 @@ func _pad_hint(pad: String) -> String:
 		"press":
 			if visit.press_breaks():
 				return Lang.tf(PRESS_LAST_HINT, [int(rules.scoring.get("press_catch_bonus", 0))])
+			if visit.press_stage() != "test":
+				return Lang.t(PUSH_HINT)
 			return Lang.tf(PRESS_HINT, [visit.press_cost()])
 		"treat":
 			return "TREAT: they are steady. Pick it up and stamp the card."
@@ -2122,26 +2129,31 @@ func act_intake(topic: String, said: String = "") -> void:
 
 ## Pressure dialogue is autonomous; existing physical attack choreography remains in VisitState.
 func act_press(confirmed: bool = false) -> void:
-	if not _can_act():
+	if not _can_act() or (confirmed and (not _break_confirmation or not dialogue.has_menu())):
 		return
+	var stage := visit.press_stage()
 	var token := _begin_action()
-	if visit.press_breaks() and not confirmed:
+	if stage == "break" and not confirmed:
 		_break_confirmation = true
 		dialogue.set_menu("BREAK", [{"id":"break", "label":"Push again. SPACE drops the shutter.", "tag":""}, {"id":"cancel", "label":"Step back", "tag":""}])
 		_base_hint = _pad_hint("press")
 		return
-	var question := Lang.t(str(PRESS_LINES[1 if visit.press_breaks() else 0]))
+	var question := Lang.t(str(PRESS_LINES[1 if stage == "break" else 0]))
 	var d := {}
-	if visit.press_breaks():
+	if stage == "break":
 		visit.record.append("doctor", question)
 		_doctor_say(question, true)
 	else:
 		var on_file := agent.intake_in_focus()
+		var event := {"type":"press", "id":"intake" if on_file else "challenge"}
 		var options := []
-		if on_file:
+		if stage != "test":
+			event["stage"] = stage
+			question = Lang.t("Read that slip again. Still the same answer?" if on_file else "I'm asking again. Do you stand by that?")
+		elif on_file:
 			question = Lang.t("Look at the slip again. Do you stand by what you told me?")
 			options.append(visit.case_data.intake["firm" if visit.case_data.rows.temper.ok else "flat"])
-		d = await _decide({"type":"press", "id":"intake" if on_file else "challenge"}, options, question, token, true)
+		d = await _decide(event, options, question, token, true)
 		if d.is_empty():
 			return
 	var before := _note_keys()
@@ -2165,8 +2177,11 @@ func act_press(confirmed: bool = false) -> void:
 			clinic.scope.selected_mark = int(visit.marks.temper)
 			clinic.scope.open("press", visit.case_data, true, str(res.note))
 			_papers_aside()
-			_roll_surprise()
 			_patient_line(str(res.get("line", "")), token, 0.0)
+		"push", "warning":
+			if result == "warning":
+				_base_hint = PRESS_WARNING_HINT
+			_patient_line(str(res.line), token, 0.0)
 		"walkout":
 			_walkout(str(res.get("line", "")), token)
 		"attack":
@@ -4049,6 +4064,7 @@ func _cancel_exam() -> bool:
 		_close_scope(true)
 	elif dialogue.has_menu():
 		dialogue.clear_menu()
+		_break_confirmation = false
 		_base_hint = ""
 	elif _held != "":
 		_drop_stamp(true)

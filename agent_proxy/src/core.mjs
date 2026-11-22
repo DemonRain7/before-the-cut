@@ -177,11 +177,12 @@ function validLine(value) {
 }
 
 // Only public, committed actions are eligible for either the timeline or its count summary.
-function visitAction(tag, tools, topics) {
+function visitAction(tag, tools, topics, pressLimit) {
 	if (typeof tag !== "string" || !HISTORY_RE.test(tag)) return false;
-	if (["reassure", "flare", "snap", "shutter", "gave_up", "verdict:treat", "verdict:refer", "press:1", "press:2"].includes(tag)) return true;
+	if (["reassure", "flare", "snap", "shutter", "gave_up", "verdict:treat", "verdict:refer"].includes(tag)) return true;
 	const parts = tag.split(":");
 	const [kind, id, outcome] = parts;
+	if (kind === "press") return parts.length === 2 && /^[1-9]\d*$/.test(id) && isInt(Number(id), 1, pressLimit);
 	if (parts.length === 2) {
 		if (kind === "look") return ["eyes", "hands", "port"].includes(id);
 		return ["open", "done"].includes(kind) && knows(tools, id);
@@ -191,7 +192,7 @@ function visitAction(tag, tools, topics) {
 	return kind === "ask" && knows(topics, id) && ["answer", "deflect"].includes(outcome);
 }
 
-export function validateRequest(body, cases) {
+export function validateRequest(body, cases, pressLimit = 3) {
 	const identity = patientIdentity(body, cases);
 	if (!identity.ok) return identity;
 	const c = cases[body.case_id];
@@ -234,7 +235,7 @@ export function validateRequest(body, cases) {
 	const conversation = [];
 	for (const turn of history) {
 		if (!isObject(turn) || !validLine(turn.text)) return bad(400, "bad_request", "conversation_history");
-		if (turn.role === "action" ? !visitAction(turn.text, tools, topics) : !["doctor", "patient", "reaction"].includes(turn.role))
+		if (turn.role === "action" ? !visitAction(turn.text, tools, topics, pressLimit) : !["doctor", "patient", "reaction"].includes(turn.role))
 			return bad(400, "bad_request", "conversation_history");
 		conversation.push({ role: turn.role, text: turn.text });
 	}
@@ -246,7 +247,7 @@ export function validateRequest(body, cases) {
 			return bad(400, "bad_request", "visit_summary");
 		const actions = {};
 		for (const [tag, count] of Object.entries(s.actions)) {
-			if (!visitAction(tag, tools, topics) || !isInt(count, 1, Number.MAX_SAFE_INTEGER)) return bad(400, "bad_request", "visit_summary.actions");
+			if (!visitAction(tag, tools, topics, pressLimit) || !isInt(count, 1, Number.MAX_SAFE_INTEGER)) return bad(400, "bad_request", "visit_summary.actions");
 			actions[tag] = count;
 		}
 		summary = { after: s.after, omitted: s.omitted, actions };
@@ -270,7 +271,7 @@ export function validateRequest(body, cases) {
 	if (claims === null) return bad(400, "bad_request", "state.claims");
 	const asked = cleanCounts(st.asked, topics, Number.MAX_SAFE_INTEGER);
 	if (asked === null) return bad(400, "bad_request", "state.asked");
-	if (!isInt(st.press_count, 0, 8)) return bad(400, "bad_request", "state.press_count");
+	if (!isInt(st.press_count, 0, Math.max(8, pressLimit))) return bad(400, "bad_request", "state.press_count");
 	const legacyHistory = has(st, "history") ? st.history : [];
 	if (!Array.isArray(legacyHistory) || legacyHistory.length > 32) return bad(400, "bad_request", "state.history");
 	for (const tag of legacyHistory) {
@@ -562,7 +563,7 @@ export function createHandler({ cases, rules, provider, limits = {}, counters = 
 		} catch {
 			return finish(400, errorBody("bad_json", "body is not valid JSON"));
 		}
-		const checked = intent ? validateIntent(parsed, cases) : validateRequest(parsed, cases);
+		const checked = intent ? validateIntent(parsed, cases) : validateRequest(parsed, cases, rules?.patience?.press_limit);
 		if (!checked.ok) return finish(checked.status, errorBody(checked.code, checked.message));
 		const req = checked.req;
 		const fixedId = { say: "free", press: "challenge", complain: "complaint" }[req.event?.type];

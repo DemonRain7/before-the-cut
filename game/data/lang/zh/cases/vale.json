@@ -5,6 +5,8 @@
 		"Vale"
 	],
 	"strings": {
+		"I believe I answered your question, doctor.": "医生，这个问题我已经回答了。",
+		"My discretion has limits. This is where you stop.": "我的客气是有限度的。请到此为止。",
 		"Reflex rig submitted by Kessler stores.": "反射装置由凯斯勒库房送件。",
 		"Dispatch copy: stores issued it to A. Vale.": "出库联：库房将设备交给 A. Vale。",
 		"I brought the rig in myself, doctor.": "医生，装置是我亲自带来的。",

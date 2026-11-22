@@ -162,3 +162,21 @@ The button, typed text and an edited voice transcript reach the same game action
 | Balance | Two runs of 25,000 seeded nights used the same complaint-first routine. One asked every listed question and one reconciled the file. All 125,000 categorical visit records in both runs matched the M5 reference byte for byte, including signs, outcomes and credits. |
 
 Reproduce the comparison with `tools/eval/measure_loop.gd` by passing the output CSV path, `25000` and optionally `--intake` after Godot's `--`. The local evidence is under `validation/2026-11-22/intake/`. The shared SHA-256 of the three CSV files starts with `4b0e58e0f74a`. The original deployment and L1–L5 paid evaluation remain the November 21 release above. On November 22 read-only health probes returned protocol 5 on all three Workers and the live kill switch was on. The updated Worker also bundled locally with Wrangler (95.38 KiB compressed). This follow-up used zero paid calls and zero deployments. Whether a first-time player spots the distinction unaided still needs an outside playtest.
+
+## Hidden patience
+
+November 22, 2026. Rules 14 add the student's three-push limit to each appointment. Only a committed PRESS advances the count. Players can still ask for the patient's story, challenge the paperwork in their own words or review a voice transcript. Those exchanges leave the count alone. There is no visible patience meter. A new patient starts with the full allowance even when the same character returns.
+
+| At the counter | What the player sees | What the game records |
+| --- | --- | --- |
+| First PRESS with a lamp | A response from this patient's TEMPER sign and the reading beside its reference | One lamp spent, one TEMPER test, one push |
+| First PRESS with no lamps | A short reply in the patient's own voice | One push, zero new readings |
+| Second PRESS | A warning unique to the character. Rook says “That's enough, doc. You've got my answer.” The desk explains that pushing again ends the visit. | Two pushes in total. Both diagnoses give the same warning. |
+| Open BREAK and step back | A choice between committing or continuing the appointment | The count stays at two, including if a delayed confirmation arrives after cancellation |
+| Confirm the third push | A steady patient leaves unpaid. A drifting patient lunges, with the usual shutter window. | The visit records the third push. The usual fee and 50-credit catch bonus apply to a successful stop. |
+
+Each case owns its two `press_words` lines. Godot supplies the warning in the doctor's chosen language even when the dialogue service times out. The model can voice the funded first PRESS and receives the warning in its session history once displayed. It gets only the TEMPER evidence the doctor earned. The limit and remaining hidden patience are absent from the dialogue payload. Closing discards the session. Pressing while a paid check is already complete never supplies a second TEMPER observation.
+
+The first two pushes cannot themselves trigger a random attack. An instrument test can still startle a drifting visitor. A funded PRESS counts toward the order of paid tests. Keeping the old 6% and 12% probabilities on eligible instrument tests put pre-verdict snaps at 9.371% of drifting visitors on the complaint-first routine. Adjusting these to 7% and 14% put the rate at 10.898%, within the original R10 range of 10% to 20%. The runs used the same 25,000 seeded five-patient nights and 100,000 later visits. The simple complaint-led rule scored 90.183% before surprises. These are engine simulations.
+
+Checks passed on all ten patients in 120 combinations of diagnosis, TEMPER condition and starting lamps. The game passed 7,589 rule checks. The UI passed 1,191 in English, 1,192 in Chinese and 1,191 with reduced blood. Fixed nights K and L passed 59 and 53 checks. The service passed 66 tests, with 393 game-to-service and 102 wire checks against controlled providers. All 1,695 measured lines fit in each language. English and Chinese captures show the patient's warning and the final confirmation in the running game. Local results are in `validation/2026-11-22/pressure/`. This update used zero paid calls and zero deployments. Recognition of the warning by first-time human players remains unmeasured.

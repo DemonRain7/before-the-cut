@@ -1,5 +1,9 @@
 {
   "id": "priya",
+  "press_words": {
+    "push": "I heard you. I'm here about the optic.",
+    "warning": "My shift is over, doctor. I've answered you. Let it rest."
+  },
   "intake": {
     "terms": ["ward two","ward three","ward 2","ward 3","二病区","三病区","2病区","3病区"],
     "part": "eyes",

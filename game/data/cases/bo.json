@@ -1,5 +1,9 @@
 {
   "id": "bo",
+  "press_words": {
+    "push": "Easy, pal. You got my answer.",
+    "warning": "That's the bell, pal. Let it go."
+  },
   "intake": {
     "terms": ["coach","booking fee","教练","预约费"],
     "part": "hands",

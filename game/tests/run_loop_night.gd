@@ -86,7 +86,7 @@ func run() -> void:
 			await d.settle()
 			await d.put_away()
 			await d.settle()
-			check(v.press_breaks() and v.patience == 1 and main.desk.lead_pad == "", "a temper complaint never recommends BREAK")
+			check(v.press_stage() == "warning" and v.patience == 1 and main.desk.lead_pad == "", "a tested temper complaint never recommends more pressure")
 		if idx == 0:
 			main.act_say("Lovely music tonight.")
 			check(await d.until(func()->bool: return not main._thinking and not main._lock, 30.0), "chat returns")

@@ -1,5 +1,9 @@
 {
   "id": "maren",
+  "press_words": {
+    "push": "I told you what I know, dear.",
+    "warning": "Dear, I'm asking you kindly. Let that be the end of it."
+  },
   "intake": {
     "terms": ["morning shift","night shift","handover","早班","夜班","交班","天亮"],
     "part": "hands",

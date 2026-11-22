@@ -1,5 +1,9 @@
 {
   "id": "kip",
+  "press_words": {
+    "push": "I heard you, doc. Can we get back to my lens?",
+    "warning": "That's my last answer. I've got deliveries waiting."
+  },
   "intake": {
     "terms": ["ninth","tenth","9th","10th","第九街","第十街","九街","十街","9街","10街"],
     "part": "eyes",

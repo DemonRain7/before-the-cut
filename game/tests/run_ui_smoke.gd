@@ -375,15 +375,17 @@ func attack_loops() -> Array:
 	return out
 
 
-## Presses the patient twice: the first gets a reaction, the second turns somebody who is
-## drifting. Returns whether the attack has started.
-func press_twice(v: VisitState) -> bool:
+## Drive the reading, the warning and the final decision through the real desk pad.
+func press_until_attack(v: VisitState) -> bool:
 	await d.settle()
 	await d.press()
 	var reacted := v.in_exam() and v.press_count == 1
 	await d.settle()
 	await d.press()
-	return reacted and main.state == MainScript.State.ATTACK and v.attack_cause == "press"
+	var warned := v.in_exam() and v.press_count == 2
+	await d.settle()
+	await d.press()
+	return reacted and warned and main.state == MainScript.State.ATTACK and v.attack_cause == "press"
 
 
 ## The log's records of one type, oldest first.
@@ -1002,15 +1004,27 @@ func shift_reckless() -> void:
 	check(int(last_record().get("credits", 0)) == -100 and not bool(last_record().get("correct", true)), "the false alarm is billed at closing: 100")
 	check(main.clinic.line_under and main.clinic.line == 240, "the meter reads the first hour as under the line")
 
-	section("Rook: pressed twice, he walks out")
+	section("Rook leaves only after the confirmed third push")
 	v = await enter("rook")
 	await d.press()
 	check(v.in_exam() and v.press_count == 1, "the first insult only makes him angry")
-	check(str(main.desk.badges.get("press", "")) == Lang.t("BREAK") and main._pad_hint("press") == Lang.tf(main.PRESS_LAST_HINT, [int(main.rules.scoring.press_catch_bonus)]),
-		"the PRESS pad now asks for every lamp left, and its hint says the next one breaks him")
+	check(not main.desk.warn.press and main._pad_hint("press") == Lang.t(main.PUSH_HINT), "the second press hints at risk and keeps the meter hidden")
 	await d.settle()
 	await d.press()
-	check(v.outcome == "walkout" and v.patience == 0, "the second insult ends the visit, and every lamp goes out with it")
+	check(v.press_count == 2 and main.agent.last.reply == v.case_data.press_words.warning and v.actions == 1 and main._surprise == "", "Rook warns after a single paid test without rolling a surprise")
+	check(main._base_hint == main.PRESS_WARNING_HINT, "the warning explains the next decision in place of a lamp reminder")
+	check(str(main.desk.badges.get("press", "")) == Lang.t("BREAK") and main._pad_hint("press") == Lang.tf(main.PRESS_LAST_HINT, [int(main.rules.scoring.press_catch_bonus)]),
+		"the pad warns before the final commitment")
+	await d.settle()
+	d.pad("press")
+	check(main._break_confirmation and v.press_count == 2, "opening the confirmation does not commit another push")
+	d.click(main.dialogue.menu_point(1))
+	check(v.in_exam() and v.press_count == 2 and not main._break_confirmation, "stepping back keeps the visit and the warning")
+	main.act_press(true)
+	check(v.in_exam() and v.press_count == 2, "a late confirmation cannot finish the visit")
+	await d.settle()
+	await d.press()
+	check(v.outcome == "walkout" and v.patience == 1 and v.press_count == 3, "the third push ends the visit with the unused examination lamp")
 	await finish_visit("Rook")
 	check(int(last_record().get("credits", 0)) == 0 and not bool(last_record().get("correct", true)), "a walkout pays nothing")
 
@@ -1105,14 +1119,16 @@ func shift_odds_and_ends() -> void:
 	await d.stamp("treat")
 	await finish_visit("Rook")
 
-	section("Vale: pressed twice, then the lever")
+	section("Vale: third push, then the lever")
 	v = await enter("vale")
 	await d.press()
 	check(v.in_exam() and note_count(v, "temper") == 1, "the first line gets a flat reaction")
 	await d.settle()
 	main.audio.set_muted(false)      # the players must run for a fade to be seen; the dummy driver is silent
 	await d.press()
-	check(main.state == MainScript.State.ATTACK and v.attack_cause == "press", "the second line turns him")
+	await d.settle()
+	await d.press()
+	check(main.state == MainScript.State.ATTACK and v.attack_cause == "press", "the third push turns him")
 	var warned: bool = await d.wait_for_telegraph()
 	check(warned, "the warning comes")
 	check(main.audio.trim_db == main.ATTACK_TRIM_DB, "the attack's sounds start %.0f dB under the exam's" % -main.ATTACK_TRIM_DB)
@@ -1273,7 +1289,9 @@ func shift_line_and_glass() -> void:
 	check(v.in_exam() and v.press_count == 1, "the first line gets a reaction")
 	await d.settle()
 	await d.press()
-	check(main.state == MainScript.State.ATTACK and v.attack_cause == "press", "the second line turns her")
+	await d.settle()
+	await d.press()
+	check(main.state == MainScript.State.ATTACK and v.attack_cause == "press", "the third push turns her")
 	warned = await d.wait_for_telegraph()
 	check(warned and main.clinic.bar_blows.size() == 2 and is_equal_approx(main.clinic.bar_through, 1.44),
 		"the bar shows the shorter time, with two marks on it")
@@ -1359,7 +1377,9 @@ func shift_last_glass() -> void:
 	check(v.in_exam() and v.press_count == 1, "the first line gets a reaction")
 	await d.settle()
 	await d.press()
-	check(main.state == MainScript.State.ATTACK and v.attack_cause == "press", "the second line turns her")
+	await d.settle()
+	await d.press()
+	check(main.state == MainScript.State.ATTACK and v.attack_cause == "press", "the third push turns her")
 	warned = await d.wait_for_telegraph()
 	check(warned and main.clinic.bar_on and main.clinic.bar_blows.is_empty() and is_equal_approx(main.clinic.bar_through, 0.65),
 		"the bar has no mark on it: 0.65 s, and nothing for her to break first")
@@ -1632,7 +1652,9 @@ func shift_walls_and_glass() -> void:
 	check(v.in_exam() and v.press_count == 1, "the first line gets a reaction")
 	await d.settle()
 	await d.press()
-	check(main.state == MainScript.State.ATTACK and v.attack_cause == "press", "the second line turns her")
+	await d.settle()
+	await d.press()
+	check(main.state == MainScript.State.ATTACK and v.attack_cause == "press", "the third push turns her")
 	warned = await d.wait_for_telegraph()
 	check(warned and main.clinic.bar_on and main.clinic.bar_blows.size() == 3 and is_equal_approx(main.clinic.bar_through, 1.8),
 		"the bar has all three marks again: 1.8 s")
@@ -2192,8 +2214,13 @@ func shift_attack_styles() -> void:
 	section("Kip: the bike lock, stopped after two blows")
 	v = await enter("kip")
 	check(main.rig.attack_style() == "lock", "Kip's hardware is the bike lock")
-	var turned: bool = await press_twice(v)
-	check(turned, "the first press gets a reaction, the second turns him")
+	for tool in ["port", "grip"]:
+		check(await d.request_tool(tool) == "open", "Kip allows an instrument before the doctor starts pushing")
+		await d.put_away()
+		await d.settle()
+	check(v.patience == 0 and v.press_count == 0 and not main.desk.warn.press, "spending both lamps does not trip the hidden pressure threshold")
+	var turned: bool = await press_until_attack(v)
+	check(turned and not v.row_seen("temper"), "with empty lamps the third push still ends the visit and gives no TEMPER reading")
 	var warned: bool = await d.wait_for_telegraph()
 	check(warned and (main.rig._spr["turn"] as Sprite2D).visible and right_art(main.rig._spr["turn"], "turn"), "his face turns: his own turned face, for the blood setting")
 	check(main._weapon_loop == "" and attack_loops() == ["alarm"], "a lock makes no sound until it lands: only the alarm")
@@ -2224,8 +2251,8 @@ func shift_attack_styles() -> void:
 	section("Juno: ten picks, stopped after two blows")
 	v = await enter("juno")
 	check(main.rig.attack_style() == "picks", "Juno's hardware is her ten picks")
-	turned = await press_twice(v)
-	check(turned, "the first press gets a reaction, the second turns her")
+	turned = await press_until_attack(v)
+	check(turned, "both early pushes leave Juno at the counter and the third ends the visit")
 	warned = await d.wait_for_telegraph()
 	check(warned and main._weapon_loop == "hum_loop" and attack_loops() == ["alarm", "hum_loop"], "she hums as she comes")
 	struck = await d.until(func() -> bool: return main._blows >= 2, 4.0)
@@ -2248,8 +2275,8 @@ func shift_attack_styles() -> void:
 	section("Rook: the loader fist, and nobody at the shutter")
 	v = await enter("rook")
 	check(main.rig.attack_style() == "fist", "Rook's hardware is the loader arm")
-	turned = await press_twice(v)
-	check(turned, "the first press gets a reaction, the second turns him")
+	turned = await press_until_attack(v)
+	check(turned, "both early pushes leave Rook at the counter and the third ends the visit")
 	warned = await d.wait_for_telegraph()
 	check(warned and attack_loops() == ["alarm", "servo_loop"], "the arm's servos whine as it comes up")
 	struck = await d.until(func() -> bool: return main._blows >= 2, 4.0)
@@ -2318,7 +2345,7 @@ func counter_words() -> void:
 	hints.append_array(main.TAB_HINT.values())
 	# The current lamp, PRESS and BREAK hints fit the strip in each language.
 	hints.append_array(["What's bothering you?", "Listed questions are free.", Lang.tf("%s Free now.", [Lang.t(main.TOOL_WHAT.grip)]),
-		Lang.tf("%s Uses %d lamp.", [Lang.t(main.TOOL_WHAT.penlight), 1]), Lang.tf(main.PRESS_HINT, 1), Lang.tf(main.PRESS_LAST_HINT, 50), Lang.tf(main.SAY_CODE_HINT, 1), Lang.tf(main.CODE_BLANK_HINT, 1),
+		Lang.tf("%s Uses %d lamp.", [Lang.t(main.TOOL_WHAT.penlight), 1]), Lang.tf(main.PRESS_HINT, 1), main.PUSH_HINT, main.PRESS_WARNING_HINT, Lang.tf(main.PRESS_LAST_HINT, 50), Lang.tf(main.SAY_CODE_HINT, 1), Lang.tf(main.CODE_BLANK_HINT, 1),
 		main.DROP_COACH_HINT, main.FLARE_COACH_HINT, main.TRAINING_SKIP_HINT, main.TRAINING_NEXT_HINT, main.SWAP_LIST_HINT,
 		main.SWAP_SHEET_HINT])
 	var fits := 0

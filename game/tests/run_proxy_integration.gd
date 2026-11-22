@@ -124,6 +124,14 @@ func test_intake_pressure(db: Dictionary) -> void:
 			v.record.append("patient", Lang.t(str(response.reply)))
 			var follow: Dictionary = await a.classify("哪一个？" if language == "zh" else "Which one is it?")
 			check(follow.get("topic") == "intake_explain", "a displayed pressure response keeps the file in focus over HTTP")
+			var calls := a.calls_this_visit
+			event.stage = v.press_stage()
+			var warning: Dictionary = await a.decide(event, v.snapshot(), [], v.open_signs(event))
+			check(warning.source == "script" and warning.reply == t.press_words.warning and a.calls_this_visit == calls,
+				"both providers deliver the same warning locally in " + language)
+			check(v.press().result == "warning" and v.in_exam(), "a resistant visitor stays through the warning")
+			v.record.append("patient", Lang.t(str(warning.reply)))
+			check(v.press().result == "attack" and v.press_count == 3 and v.attack_cause == "press", "the game resolves the third commitment even after a timeout")
 			a.end_visit()
 			check(v.record.entries.is_empty() and not a.intake_in_focus(), "closing releases the file conversation")
 	client.base_url = str(urls.normal)
@@ -780,6 +788,11 @@ func test_talk_rules(language: String) -> void:
 	await d.settle()
 	await d.press()
 	check(v.press_count == 1 and v.patience == p - 1, "only the button pushes")
+	await d.settle()
+	var calls := main.agent.calls_this_visit
+	await d.press()
+	check(v.in_exam() and v.press_count == 2 and main.agent.calls_this_visit == calls and main.agent.last.reply == v.case_data.press_words.warning,
+		"the warning comes from this character under a working or timed-out service without another model call")
 	await d.settle()
 	await d.press()
 	check(v.outcome == "walkout", "accepting the warning ends a steady visit")

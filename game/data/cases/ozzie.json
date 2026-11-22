@@ -1,5 +1,9 @@
 {
   "id": "ozzie",
+  "press_words": {
+    "push": "I heard you fine, chief. My cart's still waiting.",
+    "warning": "Kitchen's closed on that question, chief. Drop it."
+  },
   "intake": {
     "terms": ["tuesday","wednesday","周二","周三","星期二","星期三"],
     "part": "hands",

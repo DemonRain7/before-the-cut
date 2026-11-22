@@ -5,6 +5,8 @@
 		"Nair"
 	],
 	"strings": {
+		"I heard you. I'm here about the optic.": "我听见了。我来是为了眼部义体。",
+		"My shift is over, doctor. I've answered you. Let it rest.": "医生，我已经下班了。该说的都说过了，到此为止吧。",
 		"Left optic ticket opened on Ward Two.": "左眼义体的报修单开在二病区。",
 		"Handover: noticed on Three, filed on Two.": "交班记录：三病区发现问题，二病区报修。",
 		"Ward Three is where I first noticed it, doctor.": "医生，我最早是在三病区发现的。",

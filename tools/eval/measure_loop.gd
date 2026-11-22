@@ -69,7 +69,7 @@ func _initialize() -> void:
 				else:
 					v.apply_check(TOOLS[k], "comply")
 					v.complete_check(TOOLS[k])
-				var surprise := v.roll_action(rng)
+				var surprise := "" if k == 3 else v.roll_action(rng)
 				if surprise == "snap":
 					v.snap()
 					v.shutter()
@@ -105,7 +105,7 @@ func _initialize() -> void:
 				else:
 					blind.apply_check(TOOLS[k], "comply")
 					blind.complete_check(TOOLS[k])
-				var roll := blind.roll_action(blind_rng)
+				var roll := "" if k == 3 else blind.roll_action(blind_rng)
 				if roll == "snap":
 					blind.snap()
 					blind.shutter()

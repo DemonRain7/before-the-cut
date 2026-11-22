@@ -1,5 +1,9 @@
 {
   "id": "juno",
+  "press_words": {
+    "push": "You heard me the first time. My voice needs a rest.",
+    "warning": "Last encore, doc. I'm done answering that one."
+  },
   "intake": {
     "terms": ["stage name","tip jar","june","艺名","小费罐"],
     "part": "voice",

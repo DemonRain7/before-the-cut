@@ -35,7 +35,7 @@ var asked: Dictionary = {}       # topic id -> times asked
 var answered: Dictionary = {}    # topic id -> true
 var intake_stage := 0            # 1 after hearing the account, 2 after checking its explanation
 var last_recorded_speech: String = ""  # the quote used in this appointment's closing report
-var press_count: int = 0
+var press_count: int = 0         # committed pushes in this appointment, independent of the lamps
 var attack_cause: String = ""    # "refer", "press" or "snap"
 var blows_taken: int = 0         # blows that reached the glass before the shutter was down
 var verdict_kind: String = ""    # "treat", "refer" or ""
@@ -46,7 +46,7 @@ var dropped: bool = false        # the courier answered the code and handed the 
 var drop_pay: int = 0            # what the drop put in the till
 var codes_tried: Dictionary = {} # entry id -> true: wrong codes already said to this visitor
 var codes_wrong: int = 0
-var actions: int = 0             # actions rolled for a snap or a flare
+var actions: int = 0             # funded tests so far, including the first funded PRESS
 var surprises: bool = true       # false on the training visit: nobody snaps or flares
 var snapped: bool = false
 var flared: bool = false
@@ -309,7 +309,7 @@ func open_signs(event: Dictionary = {}) -> Dictionary:
 	var evidence: Array = case_data.get("rows", {}).get("speech", {}).get("evidence", [])
 	if signs.has("speech") and (not answered.is_empty() or will_answer or intake_stage == 2):
 		result["speech"] = signs.speech if row_seen("speech") or (will_answer and evidence.has("ask:" + id)) else case_data.get("normal_speech_sign", "")
-	if signs.has("temper") and (row_seen("temper") or event.get("type") == "press"):
+	if signs.has("temper") and (row_seen("temper") or (event.get("type") == "press" and press_stage() == "test")):
 		result["temper"] = signs.temper
 	return result
 
@@ -331,17 +331,28 @@ func apply_ask(topic_id: String, _move: String = "answer", spoken: String = "") 
 	return {"result":"answered", "topic":topic_id, "move":"answer", "cost":0, "line":last_recorded_speech, "new":fresh}
 
 
+## The next committed PRESS. Only the first can buy a TEMPER reading.
+func press_stage() -> String:
+	var remaining := int(_rule("patience", "press_limit", 3)) - press_count
+	if remaining <= 1:
+		return "break"
+	if remaining == 2:
+		return "warning"
+	if press_count == 0 and patience >= _cost("press"):
+		return "test"
+	return "push"
+
+
 func press_breaks() -> bool:
-	return seen.has("press") or patience <= 0
+	return press_stage() == "break"
 
 
 func press_cost() -> int:
-	return patience if press_breaks() else _cost("press")
+	return _cost("press") if press_stage() == "test" else 0
 
 
-## Verbal pressure. The reaction is authored: it is evidence for the TEMPER line. The push that
-## breaks the patient takes every lamp left (press_cost()).
-## result: "react" | "walkout" | "attack" | "closed"
+## A paid first reading earns TEMPER. Ordinary pushes and the warning consume hidden patience.
+## The final push ends the appointment according to its truth, including when a steady row is worn.
 func press() -> Dictionary:
 	var res := {"result": "closed", "line": "", "face": "", "hands": "", "note": "", "new": false}
 	if phase != Phase.EXAM:
@@ -349,16 +360,20 @@ func press() -> Dictionary:
 	var list: Array = case_data.get("press", [])
 	if list.is_empty():
 		return res
-	var breaks := press_breaks()
-	patience = 0 if breaks else maxi(0, patience - _cost("press"))
+	var stage := press_stage()
+	patience -= press_cost()
 	press_count += 1
-	var entry: Dictionary = list[list.size() - 1 if breaks else 0]
+	_note("press:%d" % press_count)
+	if stage in ["push", "warning"]:
+		res.result = stage
+		res.line = str(case_data.press_words[stage])
+		return res
+	var entry: Dictionary = list.back() if stage == "break" else list.front()
 	res["line"] = str(entry.get("line", ""))
 	res["face"] = str(entry.get("face", ""))
 	res["hands"] = str(entry.get("hands", ""))
 	res["note"] = str(entry.get("note", ""))
 	var end := str(entry.get("end", ""))
-	_note("press:%d" % press_count)
 	if end == "walkout":
 		res["result"] = "walkout"
 		_finish("walkout")
@@ -368,6 +383,7 @@ func press() -> Dictionary:
 		attack_cause = "press"
 	else:
 		res["result"] = "react"
+		actions += 1              # the next instrument is a later test, but pressure itself never rolls
 		record_test("temper")
 		seen["press"] = true
 		res["new"] = add_note("temper", "press", str(entry.get("note", "")))
@@ -447,10 +463,7 @@ func flare_chance() -> float:
 	return clampf(float(_rule("flare", "chance", 0.0)), 0.0, 1.0)
 
 
-## One action of the player's: a tool, a question, pressure, CALM, a code or their own words.
-## Looking is free and is not one. Counts it and rolls, with the director's generator, whether
-## the patient snaps (drifting only) or flares (anyone, once a visit). Returns "snap", "flare"
-## or "". Nothing happens yet: snap() and flare() do it when the director is ready.
+## A newly funded physical instrument can cause a snap or a flare. PRESS has its own threshold.
 func roll_action(rng: RandomNumberGenerator, cost: int = 1) -> String:
 	if phase != Phase.EXAM or cost <= 0:
 		return ""

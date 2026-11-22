@@ -1,5 +1,9 @@
 {
   "id": "vale",
+  "press_words": {
+    "push": "I believe I answered your question, doctor.",
+    "warning": "My discretion has limits. This is where you stop."
+  },
   "intake": {
     "terms": ["stores","dispatch copy","库房","出库联","签收"],
     "part": "reflex",

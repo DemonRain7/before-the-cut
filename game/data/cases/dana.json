@@ -1,5 +1,9 @@
 {
   "id": "dana",
+  "press_words": {
+    "push": "Your question's on the record. So's my answer.",
+    "warning": "Call this a professional courtesy. Stop pushing."
+  },
   "intake": {
     "terms": ["off duty","on duty","raid","下班","执勤","突袭"],
     "part": "eyes",

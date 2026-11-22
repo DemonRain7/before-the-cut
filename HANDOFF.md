@@ -1,5 +1,9 @@
 # Before the Cut: handoff
 
+## Hidden patience at the counter
+
+November 22, 2026. Each appointment counts committed pushes against its own three-push limit. With a lamp the first PRESS tests TEMPER. The second gives the character's warning. The third requires confirmation and makes a steady visitor leave unpaid or a drifting visitor lunge. Typing, dictation, checking the file and stepping back preserve the count. In the next outside playtest, note whether a player recognizes the warning, cancels or commits, and distinguishes the two examination lamps from the patient's willingness to stay. [Current verification](docs/development/play-loop-redesign/PROGRESS.md#hidden-patience)
+
 ## Cross-checking a patient's registration
 
 November 22, 2026. All ten patients now bring a registration entry and a supporting slip. On K, ask Rook about Gate Two and lift four. On Juno's visit, compare June on the booking with the stage name on the permit. Both the chart button and the patient's conversation accept a follow-up. The explanation gives one SPEECH finding. Applying PRESS observes a separate TEMPER sign. For the next playtest, watch where a newcomer finds the file, which detail settles their interpretation, and whether the pressure response changes their judgment. [Verification and play instructions](docs/development/play-loop-redesign/PROGRESS.md#cross-checking-the-intake-file)

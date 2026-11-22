@@ -5,6 +5,8 @@
 		"Ferreira"
 	],
 	"strings": {
+		"Yeah, I heard you. Want to get back to the jack?": "行，我听到了。能接着看插口了吗？",
+		"Last reply you're getting on that. Back off.": "这事我就答到这儿。收手吧。",
 		"Deck jack returned to bench B.": "设备接口交回 B 号工作台。",
 		"Bench tag: pulled at A, received at B.": "工位签：在 A 台拆下，由 B 台接收。",
 		"Bench A. I pulled the jack at A myself.": "A 台。接口是我亲自在 A 台拆的。",

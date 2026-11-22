@@ -1,5 +1,9 @@
 {
   "id": "rook",
+  "press_words": {
+    "push": "I came in about my arm. You heard me.",
+    "warning": "That's enough, doc. You've got my answer."
+  },
   "intake": {
     "terms": ["gate two","gate 2","lift four","lift 4","二号门","2号门","四号吊机","4号吊机"],
     "part": "hands",

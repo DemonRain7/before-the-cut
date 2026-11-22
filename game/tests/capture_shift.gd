@@ -42,11 +42,11 @@ extends SceneTree
 ##   shift 5: Vale breaks the pane again; between patients the till buys it back, one layer at a
 ##            time; Maren turns behind the mended glass and has the whole bar again; the report
 ##            says what the glass cost
-##   shifts 6 to 9, test night B (Kip, Juno and Rook drifting, each pressed twice to turn him or
+##   shifts 6 to 9, test night B (Kip, Juno and Rook drifting, each pressed three times to turn him or
 ##            her): Kip's bike lock and Juno's picks are stopped after two blows and Rook's loader
 ##            fist gets through (6); the fist is stopped and dents the shutter deep (7); the lock
 ##            gets through (8); the picks get through (9). G buys the glass back between patients.
-##   shifts 10 to 15, the newer five on test nights C to F, each pressed twice to turn: Bo's spike
+##   shifts 10 to 15, the newer five on test nights C to F, each pressed three times to turn: Bo's spike
 ##            and Dana's baton are stopped and Ozzie's cleaver gets through (10, night C); Priya's
 ##            laser is stopped and Lux's arc gets through (11, night D); the arc is stopped and the
 ##            spike gets through (12, night F); the baton gets through (13, night C); the laser gets
@@ -1089,7 +1089,7 @@ func juno() -> void:
 
 
 ## Maren, the night's other courier, answers her code and hands her package over; then she is
-## pressed twice, turns, and nobody touches the shutter. The glass Vale left has one blow in it,
+## pressed three times, turns, and nobody touches the shutter. The glass Vale left has one blow in it,
 ## so she is through after one, and the night ends with her.
 func maren_gets_through(brief: bool) -> void:
 	await d.settle()
@@ -1131,6 +1131,8 @@ func maren_gets_through(brief: bool) -> void:
 		await shot("maren-press-blank")
 	await d.settle()
 	var due := blows_due()
+	await d.press()
+	await d.settle()
 	await d.press()
 	await turn_shots("maren", due)
 	await through_shots("maren")
@@ -1270,11 +1272,13 @@ func vale_snaps() -> void:
 	await stopped_shots("vale-3")
 
 
-## Maren is pressed twice behind whole glass and the shutter comes down after the third blow:
+## Maren is pressed three times behind whole glass and the shutter comes down after the third blow:
 ## stopped, but the pane has nothing left in it.
 func maren_stopped_late() -> void:
 	await d.settle()
 	await d.buzz_in()
+	await d.settle()
+	await d.press()
 	await d.settle()
 	await d.press()
 	await d.settle()
@@ -1302,7 +1306,7 @@ func vale_breaks_the_pane(who: String) -> void:
 	await d.take_slip()
 
 
-## Maren is pressed twice with no glass left: there is no blow to wait for and very little
+## Maren is pressed three times with no glass left: there is no blow to wait for and very little
 ## time, and the shutter comes down at once.
 func maren_stopped_bare() -> void:
 	await d.settle()
@@ -1311,6 +1315,8 @@ func maren_stopped_bare() -> void:
 	await d.press()
 	await d.settle()
 	reached(blows_due() == 0, "maren-4: no glass is left for this attack")
+	await d.press()
+	await d.settle()
 	await d.press()
 	await turn_shots("maren-4", 0)
 	await stopped_shots("maren-4")
@@ -1347,7 +1353,7 @@ func glass_fitter() -> void:
 	await shot("glass-key-nothing-to-mend")
 
 
-## Maren is pressed twice behind the mended glass: the bar has all three marks again, and the
+## Maren is pressed three times behind the mended glass: the bar has all three marks again, and the
 ## shutter comes down before the first blow.
 func maren_whole_bar() -> void:
 	await d.settle()
@@ -1356,6 +1362,8 @@ func maren_whole_bar() -> void:
 	await d.press()
 	await d.settle()
 	reached(blows_due() == 3, "maren-5: the mended glass has all three blows in it again")
+	await d.press()
+	await d.settle()
 	await d.press()
 	reached(await d.wait_for_telegraph(), "maren-5: she turns")
 	await d.seconds(0.04)
@@ -1430,10 +1438,12 @@ func wear_nights() -> void:
 				reached(main.visit.row_seen(row), "wear reading " + row)
 				await shot("wear-" + row)
 				if row == "temper":
+					await d.press()
+					await d.settle()
 					d.move(d.pad_pos("press"))
 					await d.seconds(0.35)
-					reached(main.visit.press_breaks() and main.desk.hover == "press", "the warned second PRESS is available")
-					await shot("second-press-warning")
+					reached(main.visit.press_breaks() and main.desk.hover == "press", "the warned final PRESS is available")
+					await shot("final-press-warning")
 					rest()
 				if tool != "":
 					await d.put_away()
@@ -1467,8 +1477,8 @@ func weapon_nights() -> void:
 
 
 ## One shift on a test night (B unless night says otherwise). plan lists [id, what] in the
-## night's order: "treat" or "refer" (decided with no examination), "stopped" (pressed twice: the
-## second press turns them, and the shutter drops after the second blow) or "through" (pressed
+## night's order: "treat" or "refer" (decided with no examination), "stopped" (pressed three times: the
+## third press turns them, and the shutter drops after the second blow) or "through" (pressed
 ## twice, and nobody drops it: the night ends with them). Between patients G buys back what an
 ## attack took out of the glass.
 func weapon_night(shift: String, plan: Array, night: String = "B") -> void:
@@ -1493,7 +1503,9 @@ func weapon_night(shift: String, plan: Array, night: String = "B") -> void:
 		await d.settle()
 		var due := blows_due()
 		await d.press()
-		reached(main.visit != null and main.visit.attack_cause == "press", stem + ": the second press turns them")
+		await d.settle()
+		await d.press()
+		reached(main.visit != null and main.visit.attack_cause == "press", stem + ": the third press turns them")
 		if what == "stopped":
 			await turn_shots(stem, 2)
 			await stopped_shots(stem)

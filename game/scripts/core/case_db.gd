@@ -361,10 +361,14 @@ static func validate_template(t: Dictionary, rules: Dictionary, sheet: Dictionar
 					errors.append("signs.port.%s: a normal port has no dark threads." % id)
 				if row == "port" and covered and s.has("look"):
 					errors.append("signs.port.%s: the port is covered, so a glance cannot show it (no 'look')." % id)
+	var words: Variant = t.get("press_words")
+	for stage in ["push", "warning"]:
+		if typeof(words) != TYPE_DICTIONARY or typeof(words.get(stage)) != TYPE_STRING or str(words[stage]).strip_edges().is_empty():
+			errors.append("press_words.%s needs a line shared by both diagnoses." % stage)
 	var ends: Variant = t.get("press_end")
 	for end in ["walkout", "attack"]:
 		if typeof(ends) != TYPE_DICTIONARY or str(ends.get(end, "")) == "":
-			errors.append("press_end.%s is missing (the second push: a walkout when steady, an attack when drifting)." % end)
+			errors.append("press_end.%s is missing for the final push." % end)
 	var outcomes: Variant = t.get("outcomes")
 	for truth in ["stable", "drifting"]:
 		if typeof(outcomes) != TYPE_DICTIONARY or typeof(outcomes.get(truth)) != TYPE_DICTIONARY:
@@ -639,6 +643,8 @@ static func validate_rules(rules: Dictionary, sheet: Dictionary = {}) -> Array:
 		errors.append("rules.json: line.per_hour must be 0 or more.")
 	if typeof(rules.get("patience")) == TYPE_DICTIONARY and int(rules["patience"].get("leave_ms", -1)) < 0:
 		errors.append("rules.json: patience.leave_ms must be 0 or more.")
+	if typeof(rules.get("patience")) == TYPE_DICTIONARY and int(rules.patience.get("press_limit", 3)) < 3:
+		errors.append("patience.press_limit needs room for a first push, a warning and the final push.")
 	if int(rules.get("visit", {}).get("lamps", 0)) < 1:
 		errors.append("visit.lamps must be positive.")
 	var leads: Dictionary = rules.get("complaints", {})

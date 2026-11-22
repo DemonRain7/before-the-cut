@@ -57,7 +57,7 @@ SHOWN = {
         ("name",), ("role",), ("request",), ("teaser",), ("opening", "*"),
         ("complaints", "*"), ("claims", "*", "line"), ("claims", "*", "note"),
         ("topics", "*", "q"), ("topics", "*", "deflect"),
-        ("lines", "*"), ("lines", "*", "*"), ("press_end", "*"),
+        ("lines", "*"), ("lines", "*", "*"), ("press_end", "*"), ("press_words", "*"),
         ("attack", "telegraph"), ("attack", "line"), ("exit", "*"),
     ] + [("intake", key) for key in ("filed", "slip", "account", "clear", "gap", "firm", "flat")]
       + [("signs", "*", "*", "*", key) for key in ("text", "note", "look", "after")]

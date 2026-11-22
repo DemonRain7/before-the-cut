@@ -905,9 +905,9 @@ def main():
             rows.append(check("note", cid + ".claims." + k, cl["note"]))
         for tp in c["topics"]:
             rows.append(check("question", cid + ".topics." + tp["id"] + ".q", tp["q"]))
-        # the line after the last press: the walk-out for somebody steady, the turn for somebody drifting
-        for k, s in c.get("press_end", {}).items():
-            rows.append(check("line", cid + ".press_end." + k, s))
+        for group in ("press_words", "press_end"):
+            for k, s in c[group].items():
+                rows.append(check("line", cid + "." + group + "." + k, s))
         # the visit's page of the report: who it was, what the player did beside what was true,
         # and how it ended; and its row among the totals
         role = tr("%s, %d" % (c["role"], int(c["age"]))) + tally_gap + tr("For: %s" % c["request"])

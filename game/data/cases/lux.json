@@ -1,5 +1,9 @@
 {
   "id": "lux",
+  "press_words": {
+    "push": "Yeah, I heard you. Want to get back to the jack?",
+    "warning": "Last reply you're getting on that. Back off."
+  },
   "intake": {
     "terms": ["bench a","bench b","工位a","工位b","a台","b台","a 台","b 台"],
     "part": "port",

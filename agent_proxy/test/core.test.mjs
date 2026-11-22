@@ -52,6 +52,12 @@ test("only disclosed intake testimony reaches the patient and the physical press
 test("pressure on the intake file keeps the player's readings and diagnosis out of the response", async () => {
 	const request = body("press", "intake", "Do you stand by the slip?");
 	request.state.intake_stage = 1;
+	Object.assign(request.state, { press_limit: 3, hidden_patience: 2 });
+	const { req } = validateRequest(request, cases);
+	const turn = buildPrompt(cases.kip, rules, req, 110).currentTurn;
+	assert.equal(turn.current_visit.patience, request.state.patience);
+	assert.equal(turn.current_visit.press_limit, undefined);
+	assert.equal(turn.current_visit.hidden_patience, undefined);
 	for (const reply of ["The gauge shows damage.", "I'm a cyberpsycho.", "我就是个赛博疯子。", "握力检查结果显示异常。"]) {
 		const out = await handler(fixture({ reply, reaction: "" })).post(request);
 		assert.equal(out.status, 422);
@@ -111,16 +117,16 @@ test("Chinese: the game's own smaller numbers, a prompt asking for Chinese, and 
 test("long appointments keep dialogue and validated physical actions in order", () => {
  const b = body();
  b.conversation_history = Array.from({length: 80}, (_, i) => ({role: "doctor", text: "Turn " + i}));
- b.conversation_history.splice(30, 0, {role:"action", text:"open:grip"}, {role:"action", text:"done:grip"}, {role:"action", text:"press:1"});
+ b.conversation_history.splice(30, 0, {role:"action", text:"open:grip"}, {role:"action", text:"done:grip"}, {role:"action", text:"press:1"}, {role:"action", text:"press:2"}, {role:"action", text:"press:3"});
  const validated = validateRequest(b, cases);
  assert.deepEqual(validated.req.conversation_history, b.conversation_history);
- b.visit_summary = {after: 12, omitted: 32, actions: {"open:grip": 3, "done:grip": 1, "press:1": 1}};
+ b.visit_summary = {after: 12, omitted: 32, actions: {"open:grip": 3, "done:grip": 1, "press:1": 1, "press:2": 1, "press:3": 1}};
  assert.deepEqual(validateRequest(b, cases).req.visit_summary, b.visit_summary);
- for (const tag of ["end:treated_ok", "done:grip:0.42", "press:3", "read:diagnosis", "open:ghost", "ask:ghost:answer"]) {
+ for (const tag of ["end:treated_ok", "done:grip:0.42", "press:4", "read:diagnosis", "open:ghost", "ask:ghost:answer"]) {
   assert.equal(validateRequest({...b, conversation_history:[{role:"action",text:tag}]}, cases).ok, false);
   assert.equal(validateRequest({...b, visit_summary:{...b.visit_summary,actions:{[tag]:1}}}, cases).ok, false);
  }
- for (const patch of [{after:84}, {omitted:0}, {actions:{"done:grip":-1}}]) {
+ for (const patch of [{after:b.conversation_history.length + 1}, {omitted:0}, {actions:{"done:grip":-1}}]) {
   assert.equal(validateRequest({...b, visit_summary:{...b.visit_summary,...patch}}, cases).ok, false);
  }
 });

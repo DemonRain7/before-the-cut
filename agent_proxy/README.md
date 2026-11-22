@@ -2,7 +2,7 @@
 
 The proxy gives the patient its character, the doctor's action, the conversation and the signs earned during this visit. The patient writes dialogue and visible reactions. Godot chooses the case outcomes and uses authored ASK answers by default. A separate route classifies a typed or confirmed spoken line against the current case's questions.
 
-With voice enabled, push-to-talk sends a short clip for transcription. The player can edit the transcript, send it with ENTER or discard it. A committed PRESS on the desk spends a lamp. The mock fixture produces synthetic dialogue and one labelled transcript for any clip. The game can also be played offline.
+With voice enabled, push-to-talk sends a short clip for transcription. The player can edit the transcript, send it with ENTER or discard it. Only a funded first PRESS spends a lamp and earns a TEMPER reading. The mock fixture produces synthetic dialogue and one labelled transcript for any clip. The game can also be played offline.
 
 ## Start the patient
 
@@ -64,9 +64,9 @@ The request includes `protocol: "5"`, run, session, visit and case identifiers, 
 `event` with `type`, `id` and the doctor's exact `text`, current visit state,
 `conversation_history`, a reply-length limit, and the player's `language`.
 
-`signs` can contain `speech`, `temper`, both or neither. The game unlocks SPEECH with an answered ASK or a completed comparison of an intake account with its supporting slip. A topic outside the broken sign's evidence list gets the character's normal sign until an informative question is answered. PRESS and flares unlock TEMPER. The proxy supplies exactly the corresponding sign sentences. An empty gate omits the `earned_cues` field. Instrument readings stay in the game.
+`signs` can contain `speech`, `temper`, both or neither. The game unlocks SPEECH with an answered ASK or a completed comparison of an intake account with its supporting slip. A topic outside the broken sign's evidence list gets the character's normal sign until an informative question is answered. A funded first PRESS and flares unlock TEMPER. The proxy supplies exactly the corresponding sign sentences. An empty gate omits the `earned_cues` field. Instrument readings stay in the game.
 
-An optional `state.intake_stage` is zero at arrival, one after the account and two after the explanation. The current dialogue turn receives `discussed_intake` at stages one and two. Only stage two includes the explanation actually heard. A standard `press` with ID `intake` adds the current temperament's pressure line as a reference for the model. An invalid instrument result or an explicit admission of drift detected on that turn routes to the character's authored pressure line. Questions that produce graded file evidence use the same authored lines across providers.
+An optional `state.intake_stage` is zero at arrival, one after the account and two after the explanation. The current dialogue turn receives `discussed_intake` at stages one and two. Only stage two includes the explanation actually heard. A funded first `press` with ID `intake` adds the current temperament's pressure line as a reference for the model. An invalid instrument result or an explicit admission of drift detected on that turn routes to the character's authored pressure line. Questions that produce graded file evidence use the same authored lines across providers.
 
 `language` is `"en"` or `"zh"`, the language the player chose on the title card. A request
 without it is English; any other value is refused with `400 bad_request` (message
@@ -76,7 +76,7 @@ writes them. A hanzi takes the room of two letters on the dialogue strip, so Chi
 smaller length limits of its own (see Bounds). The language is written to the log with each
 entry; the words are not.
 
-Foreground events are `check`, `ask`, `press`, `complain` and `say`. `say` carries the doctor's line and classified intent. Optional `arrive`, `after_check` and `idle` events may return an empty reply and reaction. Both service implementations cap these at three per visit and two idle attempts, within 16 dialogue attempts. Each generation rebuilds the case identity, job, voice and motive from trusted data. Godot starts a fresh session on every arrival. The visit owns one chronological record tagged `doctor`, `patient`, `reaction` and `action`. For example, opening GRIP twice and completing it once records two `open:grip` entries and one `done:grip`. A first committed PRESS records `press:1`. Chart readings and courier codes stay in Godot.
+Foreground events are `check`, `ask`, `press`, `complain` and `say`. `say` carries the doctor's line and classified intent. Optional `arrive`, `after_check` and `idle` events may return an empty reply and reaction. Both service implementations cap these at three per visit and two idle attempts, within 16 dialogue attempts. Each generation rebuilds the case identity, job, voice and motive from trusted data. Godot starts a fresh session on every arrival. The visit owns one chronological record tagged `doctor`, `patient`, `reaction` and `action`. For example, opening GRIP twice and completing it once records two `open:grip` entries and one `done:grip`. Committed pushes record `press:1`, `press:2` and `press:3`. Godot supplies the warning and resolves the third push locally. Looking at the confirmation or stepping back makes no entry. Chart readings and courier codes stay in Godot.
 
 Ordinary requests include the whole visit. When serialization would exceed 32 KiB, Godot retains the complete local record and sends a leading excerpt, a recent excerpt and `visit_summary`. Its `after` field locates the gap, `omitted` counts the missing entries and `actions` counts each action across the whole visit. A close or abandonment clears the session history and per-visit intent lookups and invalidates outstanding requests.
 
