@@ -1,6 +1,12 @@
 # What would make someone run another night?
 
-Design proposal, November 22, 2026. The shipped build has the examination desk, patient dialogue, pressure draws and closing film. The following ideas are playable hypotheses for the next prototype.
+Design notes, November 22, 2026. The owner has deferred the two-player version. The current implementation assignment is the [closing animation remake](claude-prompt.md). The experiments below are available for a later prototype.
+
+## The owner's direction for a future two-player shift
+
+One player screens arrivals and decides who enters. The other operates on the admitted patient, working close to the affected implant. The doctor handles and replaces that specific component. A short QTE can give weight to a moment such as a wrist coupling seating in its socket. Between patients, preparing a part or testing a return could give intake information for its current decision.
+
+The doctor chooses where to look. During hand or port work they can look up from the part to check the patient's face, then return to the component. During work on the face, that frightening possibility is already within arm's reach. The expression or implant can suddenly change while the tool is engaged, including between timed inputs. For a future test, try one wrist case and one face case and watch when the doctor voluntarily looks up.
 
 ## Single player
 
@@ -12,7 +18,7 @@ Today a player reads a file, looks for discrepancies and admits or removes a vis
 | **Trace a bad shipment** | Keep a removed part from an appointment, compare its serial fragment with the next failure, decide which pallet to recall. | Two patients with opposite behavior can share a supplier. A recall may protect the district and cancel innocent patients' repairs. | A mystery that resolves from reading alone. Have the player move a real suspect part onto a bench and replay its fault. |
 | **Run an underground clinic with witnesses** | Take a courier's deal, redirect a part to a neighbor or testify. See who comes back as a witness or refuses to speak for you. | Different promises create different witnesses, routes and obligations on the next night. | A menu of allegiances. Make the commitment with an object already on the desk. |
 
-Prototype the workbench first. Use one counterfeit shipment to make two appointments interact and one courier to put a price on the choice. Give the player one object to act on at a time. The normal object here is an implant cartridge. The stamp screen and clinic radio already provide places to introduce it.
+For a later solo workbench experiment, one counterfeit shipment could make two appointments interact and one courier could put a price on the choice. Give the player one object to act on at a time. The normal object here is an implant cartridge. The stamp screen and clinic radio already provide places to introduce it.
 
 ### Ninety seconds without generated dialogue
 

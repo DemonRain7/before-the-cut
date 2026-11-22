@@ -1,10 +1,16 @@
 # Before the Cut: handoff
 
-## Pressure and the closing film
+## Current handoff for the closing animation remake
+
+November 22, 2026. The owner rejected the first closing film and asked Claude to start over with full creative control. The first cut and its verification below document gameplay commit `c36f883`. The owner has deferred two-player play. That direction pairs a front-desk screener with a hands-on operating doctor who swaps the affected implant, performs timed actions and chooses when to look up at the patient. [Complete handoff prompt](docs/development/closing-shift/claude-prompt.md) · [Future surgery concept](docs/development/closing-shift/next-game.md)
+
+The next three steps for the film are to choose a new visual direction, build it into the ordinary and interrupted end-of-shift flows, and deliver a fresh in-game recording with the actual verification results.
+
+## Pressure and the first closing film
 
 November 22, 2026. Rules 15 give every committed push a separate chance of a visible tell and of ending the visit. The fourth always ends it. The game now plays the actual shift's patients on closing cameras before revealing the ledger. Priya's theatre incident closes that operating room and sends later admissions to a relief crew. [Release and verification](docs/development/closing-shift/release.md) · [Chinese sample film](docs/development/closing-shift/ward-preview-zh.mp4)
 
-Next, watch a new player decide whether a second push is worth the risk, check whether a viewer can identify the cause of one camera incident with the captions covered, and try the two-patient workbench with a fixed script and one shared replacement part. [Prototype design](docs/development/closing-shift/next-game.md) · [Claude handoff prompt](docs/development/closing-shift/claude-prompt.md)
+The first version left two outside-playtest questions open. Does a new player understand the risk of another push? Can a viewer recognize which admission caused a particular incident before reading the report?
 
 ## Hidden patience at the counter (rules 14, superseded)
 

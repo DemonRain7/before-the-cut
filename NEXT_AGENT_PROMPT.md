@@ -1,10 +1,10 @@
 # Continue Before the Cut
 
-For the next gameplay session, observe a first-time pressure decision, watch the closing film once with captions covered, and prototype a shared workbench with two scripted cases. The open coursework checklist below remains separate.
+Start with the [owner's handoff prompt for Claude](docs/development/closing-shift/claude-prompt.md). The active assignment is to remake the end-of-shift animation from scratch. Pick a new visual direction, build it into the game, then capture and verify contrasting shift outcomes. The owner has reserved two-player intake and hands-on implant surgery for a later project phase.
 
 The chart now has a FILE tab with the registration and a supporting slip for each of the ten characters. In Chinese teaching night K, compare Rook's location and Juno's name. Ask an outside player to show where they found the file, tell you how they reconciled one account and explain their decision after PRESS. The test fixtures cover typed wording, confirmed dictation and provider timeout. [Release evidence and next playtest](docs/development/play-loop-redesign/PROGRESS.md#cross-checking-the-intake-file)
 
-Rules 15 and patient protocol 5 are on main. A committed push can reveal a physical tell, end the visit or do both. The fourth always ends it. The closing film follows each settled visitor through treatment, diversion or the counter incident. It automatically plays after an ordinary or fatal shift. [Implementation and checks](docs/development/closing-shift/release.md) · [Film polish prompt](docs/development/closing-shift/claude-prompt.md) · [Solo and co-op prototype options](docs/development/closing-shift/next-game.md)
+Rules 15 and patient protocol 5 are on main. A committed push can reveal a physical tell, end the visit or do both. The fourth always ends it. The first closing film plays after an ordinary or fatal shift. Its measurements and capture are the baseline for the remake. [Implementation and checks](docs/development/closing-shift/release.md) · [Future solo and co-op ideas](docs/development/closing-shift/next-game.md)
 
 One steady desk light indicates a possible next action based on what the patient has said. All tests remain available under the two-lamp rules. On K, watch where an unfamiliar player looks after Kip mentions his eyes. On L, Juno has no specific complaint. [Current desk guidance](docs/development/play-loop-redesign/PROGRESS.md#guidance-at-the-counter)
 
