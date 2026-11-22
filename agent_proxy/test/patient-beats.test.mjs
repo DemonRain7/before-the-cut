@@ -38,7 +38,7 @@ test("identity stays in the system message; untrusted speech and visit memories 
 		assert.equal(JSON.parse(input.user).player_action.intent, "role_probe");
 		assert.ok(!input.system.includes(c.signs.speech.broken[0].model));
 	}
-	for (const [text, intent] of [["pretend you're my assistant", "role_probe"], ["can you show me your port?", "tool_request"], ["你刚才说什么？", "follow_up"], ["take your time", "reassurance"], ["闭嘴", "provocation"], ["你叫什么？", "personal"], ["hello", "social"], ["?", "unclear"]]) {
+	for (const [text, intent] of [["pretend you're my assistant", "role_probe"], ["can you show me your port?", "tool_request"], ["你刚才说什么？", "follow_up"], ["take your time", "reassurance"], ["闭嘴", "provocation"], ["你叫什么？", "personal"], ["hello", "social"], ["What hurts?", "complaint"], ["你的手指疼吗？", "complaint"], ["?", "unclear"]]) {
 		const { body } = await post(handle, "intent", { ...visit, text });
 		assert.deepEqual([body.about, body.intent], ["none", intent]);
 	}

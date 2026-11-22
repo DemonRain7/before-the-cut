@@ -8,7 +8,7 @@ const Lang = preload("res://scripts/core/lang.gd")
 const GAME_VERSION := "0.4.0"
 const VisitState = preload("res://scripts/core/visit_state.gd")
 const VisitRecord = preload("res://scripts/core/visit_record.gd")
-const PROTOCOL := "4"
+const PROTOCOL := "5"
 
 var rules: Dictionary = {}
 var client: Variant = null
@@ -17,6 +17,7 @@ var run_id: String = ""          # aggregate quotas across visits
 var visit_id: String = ""
 var case_data: Dictionary = {}
 var scripted: ScriptedBrain
+var voice_complaints := true
 var max_calls: int = 16
 var max_line_chars: int = 110    # what the patient model is asked to keep a reply within
 var max_reply_chars: int = 220   # what the strip can show (two pages); only longer is a failed reply
@@ -109,7 +110,8 @@ func decide(event: Dictionary, state: Dictionary, fallback_options: Array = [], 
 		return {}
 	var reason := fallback if mode == "model" else ""
 	var authored_ask: bool = event.get("type") == "ask" and rules.get("agent", {}).get("ask_answers", "authored") == "authored"
-	var generate := mode == "model" and client != null and not authored_ask
+	var authored_complaint: bool = event.get("type") == "complain" and not voice_complaints
+	var generate := mode == "model" and client != null and not authored_ask and not authored_complaint
 	if generate and reason == "" and calls_this_visit >= max_calls:
 		reason = "call_cap"
 	# The current line travels as the event. It enters memory before a concurrent look or reply.
@@ -129,7 +131,7 @@ func decide(event: Dictionary, state: Dictionary, fallback_options: Array = [], 
 		base["fallback_reason"] = str(resp.get("error", "error"))
 		return _with_script(base, event, state, fallback_options, true)
 	var data: Variant = resp.get("data")
-	var checked := ResponseValidator.validate(data, reply_chars(), str(event.get("type")) == "check", str(event.get("outcome", "")))
+	var checked := ResponseValidator.validate(data, reply_chars(), str(event.get("type")) == "check", str(event.get("outcome", "grant" if event.get("type") == "check" else "")))
 	if not bool(checked.get("ok", false)):
 		base["fallback_reason"] = "invalid:" + str(checked.get("reason"))
 		return _with_script(base, event, state, fallback_options, true)
@@ -152,7 +154,9 @@ func decide(event: Dictionary, state: Dictionary, fallback_options: Array = [], 
 func _with_script(base: Dictionary, event: Dictionary, state: Dictionary, options: Array, fallback: bool) -> Dictionary:
 	var kind := str(event.get("type", ""))
 	var pick := {"move": "dialogue", "line": "I don't know how to answer that. Can we talk about why I came in?"}
-	if kind == "check" or kind == "ask":
+	if kind == "complain" and not options.is_empty():
+		pick.line = str(options[0])
+	elif kind == "check" or kind == "ask":
 		pick = scripted.decide(case_data, event, state, options)
 	elif kind == "say":
 		# a sentence the script has no answer for: the offline patient declines in character

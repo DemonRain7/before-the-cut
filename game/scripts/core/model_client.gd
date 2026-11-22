@@ -41,7 +41,7 @@ func check_service(expected: Dictionary, wait_ms: int) -> Dictionary:
 	var data: Dictionary = response.data
 	if data.get("disabled") == true:
 		return {"status": "disabled"}
-	if data.get("ok") != true or data.get("protocol") != "4" or typeof(data.get("cases")) != TYPE_ARRAY:
+	if data.get("ok") != true or data.get("protocol") != "5" or typeof(data.get("cases")) != TYPE_ARRAY:
 		return {"status": "version"}
 	var seen := {}
 	for item in data.cases:

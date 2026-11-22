@@ -105,5 +105,6 @@
     "谢谢",
     "辛苦了",
     "こんにちは"
-  ]
+  ],
+  "complaint": ["what's bothering", "what hurts", "what's wrong", "how do you feel", "哪里不舒服", "哪儿不舒服", "哪里疼", "哪痛", "有什么不适", "感觉怎么样", "any discomfort", "what is bothering", "what is wrong", "anything bothering", "any part bothering", "哪里难受", "有哪儿不舒服", "哪儿疼", "哪儿难受"]
 }

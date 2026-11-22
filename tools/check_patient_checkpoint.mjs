@@ -71,7 +71,7 @@ try {
 		const q = c.topics.find(t => t.id === "sleep") || c.topics[0];
 		const speech = c.signs.speech[i % 2 ? "broken" : "normal"][0];
 		const temper = c.signs.temper[i % 3 ? "normal" : "broken"][0];
-		const hearing = { patience: rules.visit.lamps, patience_max: rules.visit.lamps, granted: [], refusals: {}, reassured: [], claims: [], asked: {}, press_count: 0, reassure_used: 0, history: [] };
+		const hearing = { patience: rules.visit.lamps, patience_max: rules.visit.lamps, granted: [], complaints_told: [], claims: [], asked: {}, press_count: 0, history: [] };
 		const history = c.opening.map(text => ({ role:"patient", text:zh ? (translations[text] || text) : text }));
 		const actions = [
 			{ type:"check", id:"grip", text:zh ? "请握一下把手。" : "Please hold the handle." },

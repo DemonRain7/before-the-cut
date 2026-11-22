@@ -46,13 +46,14 @@ function sleep(ms, signal) {
 	});
 }
 
+import { mentionedPart } from "./complaints.mjs";
 import intentCues from "../../game/data/patient_intents.json" with { type: "json" };
 import chineseTopics from "../../game/data/lang/zh/topics.json" with { type: "json" };
 
 function mockIntent(topics, text) {
 	const line = text.trim().toLowerCase();
 	for (const [intent, phrases] of Object.entries(intentCues)) {
-		if (phrases.some(phrase => line.includes(phrase))) return { about: "none", intent };
+		if (intent !== "complaint" && phrases.some(phrase => line.includes(phrase))) return { about: "none", intent };
 	}
 	const words = line.match(/[a-z]+/g) || [];
 	const chinese = { why: ["为什么来", "怎么了"], sleep: ["睡", "失眠", "休息"], implant: ["不听使唤", "义体"], chrome: ["义体", "零件"], mood: ["心情", "生气"] };
@@ -63,20 +64,22 @@ function mockIntent(topics, text) {
 		if (score > highest) { highest = score; chosen = id; }
 		else if (score > 0 && score === highest) chosen = "none";
 	}
+	if (intentCues.complaint.some(phrase => line.includes(phrase)) ||
+		(chosen === "none" && mentionedPart(line) && /[?？]|^(how|what|any|does|do|tell|is|are)|怎么样|如何|疼|痒/.test(line))) return { about:"none", intent:"complaint" };
 	return { about: chosen, intent: chosen !== "none" ? "case_question" : line.length < 4 || highest ? "unclear" : "other" };
 }
 
 /** Synthetic transport fixture. Not intelligent, not a scripted patient comparison. */
 export function createMockProvider({ fail = "" } = {}) {
 	return {
-		name: "mock", model: "mock-dialogue-4",
-		async generate({ req, intent, topics }, signal) {
+		name: "mock", model: "mock-dialogue-5",
+		async generate({ req, intent, topics, currentTurn }, signal) {
 			if (fail === "timeout") await waitUntilAborted(signal);
 			if (fail.startsWith("slow:")) await sleep(Number(fail.slice(5)) || 0, signal);
 			if (fail === "http_error") throw new ProviderError("http_503");
 			if (intent) {
 				const reading = fail === "invalid_shape" ? { about: "unknown", intent: "other" } : mockIntent(topics, req.text);
-				return { text: fail === "invalid_json" ? "not JSON" : JSON.stringify({ choice: reading.about === "none" ? reading.intent : "ask_" + reading.about }), model: "mock-intent-4", mock: true };
+				return { text: fail === "invalid_json" ? "not JSON" : JSON.stringify({ choice: reading.about === "none" ? reading.intent : "ask_" + reading.about }), model: "mock-intent-5", mock: true };
 			}
 			let answer = req && req.language === "zh"
 				? { reply: "继续之前，你能先说说这对我的夜班意味着什么吗？", reaction: "盯着医生，掂量这个回答。", cooperates: true }
@@ -84,12 +87,13 @@ export function createMockProvider({ fail = "" } = {}) {
 			if (["idle", "arrive", "after_check"].includes(req?.event?.type)) {
 				answer = { reply: req.event.type === "idle" ? "" : req.language === "zh" ? "我能喘口气吗？" : "Can I catch my breath a moment?", reaction: "" };
 			}
+			if (req?.event?.type === "complain") answer = { reply: currentTurn.voice_now.join(" "), reaction: "" };
 			if (req?.event?.outcome) answer.cooperates = ["grant", "answer"].includes(req.event.outcome);
 			if (fail === "long_line") answer.reply = "word ".repeat(80);
 			if (fail === "invalid_shape") answer.reply = 42;
 			if (fail === "readout_line") answer.reply = "My pupils look fine to me. Could the grip reading be wrong?";
 			const text = fail === "invalid_json" ? "not JSON" : JSON.stringify(answer);
-			return { text, model: "mock-dialogue-4", usage: { input_tokens: 0, output_tokens: 0 }, mock: true };
+			return { text, model: "mock-dialogue-5", usage: { input_tokens: 0, output_tokens: 0 }, mock: true };
 		},
 		// The mock cannot hear. It returns one fixed, clearly labelled sentence for any clip.
 		async transcribe(clip, signal) {

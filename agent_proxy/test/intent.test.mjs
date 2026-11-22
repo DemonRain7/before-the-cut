@@ -56,14 +56,14 @@ test("intent has distinct visit and session quotas and shares the day budget wit
 test("a named outcome controls cooperation and inappropriate outcomes or question ids fail", async () => {
 	const mock = createMockProvider();
 	const handle = createHandler({ cases, rules, provider: mock });
-	const forced = createHandler({ cases, rules, provider: { ...mock, generate: async () => ({ text: JSON.stringify({ reply: "Yes.", reaction: "", cooperates: true }) }) } });
+	const refusal = createHandler({ cases, rules, provider: { ...mock, generate: async () => ({ text: JSON.stringify({ reply: "No.", reaction: "", cooperates: false }) }) } });
 	const body = { ...intent("Hello."), signs: {}, state: { patience: 5, patience_max: 6, granted: [], refusals: {}, reassured: [], claims: [], asked: {}, press_count: 0, reassure_used: 0, history: [] }, conversation_history: [] };
-	for (const [type, id, outcome, value] of [["ask","sleep","answer",true],["ask","why","deflect",false],["check","grip","grant",true],["check","port","refuse",false]]) {
+	for (const [type, id, outcome, value] of [["ask","sleep","answer",true],["check","grip","grant",true]]) {
 		const req = { ...body, event: { type, id, text: "Please.", outcome } };
 		assert.equal((await post(handle, "patient-dialogue", req)).body.cooperates, value);
-		if (!value) assert.equal((await post(forced, "patient-dialogue", req)).body.error.message, "outcome_mismatch");
+		assert.equal((await post(refusal, "patient-dialogue", req)).body.error.message, "outcome_mismatch");
 	}
-	for (const event of [{type:"ask",id:"why"}, {type:"ask",id:"why",outcome:"grant"}, {type:"say",outcome:"answer"}])
+	for (const event of [{type:"check",id:"grip",outcome:"refuse"},{type:"ask",id:"why",outcome:"deflect"},{type:"reassure",id:"calm"},{type:"ask",id:"why"}, {type:"ask",id:"why",outcome:"grant"}, {type:"say",outcome:"answer"}])
 		assert.equal((await post(handle, "patient-dialogue", { ...body,event:{ ...event,text:"Hello." } })).status,400);
 	assert.equal((await post(handle,"patient-dialogue",{ ...body, event:{type:"say",text:"Hi"},state:{ ...body.state,asked:{free:1} } })).status,400);
 });

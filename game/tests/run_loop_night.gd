@@ -40,7 +40,19 @@ func run() -> void:
 		var v := main.visit
 		await d.settle()
 		var lamps := v.patience
-		await d.complain()
+		if idx == 0:
+			d.pad("complain")
+			await d.settle(30.0)
+		elif idx == 1:
+			main.act_say("What's bothering you?")
+			await d.settle(30.0)
+		elif idx == 2:
+			main.act_say("Do your eyes hurt?")
+			await d.settle(30.0)
+		else:
+			await d.complain()
+		if night == "K" and idx < 3:
+			check(not v.complaints_told.is_empty(), "chip, general text and part text deliver K's rows")
 		check(v.patience == lamps, "complaint is free")
 		if idx == 0:
 			main.act_say("Lovely music tonight.")

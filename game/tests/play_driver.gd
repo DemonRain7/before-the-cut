@@ -361,7 +361,7 @@ func ask(index: int) -> void:
 
 func complain() -> void:
 	main.act_complain()
-	await settle()
+	await settle(30.0)
 
 
 ## Says the provocative line and waits for the reaction to begin.

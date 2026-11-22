@@ -63,7 +63,7 @@ try {
     if (mode === 'outdated') roster[0].version++;
     const answer = () => {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, protocol: mode === 'protocol' ? '3' : '4', cases: roster,
+      res.end(JSON.stringify({ ok: true, protocol: mode === 'protocol' ? '4' : '5', cases: roster,
         provider: 'mock', disabled: mode === 'disabled', speech_to_text: false }));
     };
     if (mode === 'late') setTimeout(answer, 2400);
@@ -87,7 +87,7 @@ try {
   // What actually crossed the wire in the scene test: every typed line of a visit must be in
   // the requests that follow it, and a new patient must start from that patient's opening only.
   const wire = [];
-  const typed = prompts.filter(p => !p.fair && p.run_id !== 'btc-visit-record' && p.event.type === 'say');
+  const typed = prompts.filter(p => !p.matrix && !p.fair && p.run_id !== 'btc-visit-record' && p.event.type === 'say');
   const visitRecord = prompts.find(p => p.run_id === 'btc-visit-record' && p.event.type === 'say');
   wire.push(['dialogue carries one visit-scoped session id independently of the run', prompts.every(p => p.session_id === p.visit_id && p.run_id !== p.visit_id)]);
   wire.push(['a follow-up remembers both gauge openings, one completion and actual pressure in order',

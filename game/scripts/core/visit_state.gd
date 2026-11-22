@@ -30,15 +30,11 @@ var tests_in_order: Array = []
 var complaints_followed: Array = []
 var pending_leads: Array = []
 var idle_complaints: int = 0
-var refusals: Dictionary = {}    # tool -> how many times it was refused
-var reassured: Dictionary = {}   # tool -> true: a refusal cleared by reassurance
 var claims: Array = []           # claim ids the patient has offered
 var asked: Dictionary = {}       # topic id -> times asked
 var answered: Dictionary = {}    # topic id -> true
 var last_recorded_speech: String = ""  # memory only; never written to the event log
 var press_count: int = 0
-var reassure_left: int = 0
-var reassure_used: int = 0
 var attack_cause: String = ""    # "refer", "press" or "snap"
 var blows_taken: int = 0         # blows that reached the glass before the shutter was down
 var verdict_kind: String = ""    # "treat", "refer" or ""
@@ -171,17 +167,15 @@ func snapshot() -> Dictionary:
 		"patience": patience,
 		"patience_max": patience_max,
 		"granted": granted.keys(),
-		"refusals": refusals.duplicate(),
-		"reassured": reassured.keys(),
+		"complaints_told": complaints_told.duplicate(),
 		"claims": claims.duplicate(),
 		"asked": asked.duplicate(),
 		"press_count": press_count,
-		"reassure_used": reassure_used,
 	}
 
 
 ## Return authored lines in the current language. Only delivered facts enter the chart.
-func complain(row: String = "", maximum: int = -1) -> Dictionary:
+func complaint_offer(row: String = "", maximum: int = -1) -> Dictionary:
 	if not in_exam():
 		return {"rows": [], "line": ""}
 	var drawn: Array = case_data.get("complaint_rows", [])
@@ -200,13 +194,25 @@ func complain(row: String = "", maximum: int = -1) -> Dictionary:
 	for part in deliver:
 		var sentence := Lang.t(str(book[part]))
 		lines.append(sentence)
+	if lines.is_empty():
+		lines.append(Lang.t(str(book.get("none", ""))) if row != "" or drawn.is_empty() else Lang.t("That's all I wanted to mention."))
+	var delivery := "rows" if not deliver.is_empty() else ("none" if row != "" or drawn.is_empty() else "all")
+	return {"rows":deliver, "delivery":delivery, "line":" ".join(lines)}
+
+
+func record_complaint(result: Dictionary) -> void:
+	for part in result.rows:
 		if not complaints_told.has(part):
 			complaints_told.append(part)
 			pending_leads.append(part)
+			var sentence := Lang.t(str(case_data.complaints[part]))
 			add_note(part, "complaint:" + part, Lang.tf("Complains: %s", [sentence]))
-	if lines.is_empty():
-		lines.append(Lang.t(str(book.get("none", ""))) if row != "" or drawn.is_empty() else Lang.t("That's all I wanted to mention."))
-	return {"rows":deliver, "line":" ".join(lines)}
+
+
+func complain(row: String = "", maximum: int = -1) -> Dictionary:
+	var result := complaint_offer(row, maximum)
+	record_complaint(result)
+	return result
 
 
 func record_test(row: String) -> void:

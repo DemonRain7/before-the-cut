@@ -1907,10 +1907,10 @@ func test_agent() -> void:
 	eq(d["source"], "script", "offline mode remains a comparison")
 	eq(client.calls, 0, "offline mode does not call a provider")
 	agent.set_mode("model")
-	client.reply = {"ok": true, "data": {"reply": "Not until you explain the grip test.", "reaction": "Pulls a hand back.", "cooperates": false}}
+	client.reply = {"ok": true, "data": {"reply": "Not until you explain the grip test.", "reaction": "Pulls a hand back.", "cooperates": true}}
 	d = await agent.decide(ev, v.snapshot(), ["comply"])
 	eq(d["source"], "model", "free response accepted")
-	eq(d["move"], "stall", "model can refuse outside authored cooperation options")
+	eq(d["move"], "comply", "hesitation in the line does not deny consent")
 	var applied := v.apply_check("grip", str(d.move), true)
 	eq(applied.result, "granted", "the patient cannot veto the instrument")
 	display_answer(agent, d)
@@ -2274,7 +2274,7 @@ func test_voice() -> void:
 	keys.sort()
 	eq(keys, ["audio", "client", "language", "protocol", "run_id", "session_id", "visit_id"],
 		"a clip travels with its session, visit and language: no case, state or history")
-	eq([sent.protocol, sent.run_id, sent.session_id, sent.visit_id, sent.audio.mime], ["4", "test-session", "voice-visit", "voice-visit", "audio/wav"], "in protocol 4, as a WAV")
+	eq([sent.protocol, sent.run_id, sent.session_id, sent.visit_id, sent.audio.mime], ["5", "test-session", "voice-visit", "voice-visit", "audio/wav"], "in protocol 5, as a WAV")
 	eq(Marshalls.base64_to_raw(str(sent.audio.data)), said, "the samples arrive as they were")
 	eq([agent.calls_this_visit, agent.record.entries.size()], [0, history], "words written down are not a line said: no dialogue call, nothing remembered")
 	client.reply = {"ok": true, "data": {"text": "Plain words."}}

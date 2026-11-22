@@ -149,10 +149,15 @@ static func intent_for_text(case_data: Dictionary, text: String) -> Dictionary:
 			intent_cues = JSON.parse_string(file.get_as_text())
 	var line := text.strip_edges().to_lower()
 	for kind in intent_cues:
+		if kind == "complaint":
+			continue
 		for phrase in intent_cues[kind]:
 			if line.contains(phrase):
 				return {"topic":"", "intent":kind}
 	var topic := topic_for_text(case_data, text)
+	var question := line.ends_with("?") or line.ends_with("？") or line.get_slice(" ", 0) in ["how", "what", "does", "do", "any", "is", "are"]
+	if is_complaint(line) or (topic == "" and question and part_for_text(line) != ""):
+		return {"topic":"", "intent":"complaint"}
 	return {"topic":topic, "intent":"case_question" if topic != "" else ("unclear" if line.length() < 4 else "other")}
 
 

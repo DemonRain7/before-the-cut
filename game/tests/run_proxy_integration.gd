@@ -119,7 +119,7 @@ func test_sign_matrix(db: Dictionary) -> void:
 					v.press()
 					while not v.answered.has(id_to_ask):
 						v.apply_ask(id_to_ask, str(v.legal_moves_for_ask(id_to_ask)[0]))
-					var action := {"type": "reassure", "id": "calm", "text": Lang.t("All right.")}
+					var action := {"type": "say", "id": "free", "intent":"reassurance", "text": Lang.t("All right.")}
 					var d: Dictionary = await a.decide(action, v.snapshot(), [], v.open_signs(action))
 					check(d.source == "model" and d.meta.get("mock") == true and not str(d.reply).is_empty()
 						and (str(d.reply) == NOVEL) == (language == "en"), "HTTP mock reply for %s/%s/%s/%s" % [id, language, speech, temper])

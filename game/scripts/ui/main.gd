@@ -1699,6 +1699,7 @@ func act_call_next() -> void:
 	_beat_opening_done = false
 	_beat_pending = false
 	_beat_activity()
+	agent.voice_complaints = _service_is_mock or rules.agent.get("complaint_voice", "model") == "model"
 	agent.begin_visit(visit, Crypto.new().generate_random_bytes(16).hex_encode(), shift_seed + _visit_serial * 7919)
 	_telegraphed = false
 	_attack_t = 0.0
@@ -2075,20 +2076,33 @@ func act_complain(row: String = "", said: String = "", idle: bool = false) -> vo
 	if not _can_act():
 		return
 	var token := _seq if idle else _begin_action()
+	var offer := visit.complaint_offer(row, 1 if idle else -1)
+	var event := {"type":"complain", "id":"idle" if idle else (row if row != "" else "general"), "rows":offer.rows, "delivery":offer.delivery}
+	var response: Dictionary
+	if idle:
+		var current := visit
+		var revision := _beat_revision
+		_beat_pending = true
+		response = await agent.decide(event, visit.snapshot(), [offer.line], visit.open_signs())
+		if current != visit:
+			return
+		_beat_pending = false
+		if token != _seq or revision != _beat_revision or not _beat_quiet():
+			return
+	else:
+		var question := said if said != "" else Lang.t("What's bothering you?")
+		response = await _decide(event, [offer.line], question, token, said != "")
+	if response.is_empty() or not await _show_reaction(response, token):
+		return
 	var before := _note_keys()
-	if not idle:
-		var question := Lang.t("What's bothering you?") if said == "" else said
-		if said == "":
-			_doctor_say(question, true)
-		visit.record.append("doctor", question)
-	var result := visit.complain(row, 1 if idle else -1)
-	if not result.rows.is_empty():
+	visit.record_complaint(offer)
+	if not offer.rows.is_empty():
 		_mark_new_notes(before)
-		if coach != null:
-			coach.event("complaint")
+	if coach != null:
+		coach.event("complaint")
 	_sync_visit()
-	_log("complaint", {"rows":result.rows, "idle":idle})
-	_patient_line(result.line, token, 0.0)
+	_log("complaint", {"rows":offer.rows, "idle":idle, "source":response.source})
+	_patient_line(str(response.reply), token, 0.0)
 
 
 ## Pressure dialogue is autonomous; existing physical attack choreography remains in VisitState.
@@ -2163,7 +2177,7 @@ func act_say(text: String) -> void:
 		var tool: String = CaseDB.ROW_TOOL.get(part, "press" if part == "temper" else "")
 		if tool != "":
 			desk.pulse = tool
-	elif ScriptedBrain.is_complaint(text) or (part != "" and str(reading.topic) == ""):
+	elif reading.get("intent") == "complaint":
 		act_complain(part, text)
 		return
 	if str(reading.topic) != "":

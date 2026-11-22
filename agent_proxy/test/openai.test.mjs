@@ -131,12 +131,12 @@ test("patient requests reuse stable prefix messages and schema as one appointmen
 	assert.notEqual(calls[4].prompt_cache_key,a.prompt_cache_key);
 });
 
-test("an examination turn needs a real yes or no, and the model's refusal stands", async () => {
+test("an examination needs cooperation and a refusal triggers fallback", async () => {
 	const calls = [];
 	const provider = createOpenAIProvider({ model: "gpt-6-luna", apiKey: KEY, fetchImpl: async (url, opts) => { calls.push(JSON.parse(opts.body)); return responded({ reply: "Not touching that.", reaction: "Pulls the hand back.", cooperates: false }); } });
 	const out = await handler(provider).say(line("check", "grip", "Please hold this handle, then release it."));
-	assert.equal(out.status, 200);
-	assert.equal(out.body.cooperates, false);
+	assert.equal(out.status, 422);
+	assert.equal(out.body.error.message, "outcome_mismatch");
 	assert.deepEqual(calls[0].text.format.schema.properties.cooperates.type, ["boolean","null"], "checks use the same cached wire format as free conversation");
 	const missing = createOpenAIProvider({ model: "m", apiKey: KEY, fetchImpl: async () => responded({ reply: "Sure.", reaction: "", cooperates: null }) });
 	const bad = await handler(missing).say(line("check", "grip", "Please hold this handle, then release it."));

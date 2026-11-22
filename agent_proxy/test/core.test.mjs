@@ -87,7 +87,7 @@ test("protocol 2 is rejected rather than silently selecting authored speech",()=
  const b=body(); delete b.protocol; assert.equal(validateRequest(b,cases).code,"protocol_mismatch");
 });
 test("all dialogue entry points and free player text are accepted without legal moves",()=>{
- for(const [type,id] of [["ask","why"],["check","grip"],["press","challenge"],["reassure","calm"],["say","free"]]){
+ for(const [type,id] of [["ask","why"],["check","grip"],["press","challenge"],["say","free"]]){
   const b=body(type,id,"Can you tell me something I did not ask before?");
   const v=validateRequest(b,cases); assert.equal(v.ok,true); assert.ok(!("legal_moves" in v.req));
  }
@@ -125,9 +125,9 @@ test("novel model answer survives proxy verbatim; no authored substitution",asyn
  assert.equal(out.body.cooperates,true);assert.ok(!("move" in out.body));
  assert.ok(!JSON.stringify(logs).includes(novel.reply)); assert.ok(!JSON.stringify(logs).includes("What happened"));
 });
-test("AI can refuse an exam even if the authored case only permits comply",async()=>{
+test("the game grants an exam even if a provider attempts to veto it",async()=>{
  const {post}=handler(fixture(novel));const out=await post(body("check","grip","Hold this handle."));
- assert.deepEqual(cases.kip.checks.grip.first,["comply"]); assert.equal(out.body.cooperates,false);
+ assert.deepEqual(cases.kip.checks.grip.first,["comply"]); assert.equal(out.status,422); assert.equal(out.body.error.message,"outcome_mismatch");
 });
 test("model sees only this request's patient and visit history",async()=>{
  const inputs=[];const p={...fixture(),async generate(input){inputs.push(input);return fixture().generate();}};
@@ -208,7 +208,7 @@ test("Google transport forwards unconstrained JSON schema and conversation (fake
  assert.ok(!JSON.stringify(request.generationConfig.responseSchema).includes('"enum"'));
  assert.ok(request.contents[0].parts[0].text.includes("player_action"));
 });
-test("real HTTP server returns protocol 4 response with mock label",async()=>{
+test("real HTTP server returns protocol 5 response with mock label",async()=>{
  const server=await startServer({port:0,provider:createMockProvider(),log:()=>{}});
  try{const res=await fetch(server.url+"/v1/patient-dialogue",{method:"POST",body:JSON.stringify(body()),headers:{"content-type":"application/json"}});
  const data=await res.json();assert.equal(res.status,200);assert.equal(data.meta.mock,true);assert.ok(data.reply.length);
@@ -232,4 +232,37 @@ test("Worker entry imports the current ten cases and serves the same contract in
  const data=await health.json();assert.equal(data.protocol,PROTOCOL);assert.deepEqual(data.cases.sort((a,b)=>a.id.localeCompare(b.id)), Object.values(cases).map(({id,version})=>({id,version})).sort((a,b)=>a.id.localeCompare(b.id)));
  const res=await worker.fetch(new Request("https://local.test/v1/patient-dialogue",{method:"POST",body:JSON.stringify(body())}),{BTC_PROVIDER:"mock"});
  const reply=await res.json();assert.equal(res.status,200);assert.equal(reply.meta.mock,true);
+});
+
+test("complaints enter the prompt only on delivery or after this visit heard them", async () => {
+ const {post} = handler(createMockProvider());
+ for (const c of Object.values(cases)) for (const language of ["en","zh"]) {
+  const req = {...body("say","free"), case_id:c.id, case_version:c.version, signs:{}, language};
+  const prompt = b => { const v=validateRequest(b,cases); assert.ok(v.ok); return buildPrompt(c,rules,v.req,110); };
+  const baseline=prompt(req);
+  for(const row of ["eyes","hands","port","temper"]) assert.ok(![baseline.system,baseline.user].join(" ").includes(c.complaints[row]));
+  assert.equal(baseline.currentTurn.previously_told,undefined);
+  assert.equal(baseline.currentTurn.voice_now,undefined);
+  req.event={type:"complain",id:"general",rows:["hands","eyes"],delivery:"rows",text:"What hurts?"};
+  const current=prompt(req).currentTurn;
+  assert.equal(current.voice_now.length,2);
+  if(language==="en") assert.deepEqual(current.voice_now,[c.complaints.hands,c.complaints.eyes]);
+  else assert.ok(current.voice_now.every(s=>/[\u3400-\u9fff]/u.test(s)));
+  const reply=await post(req);
+  assert.equal(reply.status,200);assert.equal(reply.body.reply,current.voice_now.join(" "));
+  req.state.complaints_told=["hands"];req.event={type:"say",id:"free",text:"Tell me more."};
+  assert.deepEqual(prompt(req).currentTurn.previously_told,[{row:"hands",sentence:current.voice_now[0]}]);
+  for(const part of ["port","temper"]) assert.ok(!prompt(req).user.includes(c.complaints[part]));
+ }
+});
+
+test("complaint requests reject unknown, duplicate and overlong deliveries before the provider", async () => {
+ const {post}=handler(createMockProvider());
+ for(const rows of [["eyes","unknown"],["port","port"],["eyes","hands","temper"]]){
+  const b=body("complain","general","What hurts?");Object.assign(b.event,{rows,delivery:"rows"});
+  assert.equal((await post(b)).status,400);
+ }
+ const b=body("complain","idle","");Object.assign(b.event,{rows:["port"],delivery:"rows"});
+ assert.equal((await post(b)).status,200);
+ b.state.complaints_told=["unopened"];assert.equal((await post(b)).status,400);
 });

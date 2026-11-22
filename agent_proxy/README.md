@@ -1,4 +1,4 @@
-# Patient dialogue proxy — protocol 4
+# Patient dialogue proxy — protocol 5
 
 The proxy gives the patient its character, the doctor's action, the conversation and the signs earned during this visit. The patient writes dialogue and visible reactions. Godot chooses the case outcomes and uses authored ASK answers by default. A separate route classifies a typed or confirmed spoken line against the current case's questions.
 
@@ -21,7 +21,7 @@ The address form connects to an existing service. The original `-Model -AgentUrl
 
 For a separately managed Node server, run `npm run dev` from `agent_proxy`. It binds to 127.0.0.1:8787 and defaults to mock. The command uses the process environment. `-Patient live` starts the local game service and selects OpenAI `gpt-6-luna` only after the operator types `LIVE`. Node then loads the ignored credential file. Patient replies, topic classifications and transcriptions share the 2,000-attempt process cap and can each incur a charge. The approved 24-dialogue course check uses the private Worker procedure below.
 
-`GET /healthz` lists protocol `"4"`, provider, model, case ids and versions, `disabled` and `speech_to_text`. Health checks use zero provider calls. An old protocol receives 409 on a POST.
+`GET /healthz` lists protocol `"5"`, provider, model, case ids and versions, `disabled` and `speech_to_text`. Health checks use zero provider calls. An old protocol receives 409 on a POST.
 
 ## Provider configuration
 
@@ -52,11 +52,11 @@ and `BTC_TRANSCRIBE_TIMEOUT_MS` are configurable. The Worker uses durable counte
 
 ## Topic classification
 
-`POST /v1/patient-intent` receives protocol, run id, visit/session id, case id and version, language and the typed or confirmed spoken line. The provider sees the current patient's question IDs and wording, and the doctor's actual line. A single-choice schema accepts an `ask_<id>` or one free class. The public result carries `about` (an allowed question ID or `none`) and `intent`. Free classes cover follow-up, tool request, reassurance, provocation, social or personal talk, role probe, unclear and other. An inferred paid ASK shows the question and lamp price before acceptance. A player can choose small talk or the question menu. The route has its own 16-attempt visit and 240-attempt run ceilings. Each attempt also uses one unit from the UTC-day budget. The upstream deadline is 2 seconds and the game waits up to 2.5 seconds. A failed classifier falls back to the offline keyword matcher.
+`POST /v1/patient-intent` receives protocol, run id, visit/session id, case id and version, language and the typed or confirmed spoken line. The provider sees the current patient's question IDs and wording, and the doctor's actual line. A single-choice schema accepts an `ask_<id>` or one free class. The public result carries `about` (an allowed question ID or `none`) and `intent`. Free classes cover follow-up, tool request, reassurance, provocation, social or personal talk, role probe, unclear and other. A listed question receives its free answer immediately. The complaint class asks about discomfort in general or a particular body part. Tool requests can point at an instrument. Text and confirmed dictation never spend a lamp. The route has its own 16-attempt visit and 240-attempt run ceilings. Each attempt also uses one unit from the UTC-day budget. The upstream deadline is 2 seconds and the game waits up to 2.5 seconds. A failed classifier falls back to the offline keyword matcher.
 
 ## Patient dialogue
 
-The request includes `protocol: "4"`, run, session, visit and case identifiers, case version, tonight's `signs`,
+The request includes `protocol: "5"`, run, session, visit and case identifiers, case version, tonight's `signs`,
 `event` with `type`, `id` and the doctor's exact `text`, current visit state,
 `conversation_history`, a reply-length limit, and the player's `language`.
 
@@ -87,7 +87,9 @@ Response:
 }
 ```
 
-`cooperates` is required on a tool request and whenever the game names an outcome. The patient chooses whether to cooperate on its first unsettled tool request. A named `grant` or `answer` requires true, and `refuse` or `deflect` requires false. Contradictory responses trigger scripted fallback. All ASK calls carry their outcome. The default authored ASK requires no dialogue request. The resulting exchange enters conversation history in either mode.
+`cooperates` is required on a tool request and whenever the game names an outcome. The game grants each available instrument and answers every listed question. A contrary generated response triggers scripted fallback. Authored ASK uses no dialogue call. The resulting exchange enters conversation history in either mode.
+A `complain` event carries delivered row IDs and a delivery kind (rows, none or all). The service selects the corresponding authored wording in the requested language. The model receives those sentences and any previously delivered rows in this appointment. Untold rows and the underlying medical measurements stay in the game. A late or invalid complaint uses the exact authored sentence.
+
 Instrument readings, attack choreography and scoring are still implemented by the game.
 
 Successful replies reach the dialogue strip. An answered ASK writes one SPEECH note for its topic. Only PRESS records a pressure reaction. Normal display
@@ -102,7 +104,7 @@ Request:
 
 ```json
 {
-  "protocol": "4",
+  "protocol": "5",
   "run_id": "cab1f00d",
   "session_id": "1a2b3c4d",
   "visit_id": "1a2b3c4d",
@@ -212,7 +214,7 @@ deadlines, a hard 110-character reply limit and 24 history entries):
 
 `npm test` in `agent_proxy` runs on Node without Wrangler, an account or a provider key. The November 21 P1 run has **52 passing tests**. Another 7 pass in `node --test tools/live_model_guard.test.mjs` from the repository root. From the repository root, `node tools/run_proxy_integration.mjs <Godot-console-path> <evidence-directory>` drives the actual Godot HTTP client against local mocks. **334 game-side and 100 wire checks passed.** For each of ten characters in each language, four requests cross normal/broken SPEECH with normal/broken TEMPER. The wire checks match both sign ids and prompt sentences. Voice inputs are generated tones. These results measure transport, limits and game behavior. The bilingual GPT-6 Luna model results and outside-player comparison status are in the [full-build handoff](../HANDOFF.md#full-build-november-21).
 
-Dialogue, intent and transcription share one random `session_id` equal to `visit_id` at this appointment. `run_id` groups visits for the existing aggregate quotas. Legacy protocol 4 clients omit `run_id` and continue to use their original session identifier for those quotas. The proxy rebuilds each dialogue from the supplied visit and keeps only counter metadata.
+Dialogue, intent and transcription share one random `session_id` equal to `visit_id` at this appointment. `run_id` groups visits for the existing aggregate quotas.  The proxy rebuilds each dialogue from the supplied visit and keeps only counter metadata.
 
 The Worker sends one reservation to the SQLite-backed Durable Object named for the game run. Visit and run limits are checked there in order. A second object named for the UTC date reserves one daily slot across sessions and routes in that environment. These writes survive Worker and object restarts. Failed provider attempts use a slot. An unavailable counter fails closed with 503 `counter_unavailable`. Objects discard their storage after two idle days. Client-chosen session ids provide no authentication. The daily ceiling covers callers that change ids. The local Node process uses memory for the same limits and also stops at 2,000 provider attempts over its lifetime.
 
