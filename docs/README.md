@@ -1,5 +1,6 @@
 # Project documents
 
+- [Play loop redesign](development/play-loop-redesign/PROGRESS.md) with rules, measurements and the acceptance sheet.
 - [G1 concept package](g1/README.md): required design, configuration and project-plan documents, recording script and submission preparation.
 - [Chosen direction](development/direction.md): how the game looks, sounds and plays, and which parts are the student's decisions.
 - [Repository transition](development/repository-transition.md): the completed transfer from the legacy workspace into this repository.

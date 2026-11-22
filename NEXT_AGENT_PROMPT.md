@@ -1,5 +1,7 @@
 # Continue Before the Cut
 
+Follow the [play loop milestones](docs/development/play-loop-redesign/PROGRESS.md) for the November 21 redesign.
+
 Start with the [appointment memory checkpoint](HANDOFF.md#one-session-per-appointment), then read the [full build](HANDOFF.md#full-build-november-21) and [milestone record](docs/development/full-build-progress.md). M0–M7 are complete. The deployed Worker returned 24/24 genuine GPT-6 Luna replies and was switched off again. The approved M0 ledger is closed. [Cloud checkpoint evidence](docs/development/live-model-results-2026-11-21.md#deployed-worker-checkpoint) The version is rules 12, protocol 4. The student selected wear, the warned second PRESS, all repairs, pushing milestones and redeploying the three existing services.
 
 ## Run the game

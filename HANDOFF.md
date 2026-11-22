@@ -1,5 +1,9 @@
 # Before the Cut: handoff
 
+## Play loop redesign · November 21, 2026
+
+In progress. The student wrote, “就我觉得这块的逻辑应该是需要好好考量的，现在这样肯定不行，选择太多没有引导性、然后还会有patience次数限制，又加上我们还有agent、会让整个input复杂度指数提升，目前设计的包括玩起来都会很不合理。” The new loop gives every visitor two lamps, free conversation and complaints that guide tests. [Design and milestone results](docs/development/play-loop-redesign/PROGRESS.md)
+
 ## Deployed OpenAI checkpoint
 
 M0 is complete. On November 21 the permanent Cloudflare Worker returned 24/24 real GPT-6 Luna replies across six visits, three in English and three in Chinese. Median round-trip time was 1.524 seconds. Reported tokens put the standard-rate estimate at USD 0.00362719 and the conservative bound at USD 0.004588894, inside the approved USD 0.01. The project credential is bound. At 6:07 p.m. New York time the live Worker was closed again, confirmed by disabled health and a 503 on dialogue. Its temporary bearer was removed. [Paid results and cache measurements](docs/development/live-model-results-2026-11-21.md#deployed-worker-checkpoint)
