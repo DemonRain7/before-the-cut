@@ -6,7 +6,10 @@ One steady desk light indicates a possible next action based on what the patient
 
 ## Run the game
 
+A configured checkout starts GPT-6 Luna on loopback. `-CheckPatient` verifies its connection in Godot at the title. A typed turn through the live local service, return visits, and reuse of complete history groups were checked in the [local cache evaluation](docs/development/live-model-results-2026-11-21.md#local-play-and-prompt-cache-reads).
+
 ```powershell
+.\run-game.ps1 -Language zh -Seed 41307 -TestNight K
 .\run-game.ps1 -Patient script -Language zh -Seed 41307 -TestNight K
 .\run-game.ps1 -Patient mock -Language zh -Seed 41307 -TestNight K
 .\run-game.ps1 -Patient script -Language zh -Seed 41307 -TestNight L

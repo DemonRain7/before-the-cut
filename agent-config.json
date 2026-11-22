@@ -1,6 +1,6 @@
 {
   "schema_version": "course-1",
-  "config_version": "0.13.0",
+  "config_version": "0.13.1",
   "project": "Before the Cut",
   "updated": "2026-11-21",
   "status": "Rules 13, patient protocol 5. The November 21 L1–L5 evaluation completed 400 GPT-6 Luna calls through the game service. Five targets held. The three existing Workers passed public probes including the disabled live Worker.",
@@ -45,7 +45,7 @@
     "status": "November 21 L1–L5: 400/400 attempts, USD 0.0293384 standard-rate estimate, USD 1.0216562 reserved upper bound. Intent and dialogue medians were 764 and 1,370 ms."
   },
   "fallback": "Scripted offline patient and explicit in-game fallback. Only delivered complaint facts enter a generated line.",
-  "memory_policy": "One in-memory session per appointment. Closing it releases the transcript. Requests exceeding 32 KiB include the opening, recent events and whole-visit action counts. GPT reuses eligible prompt prefixes.",
+  "memory_policy": "Each case owns its static soul. Shared rules apply to all patients. Godot keeps ordered session history and successful intent lookups until that appointment ends. Returning patients start with empty history. Requests above 32 KiB include the opening, recent events and whole-visit action counts.",
   "agent_team": [
     {
       "role": "Producer",
@@ -233,7 +233,7 @@
     "status": "Push-to-talk and review-before-send are available on a voice-capable local service. The November 15 OpenAI run transcribed ten clips of synthetic speech. The November 21 evaluation did not send audio. Public Workers disable transcription."
   },
   "providers": {
-    "default": "The game starts with authored patients. Its menu connects to the permanent public mock when enabled.",
+    "default": "The launcher uses local OpenAI when the checkout has a configured project key. A clean installation starts offline. SETTINGS uses the configured service or loopback. Mock is an explicit test mode.",
     "google": "Gemini API key, or Vertex AI with an OAuth access token from gcloud application-default credentials; default model gemini-3.5-flash-lite",
     "openai": "API key only (ChatGPT sign-in does not use API credit); default models gpt-6-luna and gpt-4o-mini-transcribe",
     "status": "The shipped live launcher selects OpenAI gpt-6-luna. Real OpenAI results for November 15 and 21 are recorded in HANDOFF.md. Google/Vertex only have simulated provider tests."

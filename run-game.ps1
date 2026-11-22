@@ -30,7 +30,6 @@ if ($patientChosen -and ($Model -or $AgentUrl)) {
     throw 'Use -Patient by itself, or use the original -Model -AgentUrl pair.'
 }
 if ($Model -and -not $AgentUrl) { throw 'For -Model, pass -AgentUrl.' }
-if ($CheckPatient -and $Patient -notin @('mock', 'timeout')) { throw '-CheckPatient takes -Patient mock or timeout.' }
 if ($Patient -notin @('script', 'mock', 'timeout', 'live')) {
     $address = $null
     if (-not [Uri]::TryCreate($Patient, [UriKind]::Absolute, [ref]$address) -or
@@ -79,6 +78,20 @@ if ($missing -gt 0) {
 }
 if ($ImportOnly) { exit 0 }
 
+$proxyDir = Join-Path $PSScriptRoot 'agent_proxy'
+$projectSettings = Join-Path $proxyDir '.dev.vars'
+if (-not $patientChosen -and -not $AgentUrl -and -not $Model -and -not $env:BTC_AGENT_URL -and (Test-Path -LiteralPath $projectSettings)) {
+    $node = Get-Command node -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($node) {
+        # Use the service's normal environment loader. Only the exit status leaves the child.
+        & $node.Source "--env-file-if-exists=$projectSettings" -e 'process.exit(process.env.OPENAI_API_KEY?.trim() ? 0 : 3)'
+        if ($LASTEXITCODE -eq 0) { $Patient = 'live' }
+    }
+}
+if ($CheckPatient -and $Patient -notin @('mock', 'timeout', 'live')) {
+    throw '-CheckPatient needs a configured local OpenAI service or -Patient live, mock or timeout.'
+}
+
 # A child server binds a free port itself. Only its environment changes.
 $proxyProcess = $null
 $readyFile = $null
@@ -86,16 +99,14 @@ try {
     if ($Patient -in @('mock', 'timeout', 'live')) {
         $info = New-Object System.Diagnostics.ProcessStartInfo
         $info.FileName = (Get-Command node -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
-        $info.WorkingDirectory = Join-Path $PSScriptRoot 'agent_proxy'
+        $info.WorkingDirectory = $proxyDir
         $info.UseShellExecute = $false
         $info.CreateNoWindow = $true
         $info.Arguments = 'src/dev_server.mjs'
         $info.EnvironmentVariables['BTC_HOST'] = '127.0.0.1'
         $info.EnvironmentVariables['BTC_PORT'] = '0'
         if ($Patient -eq 'live') {
-            $limits = (Get-Content -LiteralPath (Join-Path $gameDir 'data/rules.json') -Raw -Encoding UTF8 | ConvertFrom-Json).agent
-            Write-Host "Live patient dialogue, topic classification and microphone transcription cost money. The process cap is $($limits.max_provider_calls_per_process) provider calls."
-            if ((Read-Host 'Type LIVE to start the paid local service') -cne 'LIVE') { throw 'Live launch cancelled.' }
+            Write-Host 'Local patient service: OpenAI GPT-6 Luna. Model turns during play use the project API key.'
             $info.EnvironmentVariables['BTC_PROVIDER'] = 'openai'
             $info.EnvironmentVariables['BTC_MODEL'] = 'gpt-6-luna'
             $info.EnvironmentVariables['BTC_REASONING_EFFORT'] = 'none'
@@ -117,11 +128,13 @@ try {
         if ($port -eq 0) { throw 'Patient service did not start in time.' }
         $AgentUrl = "http://127.0.0.1:$port"
         $health = Invoke-RestMethod -Uri "$AgentUrl/healthz" -TimeoutSec 2
-        $expectsMock = $Patient -ne 'live'
+        $expectedProvider = if ($Patient -eq 'live') { 'openai' } else { 'mock' }
         $protocol = (Get-Content -LiteralPath (Join-Path $gameDir 'data/rules.json') -Raw -Encoding UTF8 | ConvertFrom-Json).agent.protocol
-        if ($health.protocol -ne $protocol -or $health.disabled -or ($health.provider -eq 'mock') -ne $expectsMock) {
+        if ($health.protocol -ne $protocol -or $health.disabled -or $health.provider -ne $expectedProvider -or
+            ($Patient -eq 'live' -and $health.model -ne 'gpt-6-luna')) {
             throw 'Patient service health does not match the requested mode.'
         }
+        Write-Host "Connected to $($health.provider) / $($health.model) on loopback (protocol $protocol)."
         $Model = $true
     }
     $gameOptions = @()
@@ -141,6 +154,15 @@ try {
     if ($gameOptions.Count -gt 0) { $gameArguments += @('--') + $gameOptions }
     & $GodotPath @gameArguments
     $gameExit = $LASTEXITCODE
+    if ($Patient -eq 'live' -and -not $CheckPatient) {
+        try {
+            $usage = (Invoke-RestMethod -Uri "$AgentUrl/healthz" -TimeoutSec 2).prompt_cache_usage
+            foreach ($route in $usage.PSObject.Properties) {
+                $total = $route.Value
+                Write-Host ("OpenAI {0} cache read on {1}/{2} requests ({3}/{4} input tokens)." -f $route.Name, $total.hits, $total.reports, $total.cached_tokens, $total.input_tokens)
+            }
+        } catch { Write-Host 'Cache counts unavailable for this play session.' }
+    }
 } finally {
     if ($proxyProcess) {
         if (-not $proxyProcess.HasExited) { $proxyProcess.Kill(); $proxyProcess.WaitForExit() }

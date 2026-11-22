@@ -61,6 +61,15 @@ class FakeClient:
 		return reply
 
 
+class IntentClient:
+	extends RefCounted
+	var reply := {"ok": true, "data": {"about": "none", "intent": "social"}}
+	var calls := 0
+	func request_intent(_payload: Dictionary) -> Dictionary:
+		calls += 1
+		return reply
+
+
 ## Stands in for the proxy's speech route. `hold` keeps the words back until `released` is
 ## emitted, the way a slow speech service would.
 class VoiceClient:
@@ -148,6 +157,7 @@ func _initialize() -> void:
 	test_brain()
 	await test_agent()
 	await test_conversation()
+	await test_visit_intent_cache()
 	test_visit_record()
 	test_validator()
 	await test_offline_say()
@@ -1990,6 +2000,42 @@ func test_visit_record() -> void:
 func display_answer(agent: PatientAgent, answer: Dictionary) -> void:
 	agent.record.append("reaction", Lang.t(str(answer.get("reaction", ""))))
 	agent.record.append("patient", Lang.t(str(answer.reply)))
+
+
+func test_visit_intent_cache() -> void:
+	var language := Lang.code
+	Lang.pin("en")
+	var client := IntentClient.new()
+	var agent := PatientAgent.new(rules, client)
+	var v := visit("rook")
+	agent.begin_visit(v, "one", 1)
+	agent.set_mode("model")
+	var line := "May I ask you about the docks?"
+	var result: Dictionary = await agent.classify(str(v.case_data.topics[0].q))
+	eq([result.source, client.calls], ["listed", 0], "an exact listed question needs no classifier")
+	result = await agent.classify(line)
+	eq([result.source, client.calls], ["model", 1], "a new free line uses the classifier")
+	result.intent = "other"
+	result = await agent.classify(line)
+	eq([result.source, result.intent, client.calls], ["cache", "social", 1], "a cached classification is independent of the caller's dictionary")
+	Lang.pin("zh")
+	result = await agent.classify(Lang.t(str(v.case_data.topics[0].q)))
+	eq([result.source, client.calls], ["listed", 1], "the displayed Chinese question also skips classification")
+	result = await agent.classify(line)
+	eq([result.source, client.calls], ["model", 2], "each language has its own routing result")
+	agent.max_intents = 2
+	result = await agent.classify(line)
+	eq([result.source, agent.intents_this_visit], ["cache", 2], "reusing a result spends no visit quota")
+	agent.begin_visit(visit("rook"), "two", 2)
+	client.reply = {"ok": false, "error": "timeout"}
+	result = await agent.classify(line)
+	eq([result.reason, client.calls], ["timeout", 3], "a returning patient starts cold")
+	client.reply = {"ok": true, "data": {"about": "mood"}}
+	result = await agent.classify(line)
+	eq([result.source, result.topic, client.calls], ["model", "mood", 4], "a failed classification can be retried")
+	agent.end_visit()
+	ok(agent._intent_cache.is_empty(), "closing clears the visit's routing results")
+	Lang.pin(language)
 
 
 func test_conversation() -> void:

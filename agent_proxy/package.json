@@ -5,10 +5,10 @@
   "type": "module",
   "description": "Autonomous patient dialogue for Before the Cut: character context and conversation in, original speech and reaction out. Also turns a push-to-talk clip into text.",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.9.0"
   },
   "scripts": {
     "test": "node --test test/core.test.mjs test/transcribe.test.mjs test/openai.test.mjs test/service.test.mjs test/intent.test.mjs test/patient-beats.test.mjs",
-    "dev": "node src/dev_server.mjs"
+    "dev": "node --env-file-if-exists=.dev.vars src/dev_server.mjs"
   }
 }

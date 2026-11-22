@@ -5,7 +5,9 @@ import { openAIInput, ProviderError } from "../../agent_proxy/src/providers.mjs"
 export const LIMITS = Object.freeze({ E1: 400, E2: 408, E3: 120, E4: 174 });
 const budgets = {
   full: { counts: LIMITS, maxNano: 50_000_000_000, inputNano: 138, outputNano: 550 },
-  slim: { counts: { L1:120, L2:80, L3:80, L4:80, L5:40 }, maxNano:5_000_000_000, inputNano:600, outputNano:1600 }
+  slim: { counts: { L1:120, L2:80, L3:80, L4:80, L5:40 }, maxNano:5_000_000_000, inputNano:600, outputNano:1600 },
+  // Standard Luna with 30-minute writes and a 10% regional premium. Prior reservations retain their original bound.
+  cache: { counts: { C:8, H:4, G:2 }, maxNano:50_000_000, inputNano:138, outputNano:550 }
 };
 const MODEL = "gpt-6-luna";
 
@@ -43,9 +45,11 @@ export function openLedger(dir, live, kind = "full") {
     if (!Object.hasOwn(budget.counts, group) || attempts.has(id) || counts[group] >= budget.counts[group]) throw new ProviderError("eval_call_cap");
     // Max UTF-8 bytes for the exact prompt, schema, framing and output. Upper standard/regional rates per token, in nanodollars.
     const bytes = Buffer.byteLength(JSON.stringify([openAIInput(input, true), input.schema])) + 1024;
-    const nano = live ? bytes * budget.inputNano + input.maxOutputTokens * budget.outputNano : 0;
+    const upper = bytes * budget.inputNano + input.maxOutputTokens * budget.outputNano;
+    const nano = live ? upper : 0;
     if (bound + nano > budget.maxNano) throw new ProviderError("eval_cost_cap");
     append({ stage: "reserve", id, group, nano });
+    return upper;
   }
   return {
     events, attempts, counts, get bound() { return bound; }, append, reserve,

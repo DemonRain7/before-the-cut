@@ -109,7 +109,9 @@ test("patient requests reuse stable prefix messages and schema as one appointmen
 	assert.equal((await api.say(next)).status, 200);
 	const [a,b] = calls;
 	assert.equal(a.prompt_cache_key, b.prompt_cache_key);
-	assert.deepEqual(a.prompt_cache_options, {mode:"implicit"});
+	assert.deepEqual(a.prompt_cache_options, {mode:"explicit"});
+	assert.ok(a.input[0].content.every(block => block.prompt_cache_breakpoint?.mode === "explicit"));
+	assert.ok(!a.input.at(-1).content[0].prompt_cache_breakpoint);
 	assert.deepEqual(a.input.slice(0,2), b.input.slice(0,2));
 	assert.deepEqual(a.text.format, b.text.format);
 	assert.equal(a.input[1].content[0].prompt_cache_breakpoint.mode, "explicit");
@@ -127,8 +129,25 @@ test("patient requests reuse stable prefix messages and schema as one appointmen
 	const chronology = calls[3].input.slice(1,-1).flatMap(m => JSON.parse(m.content[0].text).conversation_history);
 	assert.deepEqual(chronology[3], {visit_summary:compact.visit_summary});
 	assert.deepEqual(chronology.filter(e => e.role), compact.conversation_history);
-	assert.equal(await api.say({...first, language:"zh"}).then(r=>r.status), 200);
-	assert.notEqual(calls[4].prompt_cache_key,a.prompt_cache_key);
+	assert.equal((await api.say({...returnVisit, case_id:"rook", language:"zh"})).status, 200);
+	const other = calls[4];
+	assert.equal(other.prompt_cache_key, a.prompt_cache_key);
+	assert.deepEqual(other.input[0].content[0], a.input[0].content[0], "all cases and languages share the rules");
+	assert.match(other.input[0].content[1].text, /Rook Dunmore/);
+	assert.match(other.input[0].content[1].text, /Simplified Chinese/);
+	assert.ok(!JSON.stringify(other.input).includes("Kip Marlow"));
+	assert.deepEqual(other.text.format, a.text.format);
+	const history = Array.from({length:33}, (_, i) => ({role:"doctor", text:"Unique turn " + i}));
+	for (const size of [16,24,33]) {
+		assert.equal((await api.say({...first, conversation_history:history.slice(0,size)})).status, 200);
+	}
+	for (const [index, count] of [[5, 2], [6, 3], [7, 4]]) {
+		const input = calls[index].input;
+		const boundaries = input.slice(1,-1).flatMap((m,i) => m.content[0].prompt_cache_breakpoint ? [i+1] : []);
+		assert.deepEqual(boundaries, [count-1, count], "the latest two complete groups remain lookup boundaries");
+		assert.equal(input.flatMap(m => m.content).filter(b => b.prompt_cache_breakpoint).length, 4);
+		assert.ok(!input.at(-1).content[0].prompt_cache_breakpoint);
+	}
 });
 
 test("an examination needs cooperation and a refusal triggers fallback", async () => {

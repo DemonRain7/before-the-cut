@@ -32,6 +32,7 @@ var max_intents: int = 16
 var voice_clips_this_visit: int = 0
 var last: Dictionary = {}
 var record: VisitRecord = null
+var _intent_cache: Dictionary = {}   # successful, context-free classifications in this visit
 var max_body_bytes: int = 32768
 var _generation: int = 0
 
@@ -89,6 +90,7 @@ func begin_visit(visit: VisitState, p_visit_id: String, p_seed: int) -> void:
 
 func end_visit() -> void:
 	_generation += 1
+	_intent_cache.clear()
 	if record != null:
 		record.clear()
 	record = null
@@ -212,10 +214,19 @@ func build_voice_payload(wav: PackedByteArray) -> Dictionary:
 func classify(text: String) -> Dictionary:
 	if record == null:
 		return {}
+	text = text.strip_edges()
+	for topic in case_data.get("topics", []):
+		if text == topic.q or text == Lang.t(str(topic.q)):
+			return {"topic": topic.id, "intent": "case_question", "source": "listed", "reason": ""}
 	var fallback := ScriptedBrain.intent_for_text(case_data, text)
 	fallback.merge({"source":"script","reason":""})
 	if mode != "model" or client == null:
 		return fallback
+	var key := Lang.code + ":" + text.sha256_text()
+	if _intent_cache.has(key):
+		var hit: Dictionary = _intent_cache[key].duplicate()
+		hit.source = "cache"
+		return hit
 	fallback.source = "fallback"
 	if calls_this_visit >= max_calls or intents_this_visit >= max_intents or not client.has_method("request_intent"):
 		fallback.reason = "call_cap" if calls_this_visit >= max_calls or intents_this_visit >= max_intents else "not_configured"
@@ -229,11 +240,19 @@ func classify(text: String) -> Dictionary:
 		return {}
 	if response.get("ok") == true:
 		var about: Variant = response.get("data", {}).get("about")
+		var result := {}
 		if about == "none":
-			return {"topic": "", "intent": str(response.data.get("intent", "other")), "source": "model", "reason": ""}
-		for item in case_data.get("topics", []):
-			if item.id == about:
-				return {"topic": about, "intent":"case_question", "source":"model", "reason":""}
+			var kind := str(response.data.get("intent", ""))
+			if kind in ["unclear", "other"] or ScriptedBrain.intent_cues.has(kind):
+				result = {"topic": "", "intent": kind, "source": "model", "reason": ""}
+		else:
+			for item in case_data.get("topics", []):
+				if item.id == about:
+					result = {"topic": about, "intent": "case_question", "source": "model", "reason": ""}
+					break
+		if not result.is_empty():
+			_intent_cache[key] = result.duplicate()
+			return result
 	fallback.reason = str(response.get("error", "invalid_intent"))
 	return fallback
 

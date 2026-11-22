@@ -1,4 +1,20 @@
-# Patient-agent cloud checkpoint, November 21, 2026
+# Patient-agent model checkpoints, November 21, 2026
+
+## Local play and prompt-cache reads
+
+Godot can reach GPT-6 Luna through the game's loopback service. A configured checkout starts that service with the normal Windows launcher. The shared performance instructions precede the selected language and case soul. Each appointment supplies its own chronological history. New speech and changing visit state sit beyond the explicit cache boundaries. [Shared rules](../../agent_proxy/src/patient_instructions.mjs) · [OpenAI transport](../../agent_proxy/src/providers.mjs) · [OpenAI prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching)
+
+The owner approved a fresh local evaluation with a USD 0.05 total ceiling. All 14 production-route requests returned HTTP 200 and reported actual OpenAI usage. The first eight dialogue calls covered Rook in Chinese, Kip in English and a new Chinese visit by Rook. Seven had a cache read. The first English Kip call began with empty history and read 1,101 cached tokens. The returning Rook also began with empty history and read 1,288. The shared rules and the static character were reusable independently of a previous visit's conversation.
+
+| Route | Requests with an OpenAI cache read | Cached / total input tokens |
+| --- | ---: | ---: |
+| Dialogue | 12 / 13 (92.3%) | 15,483 / 19,236 (80.49%) |
+| Intent | 0 / 1 | 0 / 399 |
+| Combined | 12 / 14 (85.7%) | 15,483 / 19,635 (78.85%) |
+
+Four English Rook calls exercised history groups. The visit started with eight entries drawn from his authored opening and two answered questions. After subsequent real model replies and another authored exchange, the requests carried 8, 10, 16 and 18 history entries. Their cache reads were 1,101, 1,398, 1,398 and 1,563 tokens respectively. The last two requests reused the earlier complete group while writing the next one, then read the longer prefix.
+
+The last two provider requests came from a headless Godot visit. The driver opened the typing control, entered a social question and verified that OpenAI's reply appeared in the patient's displayed history. A repeat lookup of the same doctor's sentence returned from the local intent cache. Total reported output was 542 tokens, with 1,890 input cache-write tokens. Standard pricing gives an estimated USD 0.00088828. The ledger reserved at most USD 0.049979694 in total. This repeat-visit sample measures the selected turns. The earlier 400-request evaluation used independent short cases. [Measurement client](../../tools/eval/visit_cache.mjs) · [Godot scene check](../../game/tests/run_proxy_integration.gd) · [GPT-6 Luna prices](https://developers.openai.com/api/docs/models/gpt-6-luna)
 
 ## Deployed Worker checkpoint
 

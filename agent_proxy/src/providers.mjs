@@ -260,21 +260,18 @@ function dropNulls(text, optional) {
 	return JSON.stringify(parsed);
 }
 
-// Full groups keep their message boundaries as the visit grows. OpenAI can reuse the last
-// complete group and the developer prefix while the newest exchange still changes.
 const HISTORY_GROUP_SIZE = 8;
 
-export function openAIInput({ system, user, req, currentTurn }, useBreakpoints) {
-	const input = [];
-	function message(role, text, checkpoint = false) {
+export function openAIInput({ system, developerSections = [system], user, req, currentTurn }, useBreakpoints) {
+	function blockFor(text, checkpoint = false) {
 		const block = { type: "input_text", text };
 		if (checkpoint && useBreakpoints) block.prompt_cache_breakpoint = { mode: "explicit" };
-		input.push({ role, content: [block] });
+		return block;
 	}
 
-	message("developer", system, true);
+	const input = [{ role: "developer", content: developerSections.map(text => blockFor(text, true)) }];
 	if (!currentTurn) {
-		message("user", user);
+		input.push({ role: "user", content: [blockFor(user)] });
 		return input;
 	}
 	const history = req.conversation_history.slice();
@@ -283,9 +280,12 @@ export function openAIInput({ system, user, req, currentTurn }, useBreakpoints) 
 	const completed = history.length - history.length % HISTORY_GROUP_SIZE;
 	for (let start = 0; start < history.length; start += HISTORY_GROUP_SIZE) {
 		const group = history.slice(start, start + HISTORY_GROUP_SIZE);
-		message("user", JSON.stringify({ conversation_history: group }), start + HISTORY_GROUP_SIZE === completed);
+		const end = start + HISTORY_GROUP_SIZE;
+		// Keep the preceding boundary reachable when a new full group is appended.
+		const reusable = end === completed || end === completed - HISTORY_GROUP_SIZE;
+		input.push({ role: "user", content: [blockFor(JSON.stringify({ conversation_history: group }), reusable)] });
 	}
-	message("user", JSON.stringify(currentTurn));
+	input.push({ role: "user", content: [blockFor(JSON.stringify(currentTurn))] });
 	return input;
 }
 
@@ -340,8 +340,8 @@ export function createOpenAIProvider({ model, sttModel = "gpt-4o-mini-transcribe
 			const body = {
 				model,
 				input: openAIInput(prompt, useBreakpoints),
-				...(useBreakpoints ? { prompt_cache_options: { mode: "implicit" },
-					prompt_cache_key: ["btc-visit-v1", intent ? "intent" : "dialogue", req.case_id, req.language].join(":") } : {}),
+				...(useBreakpoints ? { prompt_cache_options: { mode: "explicit" },
+					prompt_cache_key: intent ? "btc-intent-v2:" + req.case_id : "btc-dialogue-v2" } : {}),
 				text: { format: { type: "json_schema", name: "patient_turn", schema: toOpenAISchema(wireSchema), strict: true } },
 				max_output_tokens: maxOutputTokens + REASONING_ALLOWANCE[effort],
 				store: false,

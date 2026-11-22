@@ -623,8 +623,8 @@ func test_patient_settings(main: MainScript, driver: PlayDriver) -> void:
 	main.mic.simulated = true
 	driver.key(KEY_RIGHT)
 	await main.patient_check_finished
-	check(main.use_model and main.screens.voice and main.screens.status_line == main.STATUS_AI_VOICE,
-		"the mock connects by keyboard and the title offers its voice route")
+	check(main.use_model and main.screens.voice and main.screens.status_line == main.STATUS_MOCK,
+		"the mock connects by keyboard and is identified on the title")
 	main.act_menu_back()
 
 
@@ -740,7 +740,7 @@ func test_talk_rules(language: String) -> void:
 	await d.leave()
 
 
-## Both launcher demos use the actual startup options and patient scene.
+## Launcher checks use the actual startup options. A live check stops at the title.
 func test_launcher(mode: String) -> void:
 	await process_frame
 	var main: MainScript = load("res://scenes/main.tscn").instantiate()
@@ -749,6 +749,34 @@ func test_launcher(mode: String) -> void:
 	var driver := PlayDriver.new(self, main)
 	if main._patient_status == "checking":
 		await main.patient_check_finished
+	if mode == "live":
+		check(main.use_model and not main._service_is_mock and main._patient_override == "on", "title connected to the launcher's OpenAI service")
+		check(main.agent_url.begins_with("http://127.0.0.1:") and main.visit == null, "no visit or paid turn during the live health check")
+		await driver.leave()
+		print("LIVE HEALTH: %d passed, %d failed" % [passed, failed])
+		quit(1 if failed else 0)
+		return
+	if mode == "cache-turn":
+		check(main.use_model and main._patient_override == "on", "the game connected to the evaluation service")
+		Engine.time_scale = 4.0
+		check(await driver.open_counter() and await driver.buzz_in(), "a patient arrives for the typed turn")
+		await driver.settle()
+		Engine.time_scale = 1.0
+		var line := "How do you like the music?"
+		driver.key(KEY_T, 116)
+		driver.type_text(line)
+		driver.key(KEY_ENTER)
+		var shown: bool = await driver.until(func() -> bool:
+			return main.agent.last.get("source") == "model" and main.agent.record.entries.has(
+				{"role":"patient", "text":main.agent.last.get("reply")}), 15.0)
+		check(shown and main.agent.last.get("meta", {}).get("provider") == urls.get("expected-provider"), "the provider's reply is displayed and enters the visit history")
+		var again: Dictionary = await main.agent.classify(line)
+		check(again.get("source") == "cache" and main.agent.intents_this_visit == 1 and main.agent.calls_this_visit == 1,
+			"repeating the classification needs no second provider request")
+		await driver.leave()
+		print("CACHE TURN: %d passed, %d failed" % [passed, failed])
+		quit(1 if failed else 0)
+		return
 	check(main.use_model and main._service_is_mock and main._patient_override == "on", "launcher connected to its mock service")
 	if not main.use_model or not main._service_is_mock:
 		await driver.leave()

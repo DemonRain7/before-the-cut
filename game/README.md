@@ -824,7 +824,7 @@ says what speaking needs.
   log). Asking, tools, CALM, PRESS, codes, typing and speaking wait; after 0.8 s the strip says
   "Still answering. You can look meanwhile, or decide now."
 
-The default SETTINGS endpoint is the permanent public mock. The game starts with PATIENT AI off. For the OpenAI patient use `.\run-game.ps1 -Patient live -Language zh -Seed 41307 -TestNight J` from the repository root and type `LIVE`. [Service runbook](../agent_proxy/README.md)
+From a checkout with its configured project key, `.\run-game.ps1 -Language zh -TestNight K` starts Godot with the local OpenAI service. The title checks the connection before opening a visit. A fresh standalone game starts offline. Enabling PATIENT AI in SETTINGS uses the configured address or `http://127.0.0.1:8787`. Select `-Patient mock` for the synthetic demo. [Service runbook](../agent_proxy/README.md)
 
 ## Checks
 

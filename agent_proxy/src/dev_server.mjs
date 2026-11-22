@@ -43,7 +43,19 @@ function readBody(req, cap) {
 export function startServer({ provider, limits = {}, disabled = false, transcribeEnabled = true, host = "127.0.0.1", port = 8787, dataDir, localJudge, log = (entry) => console.log(JSON.stringify(entry)) } = {}) {
 	if (localJudge && host !== "127.0.0.1") throw Error("Evaluation requires loopback");
 	const { rules, cases } = loadGameData(dataDir);
-	const handle = createHandler({ cases, rules, provider, limits, disabled, transcribeEnabled, log: (entry) => log({ t: new Date().toISOString(), ...entry }) });
+	const usage = {};
+	const reportCache = host === "127.0.0.1" && provider.name === "openai";
+	const handle = createHandler({ cases, rules, provider, limits, disabled, transcribeEnabled, log(entry) {
+		const read = entry.cached_input_tokens, input = entry.input_tokens;
+		if (reportCache && ["dialogue", "intent"].includes(entry.route) && Number.isSafeInteger(read) && Number.isSafeInteger(input) && read >= 0 && read <= input) {
+			const route = usage[entry.route] ??= { reports:0, hits:0, input_tokens:0, cached_tokens:0 };
+			route.reports++;
+			if (read > 0) route.hits++;
+			route.input_tokens += input;
+			route.cached_tokens += read;
+		}
+		log({ t: new Date().toISOString(), ...entry });
+	} });
 	const server = http.createServer(async (req, res) => {
 		let out;
 		try {
@@ -52,6 +64,7 @@ export function startServer({ provider, limits = {}, disabled = false, transcrib
 				out = body.bodyTooLarge ? { status:413, body:{} } : await localJudge.evaluate(JSON.parse(body.bodyText));
 			} else {
 				out = await handle({ method: req.method, path: req.url, readBody: (cap) => readBody(req, cap) });
+				if (reportCache && req.method === "GET" && req.url === "/healthz") out.body.prompt_cache_usage = usage;
 			}
 		} catch {
 			out = { status: 500, body: { error: { code: "internal", message: "internal" } } };
@@ -77,7 +90,8 @@ if (startedDirectly) {
 	const options = serviceSettings(env);
 	let provider;
 	try {
-		provider = options.disabled ? { name: env.BTC_PROVIDER || "mock", model: env.BTC_MODEL || "" } : providerFromSettings(env);
+		const kind = env.BTC_PROVIDER || (env.OPENAI_API_KEY?.trim() ? "openai" : "mock");
+		provider = options.disabled ? { name: kind, model: env.BTC_MODEL || "" } : providerFromSettings({ ...env, BTC_PROVIDER: kind });
 	} catch (err) {
 		console.error(String(err.message));
 		process.exit(1);

@@ -34,13 +34,14 @@ This repository was renamed from `before-the-cut-g1` to `before-the-cut` so late
 Windows, PowerShell, from the repository root. The launcher looks for Godot 4.7.2 in `$env:GODOT_BIN`, then `%LOCALAPPDATA%\CodexTools\Godot\4.7.2\`, then on `PATH` (or pass `-GodotPath <exe>`). In a fresh clone its first run imports the pictures, fonts and sounds before the game starts (a few seconds; `-ImportOnly` does only that).
 
 ```powershell
-.\run-game.ps1                 # saved settings, initially the scripted patient
+.\run-game.ps1 -Language zh     # local GPT-6 Luna when this checkout has its project key
+.\run-game.ps1 -CheckPatient   # verify the configured OpenAI connection in Godot at the title, zero model calls
 .\run-game.ps1 -LessBlood      # the attack scenes without blood
 ```
 
 The title menu has START, HOW TO PLAY, SETTINGS and QUIT. SETTINGS keeps the language (English or 中文), blood, sound, screen mode and patient AI choice.
 
-The launch commands below take you directly to reproducible demonstration nights. The scripted and mock commands are free. The live command starts the game's local HTTP service, then calls OpenAI GPT-6 Luna after you enter `LIVE`. In SETTINGS, enabling PATIENT AI with no launch flags connects to the public mock.
+The Windows launcher starts a loopback service when this checkout has its configured OpenAI key. Godot uses that service for GPT-6 Luna dialogue and intent classification during play. A checkout without a configured project uses the saved patient setting, initially offline. A separately launched game checks the loopback address in SETTINGS. The public mock is available by explicit address. The following commands select each mode directly.
 
 ```powershell
 .\run-game.ps1 -Patient script -Language zh -TestNight I -Seed 41307

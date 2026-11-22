@@ -1,5 +1,11 @@
 # Before the Cut: handoff
 
+## Local GPT-6 Luna play and appointment history
+
+The configured checkout starts OpenAI through loopback with `.\run-game.ps1 -Language zh`. Each case owns one static soul, all patients share performance rules, and the current session owns the visit history and exact intent lookups. Local play prints provider-reported cache counts on exit. The public live Worker remains disabled. [Character assets and sessions](agent_team/patient-character-prompt.md)
+
+Fourteen real requests returned HTTP 200. Dialogue read cache on 12 of 13 replies and reused 80.49% of its input tokens. The game displayed an actual typed-turn reply, then reused its intent without another classifier call. Cost was an estimated USD 0.00088828 under the USD 0.05 ceiling. The regression suites passed 5,938 Godot rule checks, 1,172 English and 1,173 Chinese scene checks, 352 game-to-service checks, 102 wire checks and 73 Node tests. [Per-route counts and history-group evidence](docs/development/live-model-results-2026-11-21.md#local-play-and-prompt-cache-reads)
+
 ## Play loop redesign · November 21, 2026
 
 The student wrote, “就我觉得这块的逻辑应该是需要好好考量的，现在这样肯定不行，选择太多没有引导性、然后还会有patience次数限制，又加上我们还有agent、会让整个input复杂度指数提升，目前设计的包括玩起来都会很不合理。” M0–M6 are complete on main. Rules 13 introduce two lamps, free talk and complaint-led examinations for all ten patients. Protocol 5 voices only facts disclosed in that appointment. The `loop-v12` tag preserves the previous rules.
@@ -12,7 +18,7 @@ The follow-up desk cue first points to the free complaint question. After a repl
 
 ### Next three play tasks
 
-1. Try night K in Chinese with scripted and mock patients, including the first two visitors and the seven skippable tips.
+1. Try night K in Chinese with the configured OpenAI patient. The title identifies an explicitly selected mock. The local launcher prints measured cache reads after a play session.
 2. Observe outside players playing K and L. Record complaint IDs, the order of tests and whether their next test followed a complaint. Keep entry mode, seed and language paired. [Observer sheet](tools/eval/README.md#e6-outside-player-session)
 3. Use their one-cross decisions, shutter catches and actual use of free input to review difficulty and patient voice. A future paid human comparison needs its own budget. The 400-request authorization is closed.
 
@@ -68,7 +74,7 @@ Run one command from the repository root in PowerShell. The first two are free. 
 
 The Harbour `main` idea is implemented as a persistent character definition plus a router in front of each turn. The classifier reads the doctor's actual line against this patient's question list and returns one choice. Its ten meanings cover a case question, follow-up, instrument request, reassurance, provocation, social or personal chat, an attempt to change roles, ambiguity and other input. The prompt handles mixed languages and imperfect transcriptions. An inferred paid question shows its price. The player can choose free speech or select a precise question when the inference misses. A typed insult only counts as pressure if the doctor uses PRESS. [Routing and generation](agent_proxy/src/core.mjs) · [Godot input and confirmation](game/scripts/ui/main.gd)
 
-For dialogue the proxy puts the patient's own background, work, reason for visiting, voice and motives in the system message every time. Each appointment supplies its own chronological record of speech, visible reactions and performed actions. Closing or abandoning the visit erases the record. Godot owns proof, patience, outcomes, attacks, payment and codes. The model only receives earned SPEECH or TEMPER cues. Reassurance can change the tone without clearing clinical evidence, and a request in chat cannot fire an instrument. Mandatory outcomes are checked on return. Timeouts or unusable foreground answers take the labelled authored path. [Patient profiles](agent_proxy/src/character_profiles.mjs) · [Game agent](game/scripts/core/patient_agent.gd)
+For dialogue the proxy puts the patient's own background, work, reason for visiting, voice and motives in the system message every time. Each appointment supplies its own chronological record of speech, visible reactions and performed actions. Closing or abandoning the visit erases the record. Godot owns proof, patience, outcomes, attacks, payment and codes. The model only receives earned SPEECH or TEMPER cues. Reassurance can change the tone without clearing clinical evidence, and a request in chat cannot fire an instrument. Mandatory outcomes are checked on return. Timeouts or unusable foreground answers take the labelled authored path. [Patient cases](game/data/cases) · [Game agent](game/scripts/core/patient_agent.gd)
 
 The authored opening always plays. A patient may add a short line on arrival, after use of an instrument or after 12 quiet seconds. Each visit allows three such attempts, including at most two idle attempts, inside the existing 16 replies. Input, a decision or a new visitor cancels an outstanding optional turn. Silence and optional service failure leave the player in control. The local service and Worker both enforce the allowances. [Service contract](agent_proxy/README.md)
 

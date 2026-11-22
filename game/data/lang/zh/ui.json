@@ -120,6 +120,7 @@
 		"AI writes ASK replies. Press T to type.": "AI 撰写提问的回答。按 T 打字。",
 		"AI writes ASK replies. No microphone found. Press T to type.": "AI 撰写提问的回答。无麦克风，按 T 打字。",
 		"Connecting to the patient service...": "正在连接病人服务……",
+		"Mock patient. Replies are test lines. Press T to type.": "模拟病人使用测试台词。按 T 打字。",
 		"Scripted patient. Choose PATIENT AI in SETTINGS to connect a service.": "当前由预写的病人作答。可在设置中开启病人 AI，连接病人服务。",
 		"Trauma Team dispatch. A unit is rolling to your counter. Keep them there.": "创伤小组调度。一支小队正赶往你的柜台。把人留住。",
 		"Trauma Team. Step back from the glass. You are coming with us.": "创伤小组。离玻璃远点。你跟我们走。",

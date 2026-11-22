@@ -6,13 +6,15 @@ From the repository root, run the mock with `node tools/eval/run.mjs mock`. For 
 
 ## Protocol 5 slim evaluation
 
+For the separate cache check, run `node tools/eval/visit_cache.mjs mock visits` and `node tools/eval/visit_cache.mjs mock history`. The `game` phase uses `GODOT_BIN` to play one typed turn and look up its intent again. All three live phases used the same bounded ledger, and each completed phase is single-use. The local OpenAI service also reports per-route cache reads when a normal play session ends. [Live cache results](../../docs/development/live-model-results-2026-11-21.md#local-play-and-prompt-cache-reads)
+
 The five probes use the game's HTTP routes and fixed bilingual material across ten patients. The local ledger has separate quotas of 120 listed questions, 80 complaint questions, 80 social controls, 80 voiced complaints and 40 health conversations. It reserves the full prompt and maximum output before each OpenAI call, including failures. The five groups share USD 5 and 400 attempts. The local evidence contains categorical scores and token usage. No words, recordings or paid judge are saved. L4 checks body-part words and diagnostic claims in both languages. L5 screens for physical symptom claims near a tested body part and for temper symptoms. These are automated language screens. The measured figures and actual production decision are in [the redesign results](../../docs/development/play-loop-redesign/PROGRESS.md).
 
 ## E6 outside-player session
 
 Recruit at least three people unfamiliar with the build. Each person plays night K and night L in **both** modes. Keep the language, seed, audio and controls fixed for that person. Odd-numbered participants play K scripted, L model, L scripted, K model. Even-numbered participants play K model, L scripted, L model, K scripted. Use anonymous participant numbers. This is a prepared comparison. No human results have been collected.
 
-From the repository root in PowerShell, set `$night = 'K'` or `'L'` and `$language = 'en'` or `'zh'`. Run one command for the assigned condition. The live launcher starts the game's own local OpenAI proxy and names its provider-call cap before the operator enables that human session. Human-session calls need their own budget.
+From the repository root in PowerShell, set `$night = 'K'` or `'L'` and `$language = 'en'` or `'zh'`. Run one command for the assigned condition. The live launcher starts the game's own local OpenAI proxy and verifies its provider before the first visit. Human-session calls need their own budget.
 
 ```powershell
 .\run-game.ps1 -Patient script -Language $language -Seed 41307 -TestNight $night

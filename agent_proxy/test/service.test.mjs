@@ -3,9 +3,30 @@ import assert from "node:assert/strict";
 import { setTimeout as delay } from "node:timers/promises";
 import { createHandler, createMemoryCounters, DEFAULT_LIMITS, serviceSettings } from "../src/core.mjs";
 import { createMockProvider } from "../src/providers.mjs";
-import { loadGameData } from "../src/dev_server.mjs";
+import { loadGameData, startServer } from "../src/dev_server.mjs";
 import worker from "../src/worker.mjs";
 import { probe } from "../probe.mjs";
+
+test("loopback usage counts reported cache reads per route and omits missing reports", async () => {
+	const mock = createMockProvider();
+	const reads = [undefined, 0, 1057];
+	const provider = {...mock, name:"openai", async generate(input, signal) {
+		const answer = await mock.generate(input, signal);
+		return {...answer, usage:{input_tokens:1300, output_tokens:18, cached_input_tokens:reads.shift()}};
+	}};
+	const service = await startServer({port:0, provider, log:()=>{}});
+	try {
+		const body = {protocol:"5", session_id:"cache-test", visit_id:"cache-test", case_id:"rook", case_version:3,
+			language:"en", text:"How was the wait?"};
+		for (let i = 0; i < 3; i++) {
+			const res = await fetch(service.url + "/v1/patient-intent", {method:"POST", body:JSON.stringify(body)});
+			assert.equal(res.status, 200);
+		}
+		const health = await (await fetch(service.url + "/healthz")).json();
+		assert.deepEqual(health.prompt_cache_usage, {intent:{reports:2, hits:1, input_tokens:2600, cached_tokens:1057}});
+		assert.ok(!JSON.stringify(health).includes(body.text));
+	} finally { await service.close(); }
+});
 
 test("two interleaved sessions keep their own prompts, visit counts and logged ids with asynchronous storage", async () => {
 	const memory = createMemoryCounters();

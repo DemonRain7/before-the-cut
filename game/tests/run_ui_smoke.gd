@@ -2311,7 +2311,7 @@ func counter_words() -> void:
 		else:
 			print("  too wide for the bar: ", text)
 	check(fits == plates.size(), "every way a stop can be told fits the bar over the printer slot")
-	var title: Array = [main.STATUS_AI_VOICE, main.STATUS_AI_TYPE, main.STATUS_AI_NO_MIC, main.STATUS_CHECKING, main.STATUS_OFFLINE,
+	var title: Array = [main.STATUS_AI_VOICE, main.STATUS_AI_TYPE, main.STATUS_AI_NO_MIC, main.STATUS_MOCK, main.STATUS_CHECKING, main.STATUS_OFFLINE,
 		main.screens.WARNING, main.screens.HOWTO_KEYS, main.screens.HOWTO_LAST_KEYS, main.screens.SETTINGS_KEYS]
 	title.append_array(main.screens.MENU_NAMES.values())
 	fits = 0

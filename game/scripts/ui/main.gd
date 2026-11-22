@@ -207,6 +207,7 @@ const STOP_LAST_LINE := "STOPPED, BUT THE GLASS IS GONE"
 # the title card says whether the patient can be spoken to, and how
 const STATUS_AI_VOICE := "AI connected. ASK uses case answers. Hold TAB to speak or press T to type."
 const STATUS_AI_TYPE := "AI connected. ASK uses case answers. Press T to type."
+const STATUS_MOCK := "Mock patient. Replies are test lines. Press T to type."
 const STATUS_AI_NO_MIC := "AI connected. ASK uses case answers. No microphone. Press T to type."
 const STATUS_MODEL_VOICE := "AI writes ASK replies. Hold TAB to speak or press T to type."
 const STATUS_MODEL_TYPE := "AI writes ASK replies. Press T to type."
@@ -875,6 +876,8 @@ func _status_line() -> String:
 		return STATUS_CHECKING
 	if not use_model:
 		return STATUS_OFFLINE
+	if _service_is_mock:
+		return STATUS_MOCK
 	var authored := str(rules.get("agent", {}).get("ask_answers", "authored")) == "authored"
 	match _mic_why_not():
 		"":
