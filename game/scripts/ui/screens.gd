@@ -596,8 +596,12 @@ func _draw_languages() -> void:
 		Gfx.text_center_raw(self, r.position.x + r.size.x / 2.0, r.position.y + 2.0, str(Lang.NAMES[code]), ink, true)
 
 
+const REPLAY_FILM := Rect2(526, 15, 111, 28)
+
 func _draw_report() -> void:
 	draw_rect(Rect2(Vector2.ZERO, Gfx.SCREEN), Color(Gfx.INK0, 0.82))
+	draw_rect(REPLAY_FILM, Gfx.TEAL2)
+	Gfx.text_center(self, REPLAY_FILM.get_center().x, REPLAY_FILM.position.y + 9, "Replay film [R]", Gfx.TEAL7)
 	var p := Rect2(120, 14, 400, 332)
 	draw_rect(Rect2(p.position + Vector2(3, 3), p.size), Color(0, 0, 0, 0.5))
 	draw_rect(p, Gfx.PAPER3)

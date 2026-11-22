@@ -192,7 +192,7 @@ function visitAction(tag, tools, topics, pressLimit) {
 	return kind === "ask" && knows(topics, id) && ["answer", "deflect"].includes(outcome);
 }
 
-export function validateRequest(body, cases, pressLimit = 3) {
+export function validateRequest(body, cases, pressLimit = 4) {
 	const identity = patientIdentity(body, cases);
 	if (!identity.ok) return identity;
 	const c = cases[body.case_id];
@@ -757,6 +757,7 @@ export function createHandler({ cases, rules, provider, limits = {}, counters = 
 				provider: provider.name,
 				model: provider.model,
 				patient_beats: !disabled,
+				press_history_max: rules?.patience?.press_limit ?? 4,
 				speech_to_text: !disabled && transcribeEnabled && typeof provider.transcribe === "function",
 				cases: Object.keys(cases).map((id) => ({ id, version: cases[id].version })),
 			});

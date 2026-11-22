@@ -65,6 +65,7 @@ var _react_t: float = 0.0
 var _react_hands: bool = false
 var _hold_hands: bool = false
 var _still_face: bool = false
+var _tell_left := 0.0
 var _attack: bool = false
 var _shake_t: float = 0.0
 var _shake_amp: float = 0.0
@@ -227,12 +228,26 @@ func soften() -> void:
 
 
 ## The patient turns: the dark threads are over the face, the weapon is out.
+func show_pressure_tell() -> void:
+	surge(0.14)
+	if case_data.rows.temper.ok or not _has_layer("turn_clean"):
+		return
+	# A worn temper circuit can produce exactly the same momentary facial distortion.
+	_tell_left = 0.52
+	_set_tex("turn", "turn_clean")
+	var overlay: Sprite2D = _spr["turn"]
+	overlay.modulate.a = 0.78
+	overlay.show()
+
+
 func set_attack(on: bool) -> void:
 	_attack = on
 	var has := _has_layer("attack")
 	(_spr["attack"] as Sprite2D).visible = on and has
 	(_spr["hands"] as Sprite2D).visible = not (on and has)
 	var turn: Sprite2D = _spr["turn"]
+	_tell_left = 0.0
+	turn.modulate.a = 1.0
 	turn.visible = false
 	if not on:
 		_zoom_to = 1.0
@@ -330,6 +345,11 @@ func lunge(amount: float) -> void:
 # ------------------------------------------------------------------ per-frame life
 func _process(delta: float) -> void:
 	_t += delta
+	if _tell_left > 0.0:
+		_tell_left = maxf(0, _tell_left - delta)
+		var overlay: Sprite2D = _spr["turn"]
+		overlay.modulate.a = minf(0.78, _tell_left * 4.0)
+		overlay.visible = _tell_left > 0.0
 	var minded := (thinking or listening) and not frozen and not _attack and at_counter()
 	if minded != _minded:
 		_minded = minded

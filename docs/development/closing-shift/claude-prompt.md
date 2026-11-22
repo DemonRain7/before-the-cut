@@ -1,0 +1,15 @@
+# Handoff prompt for Claude
+
+Copy the text below into a new coding session in the Before the Cut checkout.
+
+> Open `AGENTS.md`, `README.md`, `docs/development/closing-shift/release.md` and `docs/development/closing-shift/next-game.md`. Run the Godot 4 game in Chinese and watch the closing sequence in motion. Polish one cut of the existing closing film so an unfamiliar player can recognize the patient, see what the implant does and explain who benefited or was hurt with the captions covered.
+>
+> The entry points are `game/scripts/ui/main.gd` (`_start_reel`, `_finish_reel`), `game/scripts/ui/closing_reel.gd` (`build`, the playback clock and the shot drawing), and `VisitState.settlement()`. Build the cast from `shift.records` in settlement order. Use the named patient's art under `game/assets/patients/<id>/`. For new raster assets use the repository generators under `tools/art/`. Character-specific treatment endings live in `game/data/cases/<id>.json`. Keep the report and the film consistent. Put every new English screen line in the corresponding `game/data/lang/zh/` catalog.
+>
+> Start with Rook's repaired hand and Priya's scanner incident. Show the ward before the change, the new implant activating, a recognizably different motion, and the result. Priya's two attendants go down and their two monitors stop in sequence. Keep the action readable with less blood, sound muted and at 640 by 360. Later admissions move to relief staff in the overflow theatre. Check the city footage too, particularly whether Kip's vehicle, Dana's grid and Maren's late shipyard incident read at a glance. Preserve each character's established story or update its closing report and both languages in the same change.
+>
+> Exercise successful and dangerous admissions together, multiple dangerous admissions, no admissions, referral of a steady patient, containment, walkout and a shortened shift after the doctor's death. Show only settled visitors. Check automatic playback, next shot, skip, replay from a later report page, reduced blood, and a new night after replay. A replay must preserve the report page, credits, diagnosis and death state. Inspect screenshots and watch the sequence at real playback speed.
+>
+> The pressure rule is version 15. Each committed push draws a visible TEMPER tell separately from the chance of leaving or attacking. Only the final push is certain. The game already owns these draws and all closing shots. The dialogue service voices the encounter. Keep hidden outcomes out of the model contract and keep clinic operations playable offline.
+>
+> Run `res://tests/run_tests.gd` and `res://tests/run_ui_smoke.gd` in English, Chinese and reduced-blood mode. Run `python tools/check_lang.py` and both text-fit passes in `tools/art`. To capture the repeatable sample, run `res://tests/capture_closing.gd -- --out=<absolute directory> --lang=zh --less-blood` in a Godot window at 640 by 360. It produces 12 frames per second and a timestamped sound cue list. Report specific visual changes in Chinese and deliver the new clip plus verification results. The solo and co-op concepts are design proposals for a separate playable prototype.

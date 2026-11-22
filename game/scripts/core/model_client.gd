@@ -6,6 +6,7 @@ extends Node
 ## Used as: const ModelClient = preload("res://scripts/core/model_client.gd")
 
 var base_url: String = ""
+var press_history_max := 2  # Original protocol 5 service accepts press:1 and press:2.
 var timeout_ms: int = 4000           # a patient reply; main sets both from rules.json
 var intent_timeout_ms: int = 2500
 var voice_timeout_ms: int = 7000     # the words of a clip: a longer upload, a slower answer
@@ -20,7 +21,30 @@ func is_configured() -> bool:
 ##   {"ok": false, "error": "<reason>"}   reason: not_configured, request_failed, timeout,
 ##                                        network_<n>, bad_json, http_<code>[:<proxy error code>]
 func request_move(payload: Dictionary) -> Dictionary:
-	return await _request("/v1/patient-dialogue", HTTPClient.METHOD_POST, JSON.stringify(payload), timeout_ms)
+	return await _request("/v1/patient-dialogue", HTTPClient.METHOD_POST, JSON.stringify(_wire_history(payload)), timeout_ms)
+
+
+## Older protocol 5 services accept only the first two pressure action IDs. Keep spoken
+## turns, observed reactions and the actual state.press_count in their original order.
+func _wire_history(payload: Dictionary) -> Dictionary:
+	if int(payload.get("state", {}).get("press_count", 0)) <= press_history_max:
+		return payload
+	var wire := payload.duplicate(true)
+	var turns: Array = wire.get("conversation_history", [])
+	for i in range(turns.size() - 1, -1, -1):
+		if turns[i].role == "action" and _unsupported_push(str(turns[i].text)):
+			turns.remove_at(i)
+			if wire.has("visit_summary") and i < int(wire.visit_summary.after):
+				wire.visit_summary.after -= 1
+	if wire.has("visit_summary"):
+		for tag in wire.visit_summary.actions.keys():
+			if _unsupported_push(str(tag)):
+				wire.visit_summary.actions.erase(tag)
+	return wire
+
+
+func _unsupported_push(tag: String) -> bool:
+	return tag.begins_with("press:") and tag.trim_prefix("press:").to_int() > press_history_max
 
 
 func request_intent(payload: Dictionary) -> Dictionary:
@@ -43,6 +67,7 @@ func check_service(expected: Dictionary, wait_ms: int) -> Dictionary:
 		return {"status": "disabled"}
 	if data.get("ok") != true or data.get("protocol") != "5" or typeof(data.get("cases")) != TYPE_ARRAY:
 		return {"status": "version"}
+	press_history_max = int(data.get("press_history_max", 2))
 	var seen := {}
 	for item in data.cases:
 		if typeof(item) != TYPE_DICTIONARY:

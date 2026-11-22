@@ -105,7 +105,7 @@ func _identity() -> Dictionary:
 
 
 ## fallback_options are ONLY for the offline script; never sent to or checked against AI.
-func decide(event: Dictionary, state: Dictionary, fallback_options: Array = [], signs: Dictionary = {}, fallback: String = "") -> Dictionary:
+func decide(event: Dictionary, state: Dictionary, fallback_options: Array = [], signs: Dictionary = {}, fallback: String = "", on_doctor_spoke: Callable = Callable()) -> Dictionary:
 	var base := {"event": event.duplicate(), "move": "", "line": "", "reply": "", "reaction": "",
 		"source": "script", "fallback_reason": "", "latency_ms": 0, "meta": {}}
 	if record == null:
@@ -120,6 +120,8 @@ func decide(event: Dictionary, state: Dictionary, fallback_options: Array = [], 
 	# The current line travels as the event. It enters memory before a concurrent look or reply.
 	var payload := build_payload(event, state, signs) if generate and reason == "" else {}
 	record.append("doctor", str(event.get("text", "")))
+	if on_doctor_spoke.is_valid():
+		on_doctor_spoke.call()
 	if not generate or reason != "":
 		base.fallback_reason = reason
 		return _with_script(base, event, state, fallback_options, reason != "")

@@ -32,7 +32,7 @@ func _initialize() -> void:
 				cache[key] = DB.compose(db.templates[pick.id], pick)
 			var c: Dictionary = cache[key].duplicate(false)
 			c.complaint_rows = pick.complaints
-			var v := Visit.new(c, db.rules)
+			var v := Visit.new(c, db.rules, hash("%d:%d" % [seed_id, idx]))
 			v.surprises = idx != 0
 			var order: Array = range(4)
 			rng.seed = hash("routine:%d:%d" % [seed_id, idx])
@@ -66,6 +66,10 @@ func _initialize() -> void:
 					break
 				if k == 3:
 					v.press()
+					if not v.in_exam():
+						if v.phase == Visit.Phase.ATTACK:
+							v.shutter()
+						break
 				else:
 					v.apply_check(TOOLS[k], "comply")
 					v.complete_check(TOOLS[k])
@@ -84,7 +88,7 @@ func _initialize() -> void:
 				v.verdict("refer" if crosses >= 2 else "treat")
 				if v.phase == Visit.Phase.ATTACK:
 					v.shutter()
-			var blind := Visit.new(c, db.rules)
+			var blind := Visit.new(c, db.rules, hash("%d:%d" % [seed_id, idx]))
 			blind.surprises = v.surprises
 			for entry in couriers:
 				if entry["case"] == pick.id:
@@ -102,6 +106,10 @@ func _initialize() -> void:
 					break
 				if k == 3:
 					blind.press()
+					if not blind.in_exam():
+						if blind.phase == Visit.Phase.ATTACK:
+							blind.shutter()
+						break
 				else:
 					blind.apply_check(TOOLS[k], "comply")
 					blind.complete_check(TOOLS[k])
@@ -120,7 +128,7 @@ func _initialize() -> void:
 				blind.verdict("refer" if blind_cross >= 2 else "treat")
 				if blind.phase == Visit.Phase.ATTACK:
 					blind.shutter()
-			out.store_csv_line(PackedStringArray([str(seed_id),str(idx),pick.id,str(c.fee),str(int(v.is_drifting())),str(mask),str(clues),str(speech),str(order[0]*64+order[1]*16+order[2]*4+order[3]),str(crosses),str(int(v.snapped)),str(int(v.flared)),str(int(v.is_correct(v.outcome))),str(v.credits_for(v.outcome)),str(int(c.attack.on_refer)),str(blind.credits_for(blind.outcome)+blind.drop_pay)]))
+			out.store_csv_line(PackedStringArray([str(seed_id),str(idx),pick.id,str(c.fee),str(int(v.is_drifting())),str(mask),str(clues),str(speech),str(order[0]*64+order[1]*16+order[2]*4+order[3]),str(crosses),str(int(v.snapped)),str(int(v.flared)),str(int(v.is_correct(v.outcome))),str(v.credits_for(v.outcome)),str(int(c.attack.on_refer)),str(blind.credits_for(blind.outcome)+blind.drop_pay),str(int(v.attack_cause == "press" or v.outcome == "walkout"))]))
 	out.close()
 	print("Computed %d visits including %d later visitors." % [nights*5,nights*4])
 	quit()

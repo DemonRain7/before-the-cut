@@ -1,6 +1,12 @@
 # Before the Cut: handoff
 
-## Hidden patience at the counter
+## Pressure and the closing film
+
+November 22, 2026. Rules 15 give every committed push a separate chance of a visible tell and of ending the visit. The fourth always ends it. The game now plays the actual shift's patients on closing cameras before revealing the ledger. Priya's theatre incident closes that operating room and sends later admissions to a relief crew. [Release and verification](docs/development/closing-shift/release.md) · [Chinese sample film](docs/development/closing-shift/ward-preview-zh.mp4)
+
+Next, watch a new player decide whether a second push is worth the risk, check whether a viewer can identify the cause of one camera incident with the captions covered, and try the two-patient workbench with a fixed script and one shared replacement part. [Prototype design](docs/development/closing-shift/next-game.md) · [Claude handoff prompt](docs/development/closing-shift/claude-prompt.md)
+
+## Hidden patience at the counter (rules 14, superseded)
 
 November 22, 2026. Each appointment counts committed pushes against its own three-push limit. With a lamp the first PRESS tests TEMPER. The second gives the character's warning. The third requires confirmation and makes a steady visitor leave unpaid or a drifting visitor lunge. Typing, dictation, checking the file and stepping back preserve the count. In the next outside playtest, note whether a player recognizes the warning, cancels or commits, and distinguishes the two examination lamps from the patient's willingness to stay. [Current verification](docs/development/play-loop-redesign/PROGRESS.md#hidden-patience)
 

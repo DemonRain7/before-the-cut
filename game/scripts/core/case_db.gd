@@ -643,8 +643,21 @@ static func validate_rules(rules: Dictionary, sheet: Dictionary = {}) -> Array:
 		errors.append("rules.json: line.per_hour must be 0 or more.")
 	if typeof(rules.get("patience")) == TYPE_DICTIONARY and int(rules["patience"].get("leave_ms", -1)) < 0:
 		errors.append("rules.json: patience.leave_ms must be 0 or more.")
-	if typeof(rules.get("patience")) == TYPE_DICTIONARY and int(rules.patience.get("press_limit", 3)) < 3:
-		errors.append("patience.press_limit needs room for a first push, a warning and the final push.")
+	if typeof(rules.get("patience")) == TYPE_DICTIONARY:
+		var patience: Dictionary = rules.patience
+		for key in ["end_chance", "tell_chance"]:
+			var curve: Array = patience.get(key, []) if patience.get(key) is Array else []
+			if curve.size() != 4 or int(patience.get("press_limit", 0)) != curve.size():
+				errors.append("patience.%s needs one chance for each of four pushes." % key)
+				continue
+			var previous := 0.0
+			for chance in curve:
+				if typeof(chance) not in [TYPE_INT, TYPE_FLOAT] or float(chance) <= previous or float(chance) > 1.0:
+					errors.append("patience.%s must rise on each push and stay within 1." % key)
+					break
+				previous = float(chance)
+			if key == "end_chance" and curve.back() != 1.0:
+				errors.append("The last push must end the visit.")
 	if int(rules.get("visit", {}).get("lamps", 0)) < 1:
 		errors.append("visit.lamps must be positive.")
 	var leads: Dictionary = rules.get("complaints", {})

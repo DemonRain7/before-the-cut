@@ -22,7 +22,9 @@ blind_values = defaultdict(float)
 firsts = Counter()
 one_fees = defaultdict(Counter)
 for line in draws:
-    seed, slot, who, fee, drift, mask, leads, speech, packed, crosses, snap, flare, right, credits, fights, blind = line
+    seed, slot, who, fee, drift, mask, leads, speech, packed, crosses, snap, flare, right, credits, fights, blind = line[:16]
+    if len(line) > 16 and int(slot) > 0:
+        stats['pressure_end'] += int(line[16])
     seed, slot, drift, mask, leads, speech, packed, crosses, snap, flare, right, credits, fights = map(int, (seed,slot,drift,mask,leads,speech,packed,crosses,snap,flare,right,credits,fights))
     fee = int(float(fee))
     fees.add(fee)
@@ -108,7 +110,7 @@ result = {"n":n,"nights":len(night_values),"C":pct(stats["C"]),"Cbest":pct(stats
           "removed_pp":{name:round(best-optimum(tests=tuple(j for j in range(4) if j!=i)),3) for i,name in enumerate(names)},
           "first_pct":{k:pct(v) for k,v in firsts.items()},
           "credits":{k:round(stats[k]/n,2) for k in ("money","always_treat","always_team","always_break")},
-          "snap_drift":round(100*stats["snap"]/stats["drift"],3),"flare":pct(stats["flare"]),
+          "pressure_end_pct":pct(stats["pressure_end"]),"snap_drift":round(100*stats["snap"]/stats["drift"],3),"flare":pct(stats["flare"]),
           "line_pct":[round(100*sum(v+k*rules["contacts"]["pay"]>=floor for v in night_values.values())/len(night_values),3) for k in range(3)],
           "matched_night":round(sum(night_values.values())/len(night_values)+2*rules["contacts"]["pay"],2),
           "blind_night":round(sum(blind_values.values())/len(night_values),2)}

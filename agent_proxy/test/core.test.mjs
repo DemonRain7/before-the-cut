@@ -122,7 +122,7 @@ test("long appointments keep dialogue and validated physical actions in order", 
  assert.deepEqual(validated.req.conversation_history, b.conversation_history);
  b.visit_summary = {after: 12, omitted: 32, actions: {"open:grip": 3, "done:grip": 1, "press:1": 1, "press:2": 1, "press:3": 1}};
  assert.deepEqual(validateRequest(b, cases).req.visit_summary, b.visit_summary);
- for (const tag of ["end:treated_ok", "done:grip:0.42", "press:4", "read:diagnosis", "open:ghost", "ask:ghost:answer"]) {
+ for (const tag of ["end:treated_ok", "done:grip:0.42", "press:5", "read:diagnosis", "open:ghost", "ask:ghost:answer"]) {
   assert.equal(validateRequest({...b, conversation_history:[{role:"action",text:tag}]}, cases).ok, false);
   assert.equal(validateRequest({...b, visit_summary:{...b.visit_summary,actions:{[tag]:1}}}, cases).ok, false);
  }

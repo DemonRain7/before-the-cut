@@ -108,6 +108,7 @@ func _run() -> void:
 	counter_words()
 	check_log(six, nine)
 	await shift_wear()
+	await shift_pressure_draws()
 	await shift_abandon()
 	untranslated_words()
 	print("")
@@ -382,7 +383,9 @@ func press_until_attack(v: VisitState) -> bool:
 	var reacted := v.in_exam() and v.press_count == 1
 	await d.settle()
 	await d.press()
-	var warned := v.in_exam() and v.press_count == 2
+	await d.settle()
+	await d.press()
+	var warned := v.in_exam() and v.press_count == 3
 	await d.settle()
 	await d.press()
 	return reacted and warned and main.state == MainScript.State.ATTACK and v.attack_cause == "press"
@@ -457,6 +460,7 @@ func enter(id: String, keep_guide: bool = false) -> VisitState:
 	check(not visit_ids.has(main.agent.visit_id), "a returning patient gets a fresh visit budget on a later night")
 	visit_ids[main.agent.visit_id] = true
 	var v: VisitState = main.visit
+	v.pressure_seed = 86  # This fixture reaches the fourth push without incidental tells.
 	check(v != null and str(v.case_data.get("id", "")) == id, "the visit is %s's" % id)
 	return v
 
@@ -485,8 +489,19 @@ func finish_visit(label: String) -> void:
 ## A blow landed: the night ends with this visit. No slip prints; the report comes up out of the
 ## dark, names the visitors still in the hall, and nobody reads the meter.
 func lights_out(label: String, unseen: Array) -> void:
-	var up: bool = await d.wait_for_report(40.0)
-	check(up and main.screens.mode == "report" and main.screens.fade > 0.5, "%s: the night ends here: the report comes up out of the dark" % label)
+	check(await d.until(func() -> bool: return main.state == MainScript.State.AFTERMATH, 40.0), "%s: the actual ward footage opens after the fatal blow" % label)
+	check(main.reel.visible and main.reel.shots.back().outcome == "hit" and main.reel.shots.back().id == main.shift.records.back().case_id, "the final camera names the patient who ended the shift")
+	for shot in main.reel.shots:
+		check(shot.id not in unseen, "unseen patients have no footage")
+	d.key(KEY_ESCAPE)
+	var up: bool = await d.wait_for_report()
+	check(up and main.screens.mode == "report", "skipping footage opens the closing report")
+	var ended := logged("shift_end").size()
+	d.click(main.screens.REPLAY_FILM.get_center())
+	check(main.reel.visible and main.reel.index == 0, "the replay button restarts the same film")
+	d.key(KEY_ENTER)
+	d.click(main.reel.SKIP.get_center())
+	check(main.state == MainScript.State.REPORT and logged("shift_end").size() == ended, "replaying preserves the report and settles exactly once")
 	check(main._slip_data.is_empty() and main._slip_mode == "hidden", "%s: no slip prints for it" % label)
 	check(main.visit == null and main.rig == null, "%s: the counter is empty" % label)
 	check(main.shift.died and main.shift.is_done() and main.shift.current_id() == "", "%s: nobody else comes in tonight" % label)
@@ -605,6 +620,7 @@ func the_guide() -> VisitState:
 	var ok: bool = await d.buzz_in(true)
 	check(ok, "kip comes to the counter")
 	var v: VisitState = main.visit
+	v.pressure_seed = 86  # This fixture reaches the fourth push without incidental tells.
 	check(v != null and str(v.case_data.get("id", "")) == "kip", "the visit is kip's")
 	check(main.guide.is_open() and main.guide.page == 0, "the guide opens by itself at the first patient of a session")
 	var ids: Array = []
@@ -1004,27 +1020,30 @@ func shift_reckless() -> void:
 	check(int(last_record().get("credits", 0)) == -100 and not bool(last_record().get("correct", true)), "the false alarm is billed at closing: 100")
 	check(main.clinic.line_under and main.clinic.line == 240, "the meter reads the first hour as under the line")
 
-	section("Rook leaves only after the confirmed third push")
+	section("Rook leaves only after the confirmed fourth push")
 	v = await enter("rook")
 	await d.press()
 	check(v.in_exam() and v.press_count == 1, "the first insult only makes him angry")
 	check(not main.desk.warn.press and main._pad_hint("press") == Lang.t(main.PUSH_HINT), "the second press hints at risk and keeps the meter hidden")
 	await d.settle()
 	await d.press()
-	check(v.press_count == 2 and main.agent.last.reply == v.case_data.press_words.warning and v.actions == 1 and main._surprise == "", "Rook warns after a single paid test without rolling a surprise")
+	check(v.in_exam() and v.press_count == 2, "a second push can leave the decision open")
+	await d.settle()
+	await d.press()
+	check(v.press_count == 3 and main.agent.last.reply == v.case_data.press_words.warning and v.actions == 1 and main._surprise == "", "Rook warns after a single paid test without rolling a surprise")
 	check(main._base_hint == main.PRESS_WARNING_HINT, "the warning explains the next decision in place of a lamp reminder")
 	check(str(main.desk.badges.get("press", "")) == Lang.t("BREAK") and main._pad_hint("press") == Lang.tf(main.PRESS_LAST_HINT, [int(main.rules.scoring.press_catch_bonus)]),
 		"the pad warns before the final commitment")
 	await d.settle()
 	d.pad("press")
-	check(main._break_confirmation and v.press_count == 2, "opening the confirmation does not commit another push")
+	check(main._break_confirmation and v.press_count == 3, "opening the confirmation does not commit another push")
 	d.click(main.dialogue.menu_point(1))
-	check(v.in_exam() and v.press_count == 2 and not main._break_confirmation, "stepping back keeps the visit and the warning")
+	check(v.in_exam() and v.press_count == 3 and not main._break_confirmation, "stepping back keeps the visit and the warning")
 	main.act_press(true)
-	check(v.in_exam() and v.press_count == 2, "a late confirmation cannot finish the visit")
+	check(v.in_exam() and v.press_count == 3, "a late confirmation cannot finish the visit")
 	await d.settle()
 	await d.press()
-	check(v.outcome == "walkout" and v.patience == 1 and v.press_count == 3, "the third push ends the visit with the unused examination lamp")
+	check(v.outcome == "walkout" and v.patience == 1 and v.press_count == 4, "the fourth push ends the visit with the unused examination lamp")
 	await finish_visit("Rook")
 	check(int(last_record().get("credits", 0)) == 0 and not bool(last_record().get("correct", true)), "a walkout pays nothing")
 
@@ -1119,7 +1138,7 @@ func shift_odds_and_ends() -> void:
 	await d.stamp("treat")
 	await finish_visit("Rook")
 
-	section("Vale: third push, then the lever")
+	section("Vale: fourth push, then the lever")
 	v = await enter("vale")
 	await d.press()
 	check(v.in_exam() and note_count(v, "temper") == 1, "the first line gets a flat reaction")
@@ -1128,7 +1147,9 @@ func shift_odds_and_ends() -> void:
 	await d.press()
 	await d.settle()
 	await d.press()
-	check(main.state == MainScript.State.ATTACK and v.attack_cause == "press", "the third push turns him")
+	await d.settle()
+	await d.press()
+	check(main.state == MainScript.State.ATTACK and v.attack_cause == "press", "the fourth push turns him")
 	var warned: bool = await d.wait_for_telegraph()
 	check(warned, "the warning comes")
 	check(main.audio.trim_db == main.ATTACK_TRIM_DB, "the attack's sounds start %.0f dB under the exam's" % -main.ATTACK_TRIM_DB)
@@ -1291,7 +1312,9 @@ func shift_line_and_glass() -> void:
 	await d.press()
 	await d.settle()
 	await d.press()
-	check(main.state == MainScript.State.ATTACK and v.attack_cause == "press", "the third push turns her")
+	await d.settle()
+	await d.press()
+	check(main.state == MainScript.State.ATTACK and v.attack_cause == "press", "the fourth push turns her")
 	warned = await d.wait_for_telegraph()
 	check(warned and main.clinic.bar_blows.size() == 2 and is_equal_approx(main.clinic.bar_through, 1.44),
 		"the bar shows the shorter time, with two marks on it")
@@ -1379,7 +1402,9 @@ func shift_last_glass() -> void:
 	await d.press()
 	await d.settle()
 	await d.press()
-	check(main.state == MainScript.State.ATTACK and v.attack_cause == "press", "the third push turns her")
+	await d.settle()
+	await d.press()
+	check(main.state == MainScript.State.ATTACK and v.attack_cause == "press", "the fourth push turns her")
 	warned = await d.wait_for_telegraph()
 	check(warned and main.clinic.bar_on and main.clinic.bar_blows.is_empty() and is_equal_approx(main.clinic.bar_through, 0.65),
 		"the bar has no mark on it: 0.65 s, and nothing for her to break first")
@@ -1654,7 +1679,9 @@ func shift_walls_and_glass() -> void:
 	await d.press()
 	await d.settle()
 	await d.press()
-	check(main.state == MainScript.State.ATTACK and v.attack_cause == "press", "the third push turns her")
+	await d.settle()
+	await d.press()
+	check(main.state == MainScript.State.ATTACK and v.attack_cause == "press", "the fourth push turns her")
 	warned = await d.wait_for_telegraph()
 	check(warned and main.clinic.bar_on and main.clinic.bar_blows.size() == 3 and is_equal_approx(main.clinic.bar_through, 1.8),
 		"the bar has all three marks again: 1.8 s")
@@ -2166,6 +2193,50 @@ func shift_wear() -> void:
 	main.test_night = ""
 
 
+func shift_pressure_draws() -> void:
+	main.test_night = "K"
+	check(await d.open_counter(), "fixed pressure night begins")
+	for i in main.shift.order.size():
+		var v: VisitState = await enter(main.shift.order[i])
+		await d.settle()
+		if i in [0,2,3]:
+			for fixture in 2000:
+				v.pressure_seed = fixture
+				var draw := v.pressure_draw()
+				if draw.ends and draw.tell:
+					break
+			d.pad("press")
+			check(v.press_count == 1 and v.patience == 1 and not v.in_exam(), "an early terminal push commits immediately on the real pad")
+			check(v.row_seen("temper") and v.record.entries.has({"role":"reaction","text":Lang.t(str(v.case_data.flare.note))}), "the actual visible tell is in this appointment's history")
+			check((main.rig._tell_left > 0.0) == (not v.case_data.rows.temper.ok), "visible distortion follows the actual TEMPER row")
+			if i > 0:
+				check(await d.wait_for_telegraph(), "a first-push tell can lead into the shutter window")
+				d.shutter_key()
+			await finish_visit("early pressure")
+			check(last_record().outcome == ("walkout" if i == 0 else "caught"), "an early push settles the matching outcome")
+		else:
+			if i == 1:
+				v.pressure_seed = 0
+				v.patience = 0
+				await d.press()
+				check(v.in_exam() and v.row_seen("temper") and v.tests_in_order.is_empty(), "an empty-lamp push shows a physical tell while the patient stays")
+				await d.settle()
+			await d.stamp("treat")
+			await finish_visit("admission")
+	var ended := logged("shift_end").size()
+	await d.until(func() -> bool: return main.screens.age() > main.REPORT_TURN, 3.0)
+	d.key(KEY_RIGHT)
+	var report_page := main.screens.page
+	check(report_page == 1, "the report can open a later patient before replay")
+	d.key(KEY_R)
+	check(main.reel.visible and main.reel.shots.size() == 5, "the report replays all five settled visitors")
+	for i in 5:
+		check(main.reel.shots[main.reel.index].id == main.shift.records[i].case_id, "the camera follows admission order and identity")
+		d.key(KEY_RIGHT)
+	check(main.state == MainScript.State.REPORT and main.screens.page == report_page and logged("shift_end").size() == ended, "playing every shot returns to the same report page")
+	main.test_night = ""
+
+
 func check_intake_at_counter(v: VisitState) -> void:
 	await d.take_card()
 	d.click(main.clipboard.file_tab().get_center())
@@ -2220,7 +2291,7 @@ func shift_attack_styles() -> void:
 		await d.settle()
 	check(v.patience == 0 and v.press_count == 0 and not main.desk.warn.press, "spending both lamps does not trip the hidden pressure threshold")
 	var turned: bool = await press_until_attack(v)
-	check(turned and not v.row_seen("temper"), "with empty lamps the third push still ends the visit and gives no TEMPER reading")
+	check(turned and not v.row_seen("temper"), "with empty lamps the fourth push still ends the visit and gives no TEMPER reading")
 	var warned: bool = await d.wait_for_telegraph()
 	check(warned and (main.rig._spr["turn"] as Sprite2D).visible and right_art(main.rig._spr["turn"], "turn"), "his face turns: his own turned face, for the blood setting")
 	check(main._weapon_loop == "" and attack_loops() == ["alarm"], "a lock makes no sound until it lands: only the alarm")
@@ -2336,6 +2407,12 @@ func voice_words() -> void:
 ## is drawn.
 func counter_words() -> void:
 	section("The counter's words fit where they are drawn")
+	for id in main.reel.STORIES:
+		var story: Array = main.reel.STORIES[id]
+		check(Gfx.text_w(story[0], true) < 250.0 and Gfx.wrap_text(story[1],590).size() <= 2 and Gfx.wrap_text(story[2],590).size() <= 2, "both camera captions fit for " + str(id))
+	check(Gfx.text_w("Replay film [R]") <= main.screens.REPLAY_FILM.size.x - 4, "the report replay control fits")
+	for caption in main.reel.EXIT_LINES.values():
+		check(Gfx.wrap_text(caption,590).size() <= 2, "corridor and quiet ward captions fit")
 	var hints: Array = [main.SHORT_HINT, main.LEAVING_HINT, main.LEAVING_LAST_HINT, main.NOTE_COACH_HINT,
 		main.NOTE_OPEN_COACH_HINT, main.LAMP_COACH_HINT, main.GLASS_COACH_HINT, main.WAIT_HINT, main.CAM_HINT, main.CAM_PEEK_HINT,
 		main.CAM_OFF_HINT, main.THINK_HINT, Lang.tf(main.GLASS_HINT, 40), Lang.tf(main.GLASS_HINT, 999), main.GLASS_BUSY_HINT, main.GLASS_WHOLE_HINT,

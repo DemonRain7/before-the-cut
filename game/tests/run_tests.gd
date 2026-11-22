@@ -108,7 +108,7 @@ func eq(a: Variant, b: Variant, label: String) -> void:
 
 
 func visit(id: String) -> VisitState:
-	return VisitState.new((cases[id] as Dictionary).duplicate(true), rules)
+	return VisitState.new((cases[id] as Dictionary).duplicate(true), rules, 86)
 
 
 func brain_move(v: VisitState, kind: String, id: String, brain: ScriptedBrain = null) -> Dictionary:
@@ -138,6 +138,7 @@ func _initialize() -> void:
 	test_talk()
 	test_intake()
 	test_press_and_attack()
+	test_pressure_draws_and_film()
 	test_shutter()
 	test_patience_walkout()
 	test_marks()
@@ -184,7 +185,7 @@ func test_intake() -> void:
 					if truth == "drifting":
 						for row in ["eyes", "hands"]:
 							signs[row] = t.signs[row].broken[0].id
-					var v := VisitState.new(CaseDB.compose(t, {"signs":signs, "truth":truth}), rules)
+					var v := VisitState.new(CaseDB.compose(t, {"signs":signs, "truth":truth}), rules, 86)
 					var label := "%s %s %s %s" % [id, truth, speech, temper]
 					eq(v.intake_line(true), t.intake.account, label + " starts with the same account even if challenged first")
 					v.record_intake(true)
@@ -585,12 +586,13 @@ func test_press_and_attack() -> void:
 	var r := v.press()
 	eq(r["result"], "react", "first press is a reaction")
 	eq(v.patience, 1, "pressure spends one lamp")
-	eq([v.press_stage(), v.press_cost()], ["warning", 0], "the next press gives a character warning")
+	eq([v.press_stage(), v.press_cost()], ["push", 0], "the next push is free")
 	ok(v.row_seen("temper"), "the reaction is temper evidence")
-	eq(v.phase, VisitState.Phase.EXAM, "one press never ends a visit")
-	eq(v.press().line, v.case_data.press_words.warning, "the second push delivers the warning")
+	eq(v.phase, VisitState.Phase.EXAM, "the first push survives this draw")
+	eq(v.press().result, "push", "second push survives this draw")
+	eq(v.press().line, v.case_data.press_words.warning, "third push delivers the warning on this draw")
 	r = v.press()
-	eq(r["result"], "walkout", "a stable patient walks out on the third press")
+	eq(r["result"], "walkout", "a stable patient walks out on the fourth press")
 	eq(v.patience, 1, "the unused examination lamp is accounted for at closing")
 	eq(v.outcome, "walkout", "walkout outcome")
 	eq(v.settlement()["credits"], 0, "walkout earns nothing")
@@ -599,18 +601,18 @@ func test_press_and_attack() -> void:
 
 	for id in ["vale", "maren"]:
 		v = visit(id)
-		eq(v.press()["result"], "react", "%s: first press is safe" % id)
-		eq(v.press()["result"], "warning", "%s: the second press leaves a decision" % id)
-		eq(v.press()["result"], "attack", "%s: the third press brings the attack" % id)
+		eq(v.press()["result"], "react", "%s: first press survives this draw" % id)
+		eq(v.press()["result"], "push", "%s: the second press is free" % id)
+		eq(v.press()["result"], "warning", "%s: the third press leaves a decision" % id)
+		eq(v.press()["result"], "attack", "%s: the fourth press brings the attack" % id)
 		eq(v.patience, 1, "%s: only a funded TEMPER reading spent a lamp" % id)
 		eq(v.attack_cause, "press", "%s: cause recorded" % id)
 		eq(v.shutter()["result"], "caught", "%s: shutter stops it" % id)
 		eq(v.settlement()["credits"], int(cases[id]["fee"]) + int(rules["scoring"]["refer_drifting"]) + int(rules["scoring"]["press_catch_bonus"]), "%s: caught pays the bounty and the PRESS bonus" % id)
 		ok(v.settlement()["correct"], "%s: caught counts as right" % id)
 		v = visit(id)
-		v.press()
-		v.press()
-		v.press()
+		for push in 4:
+			v.press()
 		eq(v.attack_timeout()["result"], "hit", "%s: too slow" % id)
 		eq(v.settlement()["credits"], int(rules["scoring"]["hit"]), "%s: hit penalty" % id)
 		ok(v.settlement()["injured"], "%s: injury recorded" % id)
@@ -626,9 +628,8 @@ func test_press_and_attack() -> void:
 	eq(visit("kip").attack_timeout()["result"], "", "no attack, no timeout")
 	for id in ["kip", "rook", "juno"]:
 		v = visit(id)
-		v.press()
-		v.press()
-		v.press()
+		for push in 4:
+			v.press()
 		ok(v.phase != VisitState.Phase.ATTACK, "%s: a stable patient never attacks" % id)
 
 	for id in templates:
@@ -642,23 +643,101 @@ func test_press_and_attack() -> void:
 				if worn_temper:
 					signs["temper"] = t.signs.temper.broken[0].id
 				for spent in 3:
-					v = VisitState.new(CaseDB.compose(t, {"truth":truth, "signs":signs}), rules)
+					v = VisitState.new(CaseDB.compose(t, {"truth":truth, "signs":signs}), rules, 86)
 					for tool in ["grip", "penlight"].slice(0, spent):
 						v.apply_check(tool, "comply")
 					var label := "%s/%s/temper=%s/spent=%d" % [id, truth, worn_temper, spent]
 					var funded := spent < 2
 					eq(v.open_signs({"type":"press"}).has("temper"), funded, label + " model gets only a funded reading")
 					v.record_intake(false)
-					eq(v.press().result, "react" if funded else "push", label + " the first push never ends the visit")
+					eq(v.press().result, "react" if funded else "push", label + " the first push survives this draw")
 					var lamps := v.patience
 					v.apply_ask(t.topics[0].id)
 					v.record_intake(true)
-					eq([v.press_count, v.press_stage(), v.press_cost()], [1, "warning", 0], label + " interview does not spend hidden patience")
+					eq([v.press_count, v.press_stage(), v.press_cost()], [1, "push", 0], label + " interview does not spend hidden patience")
+					eq(v.press().result, "push", label + " second push stays open on this seed")
 					eq(v.press().line, t.press_words.warning, label + " the warning is the same under either diagnosis")
 					eq([v.row_seen("temper"), v.notes.temper.size(), v.tests_in_order.count("temper")], [funded, int(funded), int(funded)], label + " only the paid first reading supplies evidence")
-					eq([v.in_exam(), v.press_count, v.press_breaks(), v.actions], [true, 2, true, int(funded)], label + " the warning is safe and only a funded reading counts as a test")
-					eq(v.press().result, "attack" if truth == "drifting" else "walkout", label + " the third push follows truth")
-					eq([v.press_count, v.patience, v.press().result], [3, lamps, "closed"], label + " terminal push commits only once")
+					eq([v.in_exam(), v.press_count, v.press_breaks(), v.actions], [true, 3, true, int(funded)], label + " the warning is safe and only a funded reading counts as a test")
+					eq(v.press().result, "attack" if truth == "drifting" else "walkout", label + " the fourth push follows truth")
+					eq([v.press_count, v.patience, v.press().result], [4, lamps, "closed"], label + " terminal push commits only once")
+
+
+func test_pressure_draws_and_film() -> void:
+	var curve: Dictionary = rules.patience
+	var reached := [0, 0, 0, 0]
+	var ended := [0, 0, 0, 0]
+	var tells := [0, 0, 0, 0]
+	var outcomes := {}
+	var patient := visit("rook")
+	for night in 6000:
+		for slot in 5:
+			patient.pressure_seed = hash("%d:%d" % [night, slot])
+			for push in 4:
+				patient.press_count = push
+				var draw := patient.pressure_draw()
+				reached[push] += 1
+				tells[push] += int(draw.tell)
+				ended[push] += int(draw.ends)
+				outcomes[[push,draw.ends,draw.tell]] = patient.pressure_seed
+				if draw.ends:
+					break
+	for push in 4:
+		var end_rate: float = float(ended[push]) / reached[push]
+		var tell_rate: float = float(tells[push]) / reached[push]
+		print("PRESS %d reached %d, ended %d, tells %d" % [push+1,reached[push],ended[push],tells[push]])
+		ok(absf(end_rate - curve.end_chance[push]) < 0.02 and absf(tell_rate - curve.tell_chance[push]) < 0.02, "conditional rates follow both curves")
+		for ends in ([true] if push == 3 else [false, true]):
+			for tell in [false, true]:
+				var key := [push, ends, tell]
+				ok(outcomes.has(key), "every allowed tell and outcome combination occurs")
+				for id in ["rook","vale"]:
+					var v := visit(id)
+					v.pressure_seed = outcomes[key]
+					v.patience = 0
+					for prior in push:
+						v.press()
+					var preview := v.pressure_draw()
+					v.record_intake(false)
+					v.apply_ask(v.case_data.topics[0].id)
+					eq(v.pressure_draw(), preview, "chat and looking cannot reroll a push")
+					var result := v.press()
+					eq(not result.tell.is_empty(), tell, "committed push presents this tell")
+					if tell:
+						eq(result.tell.note, v.case_data.flare.note, "even an unfunded or terminal tell shows this appointment's TEMPER")
+						ok(v.row_seen("temper") and v.tests_in_order.is_empty(), "visible tell earns one row independently of instrument credit")
+					eq(v.in_exam(), not ends, "escalation settles or continues according to this draw")
+					if ends:
+						eq(result.result, "attack" if v.is_drifting() else "walkout", "truth selects only the terminal outcome")
+						eq(v.press().result, "closed", "terminal commitment cannot be replayed")
+	var reel = preload("res://scripts/ui/closing_reel.gd")
+	eq(reel.build([])[0].outcome, "empty", "an empty list shows the unused chair")
+	var records := []
+	for id in templates:
+		for truth in ["stable","drifting"]:
+			var v := VisitState.new(CaseDB.compose(templates[id], {"truth":truth}), rules)
+			v.verdict("treat")
+			records.append(v.settlement())
+	var shots: Array = reel.build(records)
+	eq(shots.size(), records.size(), "one operation for each actual admission")
+	for i in records.size():
+		eq([shots[i].id,shots[i].outcome], [records[i].case_id,records[i].outcome], "film keeps identity, order and actual treatment")
+		ok(reel.STORIES.has(shots[i].id), "every admitted character has a success and an incident")
+	var mixed: Array = reel.build([{"case_id":"priya","name":"Priya","truth":"drifting","outcome":"treated_drifting"},{"case_id":"rook","name":"Rook","truth":"stable","outcome":"treated_ok"}])
+	eq([mixed[0].annex, mixed[1].annex], [false,true], "later admissions reach relief staff after a fatal ward incident")
+	var records_at_door := []
+	for mode in ["referred_stable","referred_drifting","locked_out","false_alarm","walkout","gave_up","caught","hit"]:
+		records_at_door.append({"case_id":"kip","name":"Kip","outcome":mode,"truth":"stable","title":mode})
+	shots = reel.build(records_at_door)
+	eq(shots.size(), records_at_door.size()+1, "every denial stays on camera and the vacant ward is shown once")
+	eq([shots[-2].outcome,shots[-1].outcome], ["empty","hit"], "a fatality cuts the final feed")
+	var wire := preload("res://scripts/core/model_client.gd").new()
+	var whole := {"state":{"press_count":3},"conversation_history":[{"role":"action","text":"press:3"},{"role":"reaction","text":"A hand stiffens."}],"visit_summary":{"after":1,"omitted":1,"actions":{"press:3":1}}}
+	var legacy: Dictionary = wire._wire_history(whole)
+	eq([legacy.conversation_history.size(),legacy.visit_summary.after,legacy.visit_summary.actions.size(),legacy.state.press_count], [1,0,0,3], "older transports receive the real pressure count and observed reaction")
+	wire.press_history_max = 4
+	eq(wire._wire_history(whole).conversation_history.size(), 2, "current transports and local histories preserve the third action")
+	wire.free()
 
 
 func test_shutter() -> void:
@@ -1300,9 +1379,8 @@ func test_glass() -> void:
 	eq(v.settlement()["credits"], int(cases["vale"]["fee"]) + int(rules["scoring"]["refer_drifting"]), "a late stop is paid like a clean one: the glass is the cost")
 	eq(v.take_blow(), 2, "nothing lands once the shutter is down")
 	v = visit("maren")
-	v.press()
-	v.press()
-	v.press()
+	for push in 4:
+		v.press()
 	for i in 3:
 		v.take_blow()
 	v.attack_timeout()
@@ -1439,7 +1517,8 @@ func test_wear_distribution() -> void:
 			var v := VisitState.new(c, rules)
 			ok(not v.snap() and v.snap_chance() == 0.0, "wear cannot cause a snap")
 			ok(v.verdict("refer").get("next") != "attack", "a worn patient never lunges at a call")
-			v = VisitState.new(c, rules)
+			v = VisitState.new(c, rules, 86)
+			v.press()
 			v.press()
 			v.patience = 0
 			eq(v.press().result, "warning", "wear and an empty chart still allow a warning")

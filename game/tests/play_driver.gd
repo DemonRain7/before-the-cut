@@ -427,7 +427,7 @@ func leave() -> void:
 func take_slip() -> bool:
 	click(MainScript.SLIP_CLIP.get_center())
 	return await until(func() -> bool:
-		return (main.state == MainScript.State.WAIT and main.clinic.cam_prompt) or main.state == MainScript.State.REPORT, 15.0)
+		return (main.state == MainScript.State.WAIT and main.clinic.cam_prompt) or main.state == MainScript.State.REPORT, 38.0)
 
 
 ## Waits for the end-of-night report: after the last slip, or out of the dark when a blow

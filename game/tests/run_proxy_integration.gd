@@ -109,7 +109,7 @@ func test_intake_pressure(db: Dictionary) -> void:
 		for scenario in ["normal", "timeout"]:
 			client.base_url = str(urls[scenario])
 			var pick := {"truth":"drifting", "signs":{"speech":t.signs.speech.broken[0].id, "temper":t.signs.temper.broken[0].id}}
-			var v := VisitState.new(CaseDB.compose(t, pick), rules)
+			var v := VisitState.new(CaseDB.compose(t, pick), rules, 86)
 			var a := new_agent(v)
 			for id in ["account", "explain"]:
 				var d: Dictionary = await a.decide({"type":"intake", "id":id, "text":"Compare the file."}, v.snapshot(), [v.intake_line(id == "explain")])
@@ -125,13 +125,14 @@ func test_intake_pressure(db: Dictionary) -> void:
 			var follow: Dictionary = await a.classify("哪一个？" if language == "zh" else "Which one is it?")
 			check(follow.get("topic") == "intake_explain", "a displayed pressure response keeps the file in focus over HTTP")
 			var calls := a.calls_this_visit
+			check(v.press().result == "push", "the second push survives this draw")
 			event.stage = v.press_stage()
 			var warning: Dictionary = await a.decide(event, v.snapshot(), [], v.open_signs(event))
 			check(warning.source == "script" and warning.reply == t.press_words.warning and a.calls_this_visit == calls,
 				"both providers deliver the same warning locally in " + language)
 			check(v.press().result == "warning" and v.in_exam(), "a resistant visitor stays through the warning")
 			v.record.append("patient", Lang.t(str(warning.reply)))
-			check(v.press().result == "attack" and v.press_count == 3 and v.attack_cause == "press", "the game resolves the third commitment even after a timeout")
+			check(v.press().result == "attack" and v.press_count == 4 and v.attack_cause == "press", "the game resolves the fourth commitment even after a timeout")
 			a.end_visit()
 			check(v.record.entries.is_empty() and not a.intake_in_focus(), "closing releases the file conversation")
 	client.base_url = str(urls.normal)
@@ -148,7 +149,7 @@ func test_sign_matrix(db: Dictionary) -> void:
 				for temper in ["normal", "broken"]:
 					var signs := {"speech": template.signs.speech[speech][0].id, "temper": template.signs.temper[temper][0].id}
 					var c := CaseDB.compose(template, {"signs": signs, "truth": "stable" if speech == "normal" and temper == "normal" else "drifting"})
-					var v := VisitState.new(c, rules)
+					var v := VisitState.new(c, rules, 86)
 					var a := new_agent(v)
 					a.run_id = "btc-sign-matrix"
 					var evidence: Array = c.rows.speech.evidence
@@ -765,6 +766,7 @@ func test_talk_rules(language: String) -> void:
 	main.agent.run_id = "btc-fair-" + language
 	main.agent.set_mode("model")
 	var v := main.visit
+	v.pressure_seed = 86
 	var p := v.patience
 	var draws := main._snap_rng.state
 	var actions := v.actions
@@ -791,7 +793,10 @@ func test_talk_rules(language: String) -> void:
 	await d.settle()
 	var calls := main.agent.calls_this_visit
 	await d.press()
-	check(v.in_exam() and v.press_count == 2 and main.agent.calls_this_visit == calls and main.agent.last.reply == v.case_data.press_words.warning,
+	check(v.in_exam() and v.press_count == 2, "the second push survives this draw")
+	await d.settle()
+	await d.press()
+	check(v.in_exam() and v.press_count == 3 and main.agent.calls_this_visit == calls and main.agent.last.reply == v.case_data.press_words.warning,
 		"the warning comes from this character under a working or timed-out service without another model call")
 	await d.settle()
 	await d.press()

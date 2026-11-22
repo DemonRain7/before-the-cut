@@ -2,6 +2,8 @@
 
 Codex keeps this file during the run described in [KICKOFF.md](KICKOFF.md). The design is [01-design.md](01-design.md).
 
+November 22 follow-up. Rules 15 supersede the three-push rule below and add a patient-specific closing film. [Current implementation and verification](../closing-shift/release.md)
+
 Status on November 21, 2026: M0–M6 complete and verified. M0 tagged 31c8dbd as loop-v12.
 
 ## Milestones

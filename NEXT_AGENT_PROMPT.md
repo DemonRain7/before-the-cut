@@ -1,8 +1,10 @@
 # Continue Before the Cut
 
+For the next gameplay session, observe a first-time pressure decision, watch the closing film once with captions covered, and prototype a shared workbench with two scripted cases. The open coursework checklist below remains separate.
+
 The chart now has a FILE tab with the registration and a supporting slip for each of the ten characters. In Chinese teaching night K, compare Rook's location and Juno's name. Ask an outside player to show where they found the file, tell you how they reconciled one account and explain their decision after PRESS. The test fixtures cover typed wording, confirmed dictation and provider timeout. [Release evidence and next playtest](docs/development/play-loop-redesign/PROGRESS.md#cross-checking-the-intake-file)
 
-Rules 14 and patient protocol 5 are on main. Each visit gets two examination lamps and its own hidden three-push limit. A funded first PRESS reads TEMPER, a second draws a warning and a confirmed third ends the visit. Only fresh physical instruments roll surprise attacks. Ask an outside player what the warning meant, observe whether they step back, and compare their decision with an empty-lamp visit. [Current measurements](docs/development/play-loop-redesign/PROGRESS.md#hidden-patience) The first visitor teaches the loop and the second teaches the contact list. [Full release, measurements and acceptance sheet](docs/development/play-loop-redesign/PROGRESS.md)
+Rules 15 and patient protocol 5 are on main. A committed push can reveal a physical tell, end the visit or do both. The fourth always ends it. The closing film follows each settled visitor through treatment, diversion or the counter incident. It automatically plays after an ordinary or fatal shift. [Implementation and checks](docs/development/closing-shift/release.md) · [Film polish prompt](docs/development/closing-shift/claude-prompt.md) · [Solo and co-op prototype options](docs/development/closing-shift/next-game.md)
 
 One steady desk light indicates a possible next action based on what the patient has said. All tests remain available under the two-lamp rules. On K, watch where an unfamiliar player looks after Kip mentions his eyes. On L, Juno has no specific complaint. [Current desk guidance](docs/development/play-loop-redesign/PROGRESS.md#guidance-at-the-counter)
 

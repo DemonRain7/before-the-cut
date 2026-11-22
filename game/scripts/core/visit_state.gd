@@ -36,6 +36,7 @@ var answered: Dictionary = {}    # topic id -> true
 var intake_stage := 0            # 1 after hearing the account, 2 after checking its explanation
 var last_recorded_speech: String = ""  # the quote used in this appointment's closing report
 var press_count: int = 0         # committed pushes in this appointment, independent of the lamps
+var pressure_seed: int
 var attack_cause: String = ""    # "refer", "press" or "snap"
 var blows_taken: int = 0         # blows that reached the glass before the shutter was down
 var verdict_kind: String = ""    # "treat", "refer" or ""
@@ -52,7 +53,8 @@ var snapped: bool = false
 var flared: bool = false
 
 
-func _init(p_case: Dictionary = {}, p_rules: Dictionary = {}) -> void:
+func _init(p_case: Dictionary = {}, p_rules: Dictionary = {}, p_pressure_seed: int = -1) -> void:
+	pressure_seed = randi() if p_pressure_seed < 0 else p_pressure_seed
 	case_data = p_case
 	rules = p_rules
 	patience_max = int(_rule("visit", "lamps", 2))
@@ -333,7 +335,7 @@ func apply_ask(topic_id: String, _move: String = "answer", spoken: String = "") 
 
 ## The next committed PRESS. Only the first can buy a TEMPER reading.
 func press_stage() -> String:
-	var remaining := int(_rule("patience", "press_limit", 3)) - press_count
+	var remaining := int(_rule("patience", "press_limit", 4)) - press_count
 	if remaining <= 1:
 		return "break"
 	if remaining == 2:
@@ -351,8 +353,21 @@ func press_cost() -> int:
 	return _cost("press") if press_stage() == "test" else 0
 
 
-## A paid first reading earns TEMPER. Ordinary pushes and the warning consume hidden patience.
-## The final push ends the appointment according to its truth, including when a steady row is worn.
+## A draw belongs to a particular push in this appointment. Previewing or cancelling consumes nothing.
+func pressure_draw() -> Dictionary:
+	if not in_exam():
+		return {"ends":false, "tell":false}
+	var rng := RandomNumberGenerator.new()
+	rng.seed = pressure_seed
+	for previous in press_count:
+		rng.randf()
+		rng.randf()
+	var end_curve: Array = _rule("patience", "end_chance", [0.05, 0.20, 0.50, 1.0])
+	var tell_curve: Array = _rule("patience", "tell_chance", [0.25, 0.45, 0.65, 0.85])
+	var end_roll := rng.randf()
+	var tell_roll := rng.randf()
+	return {"ends": press_breaks() or end_roll < float(end_curve[press_count]), "tell": tell_roll < float(tell_curve[press_count])}
+
 func press() -> Dictionary:
 	var res := {"result": "closed", "line": "", "face": "", "hands": "", "note": "", "new": false}
 	if phase != Phase.EXAM:
@@ -361,32 +376,41 @@ func press() -> Dictionary:
 	if list.is_empty():
 		return res
 	var stage := press_stage()
+	var draw := pressure_draw()
+	res["tell"] = {}
 	patience -= press_cost()
+	if stage == "test":
+		actions += 1
+		record_test("temper")
 	press_count += 1
 	_note("press:%d" % press_count)
+	if draw.tell:
+		var tell: Dictionary = case_data.flare
+		seen["pressure_tell"] = true
+		add_note("temper", "pressure_tell", str(tell.note))
+		res.tell = tell
+	if draw.ends:
+		var ending: Dictionary = list.back()
+		res.result = str(ending.end)
+		res.line = str(ending.line)
+		if ending.end == "attack":
+			phase = Phase.ATTACK
+			attack_cause = "press"
+		else:
+			_finish("walkout")
+		return res
 	if stage in ["push", "warning"]:
 		res.result = stage
 		res.line = str(case_data.press_words[stage])
 		return res
-	var entry: Dictionary = list.back() if stage == "break" else list.front()
+	var entry: Dictionary = list.front()
 	res["line"] = str(entry.get("line", ""))
 	res["face"] = str(entry.get("face", ""))
 	res["hands"] = str(entry.get("hands", ""))
 	res["note"] = str(entry.get("note", ""))
-	var end := str(entry.get("end", ""))
-	if end == "walkout":
-		res["result"] = "walkout"
-		_finish("walkout")
-	elif end == "attack":
-		res["result"] = "attack"
-		phase = Phase.ATTACK
-		attack_cause = "press"
-	else:
-		res["result"] = "react"
-		actions += 1              # the next instrument is a later test, but pressure itself never rolls
-		record_test("temper")
-		seen["press"] = true
-		res["new"] = add_note("temper", "press", str(entry.get("note", "")))
+	res["result"] = "react"
+	seen["press"] = true
+	res["new"] = add_note("temper", "press", str(entry.get("note", "")))
 	return res
 
 
@@ -489,7 +513,7 @@ func snap() -> bool:
 
 
 ## A shout and a hand slammed on the glass. Never an attack. The note is TEMPER evidence and
-## agrees with the case: face and voice together for the steady, not for the drifting.
+## follows this appointment's TEMPER row, including ordinary wear.
 func flare() -> Dictionary:
 	var res := {"ok": false, "line": "", "face": "", "hands": "", "note": "", "new": false}
 	if phase != Phase.EXAM or flared:
@@ -594,7 +618,7 @@ func cycle_mark(row: String) -> int:
 func row_seen(row: String) -> bool:
 	if row == "speech" and intake_stage == 2:
 		return true
-	if row == "temper" and seen.has("flare"):
+	if row == "temper" and (seen.has("flare") or seen.has("pressure_tell")):
 		return true      # a flare shows the temper as plainly as pressure does
 	var spec: Dictionary = case_data.get("rows", {}).get(row, {})
 	for key in spec.get("evidence", []):

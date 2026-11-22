@@ -41,6 +41,7 @@ const ClinicView = preload("res://scripts/ui/clinic_view.gd")
 const DialogueBox = preload("res://scripts/ui/dialogue_box.gd")
 const Desk = preload("res://scripts/ui/desk.gd")
 const Clipboard = preload("res://scripts/ui/clipboard.gd")
+const ClosingReel = preload("res://scripts/ui/closing_reel.gd")
 const Screens = preload("res://scripts/ui/screens.gd")
 const PatientRig = preload("res://scripts/ui/patient_rig.gd")
 const AudioBank = preload("res://scripts/ui/audio_bank.gd")
@@ -49,7 +50,7 @@ const Intro = preload("res://scripts/ui/intro.gd")
 const Guide = preload("res://scripts/ui/guide.gd")
 const Coach = preload("res://scripts/ui/coach.gd")
 
-enum State { TITLE, WAIT, ENTER, EXAM, ATTACK, RESOLVE, SLIP, REPORT, INTRO }
+enum State { TITLE, WAIT, ENTER, EXAM, ATTACK, RESOLVE, SLIP, REPORT, INTRO, AFTERMATH }
 
 const SLIP_CLIP := Rect2(217, 148, 202, 152)   # over the counter: the slip feeds up out of the printer in the desk
 const SLIP_REST := 4.0                          # its last few pixels stay in the printer
@@ -167,7 +168,7 @@ const LEAD_HINT := {
 	"penlight": "They mentioned their eyes. Try LIGHT.",
 	"grip": "They mentioned their hands. Try GRIP.",
 	"port": "They mentioned their port. Try PORT.",
-	"press": "They mentioned their temper. Try PRESS.",
+	"press": "They mentioned their temper. PRESS can end the visit.",
 }
 # a patient with no patience left gives one last wait and then leaves by themselves
 const SHORT_HINT := "No lamps left. You can still talk, press or decide."
@@ -182,9 +183,9 @@ const DROP_COACH_HINT := "The drop changes nothing about the exam. Steady or dri
 const FLARE_COACH_HINT := "Only temper: no red bar, nothing to stop. The SHUTTER is for the red bar."
 const SAY_CODE_HINT := "SAY the code. A matching contact hands over a package. A wrong code costs %d lamp."
 const CODE_BLANK_HINT := "Wrong code: a blank look, -%d lamp. Keep examining them."
-# BREAK is available after PRESS or with no lamps.
-const PRESS_HINT := "PRESS tests temper for %d lamp. Compare the reaction with the TEMPER line."
-const PUSH_HINT := "Keep pushing. The patient may end the visit."
+# The first three pushes may end an appointment. The fourth requires confirmation.
+const PRESS_HINT := "PRESS costs %d lamp. Even this push could end the visit."
+const PUSH_HINT := "Pushing is free. Each push is riskier. Watch their face and hands."
 const PRESS_WARNING_HINT := "You can make your call now. Pushing again ends the visit."
 const PRESS_LAST_HINT := "BREAK is free. Steady: walks unpaid. Drift: lunges. SPACE to catch them (+%d)."
 const TRAINING_SKIP_HINT := "SKIP ALL [K]: end the training. H opens the counter guide any time."
@@ -345,6 +346,8 @@ var dialogue: DialogueBox = null
 var desk: Desk = null
 var clipboard: Clipboard = null
 var screens: Screens = null
+var reel := ClosingReel.new()
+var _replaying_film := false
 var audio: AudioBank = null
 var mic: VoiceInput = null        # push-to-talk: a microphone that is open only while the key is held
 var gore: GoreLayer = null
@@ -561,6 +564,10 @@ func _build() -> void:
 	screens = Screens.new()
 	screens.errors = data_errors
 	add_child(screens)
+	reel.hide()
+	add_child(reel)
+	reel.finished.connect(_finish_reel)
+	reel.sound.connect(func(cue: String): audio.play(cue, 0.9, -9.0))
 	var line_rules: Dictionary = rules.get("line", {})
 	var per_hour := int(line_rules.get("per_hour", 0))
 	var night_rules: Dictionary = rules.get("night", {}) if typeof(rules.get("night")) == TYPE_DICTIONARY else {}
@@ -1681,7 +1688,7 @@ func act_call_next() -> void:
 	audio.play("beep", 0.8)
 	var c: Dictionary = cases[id]
 	_visit_serial += 1
-	visit = VisitState.new(c, rules)
+	visit = VisitState.new(c, rules, hash("%d:%d" % [shift_seed, shift.index]))
 	_general_complaint_answered = false
 	visit.set_contact(shift.contact_for(id))
 	# The first visitor teaches the tests, the second teaches contacts.
@@ -1830,7 +1837,7 @@ func act_tool(tool: String) -> void:
 ## own: ask_line is the doctor's own wording (typed or spoken), sent and shown as it was said;
 ## otherwise it is an authored line, and the patient hears it in the player's language.
 ## Returns {} when the action was cancelled meanwhile (the shutter fell).
-func _decide(event: Dictionary, legal: Array, ask_line: String, token: int, own: bool = false, fallback: String = "") -> Dictionary:
+func _decide(event: Dictionary, legal: Array, ask_line: String, token: int, own: bool = false, fallback: String = "", on_doctor_spoke: Callable = Callable()) -> Dictionary:
 	_thinking = true
 	_lock = true
 	_think_t = 0.0
@@ -1841,7 +1848,7 @@ func _decide(event: Dictionary, legal: Array, ask_line: String, token: int, own:
 		_doctor_say(ask_line, true)
 	event = event.duplicate(true)
 	event["text"] = ask_line
-	var d: Dictionary = await agent.decide(event, visit.snapshot(), legal, visit.open_signs(event), fallback)
+	var d: Dictionary = await agent.decide(event, visit.snapshot(), legal, visit.open_signs(event), fallback, on_doctor_spoke)
 	if _quit_night.visible:
 		await night_resumed
 	if token != _seq or d.is_empty():
@@ -1866,11 +1873,11 @@ func _spoken_for_display(text: String) -> String:
 	return "..." if display == "" and text != "" else display
 
 
-func _show_reaction(response: Dictionary, token: int) -> bool:
+func _show_reaction(response: Dictionary, token: int, remember: bool = true) -> bool:
 	var reaction := str(response.get("reaction", ""))
 	if token != _seq or visit == null or reaction == "":
 		return token == _seq
-	if agent != null and agent.record == visit.record:
+	if remember and agent != null and agent.record == visit.record:
 		visit.record.append("reaction", Lang.t(reaction))
 	return await _narrate(_patient_name(), _spoken_for_display(Lang.t(reaction)), token, 0.35)
 
@@ -2140,9 +2147,11 @@ func act_press(confirmed: bool = false) -> void:
 		return
 	var question := Lang.t(str(PRESS_LINES[1 if stage == "break" else 0]))
 	var d := {}
-	if stage == "break":
+	var res := {}
+	if visit.pressure_draw().ends:
 		visit.record.append("doctor", question)
 		_doctor_say(question, true)
+		_commit_push(res)
 	else:
 		var on_file := agent.intake_in_focus()
 		var event := {"type":"press", "id":"intake" if on_file else "challenge"}
@@ -2153,26 +2162,20 @@ func act_press(confirmed: bool = false) -> void:
 		elif on_file:
 			question = Lang.t("Look at the slip again. Do you stand by what you told me?")
 			options.append(visit.case_data.intake["firm" if visit.case_data.rows.temper.ok else "flat"])
-		d = await _decide(event, options, question, token, true)
+		d = await _decide(event, options, question, token, true, "", _commit_push.bind(res))
 		if d.is_empty():
 			return
-	var before := _note_keys()
-	var res: Dictionary = visit.press()
 	res["line"] = str(d.get("reply", res.get("line", "")))
 	var result := str(res.get("result", ""))
-	_sync_visit()
-	_log("press", {"count": visit.press_count, "result": result, "patience": visit.patience})
-	if coach != null:
-		if result == "react":
-			coach.event("first_test" if visit.tests_in_order.size() == 1 else "second_test")
-	if not await _show_reaction(d, token):
+	if not res.tell.is_empty():
+		_lock = true
+		if not await _show_reaction({"reaction":res.tell.note}, token, false):
+			return
+		_lock = false
+	elif not await _show_reaction(d, token):
 		return
 	match result:
 		"react":
-			if rig != null:
-				rig.react(str(res.get("face", "")), str(res.get("hands", "")))
-			audio.play("sting")
-			_mark_new_notes(before)
 			clinic.scope.standard = _sheet_normal("temper")
 			clinic.scope.selected_mark = int(visit.marks.temper)
 			clinic.scope.open("press", visit.case_data, true, str(res.note))
@@ -2186,6 +2189,27 @@ func act_press(confirmed: bool = false) -> void:
 			_walkout(str(res.get("line", "")), token)
 		"attack":
 			_attack_sequence(str(res.get("line", "")), token)
+
+
+## Commit on the doctor's input, including when a reply is slow or gets interrupted.
+func _commit_push(res: Dictionary) -> void:
+	var before := _note_keys()
+	res.merge(visit.press())
+	_sync_visit()
+	var tell: Dictionary = res.tell
+	if not tell.is_empty():
+		visit.record.append("reaction", Lang.t(str(tell.note)))
+	if not tell.is_empty() or res.result == "react":
+		var pose := tell if not tell.is_empty() else res
+		if rig != null:
+			if not tell.is_empty():
+				rig.show_pressure_tell()
+			rig.react(str(pose.face), str(pose.hands))
+		audio.play("sting")
+		_mark_new_notes(before)
+	if coach != null and res.result == "react":
+		coach.event("first_test" if visit.tests_in_order.size() == 1 else "second_test")
+	_log("press", {"count":visit.press_count, "result":res.result, "tell":not tell.is_empty(), "patience":visit.patience})
 
 
 ## The doctor says something in their own words: typed, or dictated and then sent.
@@ -3523,7 +3547,7 @@ func _lights_out(s: Dictionary, token: int) -> void:
 	var ok: bool = await _wait(0.6, token)
 	if not ok:
 		return
-	_show_report()
+	_start_reel()
 	await _fade_to(0.0, 1.4)
 
 
@@ -3544,13 +3568,33 @@ func act_continue() -> void:
 	desk.badges.clear()
 	desk.warn.clear()
 	if shift.is_done():
-		_show_report()
+		_start_reel()
 	else:
 		if clinic.shutter_pos > 0.0:
 			clinic.shutter_to(0.0, 0.9)
 			audio.play("shutter_roll")
 		desk.lever_down = false
 		_begin_wait(shift.reading())      # the hour is over: the meter reads the till
+
+
+func _start_reel(replay: bool = false) -> void:
+	_replaying_film = replay
+	state = State.AFTERMATH
+	_bump()
+	_desk_off()
+	dialogue.clear()
+	if coach != null and coach.is_running():
+		coach.stop(false)
+	reel.start(shift.records, less_blood)
+
+
+func _finish_reel() -> void:
+	if state != State.AFTERMATH:
+		return
+	if _replaying_film:
+		state = State.REPORT
+	else:
+		_show_report()
 
 
 func _show_report() -> void:
@@ -3746,7 +3790,16 @@ func _pointer_press(pos: Vector2, button: int) -> void:
 		elif button == MOUSE_BUTTON_LEFT:
 			act_intro_next()
 		return
+	if state == State.AFTERMATH:
+		if button == MOUSE_BUTTON_RIGHT or (button == MOUSE_BUTTON_LEFT and ClosingReel.SKIP.has_point(pos)):
+			reel.finish()
+		elif button == MOUSE_BUTTON_LEFT:
+			reel.advance()
+		return
 	if state == State.REPORT:
+		if button == MOUSE_BUTTON_LEFT and Screens.REPLAY_FILM.has_point(pos):
+			_start_reel(true)
+			return
 		# the report is over everything: a click turns its page, the right button goes to the totals
 		if button == MOUSE_BUTTON_RIGHT:
 			act_report_skip()
@@ -3889,6 +3942,13 @@ func _key_press(keycode: int, unicode: int, control: bool) -> void:
 	if _quit_night.visible:
 		_quit_night.key(keycode)
 		return
+	if state == State.AFTERMATH:
+		match keycode:
+			KEY_ESCAPE: reel.finish()
+			KEY_ENTER, KEY_KP_ENTER, KEY_SPACE, KEY_RIGHT: reel.advance()
+			KEY_M: audio.set_muted(not audio.muted)
+			KEY_F11: act_fullscreen(not fullscreen)
+		return
 	if keycode == KEY_F10 and state not in [State.TITLE, State.REPORT]:
 		_offer_quit_night()
 		return
@@ -3927,6 +3987,8 @@ func _key_press(keycode: int, unicode: int, control: bool) -> void:
 					act_report_menu()
 				else:
 					act_report_skip()
+			KEY_R:
+				_start_reel(true)
 			KEY_LEFT, KEY_BACKSPACE:
 				act_report_back()
 			KEY_ENTER, KEY_KP_ENTER, KEY_SPACE, KEY_RIGHT:
@@ -4372,6 +4434,10 @@ func _update_hover() -> void:
 		screens.hover_menu_item(screens.menu_at(pos))
 		screens.hover_setting_item(screens.setting_at(pos))
 		if screens.hover_menu != "" or screens.hover_setting != "":
+			_cursor_kind = "hand"
+		return
+	if state in [State.AFTERMATH, State.REPORT]:
+		if state == State.AFTERMATH or Screens.REPLAY_FILM.has_point(pos):
 			_cursor_kind = "hand"
 		return
 	if _coach_hover(pos):
