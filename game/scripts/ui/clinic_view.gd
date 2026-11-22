@@ -1024,7 +1024,7 @@ func _draw_patience() -> void:
 		_hud.draw_rect(Rect2(track.position, Vector2(roundf(track.size.x * clampf(leaving, 0.0, 1.0)), track.size.y)), red)
 		_frame(track.grow(1.0), Gfx.RED1)
 		return
-	Gfx.text(_hud, Vector2(x, y), "PATIENCE", Gfx.WARM7)
+	Gfx.text(_hud, Vector2(x, y), "LAMPS", Gfx.WARM7)
 	var on := Gfx.tex("ui/pip_on.png")
 	var off := Gfx.tex("ui/pip_off.png")
 	for i in patience_max:

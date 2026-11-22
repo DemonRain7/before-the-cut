@@ -3,7 +3,7 @@ import { CHARACTER_CONTEXT } from "./character_profiles.mjs";
 
 import intentCues from "../../game/data/patient_intents.json" with { type: "json" };
 
-import { complaintLine, rows as complaintRows } from "./complaints.mjs";
+import { complaintLine, namesPart, statesResult, rows as complaintRows } from "./complaints.mjs";
 
 export const BEATS = Object.freeze(["arrive", "after_check", "idle"]);
 export const INTENTS = Object.freeze(["case_question", ...Object.keys(intentCues), "unclear", "other"]);
@@ -517,9 +517,10 @@ export function createHandler({ cases, rules, provider, limits = {}, counters = 
 		const [visitLimit, sessionLimit, code] = quotas[kind];
 		const entries = [[kind + ":" + req.visit_id, visitLimit], [kind, sessionLimit]];
 		try {
-			if (kind === "dialogue" && BEATS.includes(req.event?.type)) {
+			const idle = req.event?.type === "idle" || (req.event?.type === "complain" && req.event.id === "idle");
+			if (kind === "dialogue" && (idle || BEATS.includes(req.event?.type))) {
 				entries.push(["beat:" + req.visit_id, lim.maxBeatsPerVisit]);
-				if (req.event.type === "idle") entries.push(["idle:" + req.visit_id, lim.maxIdleBeatsPerVisit]);
+				if (idle) entries.push(["idle:" + req.visit_id, lim.maxIdleBeatsPerVisit]);
 			}
 			const full = await ctr.takeSession(req.run_id, entries);
 			if (full === 0) return bad(429, "visit_" + code + "_cap", "visit limit reached");
@@ -632,6 +633,9 @@ export function createHandler({ cases, rules, provider, limits = {}, counters = 
 		}
 		const verdict = validateResponse(answer, maxReplyChars, req.event.type === "check", req.event.outcome, BEATS.includes(req.event.type));
 		if (!verdict.ok) return finish(422, errorBody("invalid_model_output", verdict.reason));
+		if (req.event.type === "complain" && (req.event.rows.some(row => !namesPart(verdict.reply, row)) ||
+			statesResult(verdict.reply + " " + verdict.reaction)))
+			return finish(422, errorBody("invalid_model_output", "complaint_wording"));
 		const response = { reply: verdict.reply, reaction: verdict.reaction };
 		if (typeof verdict.cooperates === "boolean") response.cooperates = verdict.cooperates;
 		return finish(200, {

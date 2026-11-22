@@ -2285,9 +2285,9 @@ func counter_words() -> void:
 		main.GLASS_OFF_HINT, Lang.tf(main.CROSS_SOME_HINT, [1, 2]), Lang.tf(main.CROSS_SOME_HINT, [4, 5]), Lang.tf(main.CROSS_RULE_HINT, 2), Lang.tf(main.CROSS_RULE_HINT, 5)]
 	hints.append_array(main.OBJECT_HINT.values())
 	hints.append_array(main.TAB_HINT.values())
-	# tonight's list, the paid CALM, the surprises and the training
-	hints.append_array([main.LEAVING_FREE_HINT, Lang.tf(main.CALM_HINT, [30, 1, 2]), Lang.tf(main.CALM_HOLD_HINT, [30, 1, 2]), main.CALM_GONE_HINT,
-		Lang.tf(main.CALM_FREE_HINT, [1, 2]), Lang.tf(main.CALM_FREE_HOLD_HINT, [1, 2]), Lang.tf(main.SAY_CODE_HINT, 1), Lang.tf(main.CODE_BLANK_HINT, 1),
+	# The current lamp, PRESS and BREAK hints fit the strip in each language.
+	hints.append_array(["What's bothering you?", "Listed questions are free.", Lang.tf("%s Free now.", [Lang.t(main.TOOL_WHAT.grip)]),
+		Lang.tf("%s Uses %d lamp.", [Lang.t(main.TOOL_WHAT.penlight), 1]), Lang.tf(main.PRESS_HINT, 1), Lang.tf(main.PRESS_LAST_HINT, 50), Lang.tf(main.SAY_CODE_HINT, 1), Lang.tf(main.CODE_BLANK_HINT, 1),
 		main.DROP_COACH_HINT, main.FLARE_COACH_HINT, main.TRAINING_SKIP_HINT, main.TRAINING_NEXT_HINT, main.SWAP_LIST_HINT,
 		main.SWAP_SHEET_HINT])
 	var fits := 0
@@ -2297,7 +2297,7 @@ func counter_words() -> void:
 			fits += 1
 		else:
 			print("  too wide or unprintable: ", text)
-	check(fits == hints.size() and fits >= 43, "all %d hints about patience, marks, the walls, the list, CALM and the training fit the hint row" % hints.size())
+	check(fits == hints.size() and fits >= 43, "all %d hints about lamps, marks, free questions, tests and training fit the hint row" % hints.size())
 	var plates: Array = [main.STOP_CLEAN_LINE, main.STOP_BARE_LINE, main.STOP_LAST_LINE, Lang.tf(main.STOP_BLOW_LINE, 1), Lang.tf(main.STOP_BLOWS_LINE, 2),
 		Lang.tf(main.STOP_BLOWS_LINE, 3)]
 	fits = 0

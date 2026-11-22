@@ -938,8 +938,8 @@ func kip() -> void:
 	await shot("kip-last-lamp-tip")
 	await d.complain()
 	await d.settle()
-	reached(main.visit != null and main.visit.calm_spent == 30, "kip: the calm-patch is paid for out of the till")
-	await shot("kip-reassured")
+	reached(main.visit != null and main.visit.patience == 1, "kip: repeating a complaint is free")
+	await shot("kip-repeat-complaint")
 	await typed_line("kip", "Is the night shift hard on you?")
 	await staged_voice("kip")
 	# the stamp is picked up from the wall plate, and the card comes down for it by itself

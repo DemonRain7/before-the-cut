@@ -53,6 +53,9 @@ func run() -> void:
 			await d.complain()
 		if night == "K" and idx < 3:
 			check(not v.complaints_told.is_empty(), "chip, general text and part text deliver K's rows")
+			if not v.complaints_told.is_empty():
+				var line := Main.Lang.t(str(v.case_data.complaints[v.complaints_told[0]]))
+				check(str(main.agent.last.get("reply", "")).contains(line), "mock and scripted fallback audibly name the delivered part")
 		check(v.patience == lamps, "complaint is free")
 		if idx == 0:
 			main.act_say("Lovely music tonight.")

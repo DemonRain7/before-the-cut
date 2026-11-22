@@ -767,7 +767,8 @@ func test_launcher(mode: String) -> void:
 	check(await driver.until(func() -> bool:
 		return main.agent.last.get("source") == source and main.clinic.corner_text.contains(label), 5.0), "corner shows reply source")
 	var elapsed := Time.get_ticks_msec() - started
-	check(elapsed < main.model_client.timeout_ms and main.agent.calls_this_visit == 1, "one bounded attempt")
+	check(elapsed < main.model_client.timeout_ms and main.agent.intents_this_visit == 1
+		and main.agent.calls_this_visit == (0 if mode == "timeout" else 1), "a failed classifier falls back without a second upstream attempt")
 	if mode == "timeout":
 		check(main.agent.last.get("fallback_reason") == "http_504:upstream_timeout", "proxy deadline triggers the scripted reply")
 		check(await driver.until(func() -> bool: return main._base_hint.contains("upstream_timeout") and main.dialogue.speaker == main._patient_name(), 2.0), "scripted reply and timeout reason are visible")

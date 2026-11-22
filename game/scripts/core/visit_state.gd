@@ -45,7 +45,6 @@ var dropped: bool = false        # the courier answered the code and handed the 
 var drop_pay: int = 0            # what the drop put in the till
 var codes_tried: Dictionary = {} # entry id -> true: wrong codes already said to this visitor
 var codes_wrong: int = 0
-var calm_spent: int = 0          # credits CALM took off the till
 var actions: int = 0             # actions rolled for a snap or a flare
 var surprises: bool = true       # false on the training visit: nobody snaps or flares
 var snapped: bool = false
@@ -401,8 +400,7 @@ func say_code(entry: Dictionary) -> Dictionary:
 	return res
 
 
-## What this visit has done to the till so far, before its outcome is known: the drop in,
-## CALM out.
+## The package payment already in the till before the call.
 func till_change() -> int:
 	return drop_pay
 
@@ -730,7 +728,6 @@ func settlement() -> Dictionary:
 		"drop": drop_pay,
 		"package": str(contact.get("package", "")) if dropped else "",
 		"missed_drop": is_contact() and not dropped,
-		"calm_spent": calm_spent,
 		"codes_wrong": codes_wrong,
 		"snapped": snapped,
 		"flared": flared,

@@ -15,8 +15,8 @@ function patient(id, language, session, visit) {
 		signs: { speech: c.signs.speech.normal[0].id, temper: c.signs.temper.normal[0].id },
 		event: { type: "ask", outcome: "answer", id: c.topics[0].id, text: c.topics[0].q },
 		conversation_history: [{ role: "doctor", text: "history-" + session }],
-		state: { patience: 5, patience_max: 6, granted: [], refusals: {}, reassured: [], claims: [],
-			asked: {}, press_count: 0, reassure_used: 0, history: [] },
+		state: { patience: 2, patience_max: 2, granted: [], complaints_told: [], claims: [],
+			asked: {}, press_count: 0, history: [] },
 	};
 }
 
@@ -48,6 +48,22 @@ export async function probe(send, scenario = "isolation") {
 		const start = performance.now();
 		refused(await post(a), 504, "upstream_timeout");
 		return { posts: 1, status: 504, elapsed_ms: Math.round(performance.now() - start) };
+	}
+	if (scenario === "complaints") {
+		let posts=0;
+		for (const [language,row,partText] of [["en","eyes","Do your eyes hurt?"],["zh","hands","你的手指疼吗？"]]) {
+			const patientCase=cases.kip;
+			const id=randomUUID();
+			const request={...patient("kip",language,id,id),run_id:run,signs:{},conversation_history:[]};
+			for (const text of [language==="en"?"What hurts?":"哪里不舒服？",partText]) {
+				const intent=await send("/v1/patient-intent",JSON.stringify({...request,text}));
+				assert.equal(intent.body.intent,"complaint");posts++;
+			}
+			request.event={type:"complain",id:row,rows:[row],delivery:"rows",text:partText};
+			const reply=await post(request);accepted(reply,language);posts++;
+			assert.ok(language==="en"?reply.body.reply===patientCase.complaints[row]:reply.body.reply.includes("指"));
+		}
+		return {posts, languages:2, status:200};
 	}
 	if (scenario === "visit") {
 		const first = { ...a, run_id: run, visit_id: a.session_id };

@@ -1024,11 +1024,10 @@ def main():
     for text in found:
         rows.append(check("report_title", "screens.gd:_verdict_of", text, scale=2))
     small = dict(consts(SCREENS_GD, r"^VISIT_"))
-    if len([k for k in small if k in ("VISIT_DROP", "VISIT_NO_DROP", "VISIT_CALM", "VISIT_MONEY")]) < 4:
+    if len([k for k in small if k in ("VISIT_DROP", "VISIT_NO_DROP", "VISIT_MONEY")]) < 3:
         rows.append(("report_tally", "screens.gd:_draw_visit_page", 0, "", " NO VISIT LINE WORDS FOUND"))
     else:
-        extra = "   ".join([tr(max(worst_numbers(small["VISIT_DROP"], [int(contacts.get("pay", 0))]), small["VISIT_NO_DROP"],
-                                   key=tw)), tr(worst_numbers(small["VISIT_CALM"], [calm_most]))])
+        extra = tr(max(worst_numbers(small["VISIT_DROP"], [int(contacts.get("pay", 0))]), small["VISIT_NO_DROP"], key=tw))
         rows.append(check("report_tally", "screens.gd:_visit_extra", extra))
         rows.append(check("report_tally", "screens.gd:VISIT_MONEY", small["VISIT_MONEY"].replace("%s", widest_money)))
     # the words that turn a page, and on the totals start the next night or the same one again
@@ -1060,10 +1059,10 @@ def main():
         rows.append(("hint", "main.gd", 0, "", " NO HINTS FOUND"))
     calm_uses = int(reassure.get("uses", 0))
     hint_values = {"GLASS_HINT": [repair_cost],
-                   "CALM_HINT": [numbers["calm_cost"], numbers["calm_gain"], calm_uses],
-                   "CALM_HOLD_HINT": [numbers["calm_cost"], numbers["calm_gain"], calm_uses],
-                   "CALM_FREE_HINT": [numbers["calm_gain"], calm_uses],
-                   "CALM_FREE_HOLD_HINT": [numbers["calm_gain"], calm_uses],
+
+
+
+
                    "SAY_CODE_HINT": [numbers["code_cost"]], "CODE_BLANK_HINT": [numbers["code_cost"]],
                    "PRESS_HINT": [numbers["press_cost"]]}
     for name, h in found:
@@ -1102,13 +1101,12 @@ def main():
     rows += training_rows(intro, numbers)
     rows += howto_rows(intro, numbers)
     # the slip's breakdown line under the call (main.gd: _slip_breakdown): the longest it can be
-    named = dict(consts(MAIN_GD, r"^SLIP_(FEE|DROP|CALM)$"))
-    if len(named) < 3:
+    named = dict(consts(MAIN_GD, r"^SLIP_(FEE|DROP)$"))
+    if len(named) < 2:
         rows.append(("slip_call", "main.gd:SLIP_*", 0, "", " NO BREAKDOWN WORDS FOUND"))
     else:
         worst = "  •  ".join([tr(worst_numbers(named["SLIP_FEE"], [max(fees | {0})])),
-                             tr(worst_numbers(named["SLIP_DROP"], [numbers["pay"]])),
-                             tr(worst_numbers(named["SLIP_CALM"], [numbers["calm_cost"] * calm_uses]))])
+                             tr(worst_numbers(named["SLIP_DROP"], [numbers["pay"]]))])
         rows.append(("slip_call", "main.gd:_slip_breakdown", tw(worst), worst,
                      " WIDER THAN THE SLIP (%d px)" % SLIP_WIDTH if tw(worst) > SLIP_WIDTH else ""))
     # tonight's contact list (clipboard.gd: _draw_list_paper), one column: each alias with what

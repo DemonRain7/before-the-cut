@@ -266,3 +266,37 @@ test("complaint requests reject unknown, duplicate and overlong deliveries befor
  assert.equal((await post(b)).status,200);
  b.state.complaints_told=["unopened"];assert.equal((await post(b)).status,400);
 });
+
+test("an unclear generated complaint or a stated instrument result routes back to authored wording",async()=>{
+ const req=body("complain","eyes","Do your eyes hurt?");
+ Object.assign(req.event,{rows:["eyes"],delivery:"rows"});
+ for(const reply of ["It's only when I work late.","My eyes are normal.","眼睛检查结果显示正常。"]) {
+  const out=await handler(fixture({reply,reaction:""})).post(req);
+  assert.equal(out.status,422);
+  assert.equal(out.body.error.message,"complaint_wording");
+ }
+ assert.equal((await handler(fixture({reply:"My eyes sting on night runs.",reaction:""})).post(req)).status,200);
+});
+
+test("all 80 authored body-part sentences pass the same delivery validator used after generation", async()=>{
+ const {post}=handler(createMockProvider());
+ for(const c of Object.values(cases)) for(const language of ["en","zh"]) for(const row of ["eyes","hands","port","temper"]){
+  const req={...body("complain",row,"What hurts?"),case_id:c.id,case_version:c.version,language,signs:{}};
+  Object.assign(req.event,{rows:[row],delivery:"rows"});
+  const answer=await post(req);
+  assert.equal(answer.status,200,c.id+"/"+language+"/"+row);
+ }
+});
+
+test("optional complaints draw on both idle and optional-line quotas and share the game protocol",async()=>{
+ assert.equal(rules.agent.protocol,PROTOCOL);
+ const {post}=handler(createMockProvider());
+ const req=body("complain","idle","");
+ Object.assign(req.event,{rows:["port"],delivery:"rows"});
+ assert.equal((await post(req)).status,200);
+ req.event={type:"idle",id:"",text:""};assert.equal((await post(req)).status,200);
+ req.event={type:"complain",id:"idle",text:"",rows:["eyes"],delivery:"rows"};
+ assert.equal((await post(req)).body.error.code,"visit_idle_cap");
+ req.event={type:"complain",id:"general",text:"What hurts?",rows:["eyes"],delivery:"rows"};
+ assert.equal((await post(req)).status,200);
+});

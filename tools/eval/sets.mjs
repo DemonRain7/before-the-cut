@@ -61,12 +61,13 @@ export function makeSets() {
         }
       }
     }
-    for (const [tool,spec] of Object.entries(c.checks)) if (spec.insist !== "refuse") {
+    // The historical E4 corpus excluded this one character/tool pair.
+    for (const tool of Object.keys(c.checks)) if (!(c.id === "vale" && tool === "port")) {
       for (const [i,template] of consentTone[lang].entries()) {
         item("E4",c,lang,{type:"check",id:tool,text:template.replace("{tool}",names[lang][tool])},{},{tone:["civil","neutral","rude"][i]});
       }
     }
   }
-  for (const [group, expected] of Object.entries({E1:400,E2:204,E3:120,E4:180})) if (sets[group].length !== expected) throw Error(group + " corpus count changed: " + sets[group].length);
+  for (const [group, expected] of Object.entries({E1:400,E2:204,E3:120,E4:174})) if (sets[group].length !== expected) throw Error(group + " corpus count changed: " + sets[group].length);
   return sets;
 }

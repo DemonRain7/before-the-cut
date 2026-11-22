@@ -59,7 +59,6 @@ const SLIP_COUNTER := "AT THE COUNTER"          # under the rule, beside what th
 const SLIP_LATER := "Right or wrong: at closing."   # the slip never says; the report does
 const SLIP_FEE := "FEE +%d"                     # under the counter line, when the figure is more than the fee: the fee,
 const SLIP_DROP := "DROP +%d"                   # what a courier's package put in the till,
-const SLIP_CALM := "CALM -%d"                   # and what the calm-patches cost
 # the lines under the slip's rule, from the slip's top: the counter line, what it is made of,
 # the word on right and wrong, and the prompt. Ten rows apart, and clear of the slip's lower
 # edge (SLIP_CLIP's height less SLIP_REST): a Chinese line is two rows taller than an English one.
@@ -162,15 +161,10 @@ const PRESS_LINES := [
 	"You look like a drift case to me. One bad night from the news.",
 	"I think the implant is running you. Prove me wrong.",
 ]
-const REASSURE_LINES := [
-	"Here, a calm-patch. On the wrist. Take your time, nobody is in trouble.",
-	"Another patch. Breathe. You're doing fine, we are nearly done.",
-]
 const FIRST_HINT := "Ask what hurts, then test that part. You can make the call at any time."
 # a patient with no patience left gives one last wait and then leaves by themselves
 const SHORT_HINT := "No lamps left. Talk, BREAK, or make the call."
 const LEAVING_HINT := "They are leaving. Talk to them or make the call."
-const LEAVING_FREE_HINT := "They are leaving. Decide now, or press CALM to hold them."
 const LEAVING_LAST_HINT := "They are leaving. Decide now, or let them go."
 # coaching: each of these is offered once in a session, when the thing it explains first happens
 const NOTE_COACH_HINT := "Noted on your intake card. It hangs on the right wall: click it, or press N."
@@ -179,16 +173,11 @@ const LAMP_COACH_HINT := "One lamp left. After your last test, you still have ti
 const GLASS_COACH_HINT := "Each blow before the shutter costs the glass. Less glass, less time."
 const DROP_COACH_HINT := "The drop changes nothing about the exam. Steady or drifting, the call is still yours."
 const FLARE_COACH_HINT := "Only temper: no red bar, nothing to stop. The SHUTTER is for the red bar."
-const CALM_HINT := "CALM: a calm-patch, %d credits. +%d patience, and a refusal softens. %d left."
-const CALM_HOLD_HINT := "CALM: a calm-patch, %d credits. +%d patience, and it keeps them here. %d left."
-const CALM_GONE_HINT := "CALM: no calm-patches left for this visit."
-const CALM_FREE_HINT := "CALM: +%d patience, and a refusal softens. %d left."
-const CALM_FREE_HOLD_HINT := "CALM: +%d patience. It keeps them at the counter. %d left."
-const SAY_CODE_HINT := "SAY the code. The right contact hands over a package. Anyone else: -%d patience."
-const CODE_BLANK_HINT := "Wrong code: a blank look, -%d patience. It says nothing about the patient."
-# the second PRESS breaks every patient and takes every lamp left (rules version 10)
-const PRESS_HINT := "PRESS: say something that stings. Costs %d patience. Twice, and they break."
-const PRESS_LAST_HINT := "All lamps. Steady: walks, no fee. Drift: lunges. SPACE to stop it (+%d at closing)."
+const SAY_CODE_HINT := "SAY the code. A matching contact hands over a package. A wrong code costs %d lamp."
+const CODE_BLANK_HINT := "Wrong code: a blank look, -%d lamp. Keep examining them."
+# BREAK is available after PRESS or with no lamps.
+const PRESS_HINT := "PRESS tests temper for %d lamp. Compare the reaction with the TEMPER line."
+const PRESS_LAST_HINT := "BREAK is free. Steady: walks unpaid. Drift: lunges. SPACE to catch them (+%d)."
 const TRAINING_SKIP_HINT := "SKIP ALL [K]: end the training. H opens the counter guide any time."
 const TRAINING_NEXT_HINT := "NEXT: on to the next tip."
 const SWAP_LIST_HINT := "Swap for tonight's contact list. [L]"
@@ -570,12 +559,11 @@ func _build() -> void:
 	var hours := int(night_rules.get("visitors", (rules.get("shift_order", []) as Array).size()))
 	var repair_cost := int((rules.get("attack", {}) as Dictionary).get("repair_cost", 0))
 	var contact_rules: Dictionary = rules.get("contacts", {})
-	var calm_rules: Dictionary = rules.get("reassure", {})
 	var costs: Dictionary = rules.get("costs", {})
 	var numbers := {"lamps":int(rules.visit.lamps), "idle":int(rules.patience.leave_ms / 1000.0), "per_hour": per_hour, "hours": hours, "total": per_hour * hours, "threshold": int(rules.visit.threshold),
 		"repair_cost": repair_cost, "pay": int(contact_rules.get("pay", 0)), "code_cost": int(contact_rules.get("wrong_cost", 1)),
-		"per_night": int(contact_rules.get("per_night", 0)), "calm_cost": int(calm_rules.get("cost", 0)),
-		"catch_bonus": int(rules.scoring.press_catch_bonus), "calm_gain": int(calm_rules.get("gain", 1)), "ask_cost": int(costs.get("ask", 1)), "press_cost": int(costs.get("press", 2)),
+		"per_night": int(contact_rules.get("per_night", 0)),
+		"catch_bonus": int(rules.scoring.press_catch_bonus), "ask_cost": int(costs.get("ask", 1)), "press_cost": int(costs.get("press", 2)),
 		"check_cost": int(costs.get("check", 1)), "glass": int((rules.get("attack", {}) as Dictionary).get("glass", 3)),
 		"false_alarm": absi(int((rules.get("scoring", {}) as Dictionary).get("false_alarm", 0)))}
 	intro = Intro.new()
@@ -1366,13 +1354,12 @@ func _pad_hint(pad: String) -> String:
 		return _glass_hint()
 	if visit == null:
 		return ""
-	var costs: Dictionary = rules.get("costs", {})
 	match pad:
 		"penlight", "grip", "port":
 			var status := visit.check_status(pad)
 			if status == "open":
 				return Lang.tf("%s Free now.", [Lang.t(str(TOOL_WHAT[pad]))])
-			return Lang.tf("%s Costs %d patience.", [Lang.t(str(TOOL_WHAT[pad])), visit.check_cost(pad)])
+			return Lang.tf("%s Uses %d lamp.", [Lang.t(str(TOOL_WHAT[pad])), visit.check_cost(pad)])
 		"ask":
 			return "Listed questions are free."
 		"complain":
@@ -1565,7 +1552,7 @@ func _start_shift() -> void:
 	night = _night_for_shift()
 	cases = CaseDB.compose_night(templates, night, parts)
 	shift = ShiftState.new(rules, CaseDB.night_order(night))
-	# the training night puts its first visitor on the list, so the code is shown on the first exam
+	# On the training night the second visitor is the contact lesson.
 	var training := training_enabled and intro_enabled and not _trained and coach != null and coach.has_steps()
 	var contact_rules: Dictionary = rules.get("contacts", {})
 	# only the entries that are fair among tonight's visitors: no clue alone gives anybody away
@@ -4184,7 +4171,7 @@ func _beat_activity() -> void:
 
 
 func _beat_quiet() -> bool:
-	return not _quit_night.visible and beats_enabled and (_service_has_beats or agent.mode == "script") and state == State.EXAM and visit != null and visit.in_exam() and not visit.is_spent() and not _lock and not _thinking and _mic_state == "" and not dialogue.input_open and not dialogue.has_menu() and not dialogue.typing and not guide.is_open() and not _closing
+	return not _quit_night.visible and beats_enabled and (_service_has_beats or agent.mode == "script") and state == State.EXAM and visit != null and visit.in_exam() and (not visit.is_spent() or _has_idle_complaint()) and not _lock and not _thinking and _mic_state == "" and not dialogue.input_open and not dialogue.has_menu() and not dialogue.typing and not guide.is_open() and not _closing
 
 
 func _has_idle_complaint() -> bool:
@@ -4631,24 +4618,16 @@ func _sheet_normal(row: String) -> String:
 	return ""
 
 
-## The slip's line under the counter figure: what that figure is made of, when it is more than
-## the fee alone: the fee (if one was paid), a courier's package and what the calm-patches
-## cost. Empty when there was neither a package nor a patch: the figure is the fee then. A
-## courier who went without their package is not named: who carried an entry of the list is
-## told at closing. In the player's language already.
+## On a completed drop the slip itemizes the fee and courier payment.
 func _slip_breakdown(s: Dictionary) -> String:
 	var dropped := bool(s.get("dropped", false))
-	var calm := int(s.get("calm_spent", 0))
-	if not dropped and calm <= 0:
+	if not dropped:
 		return ""
 	var parts := PackedStringArray()
 	var fee := int(s.get("counter_fee", 0))
 	if fee > 0:
 		parts.append(Lang.tf(SLIP_FEE, [fee]))
-	if dropped:
-		parts.append(Lang.tf(SLIP_DROP, [int(s.get("drop", 0))]))
-	if calm > 0:
-		parts.append(Lang.tf(SLIP_CALM, [calm]))
+	parts.append(Lang.tf(SLIP_DROP, [int(s.get("drop", 0))]))
 	return "  •  ".join(parts)
 
 

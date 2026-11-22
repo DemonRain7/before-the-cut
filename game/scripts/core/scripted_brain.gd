@@ -45,13 +45,10 @@ func choose_move(case_data: Dictionary, event: Dictionary, state: Dictionary, le
 	return move
 
 
-func _holds(cond: Dictionary, state: Dictionary, event: Dictionary) -> bool:
+func _holds(cond: Dictionary, state: Dictionary, _event: Dictionary) -> bool:
 	for key in cond.keys():
 		var want: Variant = cond[key]
 		match str(key):
-			"reassure_used_gte":
-				if int(state.get("reassure_used", 0)) < int(want):
-					return false
 			"patience_lte":
 				if int(state.get("patience", 0)) > int(want):
 					return false
@@ -61,31 +58,18 @@ func _holds(cond: Dictionary, state: Dictionary, event: Dictionary) -> bool:
 			"press_gte":
 				if int(state.get("press_count", 0)) < int(want):
 					return false
-			"refused":
-				var refusals: Dictionary = state.get("refusals", {})
-				var was := int(refusals.get(str(event.get("id", "")), 0)) > 0
-				if was != bool(want):
-					return false
 			_:
 				return false   # unknown condition: never match, so data mistakes are visible
 	return true
 
 
 ## Authored lines for offline comparison/fallback only. Model speech never passes here.
-func line_for(case_data: Dictionary, move: String, event: Dictionary, state: Dictionary) -> String:
+func line_for(case_data: Dictionary, move: String, event: Dictionary, _state: Dictionary) -> String:
 	var lines: Dictionary = case_data.get("lines", {})
 	var id := str(event.get("id", ""))
 	if is_authored_move(move):
 		return authored_line(case_data, move, event)
-	if move == "deflect":
-		for t in case_data.get("topics", []):
-			if str(t.get("id", "")) == id and str(t.get("deflect", "")) != "":
-				return str(t["deflect"])
-		return _pick(lines.get("deflect", ["I'd rather not say."]))
 	if move == "stall":
-		var refusals: Dictionary = state.get("refusals", {})
-		if int(refusals.get(id, 0)) > 0 and str(lines.get("refuse", "")) != "":
-			return str(lines["refuse"])
 		if lines.has("stall:" + id):
 			return str(lines["stall:" + id])
 		return _pick(lines.get("stall", ["No."]))

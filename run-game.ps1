@@ -118,7 +118,8 @@ try {
         $AgentUrl = "http://127.0.0.1:$port"
         $health = Invoke-RestMethod -Uri "$AgentUrl/healthz" -TimeoutSec 2
         $expectsMock = $Patient -ne 'live'
-        if ($health.protocol -ne '4' -or $health.disabled -or ($health.provider -eq 'mock') -ne $expectsMock) {
+        $protocol = (Get-Content -LiteralPath (Join-Path $gameDir 'data/rules.json') -Raw -Encoding UTF8 | ConvertFrom-Json).agent.protocol
+        if ($health.protocol -ne $protocol -or $health.disabled -or ($health.provider -eq 'mock') -ne $expectsMock) {
             throw 'Patient service health does not match the requested mode.'
         }
         $Model = $true

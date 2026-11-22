@@ -132,7 +132,6 @@ const TOTALS_KEYS := "BACKSPACE: BACK   •   ESC: THE MENU"
 # under a visit's figure, what in it was not the call's own (the slip's words, in small)
 const VISIT_DROP := "drop +%d"
 const VISIT_NO_DROP := "drop missed"
-const VISIT_CALM := "calm -%d"
 # a visit's page
 const PAGE_OF := "VISIT %d OF %d"
 const YOUR_CALL := "Your call: %s"
@@ -487,19 +486,13 @@ func _draw_howto_art(art: String, r: Rect2) -> void:
 		"attack":
 			_draw_demo(r)
 		"money":
-			# the patience lamps going out one by one, then the three talk pads
-			var x := 320.0 - (16.0 * 6.0 + 20.0 + 44.0 * 3.0) / 2.0
-			var lit := 6 - int(fmod(_t, 4.0))
-			for k in 6:
+			var lamps := int(howto_numbers.get("lamps", 2))
+			var lit := lamps - int(fmod(_t, float(lamps + 1)))
+			for k in lamps:
 				var pip := Gfx.tex("ui/pip_on.png" if k < lit else "ui/pip_off.png")
 				if pip != null:
-					draw_texture_rect(pip, Rect2(x + 16.0 * float(k), cy - 7.0, 14, 14), false)
-			x += 16.0 * 6.0 + 20.0
-			for path in ["ui/talk_ask.png", "ui/talk_press.png", "ui/talk_calm.png"]:
-				var t := Gfx.tex(str(path))
-				if t != null:
-					draw_texture(t, Vector2(x, floorf(cy - t.get_height() / 2.0)))
-				x += 44.0
+					var x := 320.0 + (float(k) - float(lamps) / 2.0) * 24.0
+					draw_texture_rect(pip, Rect2(x, cy - 9.0, 18, 18), false)
 		"contacts":
 			var t := Gfx.tex("ui/obj_list.png")
 			if t != null:
@@ -839,15 +832,9 @@ func _money_row(x0: float, x1: float, y: float, label: String, figure: String) -
 ## and what the calm-patches cost. Empty for a visit that was only the call. In the player's
 ## language already.
 func _visit_extra(visit: Dictionary) -> String:
-	var parts := PackedStringArray()
-	if bool(visit.get("dropped", false)):
-		parts.append(Lang.tf(VISIT_DROP, [int(visit.get("drop", 0))]))
-	elif bool(visit.get("contact", false)):
-		parts.append(Lang.t(VISIT_NO_DROP))
-	var calm := int(visit.get("calm_spent", 0))
-	if calm > 0:
-		parts.append(Lang.tf(VISIT_CALM, [calm]))
-	return "   ".join(parts)
+	if visit.get("dropped", false):
+		return Lang.tf(VISIT_DROP, [int(visit.get("drop", 0))])
+	return Lang.t(VISIT_NO_DROP) if visit.get("contact", false) else ""
 
 
 ## What the player did about a visit: the call stamped on the card if there was one, else the
