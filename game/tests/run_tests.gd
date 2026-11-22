@@ -124,7 +124,7 @@ func _initialize() -> void:
 	test_art()
 	test_parts()
 	test_verdict_any_time()
-	test_looks()
+	test_complaints()
 	test_checks()
 	test_talk()
 	test_press_and_attack()
@@ -144,7 +144,6 @@ func _initialize() -> void:
 	test_wear_distribution()
 	test_contacts()
 	test_codes()
-	test_calm_cost()
 	test_surprises()
 	test_brain()
 	await test_agent()
@@ -174,8 +173,7 @@ func test_data() -> void:
 	for id in cases.keys():
 		var c: Dictionary = cases[id]
 		var texts: Array = []
-		for z in c["looks"].keys():
-			texts.append(str(c["looks"][z]))
+		ok(not c.has("looks"), "no diagnostic look on the counter")
 		for t in c["checks"].keys():
 			texts.append(str(c["checks"][t]["note"]).replace("{t}", "0.0"))
 		for t in c["topics"]:
@@ -480,148 +478,64 @@ func test_verdict_any_time() -> void:
 			eq(v.settlement()["title"], "TAKEN IN", "%s: the slip names the handover" % id)
 
 
-func test_looks() -> void:
-	var v := visit("kip")
-	for zone in ["eyes", "hands", "port"]:
-		var r := v.look(zone)
-		ok(bool(r["ok"]) and str(r["text"]) != "", "kip look %s returns text" % zone)
-	eq(v.patience, v.patience_max, "looking costs no patience")
-	eq((v.notes["eyes"] as Array).size(), 1, "look adds a record note")
-	v.look("eyes")
-	eq((v.notes["eyes"] as Array).size(), 1, "the same look is not noted twice")
-	ok(v.row_seen("port"), "an exposed port is evidence by looking")
-	ok(not v.row_seen("eyes"), "looking at eyes is not the penlight result")
-	var m := visit("maren")
-	var covered := m.look("port")
-	ok(bool(covered["covered"]), "maren's port is covered")
-	ok(not m.row_seen("port"), "a covered port shows nothing")
-	ok(not m.port_visible(), "covered port is not visible before asking")
+func test_complaints() -> void:
+	var db := CaseDB.load_all()
+	for seed_id in 40:
+		var n := ShiftState.draw_night(db, seed_id, true)
+		eq(n, ShiftState.draw_night(db, seed_id, true), "the complaint draw is repeatable")
+		eq(n.visitors[0].complaints.size(), 1, "one protected opening clue")
+		for pick in n.visitors:
+			var v := VisitState.new(CaseDB.compose(templates[pick.id], pick), rules)
+			var initial := v.snapshot()
+			eq(v.patience, 2, "everyone starts with two lamps")
+			for part in ["eyes", "hands", "port", "temper"]:
+				var choice := v.complain(part)
+				var mentioned: bool = part in pick.complaints
+				eq(choice.rows, [part] if mentioned else [], "part questions only tell the drawn fact")
+				eq(v.notes[part].size(), int(mentioned), "only a delivered fact gets a note")
+				ok(not v.row_seen(part), "a complaint never earns a reading")
+			eq(v.snapshot().patience, initial.patience, "talk costs no lamps")
+			eq(v.actions, 0, "no surprise after talking")
+			var fresh := VisitState.new(CaseDB.compose(templates[pick.id], pick), rules)
+			var told := fresh.complain()
+			eq(told.rows, pick.complaints.slice(0, 2), "general question follows the draw")
+			fresh.complain()
+			eq(fresh.complaints_told, pick.complaints, "two questions cover all four rows")
+			eq(fresh.complain().rows, [], "exhausted list never creates a new note")
 
 
 func test_checks() -> void:
-	# cooperative patient
-	var v := visit("kip")
-	eq(v.legal_moves_for_check("penlight"), ["comply"], "kip allows the penlight")
-	var r := v.apply_check("penlight", "comply")
-	eq(r["result"], "granted", "penlight granted")
-	eq(v.patience, 5, "a tool costs one patience")
-	ok(not v.row_seen("eyes"), "granted is not yet seen")
-	var done := v.complete_check("penlight")
-	ok(bool(done["ok"]) and v.row_seen("eyes"), "finishing the penlight shows the evidence")
-	eq(v.check_cost("penlight"), 0, "repeating a granted tool is free")
-	v.apply_check("penlight", "comply")
-	eq(v.patience, 5, "repeat did not charge")
-	ok(str(v.complete_check("grip")["text"]) == "", "a tool that was not granted cannot complete")
-	v.apply_check("grip", "comply")
-	eq(str(v.complete_check("grip")["text"]), "Grip: jittery. Let go 0.3 s after 'release'.", "grip note carries the time")
-	eq(v.check_status("port"), "open", "an exposed port needs no permission")
-
-	# stall, then insist
-	v = visit("rook")
-	var pick := brain_move(v, "check", "grip")
-	eq(pick["move"], "stall", "rook stalls the grip bar first")
-	eq(pick["line"], "I didn't come here to hold hands.", "rook's stall line")
-	r = v.apply_check("grip", str(pick["move"]))
-	eq(r["result"], "refused", "stall refuses the tool")
-	eq(v.patience, 4, "a refused request still costs")
-	eq(v.check_status("grip"), "refused", "grip is marked refused")
-	eq(v.check_cost("grip"), 2, "insisting costs more")
-	eq(v.legal_moves_for_check("grip"), ["comply"], "rook gives in when you insist")
-	r = v.apply_check("grip", "stall")
-	eq(r["result"], "granted", "an illegal stall is replaced by the legal move")
-	eq(v.patience, 2, "insist charged two")
-	ok(bool(r["insisted"]), "insist flag set")
-	ok(not v.row_seen("hands"), "refusal revealed nothing")
-
-	# stall, then reassure
-	v = visit("rook")
-	v.apply_check("grip", "stall")
-	var re := v.reassure()
-	eq(re["result"], "ok", "reassure works")
-	eq(v.patience, 5, "reassure gives patience back")
-	eq(v.check_cost("grip"), 1, "after reassurance the tool costs the normal price")
-	eq(v.legal_moves_for_check("grip"), ["comply"], "after reassurance the patient complies")
-
-	# a refusal that insisting cannot break
-	v = visit("vale")
-	eq(v.legal_moves_for_check("port"), ["stall"], "vale will not show the port at first")
-	v.apply_check("port", "stall")
-	eq(v.legal_moves_for_check("port"), ["stall"], "insisting does not open vale's collar")
-	r = v.apply_check("port", "comply")
-	eq(r["result"], "refused", "comply is not legal there, so it stays refused")
-	ok(not v.row_seen("port"), "port still hidden")
-	v.reassure()
-	eq(v.legal_moves_for_check("port"), ["comply"], "reassurance opens it")
-	v.apply_check("port", "comply")
-	eq(str(v.complete_check("port")["text"]), "Neck socket: dark threads under the skin.", "port evidence is fixed")
-	ok(v.row_seen("port") and v.port_visible(), "port now seen")
-	eq(str(v.look("port")["text"]), "Neck socket: dark threads under the skin.", "looking again shows the same socket")
-
-	# an explanation instead of the test
-	v = visit("vale")
-	pick = brain_move(v, "check", "penlight")
-	eq(pick["move"], "explain:idle", "vale offers an explanation for the penlight")
-	r = v.apply_check("penlight", str(pick["move"]))
-	eq(r["result"], "explained", "explanation result")
-	ok(v.claims.has("idle"), "claim recorded")
-	eq(str((v.notes["eyes"] as Array)[0]["text"]), "Says his optics idle indoors.", "claim is noted as a statement")
-	ok(not v.row_seen("eyes"), "a claim is not evidence")
-	eq(v.legal_moves_for_check("penlight"), ["comply"], "insisting gets the penlight")
-	v.apply_check("penlight", "comply")
-	v.complete_check("penlight")
-	ok(v.row_seen("eyes"), "the eye evidence cannot be refused for good")
-
-	# out of patience
-	v = visit("rook")
-	v.patience = 0
-	r = v.apply_check("penlight", "comply")
-	eq(r["result"], "spent", "no patience: the request is not granted")
-	ok(not v.granted.has("penlight"), "nothing was granted")
-	eq(v.verdict("treat")["next"], "done", "a verdict is still possible at zero patience")
-	v = visit("rook")
-	v.patience = 1
-	eq(v.apply_check("penlight", "comply")["result"], "granted", "the last patience still buys its test")
-	ok(v.is_spent(), "and then the patient is about to leave")
-	ok(bool(v.complete_check("penlight")["ok"]), "the test that spent it still runs to the end")
+	for id in templates:
+		for tool in VisitState.TOOLS:
+			var v := VisitState.new(CaseDB.compose(templates[id], {}), rules)
+			for move in v.legal_moves_for_check(tool):
+				var first := VisitState.new(v.case_data, rules)
+				eq(first.apply_check(tool, move).result, "granted", "every authored reaction opens the instrument")
+				eq(first.patience, 1, "every first test costs one lamp")
+				ok(first.complete_check(tool).ok and first.row_seen(VisitState.TOOL_ROW[tool]), "completed instrument earns its row")
+				eq(first.apply_check(tool, move).cost, 0, "reopening a test is free")
+				eq(first.tests_in_order, [VisitState.TOOL_ROW[tool]], "one paid test in the record")
 
 
 func test_talk() -> void:
-	var v := visit("kip")
-	var r := v.apply_ask("why", "answer")
-	eq(r["result"], "answered", "kip answers")
-	eq(v.patience, 5, "a question costs one patience")
-	ok(v.row_seen("speech"), "an answer is speech evidence")
-	eq(v.ask_cost("why"), 0, "asking again is free")
-	v.apply_ask("why", "answer")
-	eq(v.patience, 5, "repeat question did not charge")
-
-	v = visit("rook")
-	var pick := brain_move(v, "ask", "mood")
-	eq(pick["move"], "deflect", "rook deflects the mood question first")
-	eq(pick["line"], "What's that got to do with my arm?", "deflect line is the topic's own")
-	r = v.apply_ask("mood", str(pick["move"]))
-	eq(r["result"], "deflected", "deflected")
-	ok(not v.row_seen("speech"), "a deflection is not evidence")
-	eq(v.legal_moves_for_ask("mood"), ["answer"], "asked again, he answers")
-	r = v.apply_ask("mood", "deflect")
-	eq(r["result"], "answered", "second ask is answered")
-	eq(v.patience, 3, "both asks cost")
-
-	v = visit("vale")
-	v.apply_ask("why", "answer")
-	ok(not v.row_seen("speech"), "vale's polished answer is not his slip")
-	v.apply_ask("sleep", "answer")
-	ok(v.row_seen("speech"), "the sleep answer is the speech evidence")
-	eq(str(v.apply_ask("nope", "answer")["result"]), "closed", "unknown topic is ignored")
+	for id in templates:
+		var v := VisitState.new(CaseDB.compose(templates[id], {}), rules)
+		v.patience = 0
+		for q in v.case_data.topics:
+			var answer := v.apply_ask(q.id)
+			eq(answer.line, q.a, "an authored listed question answers even at zero")
+			ok(v.answered.has(q.id) and v.seen.has("ask:" + str(q.id)), "the question ticks only after answering")
+			eq(v.apply_ask(q.id).cost, 0, "repeating a question is free")
+		eq(v.actions, 0, "all listed questions leave the surprise counter untouched")
 
 
 func test_press_and_attack() -> void:
 	var v := visit("kip")
-	eq([v.press_breaks(), v.press_cost()], [false, 2], "the first press does not break him, and costs two")
+	eq([v.press_breaks(), v.press_cost()], [false, 1], "PRESS reads temper for one lamp")
 	var r := v.press()
 	eq(r["result"], "react", "first press is a reaction")
-	eq(v.patience, 4, "pressure costs two patience")
-	eq([v.press_breaks(), v.press_cost()], [true, 4], "the next press breaks him, and costs every lamp left")
+	eq(v.patience, 1, "pressure spends one lamp")
+	eq([v.press_breaks(), v.press_cost()], [true, 1], "the next press breaks him, and costs every lamp left")
 	ok(v.row_seen("temper"), "the reaction is temper evidence")
 	eq(v.phase, VisitState.Phase.EXAM, "one press never ends a visit")
 	r = v.press()
@@ -680,52 +594,16 @@ func test_shutter() -> void:
 ## or reassures them, leaves by themselves: no fee, no bill, no call. The director runs the
 ## clock; these check the rule.
 func test_patience_walkout() -> void:
-	eq(visit("kip").leave_ms(), int(rules["patience"]["leave_ms"]), "the wait comes from the rules")
-	ok(visit("kip").leave_ms() >= 3000, "the wait is long enough to read the ultimatum and decide")
-	for id in cases.keys():
-		var v := visit(id)
-		ok(not v.is_spent(), "%s: a fresh patient is not about to leave" % id)
-		eq(v.give_up()["result"], "", "%s: nobody leaves while there is patience" % id)
-		eq(v.phase, VisitState.Phase.EXAM, "%s: and the visit stays open" % id)
-		v.patience = 0
-		ok(v.is_spent(), "%s: at zero the patient is about to leave" % id)
-		eq(v.give_up()["result"], "gave_up", "%s: left alone, they go" % id)
-		var s := v.settlement()
-		eq(s["credits"], 0, "%s: no fee and no bill" % id)
-		ok(not bool(s["correct"]), "%s: no call was made, so it is not a right one" % id)
-		ok(not bool(s["injured"]), "%s: nobody is hurt by a patient who leaves" % id)
-		eq(s["title"], "OUT OF PATIENCE", "%s: the slip says why" % id)
-		ok(str(s["text"]) != "", "%s: and what it meant" % id)
-		eq(s["verdict"], "", "%s: no verdict is recorded" % id)
-		eq(v.give_up()["result"], "", "%s: they only leave once" % id)
-		eq(v.verdict("treat")["next"], "", "%s: and cannot be decided on afterwards" % id)
-		ok(str(cases[id]["exit"]["gave_up"]) != "", "%s: has a parting line" % id)
-	# spending the last patience starts it; reassurance holds them; a decision still counts
-	var k := visit("kip")
-	k.apply_check("penlight", "comply")
-	k.apply_check("grip", "comply")
-	k.apply_ask("why", "answer")
-	k.apply_ask("sleep", "answer")
-	ok(not k.is_spent() and k.patience == 2, "four paid actions leave Kip two patience")
-	eq(k.press()["result"], "react", "the press that takes the last of it still gets its reaction")
-	ok(k.is_spent(), "and now he is about to leave")
-	eq(k.apply_ask("implant", "answer")["result"], "spent", "nothing more can be asked")
-	eq(str(k.look("eyes")["text"]) != "", true, "looking is still free")
-	eq(k.reassure()["result"], "ok", "reassurance still works")
-	ok(not k.is_spent() and k.patience == 1, "and holds him: one patience back")
-	eq(k.give_up()["result"], "", "a reassured patient does not leave")
-	k.apply_ask("implant", "answer")
-	ok(k.is_spent(), "the next question spends it again")
-	eq(k.verdict("treat")["next"], "done", "a decision is still possible while he waits")
-	eq(k.outcome, "treated_ok", "and it counts as usual")
-	eq(k.give_up()["result"], "", "a decided visit cannot be walked out of")
-	# a patient who has turned does not wander off
-	var a := visit("vale")
-	a.patience = 0
-	a.verdict("refer")
-	ok(not a.is_spent(), "an attack is not a patient waiting to leave")
-	eq(a.give_up()["result"], "", "and it cannot be waited out")
-	eq(a.phase, VisitState.Phase.ATTACK, "the attack stands")
+	for id in templates:
+		var v := VisitState.new(CaseDB.compose(templates[id], {}), rules)
+		v.apply_check("port", "comply")
+		v.apply_check("grip", "comply")
+		ok(v.is_spent() and v.press_breaks(), "BREAK reachable even without a prior PRESS")
+		eq(v.leave_ms(), 30000, "empty bar waits thirty idle seconds")
+		eq(v.apply_check("penlight", "comply").result, "spent", "no new test after two")
+		eq(v.apply_check("port", "comply").cost, 0, "reopen while empty")
+		eq(v.give_up().result, "gave_up", "empty visitor can leave")
+		eq(v.settlement().credits, 0, "gave up is unpaid")
 
 
 ## The player's own ticks and crosses, and the house rule they are counted against (sheet
@@ -928,21 +806,18 @@ func test_patient_rules_match() -> void:
 						var d: Dictionary = await reader.decide(event, v.snapshot(), [event.outcome], v.open_signs(event))
 						display_answer(reader, d)
 						v.apply_ask(topic.id, str(d.move), str(d.line))
-						v.roll_action(randoms[i])
+						v.roll_action(randoms[i], 0)
 					eq([offline.patience, offline.seen, offline.notes, offline.last_recorded_speech, offline.actions, randoms[0].state],
 						[online.patience, online.seen, online.notes, online.last_recorded_speech, online.actions, randoms[1].state], "ASK has the same price, proof, quote and random draws")
 					eq(readers[0].record.entries, readers[1].record.entries, "authored ASK reaches both conversation histories")
 					eq(readers[1].calls_this_visit, 0, "authored ASK spends no generated reply")
 				var fresh := VisitState.new(case_data, rules)
 				fresh.patience = 0
-				eq(fresh.open_signs({"type": "ask", "id": topic.id, "outcome": "answer"}), {}, "an unaffordable question opens no gate")
+				ok(fresh.open_signs({"type":"ask", "id":topic.id, "outcome":"answer"}).has("speech"), "a free answer opens speech without a lamp")
 			for tool in VisitState.TOOLS:
 				var script := VisitState.new(case_data, rules)
 				var model := VisitState.new(case_data, rules)
 				for turn in 3:
-					if turn == 2:
-						script.reassure()
-						model.reassure()
 					var legal := script.legal_moves_for_check(tool)
 					var action := {"type": "check", "id": tool}
 					var move := agent.scripted.choose_move(case_data, action, script.snapshot(), legal)
@@ -953,8 +828,7 @@ func test_patient_rules_match() -> void:
 						model.complete_check(tool)
 					eq([a.result, a.cost, script.notes, script.seen, script.patience], [b.result, b.cost, model.notes, model.seen, model.patience], "matching tool decisions have the same price and proof")
 				var settled := VisitState.new(case_data, rules)
-				settled.reassure()
-				eq(settled.apply_check(tool, "stall", true).result, "granted", "CALM opens any instrument in both modes")
+				eq(settled.apply_check(tool, "stall", true).result, "granted", "hesitation is flavour in both modes")
 	eq(outside, 9, "all nine questions outside a broken sign are indistinguishable")
 
 
@@ -1484,11 +1358,7 @@ func test_wear_distribution() -> void:
 			ok(v.verdict("refer").get("next") != "attack", "a worn patient never lunges at a call")
 			v = VisitState.new(c, rules)
 			v.press()
-			var enough := v.patience
-			v.patience = int(rules.costs.press) - 1
-			eq(v.press().result, "spent", "short on lamps at the breaking press")
-			eq(v.press_count, 1, "a short PRESS does not advance the visit")
-			v.patience = enough
+			v.patience = 0
 			eq(v.press().result, "walkout", "a worn patient walks out on the breaking press")
 			v = VisitState.new(c, rules)
 			var rng := RandomNumberGenerator.new()
@@ -1777,9 +1647,9 @@ func test_contacts() -> void:
 		var trained := ShiftState.draw_contacts(rules, pool, order, s, true)
 		var has_first := false
 		for e in trained:
-			has_first = has_first or str(e["case"]) == str(order[0])
+			has_first = has_first or str(e["case"]) == str(order[int(rules.contacts.training_slot) - 1])
 		all_ok = all_ok and has_first and trained.size() == per
-	ok(all_ok, "40 seeds: the same list for the same seed, %d couriers, all different, and the training night lists the first visitor" % per)
+	ok(all_ok, "40 seeds: the same list for the same seed, %d couriers, all different, and the training night lists the second visitor" % per)
 	ok(first_varies.size() > 3, "different seeds give different lists")
 	# tonight's words (contacts.json version 2): each entry is given an alias and a code of the
 	# lists, none twice in a night, from the shift seed; who is on the list does not change
@@ -1913,33 +1783,6 @@ func test_codes() -> void:
 
 
 ## CALM (rules version 6) is a calm-patch from the drawer: credits as well as a use.
-func test_calm_cost() -> void:
-	var price := int(rules["reassure"]["cost"])
-	ok(price > 0, "CALM has a price")
-	var v := visit("rook")
-	var res := v.reassure()
-	eq([res["result"], res["cost"], v.calm_spent, v.till_change()], ["ok", price, price, -price], "one CALM: its price leaves the till")
-	v.reassure()
-	eq(v.reassure()["result"], "none_left", "the uses still run out")
-	eq(v.calm_spent, 2 * price, "and only the ones used are paid for")
-	v.verdict("treat")
-	eq(v.settlement()["credits"], int(cases["rook"]["fee"]) - 2 * price, "the slip takes CALM off the fee")
-	eq(v.settlement()["calm_spent"], 2 * price, "and says what CALM cost")
-	var broke := visit("vale")
-	broke.reassure()
-	broke.patience = 0
-	broke.give_up()
-	eq(broke.settlement()["credits"], -price, "CALM is paid for even when the visit earns nothing: the till may go below zero")
-	var shift := ShiftState.new(rules, ["rook"])
-	shift.record(v.settlement())
-	eq(shift.report()["calm_total"], 2 * price, "the report adds up what CALM cost")
-	var free := rules.duplicate(true)
-	free["reassure"].erase("cost")
-	var gift := VisitState.new((cases["rook"] as Dictionary).duplicate(true), free)
-	gift.reassure()
-	eq(gift.calm_spent, 0, "a rule set without a price has a free CALM")
-
-
 ## Snaps and flares (rules version 6): a drifting patient may turn mid-exam, anyone may flare.
 func test_surprises() -> void:
 	var grace := int(rules["snap"]["grace"])
@@ -1952,7 +1795,7 @@ func test_surprises() -> void:
 		odds.append(snapped(v.snap_chance(), 0.0001))
 	ok(odds[grace] == 0.0 and odds[0] == 0.0, "no snap in the first %d actions" % grace)
 	ok(is_equal_approx(odds[grace + 1], step), "then step by step")
-	eq(odds.max(), top, "never above the cap")
+	ok(is_equal_approx(odds.max(), top), "never above the cap")
 	var calm := visit("kip")
 	var stable_never := true
 	for i in 40:
@@ -2040,15 +1883,10 @@ func test_brain() -> void:
 	var ev := {"type": "check", "id": "port"}
 	eq(a.decide(v.case_data, ev, v.snapshot(), ["comply"]), b.decide(v.case_data, ev, v.snapshot(), ["comply"]),
 		"same seed, same scripted answer")
-	# stateful: a reassured Rook does not stall
 	v = visit("rook")
-	v.reassure()
-	eq(brain_move(v, "check", "grip")["move"], "comply", "rook complies at once if reassured first")
-	eq(brain_move(v, "ask", "mood")["move"], "answer", "rook answers at once if reassured first")
-	# a scripted move that is not legal is never returned
+	eq(brain_move(v, "check", "grip").move, "stall", "Rook voices an authored hesitation")
+	eq(brain_move(v, "ask", "mood").move, "answer", "listed questions always answered")
 	v = visit("vale")
-	v.apply_check("penlight", "explain:idle")
-	eq(brain_move(v, "check", "penlight")["move"], "comply", "claim cannot be offered twice")
 	eq(ScriptedBrain.authored_line(v.case_data, "answer", {"type": "ask", "id": "sleep"}),
 		"It doesn't need much sleep. I take what's left.", "authored answer lookup")
 
@@ -2074,7 +1912,7 @@ func test_agent() -> void:
 	eq(d["source"], "model", "free response accepted")
 	eq(d["move"], "stall", "model can refuse outside authored cooperation options")
 	var applied := v.apply_check("grip", str(d.move), true)
-	eq(applied.result, "refused", "refusal is not coerced into scripted comply")
+	eq(applied.result, "granted", "the patient cannot veto the instrument")
 	display_answer(agent, d)
 	var payload := agent.build_payload({"type": "say", "id": "free", "text": "What would reassure you?"}, v.snapshot())
 	ok(not payload.has("legal_moves"), "no legal moves transmitted")
@@ -2182,7 +2020,7 @@ func test_conversation() -> void:
 	ok(opening > 0 and agent.record.entries.size() == opening + 3 * agent.max_calls,
 		"doctor line, reaction and reply are all remembered")
 	eq(int(v.asked.get("free", 0)), 0, "conversation history and question counts are separate")
-	eq(v.ask_cost("free"), 0, "small talk never costs patience")
+	eq(v.patience, v.patience_max, "small talk never costs patience")
 	var d2: Dictionary = await agent.decide({"type": "say", "id": "free", "text": "One more?"}, v.snapshot(), [])
 	eq(d2.fallback_reason, "call_cap", "past the cap the model is not called")
 	eq(client.calls, agent.max_calls, "and no request leaves the game")
@@ -2266,8 +2104,7 @@ func test_offline_say() -> void:
 		agent.begin_visit(v, "offline-say", 2)
 		var d: Dictionary = await agent.decide({"type": "say", "id": "free", "text": "Nice weather tonight."}, v.snapshot(), [])
 		eq(d.source, "script", id + ": offline say stays offline")
-		var pool: Array = v.case_data.lines.deflect if typeof(v.case_data.lines.deflect) == TYPE_ARRAY else [v.case_data.lines.deflect]
-		ok(pool.has(d.reply), id + ": unknown sentence gets that patient's own deflection")
+		ok(not str(d.reply).is_empty(), id + ": the offline patient has a conversation fallback")
 
 
 ## `count` identical stereo frames.
@@ -2536,7 +2373,7 @@ func test_bad_data() -> void:
 	for side in ["left", "right"]:
 		c["eyes"][side]["follows"] = true
 		c["eyes"][side]["tightens"] = true
-	ok(has_error(CaseDB.validate_case(c, rules, {}, parts), "impossible to refuse"), "all-refusable drift evidence is caught")
+	ok(not CaseDB.validate_case(c, rules, sheet, parts).is_empty(), "one broken row cannot establish drift")
 	c = (cases["vale"] as Dictionary).duplicate(true)
 	c["checks"]["penlight"]["first"] = ["explain:ghost"]
 	ok(has_error(CaseDB.validate_case(c, rules, {}, parts), "unknown claim"), "unknown claim is caught")
@@ -2581,8 +2418,8 @@ func test_bad_data() -> void:
 	bad_odds["flare"]["delay_min_ms"] = 2000
 	ok(has_error(CaseDB.validate_rules(bad_odds), "flare.delay_min_ms"), "a flare delay that ends before it starts is caught")
 	bad_odds = rules.duplicate(true)
-	bad_odds["reassure"]["cost"] = -30
-	ok(has_error(CaseDB.validate_rules(bad_odds), "reassure.cost"), "a CALM that pays the doctor is caught")
+	bad_odds["complaints"]["normal"] = -0.1
+	ok(has_error(CaseDB.validate_rules(bad_odds), "complaints.normal"), "a negative complaint probability is caught")
 	bad_odds = rules.duplicate(true)
 	bad_odds["contacts"]["per_night"] = 3
 	ok(has_error(CaseDB.validate_rules(bad_odds), "at most 2"), "more couriers than the list paper holds is caught")

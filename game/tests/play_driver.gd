@@ -359,15 +359,16 @@ func ask(index: int) -> void:
 	await until(func() -> bool: return not main._thinking and main.dialogue.speaker != "YOU", 12.0)
 
 
-func reassure() -> void:
-	pad("calm")
-	await tree.process_frame
-	await until(func() -> bool: return not main._lock, 8.0)
+func complain() -> void:
+	main.act_complain()
+	await settle()
 
 
 ## Says the provocative line and waits for the reaction to begin.
 func press() -> void:
 	pad("press")
+	if main._break_confirmation:
+		key(KEY_ENTER)
 	await tree.process_frame
 	await until(func() -> bool: return not main._lock, 10.0)
 	await tree.process_frame

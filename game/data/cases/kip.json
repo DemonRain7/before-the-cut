@@ -6,7 +6,6 @@
   "age": 22,
   "request": "Swap cracked left optic",
   "fee": 250,
-  "patience": 6,
   "sprite": "kip",
   "voice": {"pitch": 1.45, "rate": 1.25},
   "teaser": "A kid in a courier jacket, bouncing on his heels and checking the time.",
@@ -25,14 +24,10 @@
   "eyes": {"left": {"cracked": true}, "right": {}},
   "port": {"covered": false},
   "idle": {"hands": "drum", "gaze": "dart"},
-  "looks": {
-    "eyes": "Left: a KITE optic, cracked. Right: natural.",
-    "hands": "Drumming the counter. Chewed nails."
-  },
   "checks": {
-    "penlight": {"first": ["comply"], "insist": "comply"},
-    "grip": {"first": ["comply"], "insist": "comply"},
-    "port": {"first": ["comply"], "insist": "comply"}
+    "penlight": {"first": ["comply"]},
+    "grip": {"first": ["comply"]},
+    "port": {"first": ["comply"]}
   },
   "claims": {},
   "topics": [
@@ -42,8 +37,7 @@
       "keys": [
         "wrong", "problem", "happen", "reason", "trouble", "brings", "bring", "matter", "here", "came",
         "come", "eye", "lens", "crack", "accident", "fall", "fell", "crash", "bike"
-      ],
-      "first": ["answer"]
+      ]
     },
     {
       "id": "sleep",
@@ -51,8 +45,7 @@
       "keys": [
         "sleep", "slept", "rest", "tired", "awake", "night", "bed", "dream", "insomnia", "exhaust",
         "nap"
-      ],
-      "first": ["answer"]
+      ]
     },
     {
       "id": "implant",
@@ -60,8 +53,7 @@
       "keys": [
         "own", "itself", "control", "glitch", "malfunction", "twitch", "strange", "weird", "act", "acts",
         "acting", "optic", "implant", "chrome"
-      ],
-      "first": ["answer"]
+      ]
     }
   ],
   "script": [],
@@ -70,9 +62,6 @@
     "comply:penlight": "Sure. Just don't blind the good one.",
     "comply:grip": "Okay. Like this?",
     "stall": ["Do we have to?"],
-    "refuse": "I said no, okay?",
-    "deflect": ["Uh. Can we skip that one?"],
-    "reassure": ["Okay. Okay. Thanks. Long night."],
     "spent": "I really have to go. Are you doing it or not?",
     "code": "Sorry, what? I just need the lens."
   },
@@ -141,8 +130,7 @@
         {
           "id": "calm",
           "text": "Scuffed rim, calm skin.",
-          "note": "Wrist socket, scuffed rim. Calm skin.",
-          "look": "Wrist socket, scuffed rim. Calm skin."
+          "note": "Wrist socket, scuffed rim. Calm skin."
         }
       ],
       "broken": [
@@ -150,7 +138,6 @@
           "id": "threads",
           "text": "Dark threads spread out from the wrist socket.",
           "note": "Scuffed socket. Dark threads under skin.",
-          "look": "Scuffed socket. Dark threads under skin.",
           "threads": true
         }
       ]
@@ -290,5 +277,6 @@
         "text": "Kip rides off into the rain, the optic picking his turns. You made no call. Nobody is paid for that."
       }
     }
-  }
+  },
+  "complaints": {"eyes": "My eyes sting when the bike lights go by.", "hands": "My fingers ache after a run across town.", "port": "My collar rubs against my port on every delivery.", "temper": "My fuse gets short with every late delivery.", "none": "Just the lens swap, doc. My next run starts soon."}
 }

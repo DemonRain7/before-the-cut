@@ -6,7 +6,6 @@
   "age": 41,
   "request": "Fix locking right arm",
   "fee": 300,
-  "patience": 5,
   "sprite": "rook",
   "voice": {"pitch": 0.62, "rate": 0.85},
   "teaser": "A big man fills the doorway, working one hand open and shut.",
@@ -22,14 +21,10 @@
   "eyes": {"left": {"bloodshot": true}, "right": {"bloodshot": true}},
   "port": {"covered": false},
   "idle": {"hands": "spasm", "gaze": "glare"},
-  "looks": {
-    "eyes": "Natural eyes, red-rimmed. He stares back.",
-    "hands": "LOADER rig. Jerks, settles. Raw knuckles."
-  },
   "checks": {
-    "penlight": {"first": ["comply"], "insist": "comply"},
-    "grip": {"first": ["stall", "comply"], "insist": "comply"},
-    "port": {"first": ["comply"], "insist": "comply"}
+    "penlight": {"first": ["comply"]},
+    "grip": {"first": ["stall", "comply"]},
+    "port": {"first": ["comply"]}
   },
   "claims": {},
   "topics": [
@@ -39,8 +34,7 @@
       "keys": [
         "wrong", "problem", "happen", "reason", "trouble", "brings", "bring", "matter", "here", "came",
         "come", "lock", "start", "began", "begin", "long", "cable", "dock", "pins"
-      ],
-      "first": ["answer"]
+      ]
     },
     {
       "id": "mood",
@@ -48,9 +42,7 @@
       "keys": [
         "angry", "anger", "mad", "upset", "calm", "mood", "temper", "rude", "hostile", "furious",
         "attitude", "shout", "yell"
-      ],
-      "deflect": "What's that got to do with my arm?",
-      "first": ["deflect", "answer"]
+      ]
     },
     {
       "id": "implant",
@@ -58,25 +50,16 @@
       "keys": [
         "own", "itself", "control", "glitch", "malfunction", "twitch", "strange", "weird", "act", "acts",
         "acting", "without", "move", "moving", "wander", "implant", "chrome"
-      ],
-      "first": ["answer"]
+      ]
     }
   ],
-  "script": [
-    {"on": "check:grip", "if": {"reassure_used_gte": 1}, "move": "comply"},
-    {"on": "check:grip", "move": "stall"},
-    {"on": "ask:mood", "if": {"reassure_used_gte": 1}, "move": "answer"},
-    {"on": "ask:mood", "move": "deflect"}
-  ],
+  "script": [{"on": "check:grip", "move": "stall"}],
   "lines": {
     "comply": ["Fine.", "Get on with it."],
     "comply:grip": "Fine. Give me the damn bar.",
     "comply:port": "Look all you want.",
     "stall": ["No."],
     "stall:grip": "I didn't come here to hold hands.",
-    "refuse": "I said no.",
-    "deflect": ["Not your business."],
-    "reassure": ["...Yeah. All right. Long week."],
     "spent": "Enough tests. Cut or don't.",
     "code": "What are you on about?"
   },
@@ -145,8 +128,7 @@
         {
           "id": "calm",
           "text": "Burnt pins and a cable scar are ordinary. No threads.",
-          "note": "Wrist socket scorched. Two burnt pins, scar.",
-          "look": "Wrist socket scorched. Two burnt pins, scar."
+          "note": "Wrist socket scorched. Two burnt pins, scar."
         }
       ],
       "broken": [
@@ -154,7 +136,6 @@
           "id": "threads",
           "text": "Dark threads run out from the burnt pins.",
           "note": "Scorched socket. Dark threads under skin.",
-          "look": "Scorched socket. Dark threads under skin.",
           "threads": true
         }
       ]
@@ -294,5 +275,6 @@
         "text": "Rook goes back to the docks with the arm doing the thinking. You made no call. Nobody is paid for that."
       }
     }
-  }
+  },
+  "complaints": {"eyes": "My eyes ache after a shift under the dock lamps.", "hands": "My hands feel sore after the last crate.", "port": "My port itches under the loading harness.", "temper": "My temper wears thin when the hoist jams.", "none": "Nothing else. My crew's waiting."}
 }

@@ -1,35 +1,8 @@
 extends RefCounted
 ## One patient visit: every rule of the exam, with no drawing and no model in it.
 ##
-## The player may look, run a tool, ask, reassure, press, stamp TREAT, call Trauma Team or
-## drop the shutter, in any order and at any time. Nothing has to be done before a verdict.
-## The call to Trauma Team keeps its first id in the rules and the data: "refer".
-## Tests, questions and pressure cost patience. At 0 the patient gives an ultimatum; if nobody
-## decides or reassures them in time they leave by themselves (outcome "gave_up": no fee, no
-## bill, no call). The wait is the director's clock; the rule and its length are here.
-## CALM (reassure) is a calm-patch from the drawer: it costs credits as well as a use.
-##
-## Contacts (rules version 6): a visitor may be one of tonight's couriers. The player says the
-## code line of an entry on the list; the right courier answers and hands over the package, and
-## anyone else answers with their own puzzled line for a little patience, so a wrong code says
-## nothing about who is a courier. Codes are game-owned: no model call, no history tag.
-## Surprises (rules version 6): each action is rolled once. A drifting patient may snap and
-## attack mid-exam; anyone may flare once a visit (a shout and a hand on the glass, never an
-## attack, TEMPER evidence only). The training visit has neither.
-## The result is told twice (rules version 8). At the counter only what does not depend on the
-## truth: the fee, whoever the patient was, the drop and CALM, and words that hold either way
-## (rules.json "counter"). Since rules version 9 the fee comes in for a patient Trauma Team took
-## as well as for work done: the crew pays it on account. The rest comes in at closing, with the
-## night's reports: whether the call was right, Trauma Team keeping what it paid or taking it
-## back with the call-out, and the bill for work on a patient who drifted (credits_for() less
-## counter_credits_for()).
-## This class owns the truth, the evidence, patience, attacks and the result. The patient
-## AI supplies dialogue and may decide a first open instrument request. Authored case rules
-## settle subsequent access and question outcomes. Physical readings, scoring and attacks stay here.
-##
-## Notes are written in the player's language as they are taken (scripts/core/lang.gd): the
-## words a reading or a reply is filled into are translated first.
-## Used as: const VisitState = preload("res://scripts/core/visit_state.gd")
+## The appointment owns the lamps, drawn complaints, chart, surprises and settlement.
+## The patient voices the visit. Only the doctor can perform tests, mark rows or make a call.
 
 const Lang = preload("res://scripts/core/lang.gd")
 const VisitRecord = preload("res://scripts/core/visit_record.gd")
@@ -52,6 +25,11 @@ var notes: Dictionary = {}       # row -> Array of {"key", "text"}
 var marks: Dictionary = {}       # row -> 0 blank, 1 tick, 2 cross (the player's own, unscored)
 var seen: Dictionary = {}        # evidence key -> true, e.g. "check:grip"
 var granted: Dictionary = {}     # tool -> true once the patient allowed it
+var complaints_told: Array = []
+var tests_in_order: Array = []
+var complaints_followed: Array = []
+var pending_leads: Array = []
+var idle_complaints: int = 0
 var refusals: Dictionary = {}    # tool -> how many times it was refused
 var reassured: Dictionary = {}   # tool -> true: a refusal cleared by reassurance
 var claims: Array = []           # claim ids the patient has offered
@@ -81,14 +59,11 @@ var flared: bool = false
 func _init(p_case: Dictionary = {}, p_rules: Dictionary = {}) -> void:
 	case_data = p_case
 	rules = p_rules
-	patience_max = int(case_data.get("patience", 5))
+	patience_max = int(_rule("visit", "lamps", 2))
 	patience = patience_max
-	reassure_left = int(_rule("reassure", "uses", 2))
 	for row in ROWS:
 		notes[row] = []
 		marks[row] = 0
-	if not port_covered():
-		granted["port"] = true
 
 
 ## Tonight's list says this visitor is a courier (an entry of data/contacts.json "pool").
@@ -154,7 +129,7 @@ func is_spent() -> bool:
 
 ## How long a patient with no patience left waits before leaving, in ms. 0: they go at once.
 func leave_ms() -> int:
-	return maxi(0, int(_rule("patience", "leave_ms", 8000)))
+	return maxi(0, int(_rule("patience", "leave_ms", 30000)))
 
 
 ## The player's own crosses on the record. Advice only: nothing scores or gates them.
@@ -205,128 +180,73 @@ func snapshot() -> Dictionary:
 	}
 
 
-# ------------------------------------------------------------------ look (free)
-func look(zone: String) -> Dictionary:
-	var res := {"ok": false, "zone": zone, "row": zone, "text": "", "covered": false, "new": false}
-	if not ZONES.has(zone) or phase == Phase.DONE:
-		return res
-	var looks: Dictionary = case_data.get("looks", {})
-	var key := "look:" + zone
-	var text := str(looks.get(zone, ""))
-	if zone == "port":
-		if port_covered() and not granted.has("port"):
-			res["covered"] = true
-		elif port_covered():
-			# already shown on request: looking again shows the same socket
-			var spec: Dictionary = case_data.get("checks", {}).get("port", {})
-			text = str(spec.get("note", text))
-			key = "check:port"
-	seen[key] = true
-	res["ok"] = true
-	res["text"] = text
-	res["new"] = add_note(zone, key, text)
-	_note("look:" + zone)
-	return res
+## Return authored lines in the current language. Only delivered facts enter the chart.
+func complain(row: String = "", maximum: int = -1) -> Dictionary:
+	if not in_exam():
+		return {"rows": [], "line": ""}
+	var drawn: Array = case_data.get("complaint_rows", [])
+	var book: Dictionary = case_data.get("complaints", {})
+	var deliver := []
+	if row != "":
+		if drawn.has(row):
+			deliver.append(row)
+	else:
+		for candidate in drawn:
+			if not complaints_told.has(candidate):
+				deliver.append(candidate)
+				if deliver.size() >= (maximum if maximum > 0 else int(_rule("complaints", "per_reply", 2))):
+					break
+	var lines := PackedStringArray()
+	for part in deliver:
+		var sentence := Lang.t(str(book[part]))
+		lines.append(sentence)
+		if not complaints_told.has(part):
+			complaints_told.append(part)
+			pending_leads.append(part)
+			add_note(part, "complaint:" + part, Lang.tf("Complains: %s", [sentence]))
+	if lines.is_empty():
+		lines.append(Lang.t(str(book.get("none", ""))) if row != "" or drawn.is_empty() else Lang.t("That's all I wanted to mention."))
+	return {"rows":deliver, "line":" ".join(lines)}
+
+
+func record_test(row: String) -> void:
+	tests_in_order.append(row)
+	if row in pending_leads:
+		complaints_followed.append(row)
+	pending_leads.clear()
 
 
 # ------------------------------------------------------------------ tools
 func check_status(tool: String) -> String:
-	if granted.has(tool):
-		return "open"
-	if int(refusals.get(tool, 0)) > 0 and not reassured.has(tool):
-		return "refused"
-	return "fresh"
+	return "open" if granted.has(tool) else "fresh"
 
 
 func check_cost(tool: String) -> int:
-	if granted.has(tool):
-		return 0
-	if sealed_repeat(tool):
-		return 0
-	var c := _cost("check")
-	if check_status(tool) == "refused":
-		c += _cost("insist")
-	return c
-
-
-func sealed_repeat(tool: String) -> bool:
-	return int(_rule("costs", "free_sealed_repeat", 0)) > 0 and check_status(tool) == "refused" and check_outcome(tool) == "refuse"
-
-
-func check_outcome(tool: String) -> String:
-	if granted.has(tool) or reassure_used > 0:
-		return "grant"
-	var spec: Dictionary = case_data.get("checks", {}).get(tool, {})
-	if str(spec.get("insist", "comply")) == "refuse":
-		return "refuse"
-	return "grant" if int(refusals.get(tool, 0)) > 0 else ""
+	return 0 if granted.has(tool) else _cost("check")
 
 
 func legal_moves_for_check(tool: String) -> Array:
-	var fixed := check_outcome(tool)
-	if fixed == "grant":
-		return ["comply"]
-	if fixed == "refuse":
-		return ["stall"]
-	var spec: Dictionary = case_data.get("checks", {}).get(tool, {})
-	var out: Array = []
-	var all_claims: Dictionary = case_data.get("claims", {})
-	for m in spec.get("first", ["comply"]):
-		var move := str(m)
-		if move.begins_with("explain:"):
-			var cid := move.substr(8)
-			if all_claims.has(cid) and not claims.has(cid):
-				out.append(move)
-		else:
-			out.append(move)
-	if out.is_empty():
-		out.append("comply")
-	return out
+	return case_data.get("checks", {}).get(tool, {}).get("first", ["comply"])
 
 
-## The player asked for a tool and the patient brain chose `move`.
-## result: "granted" | "refused" | "explained" | "spent" | "closed"
-func apply_check(tool: String, move: String, autonomous: bool = false) -> Dictionary:
-	var res := {"result": "closed", "tool": tool, "move": move, "cost": 0,
-		"row": str(TOOL_ROW.get(tool, "")), "claim": "", "insisted": false}
-	if phase != Phase.EXAM or not TOOLS.has(tool):
-		return res
-	if granted.has(tool):
-		res["result"] = "granted"
-		return res
-	if sealed_repeat(tool):
-		_note("check:%s:sealed" % tool)
-		res["result"] = "refused"
-		return res
+func apply_check(tool: String, move: String, _autonomous: bool = false) -> Dictionary:
+	var result := {"result":"closed", "tool":tool, "move":move, "cost":0, "row":TOOL_ROW.get(tool, "")}
+	if not in_exam() or not TOOLS.has(tool):
+		return result
 	var cost := check_cost(tool)
-	if patience < cost:
-		res["result"] = "spent"
-		return res
-	var legal := legal_moves_for_check(tool)
-	if (not autonomous or check_outcome(tool) != "") and not legal.has(move):
-		move = str(legal[0])
-		res["move"] = move
-	patience -= cost
-	res["cost"] = cost
-	res["insisted"] = int(refusals.get(tool, 0)) > 0
-	if move == "comply":
+	if cost > patience:
+		result.result = "spent"
+		return result
+	if not granted.has(tool):
+		patience -= cost
 		granted[tool] = true
-		res["result"] = "granted"
-	elif move.begins_with("explain:"):
-		var cid := move.substr(8)
-		var claim: Dictionary = case_data.get("claims", {}).get(cid, {})
-		claims.append(cid)
-		refusals[tool] = int(refusals.get(tool, 0)) + 1
-		add_note(str(claim.get("row", TOOL_ROW[tool])), "claim:" + cid, str(claim.get("note", "")))
-		res["result"] = "explained"
-		res["claim"] = cid
-	else:
-		refusals[tool] = int(refusals.get(tool, 0)) + 1
-		var refusal := Lang.t("Sealed. CALM opens it.") if sealed_repeat(tool) else Lang.tf("Declined the %s.", [Lang.t(str(TOOL_NAME[tool]))])
-		add_note(str(TOOL_ROW[tool]), "refuse:" + tool, refusal)
-		res["result"] = "refused"
-	_note("check:%s:%s" % [tool, move.get_slice(":", 0)])
-	return res
+		record_test(TOOL_ROW[tool])
+		if move.begins_with("explain:"):
+			claims.append(move.trim_prefix("explain:"))
+		_note("check:%s:%s" % [tool, move.get_slice(":", 0)])
+	result.cost = cost
+	result.result = "granted"
+	return result
 
 
 ## The interaction ran to the end, so the evidence has actually been shown.
@@ -340,8 +260,6 @@ func complete_check(tool: String) -> Dictionary:
 		text = Lang.fill(text, {"t": "%.1f" % (release_ms() / 1000.0)})
 	var key := "check:" + tool
 	seen[key] = true
-	if tool == "port":
-		seen["look:port"] = true
 	res["ok"] = true
 	res["text"] = text
 	res["new"] = add_note(str(TOOL_ROW[tool]), key, text)
@@ -360,7 +278,7 @@ func open_signs(event: Dictionary = {}) -> Dictionary:
 	var result := {}
 	var signs: Dictionary = case_data.get("signs", {})
 	var id := str(event.get("id", ""))
-	var will_answer: bool = event.get("type") == "ask" and event.get("outcome") == "answer" and not topic(id).is_empty() and patience >= ask_cost(id)
+	var will_answer: bool = event.get("type") == "ask" and event.get("outcome") == "answer" and not topic(id).is_empty()
 	var evidence: Array = case_data.get("rows", {}).get("speech", {}).get("evidence", [])
 	if signs.has("speech") and (not answered.is_empty() or will_answer):
 		result["speech"] = signs.speech if row_seen("speech") or (will_answer and evidence.has("ask:" + id)) else case_data.get("normal_speech_sign", "")
@@ -369,95 +287,25 @@ func open_signs(event: Dictionary = {}) -> Dictionary:
 	return result
 
 
-func ask_cost(topic_id: String) -> int:
-	return 0 if topic(topic_id).is_empty() or answered.has(topic_id) else _cost("ask")
+func legal_moves_for_ask(_topic_id: String) -> Array:
+	return ["answer"]
 
 
-func legal_moves_for_ask(topic_id: String) -> Array:
+func apply_ask(topic_id: String, _move: String = "answer", spoken: String = "") -> Dictionary:
 	var t := topic(topic_id)
-	if answered.has(topic_id) or int(asked.get(topic_id, 0)) > 0:
-		return ["answer"]
-	var out: Array = []
-	for m in t.get("first", ["answer"]):
-		out.append(str(m))
-	if out.is_empty():
-		out.append("answer")
-	return out
-
-
-## result: "answered" | "deflected" | "spent" | "closed"
-func apply_ask(topic_id: String, move: String, spoken: String = "") -> Dictionary:
-	var res := {"result": "closed", "topic": topic_id, "move": move, "cost": 0, "line": "", "new": false}
-	var t := topic(topic_id)
-	if phase != Phase.EXAM or t.is_empty():
-		return res
-	var cost := ask_cost(topic_id)
-	if patience < cost:
-		res["result"] = "spent"
-		return res
-	var legal := legal_moves_for_ask(topic_id)
-	if not legal.has(move):
-		move = str(legal[0])
-		res["move"] = move
-	patience -= cost
-	res["cost"] = cost
+	if not in_exam() or t.is_empty():
+		return {"result":"closed", "cost":0}
 	asked[topic_id] = int(asked.get(topic_id, 0)) + 1
-	if move == "deflect":
-		res["result"] = "deflected"
-	else:
-		answered[topic_id] = true
-		seen["ask:" + topic_id] = true
-		res["result"] = "answered"
-		res["line"] = spoken if spoken != "" else str(t.get("a", ""))
-		last_recorded_speech = str(res["line"])
-		res["new"] = add_note("speech", "ask:" + topic_id, Lang.tf("Says: %s", [Lang.t(last_recorded_speech)]))
-	_note("ask:%s:%s" % [topic_id, move])
-	return res
+	answered[topic_id] = true
+	seen["ask:" + topic_id] = true
+	last_recorded_speech = spoken if spoken != "" else str(t.a)
+	var fresh := add_note("speech", "ask:" + topic_id, Lang.tf("Says: %s", [Lang.t(last_recorded_speech)]))
+	_note("ask:%s:answer" % topic_id)
+	return {"result":"answered", "topic":topic_id, "move":"answer", "cost":0, "line":last_recorded_speech, "new":fresh}
 
 
-## What one CALM costs in credits: a calm-patch from the drawer.
-func reassure_cost() -> int:
-	return maxi(0, int(_rule("reassure", "cost", 0)))
-
-
-## Reassurance: a little patience back, and refused tools will be allowed next time. It costs
-## reassure_cost() credits; the till may go below zero for it.
-func reassure() -> Dictionary:
-	var res := {"result": "closed", "line": "", "cost": 0}
-	if phase != Phase.EXAM:
-		return res
-	if reassure_left <= 0:
-		res["result"] = "none_left"
-		return res
-	reassure_left -= 1
-	reassure_used += 1
-	calm_spent += reassure_cost()
-	res["cost"] = reassure_cost()
-	patience = mini(patience_max, patience + int(_rule("reassure", "gain", 1)))
-	for tool in refusals.keys():
-		if not granted.has(tool):
-			reassured[tool] = true
-	res["result"] = "ok"
-	res["line"] = _first_line("reassure")
-	_note("reassure")
-	return res
-
-
-## Whether the next PRESS is the one that breaks this patient: its entry of the press list ends
-## the visit (a walkout when steady, an attack when drifting). Every patient breaks on the second
-## (CaseDB.compose_night), so this says nothing about who is drifting.
 func press_breaks() -> bool:
-	var list: Array = case_data.get("press", [])
-	if list.is_empty():
-		return false
-	var entry: Variant = list[mini(press_count, list.size() - 1)]
-	return typeof(entry) == TYPE_DICTIONARY and str((entry as Dictionary).get("end", "")) != ""
-
-
-## The patience the next PRESS takes: rules.json costs.press, or every lamp left when it is the
-## push that breaks them (rules version 10), so the bar is empty when they go.
-func can_pay_press() -> bool:
-	return int(_rule("costs", "require_press_lamps", 0)) == 0 or patience >= _cost("press")
+	return seen.has("press") or patience <= 0
 
 
 func press_cost() -> int:
@@ -474,13 +322,10 @@ func press() -> Dictionary:
 	var list: Array = case_data.get("press", [])
 	if list.is_empty():
 		return res
-	if not can_pay_press():
-		res["result"] = "spent"
-		return res
 	var breaks := press_breaks()
 	patience = 0 if breaks else maxi(0, patience - _cost("press"))
 	press_count += 1
-	var entry: Dictionary = list[mini(press_count - 1, list.size() - 1)]
+	var entry: Dictionary = list[list.size() - 1 if breaks else 0]
 	res["line"] = str(entry.get("line", ""))
 	res["face"] = str(entry.get("face", ""))
 	res["hands"] = str(entry.get("hands", ""))
@@ -496,6 +341,7 @@ func press() -> Dictionary:
 		attack_cause = "press"
 	else:
 		res["result"] = "react"
+		record_test("temper")
 		seen["press"] = true
 		res["new"] = add_note("temper", "press", str(entry.get("note", "")))
 	return res
@@ -552,7 +398,7 @@ func say_code(entry: Dictionary) -> Dictionary:
 ## What this visit has done to the till so far, before its outcome is known: the drop in,
 ## CALM out.
 func till_change() -> int:
-	return drop_pay - calm_spent
+	return drop_pay
 
 
 # ------------------------------------------------------------------ surprises
@@ -579,8 +425,8 @@ func flare_chance() -> float:
 ## Looking is free and is not one. Counts it and rolls, with the director's generator, whether
 ## the patient snaps (drifting only) or flares (anyone, once a visit). Returns "snap", "flare"
 ## or "". Nothing happens yet: snap() and flare() do it when the director is ready.
-func roll_action(rng: RandomNumberGenerator, cost: int = 1, calm: bool = false) -> String:
-	if phase != Phase.EXAM or (cost == 0 and not calm and int(_rule("snap", "free_actions_roll", 0)) == 0):
+func roll_action(rng: RandomNumberGenerator, cost: int = 1) -> String:
+	if phase != Phase.EXAM or cost <= 0:
 		return ""
 	actions += 1
 	var s := snap_chance()
@@ -815,7 +661,7 @@ func settlement() -> Dictionary:
 	for row in ROWS:
 		var spec: Dictionary = row_specs.get(row, {})
 		var finding := {
-			"id": row,
+			"id": row, "complained":complaints_told.has(row), "tested":tests_in_order.has(row),
 			"ok": bool(spec.get("ok", true)),
 			"text": str(spec.get("text", "")),
 			"seen": row_seen(row),
@@ -825,7 +671,7 @@ func settlement() -> Dictionary:
 			finding["text"] = last_recorded_speech
 		finding["wear"] = not is_drifting() and not finding.ok
 		if not finding.ok and not finding.seen and int(_rule("report", "missed_hints", 1)) > 0:
-			var how := {"eyes": "LIGHT", "hands": "GRIP", "port": "CALM then PORT" if case_data.checks.port.get("insist") == "refuse" else "PORT", "temper": "PRESS"}
+			var how := {"eyes": "LIGHT", "hands": "GRIP", "port": "PORT", "temper": "PRESS"}
 			if row == "speech":
 				var needed := str(spec.evidence[0]).trim_prefix("ask:")
 				var question := Lang.t(str(topic(needed).get("q", "")))
@@ -837,11 +683,11 @@ func settlement() -> Dictionary:
 	var usage := {}
 	if int(_rule("report", "show_usage", 1)) > 0:
 		for tool in TOOLS:
-			usage[tool] = granted.has(tool) or refusals.has(tool)
+			usage[tool] = granted.has(tool)
 		usage["ask"] = not asked.is_empty()
 		usage["press"] = press_count > 0
-		usage["calm"] = reassure_used > 0
 	return {
+		"complaints_told": complaints_told.duplicate(), "tests_in_order": tests_in_order.duplicate(), "complaints_followed": complaints_followed.duplicate(),
 		"usage": usage, "press_bonus": press_bonus(outcome),
 		"case_id": str(case_data.get("id", "")),
 		"name": str(case_data.get("name", "")),

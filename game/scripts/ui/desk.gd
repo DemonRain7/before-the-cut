@@ -18,7 +18,7 @@ const PADS := [
 	{"id": "grip", "rect": Rect2(40, 301, 40, 58), "icon": "ui/tool_grip.png", "label": "GRIP"},
 	{"id": "port", "rect": Rect2(80, 301, 40, 58), "icon": "ui/tool_port.png", "label": "PORT"},
 	{"id": "ask", "rect": Rect2(520, 301, 40, 58), "icon": "ui/talk_ask.png", "label": "ASK"},
-	{"id": "calm", "rect": Rect2(560, 301, 40, 58), "icon": "ui/talk_calm.png", "label": "CALM"},
+	{"id": "complain", "rect": Rect2(560, 301, 40, 58), "icon": "ui/talk_ask.png", "label": "TALK"},
 	{"id": "press", "rect": Rect2(600, 301, 40, 58), "icon": "ui/talk_press.png", "label": "PRESS"},
 	{"id": "treat", "rect": Rect2(546, 190, 40, 54), "icon": "ui/stamp_treat.png", "label": "TREAT"},
 	# the second decision: hand the patient over to Trauma Team (the id stays "refer" in the data)

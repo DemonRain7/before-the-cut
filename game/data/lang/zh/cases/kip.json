@@ -10,8 +10,6 @@
 		"A kid in a courier jacket, bouncing on his heels and checking the time.": "一个穿快递夹克的年轻人，踮着脚跳来跳去，不停看时间。",
 		"Hey. Hi. Sorry, I'm on the clock.": "嘿。你好。抱歉，我在赶单。",
 		"Left eye's cracked. I just need the lens swapped before my night run.": "左眼裂了。我只想在跑夜单前把镜片换掉。",
-		"Left: a KITE optic, cracked. Right: natural.": "左：KITE 义眼，已裂。右：原生眼。",
-		"Drumming the counter. Chewed nails.": "手指敲着柜台。指甲啃得秃秃的。",
 		"Wrist socket, scuffed rim. Calm skin.": "腕部接口，边缘磨损。皮肤正常。",
 		"Light: R tightens, L no pupil. Both follow.": "光照：右收缩，左无瞳孔，双眼跟随。",
 		"Grip: jittery. Let go {t} s after 'release'.": "握力：手颤。喊‘松开’后 {t} 秒放手。",
@@ -28,9 +26,6 @@
 		"Sure. Just don't blind the good one.": "行。别把好的那只照瞎就行。",
 		"Okay. Like this?": "好。这样吗？",
 		"Do we have to?": "非得做吗？",
-		"I said no, okay?": "我说了不行，好吗？",
-		"Uh. Can we skip that one?": "呃。这个能跳过吗？",
-		"Okay. Okay. Thanks. Long night.": "好。好。谢了。今晚太长了。",
 		"I really have to go. Are you doing it or not?": "我真得走了。你到底做不做？",
 		"Sorry. Too much coffee.": "抱歉。咖啡喝多了。",
 		"Sorry, what? I just need the lens.": "抱歉，什么？我只要换镜片。",
@@ -79,7 +74,12 @@
 		"The bike lock rings off the slats three times, then stops. \"Sorry,\" from the other side. Trauma Team takes him quietly.": "车锁在卷闸上砸响三下，然后停了。另一边传来一声“抱歉”。创伤小组安静地把他带走了。",
 		"The bike lock came through before the shutter did. Trauma Team finds you on the floor. Kip is three streets away, still riding.": "卷闸还没落下，车锁先砸了进来。创伤小组发现你倒在地上。Kip 已经在三条街外，还在骑。",
 		"You dropped the shutter on a nervous kid mid-apology. At dawn a courier rides through a market stall, the optic steering. You were right. Nobody pays for that.": "那个紧张的孩子还在道歉，你就放下了卷闸。天亮时，一个快递员骑车撞穿了集市的摊位，方向由义眼掌控。你是对的。但这没人付钱。",
-		"Kip rides off into the rain, the optic picking his turns. You made no call. Nobody is paid for that.": "Kip 骑进雨里，由义眼替他挑路线。你没做决定。这种事没人付钱。"
+		"Kip rides off into the rain, the optic picking his turns. You made no call. Nobody is paid for that.": "Kip 骑进雨里，由义眼替他挑路线。你没做决定。这种事没人付钱。",
+		"My eyes sting when the bike lights go by.": "车灯一晃，我眼睛就刺痛。",
+		"My fingers ache after a run across town.": "骑车横穿城区后，我手指酸得很。",
+		"My collar rubs against my port on every delivery.": "每次送件，领口都蹭得我接口疼。",
+		"My fuse gets short with every late delivery.": "送件一迟到，我脾气就急。",
+		"Just the lens swap, doc. My next run starts soon.": "就换镜片，医生。我下一单快开始了。"
 	},
 	"topics": {
 		"kip:why": [

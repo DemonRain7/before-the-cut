@@ -6,7 +6,6 @@
   "age": 19,
   "request": "Swap burnt deck jack",
   "fee": 500,
-  "patience": 5,
   "sprite": "lux",
   "voice": {"pitch": 1.35, "rate": 1.15},
   "teaser": "A thin kid in a baggy hoodie, one eye a screen and one a lens. Her temple smells burnt.",
@@ -25,14 +24,10 @@
   "eyes": {"left": {}, "right": {}},
   "port": {"covered": false},
   "idle": {"hands": "tap", "gaze": "dart"},
-  "looks": {
-    "eyes": "Left: an IRIS screen. Right: a KITE lens.",
-    "hands": "Natural hands, bitten nails. Typing on air."
-  },
   "checks": {
-    "penlight": {"first": ["comply"], "insist": "comply"},
-    "grip": {"first": ["comply"], "insist": "comply"},
-    "port": {"first": ["stall", "comply"], "insist": "comply"}
+    "penlight": {"first": ["comply"]},
+    "grip": {"first": ["comply"]},
+    "port": {"first": ["stall", "comply"]}
   },
   "claims": {},
   "topics": [
@@ -42,8 +37,7 @@
       "keys": [
         "wrong", "problem", "happen", "reason", "trouble", "brings", "bring", "matter", "here", "came",
         "come", "jack", "deck", "burn", "burnt", "burned", "fried", "temple", "head", "smoke", "crash"
-      ],
-      "first": ["answer"]
+      ]
     },
     {
       "id": "sleep",
@@ -51,8 +45,7 @@
       "keys": [
         "sleep", "slept", "rest", "tired", "awake", "night", "bed", "dream", "insomnia", "exhaust",
         "nap"
-      ],
-      "first": ["answer"]
+      ]
     },
     {
       "id": "dive",
@@ -60,15 +53,10 @@
       "keys": [
         "see", "saw", "seen", "dive", "diving", "net", "inside", "found", "there", "data", "deep",
         "down", "met", "something"
-      ],
-      "deflect": "Nothing. Data. Boring. Next question.",
-      "first": ["deflect", "answer"]
+      ]
     }
   ],
-  "script": [
-    {"on": "check:port", "move": "stall"},
-    {"on": "ask:dive", "move": "deflect"}
-  ],
+  "script": [{"on": "check:port", "move": "stall"}],
   "lines": {
     "comply": ["Fine.", "Sure, whatever."],
     "comply:penlight": "Go on. Two different eyes, I know.",
@@ -76,9 +64,6 @@
     "comply:port": "Fine. Don't make a face.",
     "stall": ["Do you have to?"],
     "stall:port": "It's gross, okay? It's all burnt.",
-    "refuse": "No. Hard no.",
-    "deflect": ["Skip."],
-    "reassure": ["...Okay. Thanks. Nobody's nice at four in the morning."],
     "spent": "I've got a job at dawn. Yes or no, doc?",
     "code": "Is that a handle? I don't know you."
   },
@@ -147,8 +132,7 @@
         {
           "id": "calm",
           "text": "Burnt, but the skin round the jack is calm.",
-          "note": "Temple jack, burnt rim. Calm skin.",
-          "look": "Temple jack, burnt rim. Calm skin."
+          "note": "Temple jack, burnt rim. Calm skin."
         }
       ],
       "broken": [
@@ -156,7 +140,6 @@
           "id": "threads",
           "text": "Dark threads spread out from the temple jack.",
           "note": "Burnt temple jack. Dark threads under skin.",
-          "look": "Burnt temple jack. Dark threads under skin.",
           "threads": true
         }
       ]
@@ -296,5 +279,6 @@
         "text": "Lux walks off typing on air, in a hurry to dive. You made no call. Nobody is paid for that."
       }
     }
-  }
+  },
+  "complaints": {"eyes": "My eyes feel dry when I come up from a dive.", "hands": "My fingers ache after hours on the deck.", "port": "My port feels sore when the deck cable tugs.", "temper": "My mood tanks when a dive cuts out.", "none": "Just the jack on the ticket."}
 }

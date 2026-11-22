@@ -10,9 +10,6 @@
 		"A man in a pressed suit, standing very straight. He has not moved in a while.": "一个西装笔挺的男人，站得笔直。他已经很久没动过了。",
 		"Good evening. Adrian Vale, Kessler Security.": "晚上好。Adrian Vale，凯斯勒安保。",
 		"I'd like the limiter taken off my reflex rig. I pay double for discretion.": "我想请您拆掉我反射义体上的限制器。为保密，我付双倍。",
-		"TALON combat optics. Hasn't blinked.": "TALON 战斗义眼。一直没眨眼。",
-		"Hands folded. Perfectly still.": "双手交叠。纹丝不动。",
-		"Collar buttoned to the jaw. Port not visible.": "领口一直扣到下巴。看不到接口。",
 		"Light: shutters never snap. L won't follow.": "光照：快门始终不闭合，左眼不跟随。",
 		"Grip: exact. Let go {t} s after 'release'.": "握力：精准。喊‘松开’后 {t} 秒放手。",
 		"Neck socket: dark threads under the skin.": "颈部接口：皮下有黑色纹路。",
@@ -23,7 +20,6 @@
 		"\"I perform better without it.\"": "“没有它，我表现更好。”",
 		"Any lapses? Lost time?": "有没有断片？记不起的时段？",
 		"None. I remember every shift. I can recite them, if you like.": "没有。每个班次我都记得。您想听的话，我可以背给您听。",
-		"I'm cleared for duty. That is in my file.": "我已获准上岗。档案里写着。",
 		"\"None. I remember every shift.\"": "“没有。每个班次我都记得。”",
 		"It doesn't need much sleep. I take what's left.": "它不需要多少睡眠。我拿剩下的。",
 		"\"It doesn't need much sleep.\"": "“它不需要多少睡眠。”",
@@ -32,9 +28,6 @@
 		"...Very well. Briefly.": "……好吧。快一点。",
 		"I would rather not.": "恕我不便。",
 		"Company property. The port is sealed under contract.": "公司财产。按合同，接口是封着的。",
-		"I said it is sealed.": "我说了，它是封着的。",
-		"That is not relevant.": "这无关紧要。",
-		"Thank you. I do appreciate a professional.": "谢谢。我很欣赏专业的人。",
 		"I believe we're done with questions. Your decision, doctor.": "我想问题已经问完了。您来决定，医生。",
 		"Satisfied?": "满意了？",
 		"I'm afraid I don't follow, doctor.": "恐怕我没听明白，医生。",
@@ -80,7 +73,12 @@
 		"Trauma Team scans a Kessler man and finds nothing but a contract. Kessler's lawyers call before the van is back. They take the fee back, and the call-out goes on your bill.": "创伤小组扫描了这个凯斯勒的人，除了一份合同什么也没找到。车还没回来，凯斯勒的律师就打来了电话。他们收回诊费，出警费记在你账上。",
 		"Vale takes his business elsewhere. Someone else is paid double for discretion tonight.": "Vale 去了别家。今晚另有人拿到了双倍的保密费。",
 		"The shutter drops on a polite man in a pressed suit. He was only cold. Kessler will remember the clinic. That costs you.": "卷闸砸在一个西装笔挺、彬彬有礼的人面前。他只是冷淡而已。凯斯勒会记住这家诊所。这要你来赔。",
-		"Vale checks his watch once, thanks you for your time and leaves. No fee, no bill.": "Vale 看了一眼表，谢过你的时间，走了。没有诊费，也没有账单。"
+		"Vale checks his watch once, thanks you for your time and leaves. No fee, no bill.": "Vale 看了一眼表，谢过你的时间，走了。没有诊费，也没有账单。",
+		"My eyes tire halfway through night watch.": "夜间执勤到一半，我的眼睛就累了。",
+		"My fingers ache inside the duty gloves.": "戴着执勤手套，我的手指会疼。",
+		"My port feels tender under my uniform collar.": "制服领口压着接口，有点疼。",
+		"My temper is shorter after a double watch.": "连值两班后，我的脾气比平时急。",
+		"My request is on the intake form.": "我的要求已经填在登记表上。"
 	},
 	"topics": {
 		"vale:why": [

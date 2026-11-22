@@ -8,7 +8,7 @@ import { makeSets } from "./sets.mjs";
 
 test("synthetic matrix is balanced and keeps truth outside provider requests", () => {
   const s = makeSets();
-  for (const [key, count] of Object.entries({E1:400,E2:204,E3:120,E4:174})) {
+  for (const [key, count] of Object.entries({E1:400,E2:204,E3:120,E4:180})) {
     assert.equal(s[key].length,count);
     assert.equal(s[key].filter(r=>r.language==="zh").length,count/2);
     for (const row of s[key]) {

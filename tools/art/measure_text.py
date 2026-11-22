@@ -869,8 +869,8 @@ def main():
         cid = c["id"]
         rows.append(check("name", cid + ".name", c["name"], bold=True))
         rows.append(check("request", cid + ".request", c["request"]))
-        for z, t in c["looks"].items():
-            rows.append(check("look", cid + ".looks." + z, t))
+        for z, t in c["complaints"].items():
+            rows.append(check_lines("complaint", cid + ".complaints." + z, t, 360, 2))
         # every sign of every row (case data version 3): the night picks one sign a row, so any of
         # them can be the one on the screen: its card note, its look, its line after the grip,
         # its answers, its reaction to a press and its flare, and its row on the report

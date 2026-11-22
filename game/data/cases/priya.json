@@ -6,7 +6,6 @@
   "age": 45,
   "request": "Tune scanner eye",
   "fee": 450,
-  "patience": 6,
   "sprite": "priya",
   "voice": {"pitch": 1.1, "rate": 1.05},
   "teaser": "A nurse in scrubs under a raincoat. One of her eyes glows a soft red.",
@@ -25,15 +24,10 @@
   "eyes": {"left": {}, "right": {}},
   "port": {"covered": true},
   "idle": {"hands": "still", "gaze": "fixed"},
-  "looks": {
-    "eyes": "Left: a SCAN optic, red glow. Right: natural.",
-    "hands": "LANCET fingers, fine as needles. Folded.",
-    "port": "Scrub sleeve, fob watch. Port not visible."
-  },
   "checks": {
-    "penlight": {"first": ["comply"], "insist": "comply"},
-    "grip": {"first": ["explain:hold", "comply"], "insist": "comply"},
-    "port": {"first": ["comply"], "insist": "comply"}
+    "penlight": {"first": ["comply"]},
+    "grip": {"first": ["explain:hold", "comply"]},
+    "port": {"first": ["comply"]}
   },
   "claims": {
     "hold": {
@@ -49,8 +43,7 @@
       "keys": [
         "wrong", "problem", "happen", "reason", "trouble", "brings", "bring", "matter", "here", "came",
         "come", "eye", "scan", "optic", "read", "reading", "readings", "number", "numbers", "pulse", "tune"
-      ],
-      "first": ["answer"]
+      ]
     },
     {
       "id": "sleep",
@@ -58,8 +51,7 @@
       "keys": [
         "sleep", "slept", "rest", "tired", "awake", "night", "bed", "dream", "insomnia", "exhaust",
         "nap"
-      ],
-      "first": ["answer"]
+      ]
     },
     {
       "id": "ward",
@@ -67,24 +59,16 @@
       "keys": [
         "ward", "patients", "patient", "hospital", "job", "shift", "stress", "cope", "hard", "tough",
         "burnout", "death", "dying", "die", "lose", "get"
-      ],
-      "deflect": "I'm the nurse here, doctor. Let's keep it that way.",
-      "first": ["deflect", "answer"]
+      ]
     }
   ],
-  "script": [
-    {"on": "check:grip", "move": "explain:hold"},
-    {"on": "ask:ward", "move": "deflect"}
-  ],
+  "script": [{"on": "check:grip", "move": "explain:hold"}],
   "lines": {
     "comply": ["Of course.", "Go ahead, doctor."],
     "comply:penlight": "Go on. The SCAN won't mind.",
     "comply:grip": "Fine. Here.",
     "comply:port": "Let me roll the sleeve up.",
     "stall": ["Is that necessary?"],
-    "refuse": "No, doctor. Not tonight.",
-    "deflect": ["That's not why I'm here."],
-    "reassure": ["Thank you. It's strange, being on this side."],
     "spent": "I've a ward waiting. Tune it or don't, doctor.",
     "code": "Sorry? That's not a word on any chart I know."
   },
@@ -300,5 +284,6 @@
         "text": "Priya walks back to the ward, the SCAN counting pulses. You made no call. Nobody is paid for that."
       }
     }
-  }
+  },
+  "complaints": {"eyes": "My eyes ache under the ward's night lights.", "hands": "My fingers feel stiff after the rounds.", "port": "My port is tender where the scanner strap sits.", "temper": "My temper catches me by surprise at handover.", "none": "That's the whole list from my shift."}
 }

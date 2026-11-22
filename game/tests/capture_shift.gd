@@ -165,21 +165,13 @@ func _run() -> void:
 	d = PlayDriver.new(self, main)
 	main.event_log.write("automated_run", {"runner": "tests/capture_shift.gd"})
 	main.surprises_enabled = false     # a random snap or flare would cut into a staged scene; two are cued below
-	if attacks_only:
-		main.training_enabled = false  # its box would sit over the first night's frames
-	var first_night := seed_for(["kip", "maren"], main.training_enabled)
-	var later_nights := seed_for(["rook", "juno"], false)
-	reached(first_night > 0 and later_nights > 0, "a seed is found for each night's contact list")
-	main.fixed_seed = first_night
+	main.training_enabled = false
+	main.fixed_seed = 41307
 	main.has_fixed_seed = true
-	d.move(Vector2(330, 250))
-	await d.seconds(0.6)
-	if not weapons_only:
-		await first_five(later_nights)
-	# ---------------------------------------------------------------- shifts 6 to 15
+	if not attacks_only and not weapons_only:
+		for fixed in ["K", "L"]:
+			await capture_loop(fixed)
 	await weapon_nights()
-	if not attacks_only:
-		await wear_nights()
 	if dry:
 		print("DRY RUN: %d frames would be captured, %d moments missed. Nothing was drawn or saved." % [count, missed])
 	else:
@@ -189,6 +181,42 @@ func _run() -> void:
 
 
 ## Shifts 1 to 5 (the header lists what each shows). later_nights: the seed from the second on.
+func capture_loop(fixed: String) -> void:
+	main.test_night = fixed
+	reached(await d.open_counter(), "fixed night opens")
+	for id in main.shift.order.duplicate():
+		reached(await d.buzz_in(), "visitor arrives")
+		await d.settle()
+		var stem := fixed + "-" + str(main.shift.index + 1) + "-" + str(id)
+		await shot(stem + "-arrival")
+		await d.complain()
+		await shot(stem + "-complaint")
+		var v := main.visit
+		await d.take_card()
+		await d.seconds(0.4)
+		await shot(stem + "-card")
+		await d.hang_card()
+		for row in v.complaints_told.duplicate():
+			if v.patience <= 0:
+				break
+			if row == "temper":
+				await d.press()
+				await d.settle()
+			else:
+				var tool: String = main.CaseDB.ROW_TOOL[row]
+				reached(await d.request_tool(tool) == "open", "complained row can be tested")
+				match tool:
+					"grip": await d.squeeze_and_release()
+					"penlight": await d.sweep_eyes()
+					"port": await d.watch_port()
+				await shot(stem + "-" + tool)
+				await d.put_away()
+				await d.settle()
+		await d.stamp("treat")
+		reached(await d.wait_for_slip() and await d.take_slip(), "visit closes")
+	await report_shot(fixed + "-closing")
+
+
 func first_five(later_nights: int) -> void:
 	# ---------------------------------------------------------------- shift 1
 	if attacks_only:
@@ -908,7 +936,7 @@ func kip() -> void:
 	await d.seconds(0.3)
 	reached(main.visit != null and main.visit.patience == 1, "kip: one patience lamp is left after the press")
 	await shot("kip-last-lamp-tip")
-	await d.reassure()
+	await d.complain()
 	await d.settle()
 	reached(main.visit != null and main.visit.calm_spent == 30, "kip: the calm-patch is paid for out of the till")
 	await shot("kip-reassured")
@@ -959,7 +987,7 @@ func rook() -> void:
 	reached(main.visit != null and main.visit.crossed() == 1, "rook: two clicks on the box cross the row")
 	await shot("rook-one-cross")
 	d.hang_card()
-	await d.reassure()
+	await d.complain()
 	await d.settle()
 	await d.request_tool("grip")
 	await hold_grip("")
@@ -1095,7 +1123,7 @@ func maren_gets_through(brief: bool) -> void:
 		await shot("maren-port")
 		await d.put_away()
 		await d.settle()
-		await d.reassure()
+		await d.complain()
 		await d.settle()
 	await d.press()
 	await d.seconds(0.5)
@@ -1189,7 +1217,7 @@ func kip_runs_out() -> void:
 	d.move(REST)
 	await d.seconds(0.5)
 	await shot("kip-3-leaving")
-	await d.reassure()
+	await d.complain()
 	await d.settle()
 	reached(main.visit != null and main.visit.patience == 1 and not main._leave_said, "kip-3: CALM holds him")
 	await shot("kip-3-held")

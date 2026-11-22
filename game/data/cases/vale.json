@@ -6,7 +6,6 @@
   "age": 38,
   "request": "Remove reflex-rig limiter",
   "fee": 600,
-  "patience": 5,
   "sprite": "vale",
   "voice": {"pitch": 0.9, "rate": 0.9},
   "teaser": "A man in a pressed suit, standing very straight. He has not moved in a while.",
@@ -25,15 +24,10 @@
   "eyes": {"left": {}, "right": {}},
   "port": {"covered": true},
   "idle": {"hands": "still", "gaze": "fixed"},
-  "looks": {
-    "eyes": "TALON combat optics. Hasn't blinked.",
-    "hands": "Hands folded. Perfectly still.",
-    "port": "Collar buttoned to the jaw. Port not visible."
-  },
   "checks": {
-    "penlight": {"first": ["explain:idle", "comply"], "insist": "comply"},
-    "grip": {"first": ["comply"], "insist": "comply"},
-    "port": {"first": ["stall"], "insist": "refuse"}
+    "penlight": {"first": ["explain:idle", "comply"]},
+    "grip": {"first": ["comply"]},
+    "port": {"first": ["stall"]}
   },
   "claims": {
     "idle": {
@@ -49,8 +43,7 @@
       "keys": [
         "wrong", "problem", "happen", "reason", "trouble", "brings", "bring", "matter", "here", "came",
         "come", "limiter", "remove", "removal", "reflex", "faster", "perform", "speed"
-      ],
-      "first": ["answer"]
+      ]
     },
     {
       "id": "lapses",
@@ -58,9 +51,7 @@
       "keys": [
         "lapse", "lost", "lose", "time", "memory", "remember", "forget", "forgot", "blackout", "gap",
         "gaps", "missing", "blank"
-      ],
-      "deflect": "I'm cleared for duty. That is in my file.",
-      "first": ["deflect", "answer"]
+      ]
     },
     {
       "id": "sleep",
@@ -68,20 +59,16 @@
       "keys": [
         "sleep", "slept", "rest", "tired", "awake", "night", "bed", "dream", "insomnia", "exhaust",
         "nap"
-      ],
-      "first": ["answer"]
+      ]
     }
   ],
-  "script": [{"on": "check:penlight", "move": "explain:idle"}, {"on": "ask:lapses", "move": "deflect"}],
+  "script": [{"on": "check:penlight", "move": "explain:idle"}],
   "lines": {
     "comply": ["Of course.", "As you wish."],
     "comply:penlight": "If you insist.",
     "comply:port": "...Very well. Briefly.",
     "stall": ["I would rather not."],
     "stall:port": "Company property. The port is sealed under contract.",
-    "refuse": "I said it is sealed.",
-    "deflect": ["That is not relevant."],
-    "reassure": ["Thank you. I do appreciate a professional."],
     "spent": "I believe we're done with questions. Your decision, doctor.",
     "code": "I'm afraid I don't follow, doctor."
   },
@@ -294,5 +281,6 @@
         "text": "Vale thanks you for your time and walks back out into the city. You made no call. Whatever he does tonight, nobody asked you."
       }
     }
-  }
+  },
+  "complaints": {"eyes": "My eyes tire halfway through night watch.", "hands": "My fingers ache inside the duty gloves.", "port": "My port feels tender under my uniform collar.", "temper": "My temper is shorter after a double watch.", "none": "My request is on the intake form."}
 }

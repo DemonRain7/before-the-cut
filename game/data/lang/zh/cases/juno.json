@@ -10,8 +10,6 @@
 		"Two bright eyes in the dark hall. Literally bright. Someone is humming.": "昏暗的走廊里有两只发亮的眼睛。是真的在发光。有人在哼歌。",
 		"H-hey, doc. Don't mind the st-static.": "嘿-嘿，医生。别在意这杂-杂音。",
 		"My voice box skips. I sing for rent. Can you swap it tonight?": "我的声盒老卡。我靠唱歌交房租。今晚能换吗？",
-		"IRIS display eyes. Glyphs flicker.": "IRIS 显示屏义眼。字符闪烁。",
-		"DEFT implant fingers tap a beat, in time.": "DEFT 义体手指合着拍子敲。",
 		"Neck port: scars, four jacks, a cable burn.": "颈接口：伤疤、四个插孔、线缆灼痕。",
 		"Light: screens stay bright. Both follow it.": "光照：屏幕依旧亮着，双眼跟随。",
 		"Grip: steady. Let go {t} s after 'release'.": "握力：平稳。喊‘松开’后 {t} 秒放手。",
@@ -20,7 +18,6 @@
 		"\"I need my v-voice back, doc.\"": "“我得把嗓-嗓子找回来，医生。”",
 		"That's a lot of chrome. Any of it act up?": "义体真不少。有哪个不听使唤吗？",
 		"It's all me. I picked every p-piece. Only the box is broken.": "全是我。每个零-零件都是我自己挑的。坏的只有声盒。",
-		"W-wow. You ask everybody that?": "哇-哇哦。你对谁都这么问？",
 		"\"It's all me. I picked every p-piece.\"": "“全是我。每个零-零件都是我挑的。”",
 		"How are you sleeping?": "睡得怎么样？",
 		"Late. I play till two. I sleep f-fine after.": "睡得晚。我唱到两点。之后睡得挺-挺好。",
@@ -30,9 +27,6 @@
 		"Go for it. They do t-tricks.": "来吧。我这双眼睛会变-变花样。",
 		"It's not p-pretty. Look anyway.": "不-不太好看。随便看吧。",
 		"Nope.": "不要。",
-		"I said n-no.": "我说了不-不行。",
-		"Pass.": "免了。",
-		"Okay. We're c-cool.": "好吧。我们没-没事了。",
 		"Doc, I've got a set at midnight. Yes or no?": "医生，我午夜还有场演出。做不做？",
 		"Chrome's g-good for something.": "义体总-总算有点用。",
 		"Is that a l-lyric? Don't know it.": "那是歌-歌词吗？没听过。",
@@ -87,7 +81,12 @@
 		"Ten DEFT picks scrape across the slats like a scale run backwards. Then the hall is quiet. Trauma Team takes her out still humming.": "十根 DEFT 尖刺刮过卷闸，像倒着弹的音阶。然后走廊安静了。创伤小组把她带走时，她还在哼。",
 		"The DEFT picks came through before the shutter did. The last note you hear is hers. The clinic stays dark.": "卷闸还没落下，DEFT 尖刺就穿了进来。你听见的最后一个音是她的。诊所的灯再没亮起。",
 		"The shutter drops on a singer mid-joke. Before closing, her corner calls in a woman humming at the crowd with her fingers out. You were right. Nobody pays for that.": "卷闸落下时，那个歌手的玩笑还没讲完。收工前，她的街角报警说有个女人伸着手指对人群哼歌。你是对的。但这没人付钱。",
-		"Juno goes back to her corner, humming the same three notes. You made no call. Nobody is paid for that.": "Juno 回了她的街角，哼着同样的三个音。你没做决定。这种事没人付钱。"
+		"Juno goes back to her corner, humming the same three notes. You made no call. Nobody is paid for that.": "Juno 回了她的街角，哼着同样的三个音。你没做决定。这种事没人付钱。",
+		"My eyes water when the club lights come up.": "场子里的灯一亮，我就流眼泪。",
+		"My fingers ache after a long encore.": "返场唱久了，我手指就酸。",
+		"My mic strap keeps brushing a sore spot by my port.": "麦克风背带总蹭到接口旁边的痛处。",
+		"My mood sours when I miss a note on stage.": "在台上漏一个音，我的心情就坏了。",
+		"Just here for the voice box. I've got a set tonight.": "就来修声盒，今晚还有一场。"
 	},
 	"topics": {
 		"juno:why": [

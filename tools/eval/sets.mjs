@@ -38,7 +38,7 @@ export function makeSets() {
         if (sign.evidence?.length && !sign.evidence.includes(t.id)) continue;
         for (let repeat = 0; repeat < 2; repeat++) {
           const row = item("E2", c, lang, { type:"ask", id:t.id, outcome:"answer", text:tr(c,lang,t.q) }, {speech:sign.id}, {condition, reference, sample:first});
-          if (t.first[0] === "deflect") {
+          if (t.first?.[0] === "deflect") {
             row.request.state.asked[t.id] = 1;
             row.request.state.patience--;
             row.request.conversation_history.push({role:"doctor",text:tr(c,lang,t.q)});
@@ -67,6 +67,6 @@ export function makeSets() {
       }
     }
   }
-  for (const [group, expected] of Object.entries({E1:400,E2:204,E3:120,E4:174})) if (sets[group].length !== expected) throw Error(group + " corpus count changed: " + sets[group].length);
+  for (const [group, expected] of Object.entries({E1:400,E2:204,E3:120,E4:180})) if (sets[group].length !== expected) throw Error(group + " corpus count changed: " + sets[group].length);
   return sets;
 }

@@ -6,7 +6,6 @@
   "age": 47,
   "request": "Fix stuck target overlay",
   "fee": 550,
-  "patience": 5,
   "sprite": "dana",
   "voice": {"pitch": 0.85, "rate": 0.95},
   "teaser": "A woman in a plain raincoat, a badge on her belt. She has already counted the exits.",
@@ -25,15 +24,10 @@
   "eyes": {"left": {}, "right": {}},
   "port": {"covered": true},
   "idle": {"hands": "still", "gaze": "glare"},
-  "looks": {
-    "eyes": "Left: natural. Right: a TALON, a red grid in it.",
-    "hands": "Natural hands, flat on the counter. In view.",
-    "port": "Raincoat collar turned up. Port not visible."
-  },
   "checks": {
-    "penlight": {"first": ["comply"], "insist": "comply"},
-    "grip": {"first": ["comply"], "insist": "comply"},
-    "port": {"first": ["stall", "comply"], "insist": "comply"}
+    "penlight": {"first": ["comply"]},
+    "grip": {"first": ["comply"]},
+    "port": {"first": ["stall", "comply"]}
   },
   "claims": {},
   "topics": [
@@ -43,8 +37,7 @@
       "keys": [
         "wrong", "problem", "happen", "reason", "trouble", "brings", "bring", "matter", "here", "came",
         "come", "overlay", "grid", "target", "targeting", "stuck", "eye", "talon", "red", "see"
-      ],
-      "first": ["answer"]
+      ]
     },
     {
       "id": "sleep",
@@ -52,8 +45,7 @@
       "keys": [
         "sleep", "slept", "rest", "tired", "awake", "night", "bed", "dream", "insomnia", "exhaust",
         "nap"
-      ],
-      "first": ["answer"]
+      ]
     },
     {
       "id": "duty",
@@ -61,24 +53,16 @@
       "keys": [
         "duty", "used", "use", "job", "shoot", "shot", "fire", "fired", "gun", "weapon", "arrest",
         "street", "hurt", "kill", "partner", "precinct"
-      ],
-      "deflect": "Next question, doctor.",
-      "first": ["deflect", "answer"]
+      ]
     }
   ],
-  "script": [
-    {"on": "check:port", "move": "stall"},
-    {"on": "ask:duty", "move": "deflect"}
-  ],
+  "script": [{"on": "check:port", "move": "stall"}],
   "lines": {
     "comply": ["Go ahead.", "Make it quick."],
     "comply:penlight": "Go ahead. Mind the red one.",
     "comply:port": "Fine. Off the record.",
     "stall": ["I'd rather not."],
     "stall:port": "The department seals that plate. Opening it means paperwork.",
-    "refuse": "That's a no, doctor.",
-    "deflect": ["Next question."],
-    "reassure": ["...Appreciated. It's been a long year."],
     "spent": "I've answered enough questions tonight. Your call, doctor.",
     "code": "If that was a code, I didn't hear it. I'm off duty."
   },
@@ -294,5 +278,6 @@
         "text": "Dana walks back to her car, the grid sorting the street. You made no call. Nobody is paid for that."
       }
     }
-  }
+  },
+  "complaints": {"eyes": "My eyes ache after a whole patrol in the rain.", "hands": "My hands feel stiff after I park the patrol car.", "port": "My vest presses on a sore spot near my port.", "temper": "My temper gets the better of me on a late call.", "none": "That's everything I'd put in my report."}
 }

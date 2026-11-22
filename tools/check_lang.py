@@ -55,7 +55,7 @@ SHOWN = {
     # (signs.<row>.<normal|broken>[i]) and the endings for either truth
     "cases/*.json": [
         ("name",), ("role",), ("request",), ("teaser",), ("opening", "*"),
-        ("looks", "*"), ("claims", "*", "line"), ("claims", "*", "note"),
+        ("complaints", "*"), ("claims", "*", "line"), ("claims", "*", "note"),
         ("topics", "*", "q"), ("topics", "*", "deflect"),
         ("lines", "*"), ("lines", "*", "*"), ("press_end", "*"),
         ("attack", "telegraph"), ("attack", "line"), ("exit", "*"),

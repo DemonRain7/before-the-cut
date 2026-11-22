@@ -255,14 +255,14 @@ const GLASS_OFF_HINT := "GLASS: nobody mends glass at this hour."
 const GLASS_LINE := "The fitter's arm bonds a fresh layer over the frame. %d credits off the till. Glass %d of %d."
 const THINK_HINT := "Still answering. You can look meanwhile, or decide now."
 const THINK_QUIET := 1.6          # how long a look made while the patient is answering stays readable
-const SAY_HINT := "ENTER talks. CTRL+ENTER presses. Questions cost the ASK price."
+const SAY_HINT := "ENTER sends. Talking is free."
 const SAY_FULL_HINT := "That is all you can say in one go. ENTER says it."
 const SAY_SMALL_HINT := "Small talk. Use ASK to choose a question for the card."
 const SAY_CHIPS := [{"id": "type", "key": "T", "label": "TYPE"}]
 # push-to-talk: the microphone is open only while this key (or the SPEAK button) is held
 const SPEAK_KEY := KEY_TAB
 const SPEAK_CHIPS := [{"id": "speak", "key": "TAB", "label": "SPEAK"}, {"id": "type", "key": "T", "label": "TYPE"}]
-const SAY_VOICE_HINT := "ENTER talks. CTRL+ENTER presses. ASK prices apply. Hold TAB to speak."
+const SAY_VOICE_HINT := "ENTER sends for free. Hold TAB to speak."
 const MIC_LISTEN_HINT := "Let go to stop. ESC throws it away."
 const MIC_WAIT_HINT := "ESC throws it away."
 const MIC_DONE_HINT := "Check the words. ENTER says it. ESC takes it back."
@@ -328,7 +328,7 @@ var _beat_clock := 0.0
 var _beat_pending := false
 var _beat_opening_done := false
 var _beat_revision := 0
-var _reading_choice: Dictionary = {}
+var _break_confirmation := false
 var _service_has_voice: bool = true
 var _service_is_mock: bool = false
 var start_muted: bool = false
@@ -1070,7 +1070,7 @@ func _answer_pending() -> bool:
 
 ## Every new action puts away whatever was in hand and stops the sequence that was running.
 func _begin_action() -> int:
-	_reading_choice.clear()
+	_break_confirmation = false
 	if state == State.EXAM:
 		_beat_opening_done = true
 	_close_scope(true)
@@ -1090,34 +1090,14 @@ func _sync_visit() -> void:
 	clinic.set_patience(visit.patience, visit.patience_max)
 	if visit.patience == 1 and visit.in_exam():
 		_coach("lamp", LAMP_COACH_HINT)
-	var costs: Dictionary = rules.get("costs", {})
 	desk.badges.clear()
 	desk.warn.clear()
-	for t in VisitState.TOOLS:
-		var tool := str(t)
-		var status := visit.check_status(tool)
-		if status == "open":
-			continue
-		desk.badges[tool] = "-%d" % visit.check_cost(tool)
-		if status == "refused":
-			desk.warn[tool] = true
-	var open_topics := false
-	for t in visit.case_data.get("topics", []):
-		var topic: Dictionary = t
-		if not visit.answered.has(str(topic.get("id", ""))):
-			open_topics = true
-	if open_topics:
-		desk.badges["ask"] = "-%d" % int(costs.get("ask", 1))
-	# a calm-patch costs credits: the pad shows the price while there are patches left
-	if visit.reassure_left <= 0:
-		desk.badges["calm"] = "x0"
-	elif visit.reassure_cost() > 0:
-		var price := Lang.tf("%dcr", [visit.reassure_cost()])      # [shown] its price in credits
-		desk.badges["calm"] = price
-	else:
-		desk.badges["calm"] = "x%d" % visit.reassure_left
-	desk.badges["press"] = Lang.t("BREAK") if visit.press_breaks() else "-%d" % visit.press_cost()       # the push that breaks them takes every lamp left
-	desk.enabled["calm"] = visit.reassure_left > 0
+	for tool in VisitState.TOOLS:
+		var row: String = VisitState.TOOL_ROW[tool]
+		var tag := "? " if visit.complaints_told.has(row) else ""
+		desk.badges[tool] = tag + ("-%d" % visit.check_cost(tool) if not visit.granted.has(tool) else "")
+	desk.warn["press"] = visit.press_breaks()
+	desk.badges["press"] = Lang.t("BREAK") if visit.press_breaks() else ("? " if "temper" in visit.complaints_told else "") + "-%d" % visit.press_cost()
 	clinic.till = _till_now()
 
 
@@ -1385,19 +1365,11 @@ func _pad_hint(pad: String) -> String:
 			var status := visit.check_status(pad)
 			if status == "open":
 				return Lang.tf("%s Free now.", [Lang.t(str(TOOL_WHAT[pad]))])
-			if status == "refused":
-				return Lang.tf("%s refused. Insist (costs %d) or CALM them first.", [Lang.t(str(TOOL_LABEL[pad])), visit.check_cost(pad)])
 			return Lang.tf("%s Costs %d patience.", [Lang.t(str(TOOL_WHAT[pad])), visit.check_cost(pad)])
 		"ask":
-			return Lang.tf("ASK: pick a question. A new answer costs %d patience.", [int(costs.get("ask", 1))])
-		"calm":
-			var gain := int((rules.get("reassure", {}) as Dictionary).get("gain", 1))
-			var price := visit.reassure_cost()
-			if visit.reassure_left <= 0:
-				return CALM_GONE_HINT
-			if price <= 0:
-				return Lang.tf(CALM_FREE_HOLD_HINT if _leave_said else CALM_FREE_HINT, [gain, visit.reassure_left])
-			return Lang.tf(CALM_HOLD_HINT if _leave_said else CALM_HINT, [price, gain, visit.reassure_left])
+			return "Listed questions are free."
+		"complain":
+			return "What's bothering you?"
 		"press":
 			if visit.press_breaks():
 				return Lang.tf(PRESS_LAST_HINT, [int(rules.scoring.get("press_catch_bonus", 0))])
@@ -1576,7 +1548,7 @@ func _night_for_shift() -> Dictionary:
 		if not CaseDB.night_order(drawn).is_empty():
 			return drawn
 		night_name = "A"
-	return (nights.get(night_name, {}) as Dictionary).duplicate(true)
+	return ShiftState.draw_complaints((nights.get(night_name, {}) as Dictionary).duplicate(true), templates, rules, shift_seed, true)
 
 
 func _start_shift() -> void:
@@ -1592,6 +1564,18 @@ func _start_shift() -> void:
 	# only the entries that are fair among tonight's visitors: no clue alone gives anybody away
 	var pool := CaseDB.fair_contacts(contact_data, cases, shift.order)
 	# each entry is given an alias and a code for tonight only (contacts.json version 2)
+	if training:
+		# Keep all seeded cases intact. If visitor two has no fair pair of clues,
+		# call a later fair courier in that slot; the opening patient stays protected.
+		var slot := clampi(int(contact_rules.training_slot) - 1, 0, shift.order.size() - 1)
+		var eligible := CaseDB.fair_couriers(contact_data, cases, shift.order)
+		if shift.order[slot] not in eligible:
+			for i in range(slot + 1, shift.order.size()):
+				if shift.order[i] in eligible:
+					var swap: Variant = shift.order[slot]
+					shift.order[slot] = shift.order[i]
+					shift.order[i] = swap
+					break
 	shift.contacts = ShiftState.draw_contacts(rules, pool, shift.order, shift_seed, training, contact_data)
 	clipboard.set_contacts(shift.contacts, contact_data.get("clues", {}), str(contact_data.get("title", "")),
 		int(contact_rules.get("pay", 0)), int(contact_rules.get("wrong_cost", 1)))
@@ -1792,27 +1776,11 @@ func _show_upcoming() -> void:
 # ================================================================ exam actions
 
 func act_look(zone: String) -> void:
-	if not VisitState.ZONES.has(zone):
+	if not _can_decide() or not VisitState.ZONES.has(zone):
 		return
-	# a look does not interrupt: while the patient is still answering it happens beside the answer
-	var meanwhile := _can_decide() and _answer_pending()
-	if not _can_act() and not meanwhile:
-		return
-	var token := _seq
-	if meanwhile:
-		_think_quiet = THINK_QUIET
-	else:
-		token = _begin_action()
-	var before := _note_keys()
-	var res: Dictionary = visit.look(zone)
-	if not bool(res.get("ok", false)):
-		return
-	if not _mark_new_notes(before):
-		audio.play("click", 1.2, -6.0)
-	_log("look", {"zone": zone, "covered": bool(res.get("covered", false))})
-	if coach != null:
-		coach.event("look")
-	_narrate(str(ZONE_TITLE[zone]), str(res.get("text", "")), token, 0.0)
+	desk.pulse = str(CaseDB.ROW_TOOL[zone])
+	_base_hint = _pad_hint(desk.pulse)
+	audio.play("click")
 
 
 func act_tool(tool: String) -> void:
@@ -1827,18 +1795,12 @@ func act_tool(tool: String) -> void:
 		_open_scope(tool)
 		_roll_surprise(0)
 		return
-	if visit.sealed_repeat(tool):
-		visit.record.append("action", "check:%s:sealed" % tool)
-		_base_hint = Lang.t("Sealed. CALM opens it.")
-		return
 	if visit.patience < visit.check_cost(tool):
 		_spent(token)
 		return
 	var before := _note_keys()
 	var event := {"type": "check", "id": tool}
-	var outcome := visit.check_outcome(tool)
-	if outcome != "":
-		event["outcome"] = outcome
+	event["outcome"] = "grant"
 	var d: Dictionary = await _decide(event, visit.legal_moves_for_check(tool), str(TOOL_ASK[tool]), token)
 	if d.is_empty():
 		return
@@ -1859,14 +1821,6 @@ func act_tool(tool: String) -> void:
 				_open_scope(tool)
 			if ok:
 				_roll_surprise(int(res.get("cost", 0)))      # the close-up is no shelter: they can come at the glass during it
-		"explained":
-			_base_hint = Lang.tf("They gave a reason instead. Insist (costs %d) or CALM them.", [visit.check_cost(tool)])
-			_roll_surprise(int(res.get("cost", 0)))
-			_patient_line(line, token, 1.0)
-		"refused":
-			_base_hint = Lang.t("Sealed. CALM opens it.") if visit.sealed_repeat(tool) else Lang.tf("They said no. Insist (costs %d) or CALM them first.", [visit.check_cost(tool)])
-			_roll_surprise(int(res.get("cost", 0)))
-			_patient_line(line, token, 1.0)
 		"spent":
 			_spent(token)
 
@@ -1938,7 +1892,7 @@ func _start_leaving(token: int) -> void:
 	_leave_said = true
 	_leave_idle = 0.0
 	_leave_t = float(visit.leave_ms()) / 1000.0
-	_log("leaving", {"wait_ms": visit.leave_ms(), "reassure_left": visit.reassure_left})
+	_log("leaving", {"wait_ms": visit.leave_ms()})
 	audio.play("beep_low")
 	var lines: Dictionary = visit.case_data.get("lines", {})
 	_patient_line(str(lines.get("spent", "")), token, 0.0)
@@ -1955,7 +1909,7 @@ func _update_leaving(delta: float) -> void:
 		_leave_idle = 0.0
 		clinic.leaving = -1.0
 		return
-	var busy := _thinking or _lock or clinic.scope.is_open() or _mic_state != "" or guide.is_open()
+	var busy := _thinking or _lock or clinic.scope.is_open() or _mic_state != "" or guide.is_open() or dialogue.input_open or dialogue.has_menu() or dialogue.typing or dialogue.waiting or clipboard.sheet_open or clipboard.card_open or clipboard.list_open or _quit_night.visible or _held != "" or _call_armed > 0.0
 	if not _leave_said:
 		clinic.leaving = -1.0
 		if busy or dialogue.typing or dialogue.waiting:
@@ -1985,7 +1939,7 @@ func _gave_up() -> void:
 	clinic.leaving = -1.0
 	_leave_t = -1.0
 	_leave_said = false
-	_log("gave_up", {"reassured": visit.reassure_used})
+	_log("gave_up", {})
 	var exit: Dictionary = visit.case_data.get("exit", {})
 	var ok: bool = await _patient_line(str(exit.get("gave_up", "")), token, 0.6)
 	if not ok:
@@ -2066,7 +2020,7 @@ func act_ask_menu() -> void:
 		var id := str(topic.get("id", ""))
 		var known := visit.answered.has(id)
 		options.append({"id": id, "label": str(topic.get("q", "")), "dim": known,
-			"tag": "asked" if known else "-%d" % visit.ask_cost(id)})      # [shown] "asked" beside a question
+			"tag": "asked" if known else ""})      # [shown] "asked" beside a question
 	dialogue.set_menu("ASK", options)
 	_base_hint = "Pick a question. Right-click closes the list."
 	audio.play("click")
@@ -2080,9 +2034,6 @@ func act_ask(id: String, said: String = "", fallback: String = "") -> void:
 	if topic.is_empty():
 		return
 	var token := _begin_action()
-	if visit.patience < visit.ask_cost(id):
-		_spent(token)
-		return
 	var before := _note_keys()
 	var question := said if said != "" else str(topic.get("q", ""))
 	var legal := visit.legal_moves_for_ask(id)
@@ -2102,61 +2053,42 @@ func act_ask(id: String, said: String = "", fallback: String = "") -> void:
 		coach.event("talk")
 	if not await _show_reaction(d, token):
 		return
-	match result:
-		"answered":
-			_mark_new_notes(before)
-			_roll_surprise(int(res.get("cost", 0)))
-			_patient_line(str(res.get("line", "")), token, 0.0)
-		"deflected":
-			_base_hint = Lang.t("They dodged it. Ask the same thing again and they answer.")
-			if said != "":
-				_base_hint = Lang.tf("Asked as: %s", [Lang.t(str(topic.q))]) + " " + _base_hint
-			_roll_surprise(int(res.get("cost", 0)))
-			_patient_line(str(d.get("line", "")), token, 0.0)
-		"spent":
-			_spent(token)
+	if result == "answered":
+		_mark_new_notes(before)
+		_patient_line(str(res.line), token, 0.0)
 
 
-func act_reassure() -> void:
+func act_complain(row: String = "", said: String = "", idle: bool = false) -> void:
 	if not _can_act():
 		return
-	var token := _begin_action()
-	var used := visit.reassure_used
-	if visit.reassure_left <= 0:
-		audio.play("beep_low")
-		return
-	var d: Dictionary = await _decide({"type": "reassure", "id": "calm"}, [], str(REASSURE_LINES[mini(used, REASSURE_LINES.size() - 1)]), token)
-	if d.is_empty():
-		return
-	var held := visit.is_spent()      # they were on their way out: this keeps them at the counter
-	var res: Dictionary = visit.reassure()
-	if str(res.get("result", "")) != "ok":
-		audio.play("beep_low")
-		return
+	var token := _seq if idle else _begin_action()
+	var before := _note_keys()
+	if not idle:
+		var question := Lang.t("What's bothering you?") if said == "" else said
+		if said == "":
+			_doctor_say(question, true)
+		visit.record.append("doctor", question)
+	var result := visit.complain(row, 1 if idle else -1)
+	if not result.rows.is_empty():
+		_mark_new_notes(before)
+		if coach != null:
+			coach.event("complaint")
 	_sync_visit()
-	_log("reassure", {"patience": visit.patience, "held": held, "cost": int(res.get("cost", 0)), "calm_spent": visit.calm_spent})
-	audio.play("calm")
-	if int(res.get("cost", 0)) > 0:
-		audio.play("cash", 0.7, -10.0)      # the patch comes out of the till
-	if coach != null:
-		coach.event("talk")
-	if not await _show_reaction(d, token):
-		return
-	if rig != null:
-		rig.soften()
-	_roll_surprise(0, true)
-	_patient_line(str(d.get("reply", "")), token, 0.0)
+	_log("complaint", {"rows":result.rows, "idle":idle})
+	_patient_line(result.line, token, 0.0)
 
 
 ## Pressure dialogue is autonomous; existing physical attack choreography remains in VisitState.
-func act_press(said: String = "") -> void:
+func act_press(confirmed: bool = false) -> void:
 	if not _can_act():
 		return
 	var token := _begin_action()
-	if not visit.can_pay_press():
-		_base_hint = Lang.tf("PRESS needs %d lamps.", [int(rules.costs.press)])
+	if visit.press_breaks() and not confirmed:
+		_break_confirmation = true
+		dialogue.set_menu("BREAK", [{"id":"break", "label":"Push again. SPACE drops the shutter.", "tag":""}, {"id":"cancel", "label":"Step back", "tag":""}])
+		_base_hint = _pad_hint("press")
 		return
-	var question := said if said != "" else Lang.t(str(PRESS_LINES[mini(visit.press_count, PRESS_LINES.size() - 1)]))
+	var question := Lang.t(str(PRESS_LINES[1 if visit.press_breaks() else 0]))
 	var d := {}
 	if visit.press_breaks():
 		visit.record.append("doctor", question)
@@ -2209,48 +2141,11 @@ func act_say(text: String) -> void:
 	_lock = false
 	_log("intent", {"source": reading.source, "topic": reading.topic, "chars": text.length(), "code": reading.reason})
 	if str(reading.topic) != "":
-		var cost := visit.ask_cost(str(reading.topic))
-		if agent.mode == "model" and cost > 0:
-			_offer_reading(text, reading)
-			return
 		_log("say", {"source": reading.source, "topic": reading.topic, "chars": text.length()})
 		await act_ask(str(reading.topic), text, str(reading.reason))
 		return
-	if agent.mode == "model" and reading.get("intent") == "unclear":
-		_offer_reading(text, reading)
-		return
 	await _free_conversation(text, reading, token)
 
-
-func _offer_reading(text: String, reading: Dictionary) -> void:
-	_reading_choice = {"text":text, "reading":reading.duplicate(true), "token":_seq}
-	var options: Array = []
-	if reading.topic != "":
-		options.append({"id":"confirm", "label":str(visit.topic(reading.topic).q), "tag":"-%d" % visit.ask_cost(reading.topic)})
-	options.append({"id":"chat", "label":"Say it as small talk", "tag":"0"})
-	options.append({"id":"pick", "label":"Choose a listed question", "tag":""})
-	dialogue.set_menu("YOUR MEANING", options)
-	_base_hint = "ENTER picks the first line. Click another or ESC to cancel."
-
-
-func _choose_reading(id: String) -> void:
-	if _reading_choice.is_empty() or not dialogue.has_menu():
-		return
-	var pending := _reading_choice.duplicate(true)
-	_reading_choice.clear()
-	dialogue.clear_menu()
-	if pending.token != _seq or not _can_act():
-		return
-	var reading: Dictionary = pending.reading
-	match id:
-		"confirm":
-			_log("say", {"source":reading.source, "topic":reading.topic, "chars":str(pending.text).length()})
-			act_ask(reading.topic, pending.text, reading.reason)
-		"chat":
-			reading.intent = "other"
-			_free_conversation(pending.text, reading, _begin_action())
-		"pick":
-			act_ask_menu()
 
 
 func _free_conversation(text: String, reading: Dictionary, token: int) -> void:
@@ -2322,9 +2217,7 @@ func _say_key(keycode: int, unicode: int, control: bool = false) -> void:
 	match keycode:
 		KEY_ENTER, KEY_KP_ENTER:
 			var text := dialogue.input_text.strip_edges()
-			if control:
-				act_press(text)
-			elif text == "":
+			if text == "":
 				act_cancel()
 			else:
 				act_say(text)
@@ -3912,8 +3805,8 @@ func _key_press(keycode: int, unicode: int, control: bool) -> void:
 	if keycode == KEY_F10 and state not in [State.TITLE, State.REPORT]:
 		_offer_quit_night()
 		return
-	if state == State.EXAM and not guide.is_open() and not _reading_choice.is_empty() and dialogue.has_menu() and keycode in [KEY_ENTER, KEY_KP_ENTER]:
-		_choose_reading(dialogue.menu_id(0))
+	if _break_confirmation and dialogue.has_menu() and keycode in [KEY_ENTER, KEY_KP_ENTER]:
+		act_press(true)
 		return
 	if keycode == KEY_F11:
 		act_fullscreen(not fullscreen)
@@ -4124,10 +4017,13 @@ func _exam_click(pos: Vector2) -> void:
 	if dialogue.has_menu():
 		var i := dialogue.menu_index_at(pos)
 		if i >= 0:
-			if _reading_choice.is_empty():
-				act_ask(dialogue.menu_id(i))
+			if _break_confirmation:
+				if dialogue.menu_id(i) == "break":
+					act_press(true)
+				else:
+					act_cancel()
 			else:
-				_choose_reading(dialogue.menu_id(i))
+				act_ask(dialogue.menu_id(i))
 			return
 	var pad := desk.pad_at(pos)
 	if pad != "":
@@ -4161,8 +4057,8 @@ func _click_pad(pad: String) -> void:
 			act_tool(pad)
 		"ask":
 			act_ask_menu()
-		"calm":
-			act_reassure()
+		"complain":
+			act_complain()
 		"press":
 			act_press()
 		"treat":
@@ -4206,7 +4102,7 @@ func _answer_quit_night(discard: bool) -> void:
 		_mic_drop("menu")
 		_beat_pending = false
 		_beat_opening_done = false
-		_reading_choice.clear()
+		_break_confirmation = false
 		_thinking = false
 		_lock = false
 		if guide.is_open():
@@ -4238,7 +4134,11 @@ func _beat_activity() -> void:
 
 
 func _beat_quiet() -> bool:
-	return not _quit_night.visible and beats_enabled and _service_has_beats and state == State.EXAM and visit != null and visit.in_exam() and not visit.is_spent() and not _lock and not _thinking and _mic_state == "" and not dialogue.input_open and not dialogue.has_menu() and not dialogue.typing and not guide.is_open() and not _closing
+	return not _quit_night.visible and beats_enabled and (_service_has_beats or agent.mode == "script") and state == State.EXAM and visit != null and visit.in_exam() and not visit.is_spent() and not _lock and not _thinking and _mic_state == "" and not dialogue.input_open and not dialogue.has_menu() and not dialogue.typing and not guide.is_open() and not _closing
+
+
+func _has_idle_complaint() -> bool:
+	return visit != null and agent != null and agent.idle_beats_this_visit < int(rules.agent.beats.max_idle_per_visit) and agent.beats_this_visit < int(rules.agent.beats.max_per_visit) and visit.complaints_told.size() < visit.case_data.get("complaint_rows", []).size()
 
 
 func _try_beat(kind: String, tool: String = "") -> void:
@@ -4262,10 +4162,16 @@ func _try_beat(kind: String, tool: String = "") -> void:
 
 
 func _process(delta: float) -> void:
-	if _beat_opening_done and not _beat_pending and _beat_quiet() and not clinic.scope.is_open() and agent.can_beat("idle"):
+	if _beat_opening_done and not _beat_pending and _beat_quiet() and not clinic.scope.is_open() and (agent.can_beat("idle") or _has_idle_complaint()):
 		_beat_clock += delta
 		if _beat_clock >= float(rules.agent.beats.idle_seconds):
-			_try_beat("idle")
+			if _has_idle_complaint():
+				agent.idle_beats_this_visit += 1
+				agent.beats_this_visit += 1
+				_beat_clock = 0.0
+				act_complain("", "", true)
+			else:
+				_try_beat("idle")
 	_t += delta
 	_sync_ime()
 	if rig != null:
@@ -4524,9 +4430,7 @@ func _update_hint() -> void:
 		dialogue.set_hint(_alert_hint, Gfx.RED3 if fmod(_t, 0.4) < 0.28 else Gfx.RED2)
 	elif _leave_said and state == State.EXAM and visit != null and not mid_action:
 		# a patient who is on the way out outranks what the pointer is resting on
-		var last := visit.reassure_left <= 0
-		var hold := LEAVING_HINT if visit.reassure_cost() > 0 else LEAVING_FREE_HINT
-		dialogue.set_hint(LEAVING_LAST_HINT if last else hold, Gfx.RED3 if fmod(_t, 0.8) < 0.56 else Gfx.RED2)
+		dialogue.set_hint(Lang.tf("No lamps. Leaving in %d s of idle time.", [ceili(maxf(0.0, _leave_t))]), Gfx.RED3)
 	elif _hover_hint != "" and not news:
 		dialogue.set_hint(_hover_hint, Gfx.TEAL5)
 	elif _base_hint == "" and _thinking and _think_t > 0.8 and state == State.EXAM:
@@ -4747,7 +4651,6 @@ func act_say_code(id: String) -> void:
 				return
 			_lock = false
 			audio.play("beep_low", 1.1, -8.0)
-			_roll_surprise(int(res.get("cost", 0)))
 			_patient_line(str(res.get("line", "")), token, 0.0, false)
 		"drop":
 			if coach != null:
@@ -4906,10 +4809,10 @@ func _on_training_finished(was_skipped: bool) -> void:
 ## One action of the doctor's has run its course: roll whether the patient snaps (drifting
 ## only) or flares (anyone, once a visit). What comes up happens a moment later, inside
 ## whatever the doctor is doing by then.
-func _roll_surprise(cost: int = 1, calm: bool = false) -> void:
+func _roll_surprise(cost: int = 1) -> void:
 	if visit == null or state != State.EXAM or not visit.in_exam():
 		return
-	var kind := visit.roll_action(_snap_rng, cost, calm)
+	var kind := visit.roll_action(_snap_rng, cost)
 	if kind == "" or kind == _surprise or (kind == "flare" and _surprise == "snap"):
 		return
 	_surprise = kind

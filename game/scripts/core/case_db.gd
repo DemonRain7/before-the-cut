@@ -77,6 +77,14 @@ static func load_all(dir: String = DATA_DIR) -> Dictionary:
 			continue
 		for e in validate_template(t, rules, out["sheet"], out["parts"]):
 			errors.append("%s: %s" % [str(id), str(e)])
+		var zh: Variant = load_json("%s/lang/zh/cases/%s.json" % [dir, id])
+		if typeof(zh) != TYPE_DICTIONARY:
+			zh = {}
+		for row in ["eyes", "hands", "port", "temper", "none"]:
+			var line := str(t.get("complaints", {}).get(row, ""))
+			var translation := str(zh.get("strings", {}).get(line, ""))
+			if line.is_empty() or line.length() > 90 or translation.is_empty() or translation.length() > 45:
+				errors.append("%s: invalid bilingual complaint for %s." % [id, row])
 		out["templates"][str(id)] = t
 		var person := compose(t, {"truth": "stable"})
 		if not person.is_empty():
@@ -171,18 +179,9 @@ static func sign_ids(t: Dictionary, row: String, kind: String) -> Array:
 ## the eyes and the grip when insisting gets the test done, the port when it shows or insisting
 ## gets it checked, and speech and temper always.
 static func reachable_rows(t: Dictionary) -> Array:
-	var checks: Dictionary = t.get("checks", {}) if typeof(t.get("checks")) == TYPE_DICTIONARY else {}
-	var covered := false
-	if typeof(t.get("port")) == TYPE_DICTIONARY:
-		covered = bool(t["port"].get("covered", false))
-	var out: Array = []
+	var out := []
 	for row in ROWS:
-		if not ROW_TOOL.has(row):
-			out.append(row)
-			continue
-		var spec: Variant = checks.get(ROW_TOOL[row])
-		var insisted := typeof(spec) == TYPE_DICTIONARY and str(spec.get("insist", "")) == "comply"
-		if insisted or (row == "port" and not covered):
+		if not sign_ids(t, row, "broken").is_empty():
 			out.append(row)
 	return out
 
@@ -201,7 +200,7 @@ static func compose(t: Dictionary, pick: Dictionary) -> Dictionary:
 	for key in ["signs", "outcomes", "press_end"]:
 		c.erase(key)
 	c["truth"] = truth
-	var looks := _dict(c, "looks")
+	c["complaint_rows"] = (pick.get("complaints", []) as Array).duplicate()
 	var checks := _dict(c, "checks")
 	var lines := _dict(c, "lines")
 	var rows := {}
@@ -230,7 +229,7 @@ static func compose(t: Dictionary, pick: Dictionary) -> Dictionary:
 				var port := _dict(c, "port")
 				if bool(sign.get("threads", false)):
 					port["threads"] = true
-				evidence = ["check:port"] if bool(port.get("covered", false)) else ["look:port", "check:port"]
+				evidence = ["check:port"]
 			"speech":
 				var answers: Dictionary = sign.get("answers", {}) if typeof(sign.get("answers")) == TYPE_DICTIONARY else {}
 				var asked: Array = []
@@ -255,8 +254,6 @@ static func compose(t: Dictionary, pick: Dictionary) -> Dictionary:
 				evidence = ["press"]
 		if ROW_TOOL.has(row) and typeof(checks.get(ROW_TOOL[row])) == TYPE_DICTIONARY:
 			checks[ROW_TOOL[row]]["note"] = str(sign.get("note", ""))
-		if ZONES.has(row) and sign.has("look"):
-			looks[row] = str(sign["look"])
 		rows[row] = {"ok": bool(found["ok"]), "text": str(sign.get("text", "")), "evidence": evidence}
 	c["rows"] = rows
 	c["signs"] = used
@@ -392,7 +389,7 @@ static func compose_night(templates: Dictionary, night: Dictionary, parts: Dicti
 	for v in night.get("visitors", []):
 		if typeof(v) != TYPE_DICTIONARY or not templates.has(str(v.get("id", ""))):
 			continue
-		var c := compose(templates[str(v["id"])], {"truth": str(v.get("truth", "stable")), "signs": v.get("signs", {})})
+		var c := compose(templates[str(v["id"])], v)
 		if c.is_empty():
 			continue
 		resolve_parts(c, parts)
@@ -443,6 +440,17 @@ static func validate_nights(nights: Dictionary, templates: Dictionary, rules: Di
 				errors.append("%s: %s needs truth 'stable' or 'drifting'." % [where, id])
 				sound = false
 				continue
+			if v.has("complaints"):
+				var unique := {}
+				if typeof(v.complaints) != TYPE_ARRAY:
+					errors.append(where + ": complaints must be a list.")
+				else:
+					for row in v.complaints:
+						if row not in ["eyes", "hands", "port", "temper"] or unique.has(row):
+							errors.append(where + ": invalid or duplicate complaint.")
+						unique[row] = true
+					if seen.size() == 1 and unique.size() != 1:
+						errors.append(where + ": opening visitor needs exactly one complaint.")
 			var pick := {"truth": truth, "signs": v.get("signs", {})}
 			var c := compose(templates[id], pick)
 			if c.is_empty():
@@ -613,7 +621,7 @@ static func validate_rules(rules: Dictionary, sheet: Dictionary = {}) -> Array:
 	if rules.has("night"):
 		errors.append_array(_validate_night(rules, maxi(1, int(sheet.get("threshold", 1)))))
 	# the grip limit is no longer a rule: each hands model has its own (parts.json limit_ms)
-	for group in ["costs", "reassure", "attack", "scoring", "line", "patience"]:
+	for group in ["visit", "complaints", "costs", "attack", "scoring", "line", "patience"]:
 		if typeof(rules.get(group)) != TYPE_DICTIONARY:
 			errors.append("rules.json: '%s' must be an object." % group)
 	if typeof(rules.get("attack")) == TYPE_DICTIONARY:
@@ -622,8 +630,14 @@ static func validate_rules(rules: Dictionary, sheet: Dictionary = {}) -> Array:
 		errors.append("rules.json: line.per_hour must be 0 or more.")
 	if typeof(rules.get("patience")) == TYPE_DICTIONARY and int(rules["patience"].get("leave_ms", -1)) < 0:
 		errors.append("rules.json: patience.leave_ms must be 0 or more.")
-	if typeof(rules.get("reassure")) == TYPE_DICTIONARY and int(rules["reassure"].get("cost", 0)) < 0:
-		errors.append("rules.json: reassure.cost must be 0 or more (CALM never pays the doctor).")
+	if int(rules.get("visit", {}).get("lamps", 0)) < 1:
+		errors.append("visit.lamps must be positive.")
+	var leads: Dictionary = rules.get("complaints", {})
+	for key in ["broken", "normal"]:
+		if float(leads.get(key, -1)) < 0 or float(leads.get(key, 2)) > 1:
+			errors.append("complaints.%s must be a probability." % key)
+	if int(leads.get("per_reply", 0)) < 1:
+		errors.append("complaints.per_reply must be positive.")
 	errors.append_array(_validate_surprises(rules))
 	if rules.has("contacts"):
 		var contacts: Variant = rules["contacts"]
@@ -946,8 +960,6 @@ static func validate_case(c: Dictionary, rules: Dictionary, sheet: Dictionary = 
 	var drifting := truth == "drifting"
 	if int(c.get("fee", 0)) <= 0:
 		errors.append("fee must be positive.")
-	if int(c.get("patience", 0)) < 1 or int(c.get("patience", 0)) > 9:
-		errors.append("patience must be between 1 and 9.")
 	if typeof(c.get("opening")) != TYPE_ARRAY or (c["opening"] as Array).is_empty():
 		errors.append("opening must list at least one line.")
 
@@ -985,11 +997,7 @@ static func validate_case(c: Dictionary, rules: Dictionary, sheet: Dictionary = 
 	if typeof(c.get("port")) != TYPE_DICTIONARY:
 		errors.append("port must be an object with 'covered'.")
 
-	# looks and checks
-	var looks: Dictionary = c.get("looks", {}) if typeof(c.get("looks")) == TYPE_DICTIONARY else {}
-	for zone in ZONES:
-		if str(looks.get(zone, "")) == "":
-			errors.append("looks.%s is missing." % zone)
+	# Reactions are flavour. Every completed test supplies a reading.
 	var claims: Dictionary = c.get("claims", {}) if typeof(c.get("claims")) == TYPE_DICTIONARY else {}
 	var checks: Dictionary = c.get("checks", {}) if typeof(c.get("checks")) == TYPE_DICTIONARY else {}
 	for tool in TOOLS:
@@ -999,8 +1007,6 @@ static func validate_case(c: Dictionary, rules: Dictionary, sheet: Dictionary = 
 			continue
 		if str(spec.get("note", "")) == "":
 			errors.append("checks.%s.note is missing." % tool)
-		if not ["comply", "refuse"].has(str(spec.get("insist", ""))):
-			errors.append("checks.%s.insist must be 'comply' or 'refuse'." % tool)
 		var first: Variant = spec.get("first")
 		if typeof(first) != TYPE_ARRAY or (first as Array).is_empty():
 			errors.append("checks.%s.first must list at least one move." % tool)
@@ -1032,12 +1038,7 @@ static func validate_case(c: Dictionary, rules: Dictionary, sheet: Dictionary = 
 			for key in ["id", "q", "a", "note"]:
 				if str(t.get(key, "")) == "":
 					errors.append("topic '%s' needs '%s'." % [tid, key])
-			for m in t.get("first", ["answer"]):
-				if not ["answer", "deflect"].has(str(m)):
-					errors.append("topic '%s' has unknown move '%s'." % [tid, str(m)])
-				if str(m) == "deflect" and str(t.get("deflect", "")) == "" and not lines.has("deflect"):
-					errors.append("topic '%s' can deflect but has no deflect line." % tid)
-	for key in ["comply", "stall", "refuse", "reassure", "spent", "code"]:
+	for key in ["comply", "stall", "spent", "code"]:
 		if not lines.has(key):
 			errors.append("lines.%s is missing." % key)
 	# the shout at the glass anyone may give once a visit (rules.json "flare")
@@ -1121,14 +1122,10 @@ static func validate_case(c: Dictionary, rules: Dictionary, sheet: Dictionary = 
 			var target := key.get_slice(":", 1)
 			if key == "press":
 				reachable = true
-			elif k == "look" and ZONES.has(target):
-				reachable = true
 			elif k == "ask" and topic_ids.has(target):
 				reachable = true
 			elif k == "check" and TOOLS.has(target):
-				var spec_check: Dictionary = checks.get(target, {})
-				if str(spec_check.get("insist", "")) == "comply":
-					reachable = true
+				reachable = true
 			else:
 				errors.append("rows.%s has unknown evidence '%s'." % [row, key])
 		if not ok:

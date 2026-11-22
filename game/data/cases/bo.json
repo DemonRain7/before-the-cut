@@ -6,7 +6,6 @@
   "age": 29,
   "request": "Tune misfiring piston fist",
   "fee": 320,
-  "patience": 6,
   "sprite": "bo",
   "voice": {"pitch": 0.7, "rate": 1.05},
   "teaser": "A broad young man with a split lip and a grin. One arm is chrome to the elbow.",
@@ -25,14 +24,10 @@
   "eyes": {"left": {}, "right": {}},
   "port": {"covered": false},
   "idle": {"hands": "spasm", "gaze": "wander"},
-  "looks": {
-    "eyes": "Natural eyes. A fresh cut over the left.",
-    "hands": "PISTON fist, chrome to the elbow. It jerks."
-  },
   "checks": {
-    "penlight": {"first": ["explain:knock", "comply"], "insist": "comply"},
-    "grip": {"first": ["comply"], "insist": "comply"},
-    "port": {"first": ["comply"], "insist": "comply"}
+    "penlight": {"first": ["explain:knock", "comply"]},
+    "grip": {"first": ["comply"]},
+    "port": {"first": ["comply"]}
   },
   "claims": {
     "knock": {
@@ -49,8 +44,7 @@
         "wrong", "problem", "happen", "reason", "trouble", "brings", "bring", "matter", "here", "came",
         "come", "fist", "piston", "misfire", "misfiring", "fire", "fires", "late", "punch", "arm",
         "bell"
-      ],
-      "first": ["answer"]
+      ]
     },
     {
       "id": "sleep",
@@ -58,8 +52,7 @@
       "keys": [
         "sleep", "slept", "rest", "tired", "awake", "night", "bed", "dream", "insomnia", "exhaust",
         "nap"
-      ],
-      "first": ["answer"]
+      ]
     },
     {
       "id": "cage",
@@ -67,24 +60,16 @@
       "keys": [
         "hurt", "outside", "cage", "fight", "fights", "fought", "someone", "anyone", "people", "street",
         "temper", "violent", "dangerous", "attack", "hit"
-      ],
-      "deflect": "Ha! Next question, pal.",
-      "first": ["deflect", "answer"]
+      ]
     }
   ],
-  "script": [
-    {"on": "check:penlight", "move": "explain:knock"},
-    {"on": "ask:cage", "move": "deflect"}
-  ],
+  "script": [{"on": "check:penlight", "move": "explain:knock"}],
   "lines": {
     "comply": ["Sure thing, pal.", "Easy."],
     "comply:penlight": "Go on, then. Shine away.",
     "comply:grip": "Careful, pal. I'll go easy.",
     "comply:port": "Have a look. It's ugly in there.",
     "stall": ["Aw, do I have to?"],
-    "refuse": "Nah, pal.",
-    "deflect": ["Ha. Next."],
-    "reassure": ["Thanks, pal. You're all right."],
     "spent": "Pal, I've got training. Tune it or don't.",
     "code": "Huh? Is that a fight move?"
   },
@@ -153,8 +138,7 @@
         {
           "id": "calm",
           "text": "Scars where the chrome meets skin, but the skin is calm.",
-          "note": "Socket at the chrome seam. Calm skin.",
-          "look": "Socket at the chrome seam. Calm skin."
+          "note": "Socket at the chrome seam. Calm skin."
         }
       ],
       "broken": [
@@ -162,7 +146,6 @@
           "id": "threads",
           "text": "Dark threads climb the arm from the chrome seam.",
           "note": "Seam socket. Dark threads under skin.",
-          "look": "Seam socket. Dark threads under skin.",
           "threads": true
         }
       ]
@@ -302,5 +285,6 @@
         "text": "Bo jogs off toward Fifth, the PISTON twitching. You made no call. Nobody is paid for that."
       }
     }
-  }
+  },
+  "complaints": {"eyes": "My eyes burn under the ring lights.", "hands": "My hands ache inside the wraps after a bout.", "port": "My port stings when my corner towels me off.", "temper": "My fuse runs short waiting for the bell.", "none": "That's all I came in with, doc."}
 }

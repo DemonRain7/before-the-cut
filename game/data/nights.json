@@ -581,6 +581,8 @@
           }
         }
       ]
-    }
+    },
+    "K": {"visitors": [{"id": "kip", "truth": "stable", "signs": {}, "complaints": ["eyes"]}, {"id": "rook", "truth": "stable", "signs": {"hands": "locks"}, "complaints": ["hands"]}, {"id": "vale", "truth": "drifting", "signs": {"eyes": "dead", "hands": "holds"}, "complaints": ["eyes", "hands"]}, {"id": "juno", "truth": "drifting", "signs": {"speech": "we", "port": "threads", "temper": "flat"}, "complaints": ["port"]}, {"id": "maren", "truth": "stable", "signs": {}, "complaints": ["port", "temper"]}]},
+    "L": {"visitors": [{"id": "kip", "truth": "stable", "signs": {}, "complaints": ["port"]}, {"id": "rook", "truth": "drifting", "signs": {"hands": "locks", "temper": "flat"}, "complaints": ["hands"]}, {"id": "vale", "truth": "stable", "signs": {"hands": "holds"}, "complaints": ["hands", "eyes"]}, {"id": "juno", "truth": "drifting", "signs": {"eyes": "stray", "hands": "holds", "port": "threads", "temper": "flat"}, "complaints": []}, {"id": "maren", "truth": "drifting", "signs": {"speech": "lost", "eyes": "wide"}, "complaints": ["temper"]}]}
   }
 }

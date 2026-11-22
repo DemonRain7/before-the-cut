@@ -156,12 +156,7 @@ func _with_script(base: Dictionary, event: Dictionary, state: Dictionary, option
 		pick = scripted.decide(case_data, event, state, options)
 	elif kind == "say":
 		# a sentence the script has no answer for: the offline patient declines in character
-		var dodge := scripted.line_for(case_data, "deflect", event, state)
-		if dodge != "":
-			pick["line"] = dodge
-	elif kind == "reassure":
-		var lines: Variant = case_data.get("lines", {}).get("reassure", "All right.")
-		pick["line"] = str(lines[0]) if typeof(lines) == TYPE_ARRAY and not lines.is_empty() else str(lines)
+		pick["line"] = str(case_data.get("complaints", {}).get("none", pick.line))
 	elif kind == "press":
 		var reactions: Array = case_data.get("press", [])
 		if not reactions.is_empty():

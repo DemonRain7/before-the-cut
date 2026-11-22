@@ -71,11 +71,11 @@ try {
 		const q = c.topics.find(t => t.id === "sleep") || c.topics[0];
 		const speech = c.signs.speech[i % 2 ? "broken" : "normal"][0];
 		const temper = c.signs.temper[i % 3 ? "normal" : "broken"][0];
-		const hearing = { patience: c.patience, patience_max: c.patience, granted: [], refusals: {}, reassured: [], claims: [], asked: {}, press_count: 0, reassure_used: 0, history: [] };
+		const hearing = { patience: rules.visit.lamps, patience_max: rules.visit.lamps, granted: [], refusals: {}, reassured: [], claims: [], asked: {}, press_count: 0, reassure_used: 0, history: [] };
 		const history = c.opening.map(text => ({ role:"patient", text:zh ? (translations[text] || text) : text }));
 		const actions = [
 			{ type:"check", id:"grip", text:zh ? "请握一下把手。" : "Please hold the handle." },
-			{ type:"ask", id:q.id, outcome:q.first[0] === "deflect" ? "deflect" : "answer", text:zh ? (translations[q.q] || q.q) : q.q },
+			{ type:"ask", id:q.id, outcome:"answer", text:zh ? (translations[q.q] || q.q) : q.q },
 			{ type:"say", id:"free", text:zh ? "想聊聊音乐吗？" : "Would you like to talk about music?" },
 			{ type:"press", id:"challenge", text:zh ? "请你说清楚。" : "Give me a straight answer." },
 		];
@@ -125,7 +125,7 @@ try {
 				hearing.patience -= rules.costs.check;
 				if (data.cooperates) hearing.granted.push("grip"); else hearing.refusals.grip = 1;
 			} else if (j === 1) {
-				hearing.asked[q.id] = 1; hearing.patience -= rules.costs.ask;
+				hearing.asked[q.id] = 1;
 			}
 		}
 		casesSeen.push(id);

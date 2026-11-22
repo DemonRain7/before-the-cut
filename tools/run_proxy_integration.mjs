@@ -116,8 +116,7 @@ try {
   for (const [language, words] of [['en','Say it clearly.'], ['zh','说清楚。']]) {
     const fair = prompts.filter(p => p.fair && p.language === language);
     wire.push([language + ' small talk has no sign sentences', fair.some(p => p.event.type === 'say' && !p.tonight)]);
-    wire.push([language + ' typed pressure reaches the model once with earned signs', fair.filter(p => p.event.type === 'press' &&
-      p.event.text === words && p.signs.temper && p.signs.speech && p.matching_prompt).length === 1]);
+    wire.push([language + ' typed pressure remains speech', fair.some(p => p.event.type === 'say' && p.event.text === words && !p.signs.temper) && fair.some(p => p.event.type === 'press' && p.event.text !== words && p.signs.temper && p.signs.speech)]);
   }
   const matrix = prompts.filter(p => p.matrix);
   for (const c of Object.values(cases)) {

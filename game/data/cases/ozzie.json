@@ -6,7 +6,6 @@
   "age": 63,
   "request": "Fix slipping cleaver hand",
   "fee": 220,
-  "patience": 7,
   "sprite": "ozzie",
   "voice": {"pitch": 0.78, "rate": 0.92},
   "teaser": "An old man in a stained apron smells of broth and rain. One hand is wrapped in a towel.",
@@ -25,14 +24,10 @@
   "eyes": {"left": {}, "right": {}},
   "port": {"covered": false},
   "idle": {"hands": "work", "gaze": "soft"},
-  "looks": {
-    "eyes": "Natural eyes, milky at the rims. He squints.",
-    "hands": "CHOP hand, the blade folded in. Old burns."
-  },
   "checks": {
-    "penlight": {"first": ["comply"], "insist": "comply"},
-    "grip": {"first": ["comply"], "insist": "comply"},
-    "port": {"first": ["comply"], "insist": "comply"}
+    "penlight": {"first": ["comply"]},
+    "grip": {"first": ["comply"]},
+    "port": {"first": ["comply"]}
   },
   "claims": {},
   "topics": [
@@ -43,8 +38,7 @@
         "wrong", "problem", "happen", "reason", "trouble", "brings", "bring", "matter", "here", "came",
         "come", "hand", "slip", "slipping", "close", "closes", "late", "blade", "knife", "cleaver",
         "chop", "finger"
-      ],
-      "first": ["answer"]
+      ]
     },
     {
       "id": "sleep",
@@ -52,8 +46,7 @@
       "keys": [
         "sleep", "slept", "rest", "tired", "awake", "night", "bed", "dream", "insomnia", "exhaust",
         "nap"
-      ],
-      "first": ["answer"]
+      ]
     },
     {
       "id": "alone",
@@ -61,23 +54,16 @@
       "keys": [
         "alone", "family", "wife", "kids", "children", "home", "help", "friend", "friends", "after",
         "care", "lonely", "live", "anyone", "somebody"
-      ],
-      "deflect": "Ah, don't you worry about me, chief.",
-      "first": ["deflect", "answer"]
+      ]
     }
   ],
-  "script": [
-    {"on": "ask:alone", "move": "deflect"}
-  ],
+  "script": [],
   "lines": {
     "comply": ["Sure, chief.", "Whatever you say."],
     "comply:penlight": "Go on. Not much left to see in there.",
     "comply:grip": "Mind the blade, chief. It's folded.",
     "comply:port": "Here. Bit greasy, sorry.",
     "stall": ["Ah, do we have to?"],
-    "refuse": "No, chief. Leave it.",
-    "deflect": ["Ah, never mind that."],
-    "reassure": ["You're a good one, chief. Like my old doctor."],
     "spent": "Chief, the broth's boiling dry. Yes or no?",
     "code": "Eh? I only speak noodle, chief."
   },
@@ -146,8 +132,7 @@
         {
           "id": "calm",
           "text": "Grease and old burns round the socket. Calm skin.",
-          "note": "Wrist socket, greasy. Calm skin.",
-          "look": "Wrist socket, greasy. Calm skin."
+          "note": "Wrist socket, greasy. Calm skin."
         }
       ],
       "broken": [
@@ -155,7 +140,6 @@
           "id": "threads",
           "text": "Dark threads spread up the arm from the socket.",
           "note": "Greasy socket. Dark threads under skin.",
-          "look": "Greasy socket. Dark threads under skin.",
           "threads": true
         }
       ]
@@ -295,5 +279,6 @@
         "text": "Ozzie shuffles back to the cart, the blade hand tapping time. You made no call. Nobody is paid for that."
       }
     }
-  }
+  },
+  "complaints": {"eyes": "My eyes smart over the stockpot.", "hands": "My fingers ache by the last bowl.", "port": "My apron strap catches on my port.", "temper": "My temper boils over when the orders pile up.", "none": "That's it. I've still got broth on the stove."}
 }

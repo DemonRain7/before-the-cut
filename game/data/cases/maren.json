@@ -6,7 +6,6 @@
   "age": 54,
   "request": "Tune welding-arm servos",
   "fee": 400,
-  "patience": 6,
   "sprite": "maren",
   "voice": {"pitch": 1.0, "rate": 0.8},
   "teaser": "An older woman in work gear, waiting very patiently. Her gloves are still on.",
@@ -19,15 +18,10 @@
   "eyes": {"left": {}, "right": {}},
   "port": {"covered": true},
   "idle": {"hands": "work", "gaze": "soft"},
-  "looks": {
-    "eyes": "Natural eyes, tired. Old flash burns.",
-    "hands": "Gloved SEAM rig. Left closes on nothing.",
-    "port": "Glove cuff covers the wrist. Port not visible."
-  },
   "checks": {
-    "penlight": {"first": ["comply"], "insist": "comply"},
-    "grip": {"first": ["comply"], "insist": "comply"},
-    "port": {"first": ["comply"], "insist": "comply"}
+    "penlight": {"first": ["comply"]},
+    "grip": {"first": ["comply"]},
+    "port": {"first": ["comply"]}
   },
   "claims": {},
   "topics": [
@@ -37,8 +31,7 @@
       "keys": [
         "wrong", "problem", "happen", "reason", "trouble", "brings", "bring", "matter", "here", "came",
         "come", "working", "work", "mean", "hands", "weld", "servo", "tune", "stop", "keep"
-      ],
-      "first": ["answer"]
+      ]
     },
     {
       "id": "sleep",
@@ -46,8 +39,7 @@
       "keys": [
         "sleep", "slept", "rest", "tired", "awake", "night", "bed", "dream", "insomnia", "exhaust",
         "nap"
-      ],
-      "first": ["answer"]
+      ]
     },
     {
       "id": "fear",
@@ -55,19 +47,14 @@
       "keys": [
         "frighten", "afraid", "scare", "scared", "fear", "worry", "worried", "terrif", "nervous",
         "trust", "hands"
-      ],
-      "deflect": "Oh, I don't like to complain.",
-      "first": ["deflect", "answer"]
+      ]
     }
   ],
-  "script": [{"on": "ask:fear", "move": "deflect"}],
+  "script": [],
   "lines": {
     "comply": ["Of course.", "Whatever you need."],
     "comply:port": "Of course. Let me get the glove.",
     "stall": ["If you don't mind, I'd rather not."],
-    "refuse": "Please. Not that one.",
-    "deflect": ["It isn't worth your time."],
-    "reassure": ["Thank you, dear. You're kind."],
     "spent": "I shouldn't keep you. Just tell me, doctor.",
     "code": "I'm sorry, dear. I don't follow."
   },
@@ -282,5 +269,6 @@
         "text": "\"Never mind, dear.\" Maren goes back to the yard with hands that do not listen to her. You made no call. Nobody is paid for that."
       }
     }
-  }
+  },
+  "complaints": {"eyes": "My eyes feel gritty after the welding booth.", "hands": "My hands ache when I put the torch down.", "port": "My port feels raw after a shift in the heat.", "temper": "My temper frays on the last weld of the night.", "none": "Nothing else to put on the work order."}
 }

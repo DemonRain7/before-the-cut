@@ -133,7 +133,31 @@ static func draw_night(db: Dictionary, p_seed: int, first_of_session: bool) -> D
 					if not worn.is_empty():
 						signs[row] = worn[wear_rng.randi_range(0, worn.size() - 1)]
 		visitors.append({"id": ids[i], "truth": "drifting" if drifting.has(i) else "stable", "signs": signs})
-	return {"name": "", "visitors": visitors}
+	return draw_complaints({"name":"", "visitors":visitors}, templates, p_rules, p_seed, steady_first)
+
+
+## Give fixed and drawn nights the same independent complaint stream.
+static func draw_complaints(night: Dictionary, templates: Dictionary, p_rules: Dictionary, p_seed: int, protect_first: bool) -> Dictionary:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("complaints:%d" % p_seed)
+	var spec: Dictionary = p_rules.get("complaints", {})
+	for i in night.visitors.size():
+		var v: Dictionary = night.visitors[i]
+		if not spec.get("enabled", true):
+			v.complaints = []
+		if v.has("complaints"):
+			continue
+		var rows := ["eyes", "hands", "port", "temper"]
+		_shuffle(rows, rng)
+		v.complaints = []
+		if i == 0 and protect_first:
+			v.complaints.append(rows[0])
+			continue
+		for row in rows:
+			var sign := CaseDB.find_sign(templates[v.id], row, str(v.get("signs", {}).get(row, "")))
+			if rng.randf() < float(spec.get("normal" if sign.ok else "broken", 0.0)):
+				v.complaints.append(row)
+	return night
 
 
 ## One number from {number: weight} (rules.json night.drifting, night.broken), or fallback when
@@ -160,7 +184,11 @@ static func _weighted(rng: RandomNumberGenerator, weights: Variant, fallback: in
 ## threshold of them from the rows the doctor can test whatever the patient says
 ## (CaseDB.reachable_rows), the rest from any other row.
 static func _broken_rows(t: Dictionary, rng: RandomNumberGenerator, n: int, threshold: int) -> Array:
+	# Vale's original draw weighted port outside the first two picks. Keep the seed
+	# distribution independent of the tools available to the player.
 	var reachable := CaseDB.reachable_rows(t)
+	if t.id == "vale":
+		reachable.erase("port")
 	var reach: Array = []
 	var rest: Array = []
 	for row in CaseDB.ROWS:
@@ -217,10 +245,11 @@ static func draw_contacts(p_rules: Dictionary, pool: Array, p_order: Array, p_se
 	var out: Array = []
 	var taken: Dictionary = {}
 	if first_on_list:
+		var slot := clampi(int(p_rules.contacts.training_slot) - 1, 0, coming.size() - 1)
 		for e in entries:
-			if str(e.get("case", "")) == str(coming[0]):
+			if str(e.get("case", "")) == str(coming[slot]):
 				out.append((e as Dictionary).duplicate(true))
-				taken[str(coming[0])] = true
+				taken[str(coming[slot])] = true
 				break
 	for e in entries:
 		if out.size() >= per:

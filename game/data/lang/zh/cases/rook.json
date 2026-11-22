@@ -10,8 +10,6 @@
 		"A big man fills the doorway, working one hand open and shut.": "一个大块头堵满了门口，一只手攥了又松，松了又攥。",
 		"Arm's locking up. Fix it.": "胳膊卡住了。修好它。",
 		"Skip the pamphlet. I'm back on the dock at six.": "别跟我念小册子。我六点还要回码头。",
-		"Natural eyes, red-rimmed. He stares back.": "原生眼，眼圈发红。他瞪了回来。",
-		"LOADER rig. Jerks, settles. Raw knuckles.": "LOADER 义臂。一抽，又定住。指节磨破。",
 		"Wrist socket scorched. Two burnt pins, scar.": "腕部接口焦黑。两根针脚烧坏，有疤。",
 		"Light: both pupils tighten. Both follow.": "光照：双瞳收缩，双眼跟随。",
 		"Grip: shaky. Let go {t} s after 'release'.": "握力：发抖。喊‘松开’后 {t} 秒放手。",
@@ -20,7 +18,6 @@
 		"\"A dock cable cooked my pins.\"": "“码头电缆烧了我的针脚。”",
 		"You seem angry.": "你好像很生气。",
 		"I am angry. My arm quits mid-lift and the clinic wants a chat. I'm allowed.": "我就是生气。胳膊吊到一半罢工，诊所还要跟我聊天。我有权生气。",
-		"What's that got to do with my arm?": "这跟我的胳膊有什么关系？",
 		"\"I am angry. I'm allowed.\"": "“我就是生气。我有权生气。”",
 		"Does the arm ever move without you?": "这条胳膊会自己动吗？",
 		"It LOCKS. It doesn't wander. If it moved on its own I'd be at a cop shop, not here.": "它是卡死！不是乱动。要是它会自己动，我早去警局了，哪会来这儿。",
@@ -31,9 +28,6 @@
 		"Look all you want.": "随便看。",
 		"No.": "不行。",
 		"I didn't come here to hold hands.": "我不是来这儿找人牵手的。",
-		"I said no.": "我说了不行。",
-		"Not your business.": "不关你的事。",
-		"...Yeah. All right. Long week.": "……嗯。行吧。这周太累了。",
 		"Enough tests. Cut or don't.": "检查够了。要做就做，不做拉倒。",
 		"See? It shakes. It still lets go.": "看见没？它会抖。可它照样松得开。",
 		"What are you on about?": "你在说什么鬼话？",
@@ -82,7 +76,12 @@
 		"The LOADER fist punches three dents into the shutter, deep enough to see from the hall. Then quiet. Trauma Team brings a cutter for the arm.": "LOADER 拳头在卷闸上砸出三个凹坑，深得从走廊都看得见。然后没了动静。创伤小组带了切割机来对付那条手臂。",
 		"The fist came through the glass before the shutter was down. Trauma Team finds the counter in pieces and you under it. The clinic stays dark.": "卷闸还没落下，拳头就砸穿了玻璃。创伤小组找到时，柜台碎了一地，你压在下面。诊所的灯再没亮起。",
 		"You dropped the shutter on an angry man with a sore arm. At six the dock cameras catch the arm throwing a crate at the foreman. You were right. Nobody pays for that.": "卷闸砸在一个胳膊疼的愤怒男人面前。六点，码头监控拍到那条手臂把一只货箱扔向工头。你是对的。但这没人付钱。",
-		"Rook goes back to the docks with the arm doing the thinking. You made no call. Nobody is paid for that.": "Rook 回了码头，由那条手臂替他拿主意。你没做决定。这种事没人付钱。"
+		"Rook goes back to the docks with the arm doing the thinking. You made no call. Nobody is paid for that.": "Rook 回了码头，由那条手臂替他拿主意。你没做决定。这种事没人付钱。",
+		"My eyes ache after a shift under the dock lamps.": "码头灯照一个班，我眼睛就酸。",
+		"My hands feel sore after the last crate.": "搬完最后一箱，我两只手都酸。",
+		"My port itches under the loading harness.": "吊带下面的接口痒得慌。",
+		"My temper wears thin when the hoist jams.": "吊机一卡，我就容易发火。",
+		"Nothing else. My crew's waiting.": "没别的。工友还等着我。"
 	},
 	"topics": {
 		"rook:why": [
