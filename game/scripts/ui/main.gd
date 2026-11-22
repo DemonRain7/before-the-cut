@@ -166,16 +166,16 @@ const REASSURE_LINES := [
 	"Here, a calm-patch. On the wrist. Take your time, nobody is in trouble.",
 	"Another patch. Breathe. You're doing fine, we are nearly done.",
 ]
-const FIRST_HINT := "Nothing is required. Look, test, talk, or decide whenever you like."
+const FIRST_HINT := "Ask what hurts, then test that part. You can make the call at any time."
 # a patient with no patience left gives one last wait and then leaves by themselves
-const SHORT_HINT := "Not enough patience for that. CALM them, or decide."
-const LEAVING_HINT := "They are leaving. Decide now, or pay for a CALM to hold them."
+const SHORT_HINT := "No lamps left. Talk, BREAK, or make the call."
+const LEAVING_HINT := "They are leaving. Talk to them or make the call."
 const LEAVING_FREE_HINT := "They are leaving. Decide now, or press CALM to hold them."
 const LEAVING_LAST_HINT := "They are leaving. Decide now, or let them go."
 # coaching: each of these is offered once in a session, when the thing it explains first happens
 const NOTE_COACH_HINT := "Noted on your intake card. It hangs on the right wall: click it, or press N."
 const NOTE_OPEN_COACH_HINT := "Noted for you. Click the box beside a row to tick or cross it yourself."
-const LAMP_COACH_HINT := "One patience lamp left. When it goes out, they leave: no fee, no fine."
+const LAMP_COACH_HINT := "One lamp left. After your last test, you still have time to talk and decide."
 const GLASS_COACH_HINT := "Each blow before the shutter costs the glass. Less glass, less time."
 const DROP_COACH_HINT := "The drop changes nothing about the exam. Steady or drifting, the call is still yours."
 const FLARE_COACH_HINT := "Only temper: no red bar, nothing to stop. The SHUTTER is for the red bar."
@@ -382,6 +382,7 @@ var _leave_said: bool = false     # they have said so
 var _leave_idle: float = 0.0      # quiet seconds since the last lamp went out
 var _intro_seen: bool = false     # the opening plays once a session
 var _guide_seen: bool = false     # and the guide opens by itself once
+var _training_night := -1
 var _trained: bool = false        # the training has run this session (once, on the first night)
 var _training_visit: bool = false # this visit began while the training was running: no surprises
 var _coached: Dictionary = {}     # coaching hints already shown this session
@@ -571,7 +572,7 @@ func _build() -> void:
 	var contact_rules: Dictionary = rules.get("contacts", {})
 	var calm_rules: Dictionary = rules.get("reassure", {})
 	var costs: Dictionary = rules.get("costs", {})
-	var numbers := {"per_hour": per_hour, "hours": hours, "total": per_hour * hours, "threshold": int(sheet.get("threshold", 0)),
+	var numbers := {"lamps":int(rules.visit.lamps), "idle":int(rules.patience.leave_ms / 1000.0), "per_hour": per_hour, "hours": hours, "total": per_hour * hours, "threshold": int(rules.visit.threshold),
 		"repair_cost": repair_cost, "pay": int(contact_rules.get("pay", 0)), "code_cost": int(contact_rules.get("wrong_cost", 1)),
 		"per_night": int(contact_rules.get("per_night", 0)), "calm_cost": int(calm_rules.get("cost", 0)),
 		"catch_bonus": int(rules.scoring.press_catch_bonus), "calm_gain": int(calm_rules.get("gain", 1)), "ask_cost": int(costs.get("ask", 1)), "press_cost": int(costs.get("press", 2)),
@@ -1098,7 +1099,13 @@ func _sync_visit() -> void:
 		desk.badges[tool] = tag + ("-%d" % visit.check_cost(tool) if not visit.granted.has(tool) else "")
 	desk.warn["press"] = visit.press_breaks()
 	desk.badges["press"] = ("?" if "temper" in visit.complaints_told else "") + Lang.t("BREAK") if visit.press_breaks() else ("? " if "temper" in visit.complaints_told else "") + "-%d" % visit.press_cost()
+	_offer_break_tip()
 	clinic.till = _till_now()
+
+
+func _offer_break_tip() -> void:
+	if visit != null and visit.in_exam() and visit.patience == 0 and visit.crossed() == 1:
+		_coach("break", Lang.tf("One cross: wear or drift? BREAK sends a steady patient away unpaid. If they lunge, SPACE. Catch: fee +%d.", [int(rules.scoring.press_catch_bonus)]))
 
 
 func _desk_for_exam() -> void:
@@ -1222,7 +1229,7 @@ func act_card(on: int = -1) -> void:
 	audio.play("paper", 1.0 if want else 0.85, -5.0)
 	_log("panel", {"panel": "card", "open": want})
 	if want and coach != null:
-		coach.event("card_open")
+		coach.event("courier_card" if shift.index == 1 and state == State.EXAM else "card_open")
 
 
 ## The big screen of the hall camera. `on`: 1 on, 0 off, -1 the other way; and while somebody
@@ -1598,6 +1605,7 @@ func _start_shift() -> void:
 	_log("contacts", {"entries": shift.contacts.size(), "ids": ids, "training": training})
 	if training:
 		_trained = true
+		_training_night = shift_number
 		coach.start()
 		_log("training", {"tips": coach.count()})
 	elif coach != null and coach.is_running():
@@ -1681,11 +1689,10 @@ func act_call_next() -> void:
 	_visit_serial += 1
 	visit = VisitState.new(c, rules)
 	visit.set_contact(shift.contact_for(id))
-	# the training belongs to the night's first visitor: a tip still up when the second one is
-	# buzzed in has had its moment, and from here on the counter is the real one
-	if coach != null and coach.is_running() and shift.index > 0:
+	# The first visitor teaches the tests, the second teaches contacts.
+	if coach != null and coach.is_running() and shift.index > int(rules.contacts.training_slot) - 1:
 		coach.stop(false)
-	_training_visit = coach != null and coach.is_running()
+	_training_visit = shift.index == 0 and shift_number == _training_night
 	visit.surprises = surprises_enabled and not _training_visit      # nobody snaps on the training visit
 	_surprise = ""
 	_snap_rng.seed = hash("surprise:%d:%d" % [shift_seed, _visit_serial])
@@ -1698,7 +1705,7 @@ func act_call_next() -> void:
 	_blows = 0
 	_log("visit_start", {"index": shift.index, "agent_mode": agent.mode, "contact": visit.is_contact(), "training": _training_visit})
 	if coach != null:
-		coach.event("visit_start")
+		coach.event("visit_start" if shift.index == 0 else "courier_arrives")
 	rig = PatientRig.new()
 	add_child(rig)
 	rig.less_blood = less_blood
@@ -1901,7 +1908,7 @@ func _start_leaving(token: int) -> void:
 ## A patient whose patience is gone gives the doctor one last wait (rules.json:
 ## patience.leave_ms) and then leaves by themselves, with no fee and no fine. The wait stands
 ## still while an answer is on its way, while a test is open, while the doctor is speaking and
-## while the guide is up. CALM lights a lamp again, and that ends it.
+## while a paper is open.
 func _update_leaving(delta: float) -> void:
 	if state != State.EXAM or visit == null or not visit.is_spent():
 		_leave_said = false
@@ -1997,7 +2004,7 @@ func _on_scope_completed(tool: String) -> void:
 	_mark_new_notes(before)
 	_log("check_done", {"tool": tool})
 	if coach != null:
-		coach.event("check:" + tool)
+		coach.event("first_test" if visit.tests_in_order.size() == 1 else "second_test")
 	_after_check(tool, str(res.get("text", "")), _seq)
 
 
@@ -2056,7 +2063,7 @@ func act_ask(id: String, said: String = "", fallback: String = "") -> void:
 	_log("ask", {"topic": id, "move": str(res.get("move", "")), "result": result, "cost": int(res.get("cost", 0)),
 		"patience": visit.patience, "source": str(d.get("source", ""))})
 	if coach != null:
-		coach.event("talk")
+		coach.event("listed_answer")
 	if not await _show_reaction(d, token):
 		return
 	if result == "answered":
@@ -2110,7 +2117,8 @@ func act_press(confirmed: bool = false) -> void:
 	_sync_visit()
 	_log("press", {"count": visit.press_count, "result": result, "patience": visit.patience})
 	if coach != null:
-		coach.event("talk")
+		if result == "react":
+			coach.event("first_test" if visit.tests_in_order.size() == 1 else "second_test")
 	if not await _show_reaction(d, token):
 		return
 	match result:
@@ -2475,6 +2483,7 @@ func act_mark(row: String, chosen: int = 0) -> void:
 	_log("mark", {"row": row, "value": value, "crossed": crossed})
 	if coach != null:
 		coach.event("mark")
+	_offer_break_tip()
 	if crossed == before or need <= 0:
 		return
 	if crossed >= need:
@@ -2483,7 +2492,8 @@ func act_mark(row: String, chosen: int = 0) -> void:
 			audio.play("beep_low", 1.2, -10.0)
 	elif crossed > 0:
 		_base_hint = Lang.tf(CROSS_SOME_HINT, [crossed, need])
-		_coach("wear", "One cross can be wear. Two broken lines mean drift.")
+		if visit.patience > 0:
+			_coach("wear", "One cross can be wear. Two broken lines mean drift.")
 	else:
 		_base_hint = ""
 
@@ -3418,7 +3428,8 @@ func _resolve() -> void:
 		"patience_left": int(s.get("patience_left", 0)), "press_count": int(s.get("press_count", 0)),
 		"crossed": int(s.get("crossed", 0)), "blows": int(s.get("blows", 0)), "grade": str(s.get("grade", "")),
 		"seen": visit.seen.keys(), "model_calls": agent.calls_this_visit, "fallbacks": agent.fallbacks_this_visit,
-		"contact": visit.is_contact(), "dropped": visit.dropped, "calm_spent": visit.calm_spent,
+		"contact": visit.is_contact(), "dropped": visit.dropped,
+		"complaints_told":s.complaints_told, "tests_in_order":s.tests_in_order, "complaints_followed":s.complaints_followed,
 		"codes_wrong": visit.codes_wrong, "snapped": visit.snapped, "flared": visit.flared})
 	agent.end_visit()
 	if shift.died:
@@ -3521,7 +3532,7 @@ func _show_report() -> void:
 		"injuries": int(report.get("injuries", 0)), "glass_left": int(report.get("glass", 0)),
 		"glass_paid": int(report.get("repair_total", 0)), "title": str(report.get("title", "")),
 		"drops": int(report.get("drops", 0)), "drop_total": int(report.get("drop_total", 0)),
-		"calm_total": int(report.get("calm_total", 0))})
+		"complaints_told":report.complaints_told, "complaints_followed":report.complaints_followed})
 
 
 ## The report, a page at a time: each visit seen tonight, then the night's totals. On the
@@ -4209,7 +4220,7 @@ func _process(delta: float) -> void:
 		guide.close()
 	_update_leaving(delta)
 	_update_surprise(delta)
-	if _coach_next != "" and _base_hint == "" and not _leave_said:
+	if _coach_next != "" and ((_base_hint == "" and not _leave_said) or _coach_id == "break"):
 		# a one-time tip, once nothing more urgent is on the hint row. The one about the glass is
 		# for the moments after an attack, while the stop is still being read off the bar; the
 		# others belong to the exam they came up in.
@@ -4642,7 +4653,7 @@ func act_list(on: int = -1) -> void:
 		_sheet_wanted = false
 		_sheet_back = false
 		if coach != null:
-			coach.event("list_open")
+			coach.event("courier_list" if shift.index == 1 and state == State.EXAM else "list_open")
 	audio.play("paper", 1.05 if want else 0.9, -5.0)
 	_log("panel", {"panel": "list", "open": want})
 
@@ -4668,7 +4679,7 @@ func act_say_code(id: String) -> void:
 		"blank":
 			_sync_visit()
 			if coach != null:
-				coach.event("code_said")
+				coach.event("courier_code" if shift.index == 1 else "code_said")
 			_base_hint = Lang.tf(CODE_BLANK_HINT, [int(res.get("cost", 0))])
 			_lock = true
 			ok = await _doctor_line(str(entry.get("say", "")), token, 0.3)
@@ -4679,7 +4690,7 @@ func act_say_code(id: String) -> void:
 			_patient_line(str(res.get("line", "")), token, 0.0, false)
 		"drop":
 			if coach != null:
-				coach.event("code_said")
+				coach.event("courier_code" if shift.index == 1 else "code_said")
 			_lock = true
 			ok = await _doctor_line(str(entry.get("say", "")), token, 0.3)
 			if not ok:
@@ -4701,13 +4712,14 @@ func act_say_code(id: String) -> void:
 # ================================================================ the first-night training
 
 func _coach_phase() -> String:
+	var prefix := "next_" if shift != null and shift.index >= 1 else ""
 	match state:
 		State.WAIT:
-			return "wait"
+			return prefix + "wait"
 		State.EXAM:
-			return "exam" if visit != null and visit.in_exam() else ""
+			return prefix + "exam" if visit != null and visit.in_exam() else ""
 		State.SLIP:
-			return "slip"
+			return prefix + "slip"
 	return ""
 
 
@@ -4717,7 +4729,7 @@ func _sync_coach() -> void:
 	if coach == null or not coach.is_running():
 		return
 	coach.set_phase(_coach_phase())
-	coach.paused = guide.is_open() or clinic.scope.is_open()
+	coach.paused = guide.is_open() or (clinic.scope.is_open() and coach.current() not in ["mark", "second"])
 	coach.focus = _coach_focus(coach.area())
 	var avoid: Array = []
 	if clipboard.sheet_open or clipboard.list_open:
@@ -4742,6 +4754,10 @@ func _sync_coach() -> void:
 ## where it is, one that is up at its place on the wall, one under the other at the swap tab.
 func _coach_focus(area: String) -> Rect2:
 	match area:
+		"lead":
+			if visit != null and not visit.complaints_told.is_empty():
+				return desk.pad_rect(str(CaseDB.ROW_TOOL.get(visit.complaints_told[0], "press")))
+			return desk.pad_rect("complain")
 		"list":
 			if clipboard.list_open:
 				return Gfx.SHEET
@@ -4757,6 +4773,8 @@ func _coach_focus(area: String) -> Rect2:
 		"card":
 			return Gfx.RECORD if clipboard.card_open else desk.object_rect("card")
 		"marks":
+			if clinic.scope.is_open():
+				return clinic.scope.mark_rect(1).merge(clinic.scope.mark_rect(2))
 			return COACH_MARKS if clipboard.card_open else desk.object_rect("card")
 		"guide":
 			return desk.object_rect("guide")

@@ -44,6 +44,6 @@
     "walkout": {"title": "WALKED OUT", "text": "Pushed too hard, {name} walks out. No fee, no call."},
     "gave_up": {"title": "OUT OF PATIENCE", "text": "{name} got tired of waiting and left. No fee, no call."}
   },
-  "visit": {"lamps": 2},
+  "visit": {"lamps": 2, "threshold": 2},
   "complaints": {"enabled": true, "broken": 0.65, "normal": 0.2, "per_reply": 2}
 }

@@ -686,6 +686,8 @@ func _draw_visit_page(p: Rect2, visit: Dictionary, i: int, n: int) -> void:
 func _draw_finding(x0: float, x1: float, y: float, row: Dictionary) -> void:
 	var id := str(row.get("id", ""))
 	Gfx.text(self, Vector2(x0, y + 1.0), str(ROW_LABELS.get(id, id)), Gfx.PRINT)
+	if row.get("complained", false):
+		Gfx.text(self, Vector2(x0 + 43, y + 1), "?", Gfx.WARM3, true)
 	var mark := Gfx.tex(str(MARKS[clampi(int(row.get("mark", 0)), 0, 2)]))
 	if mark != null:
 		draw_texture(mark, Vector2(x0 + 50.0, y))
@@ -695,7 +697,7 @@ func _draw_finding(x0: float, x1: float, y: float, row: Dictionary) -> void:
 	if truth != null:
 		draw_texture(truth, Vector2(x0 + 64.0, y))
 	var detail := Lang.t(str(row.get("text", "")))
-	var status := "" if bool(row.get("seen", false)) else "you did not check"
+	var status := "tested" if row.get("tested", false) else ("" if row.get("seen", false) else "you did not check")  # [shown]
 	if row.has("show_with"):
 		detail = Lang.tf("Shown by %s", [row.show_with])
 		if row.get("other_question", false):
@@ -786,12 +788,14 @@ func _draw_totals(p: Rect2, visits: Array) -> void:
 			lamp += 12.0
 	y += 11.0
 	if not visits.is_empty() and not visits[0].get("usage", {}).is_empty():
-		var totals := [0, 0, 0, 0, 0, 0]
-		var tools := ["penlight", "grip", "port", "ask", "press", "calm"]
+		var totals := [0, 0, 0, 0, 0]
+		var tools := ["penlight", "grip", "port", "ask", "press"]
 		for record in visits:
 			for i in tools.size():
 				totals[i] += int(record.get("usage", {}).get(tools[i], false))
-		Gfx.text_center_raw(self, 320, y, Lang.tf("LIGHT %d  GRIP %d  PORT %d  ASK %d  PRESS %d  CALM %d", totals), Gfx.PRINT)
+		Gfx.text_center_raw(self, 320, y, Lang.tf("LIGHT %d  GRIP %d  PORT %d  ASK %d  PRESS %d", totals), Gfx.PRINT)
+		y += 10.0
+		Gfx.text_center_raw(self, 320, y, Lang.tf("You followed %d of %d complaints.", [report.complaints_followed, report.complaints_told]), Gfx.PRINT)
 		y += 12.0
 	draw_rect(Rect2(x0, y, x1 - x0, 1), Gfx.PAPER1)
 	y += 8.0

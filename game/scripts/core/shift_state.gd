@@ -515,14 +515,16 @@ func report() -> Dictionary:
 		text = str(entry.get("last_visitor_text", entry.get("text", ""))) if died and unseen().is_empty() else str(entry.get("text", ""))
 		break
 	var line_text: Dictionary = rules.get("line_text", {})
+	var told := 0
+	var followed := 0
 	var drops := 0
 	var drop_total := 0
-	var calm_total := 0
 	for r in records:
 		if bool(r.get("dropped", false)):
 			drops += 1
 			drop_total += int(r.get("drop", 0))
-		calm_total += int(r.get("calm_spent", 0))
+		told += r.get("complaints_told", []).size()
+		followed += r.get("complaints_followed", []).size()
 	var said := "held" if line_held else "short"
 	if died:
 		said = "died"
@@ -547,7 +549,7 @@ func report() -> Dictionary:
 		"contacts": contacts.size(),
 		"drops": drops,
 		"drop_total": drop_total,
-		"calm_total": calm_total,
+		"complaints_told": told, "complaints_followed": followed,
 		"title": title,
 		"text": text,
 		"line_text": str(line_text.get(said, "")),

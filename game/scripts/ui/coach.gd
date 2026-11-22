@@ -5,7 +5,7 @@ extends Node2D
 ##   - when the thing it asks for is done (now, or earlier: a tip for something the player has
 ##     already done is passed over),
 ##   - when NEXT is pressed (every tip has it),
-##   - or when the tip has been up for a while and the player goes on to something else.
+##   - or when the player finishes that stage of the visit.
 ## SKIP ALL [K] ends the training. Each tip belongs to one or more phases of a visit: waiting
 ## for the next patient, the exam, the result slip. A tip whose phases are over is dropped; one
 ## whose phase has not come yet waits out of sight. While the counter guide or a close-up is
@@ -19,7 +19,7 @@ signal finished(was_skipped: bool)
 
 const Gfx = preload("res://scripts/ui/gfx.gd")
 
-const PHASES := ["wait", "exam", "slip"]
+const PHASES := ["wait", "exam", "slip", "next_wait", "next_exam", "next_slip"]
 const WIDTH := 196.0
 const PAD := 7.0
 const TEXT_W := 182.0          # WIDTH - 2 * PAD
@@ -27,8 +27,6 @@ const BUTTON_H := 13.0
 const FLOOR := 296.0           # a low box stands on this line, just above the desk
 const FADE := 0.2
 const PULSE := 0.9             # seconds for one beat of the frame
-const LINGER_READ := 2.0       # a tip that is only read gives way to the next action after this long
-const LINGER_DO := 10.0        # a tip that asks for something gives way to something else after this long
 const TITLE := "TRAINING"
 const NEXT := "NEXT ►"
 const DONE := "DONE ►"
@@ -123,8 +121,6 @@ func start() -> void:
 func event(name: String) -> void:
 	if not is_running():
 		return
-	if is_showing() and _shown >= _linger(_steps[_index]) and str((_steps[_index] as Dictionary).get("until", "")) != name:
-		_advance()
 	_done[name] = true
 	_settle()
 
@@ -241,10 +237,6 @@ func _expired(step: Dictionary) -> bool:
 	for p in _phases_of(step):
 		last = maxi(last, PHASES.find(p))
 	return last >= 0 and now > last
-
-
-func _linger(step: Dictionary) -> float:
-	return LINGER_READ if str(step.get("until", "")) == "next" else LINGER_DO
 
 
 ## The places the box can sit, in the order they are tried.

@@ -2,14 +2,14 @@
 
 Codex keeps this file during the run described in [KICKOFF.md](KICKOFF.md). The design is [01-design.md](01-design.md).
 
-Status on November 21, 2026: M2 verified. M0 tagged 31c8dbd as loop-v12.
+Status on November 21, 2026: M3 verified. M0 tagged 31c8dbd as loop-v12.
 
 ## Milestones
 
 - [x] M0 Baseline (counts written, tag `loop-v12`, pointers in `HANDOFF.md`, `NEXT_AGENT_PROMPT.md`, `docs/README.md`)
 - [x] M1 Rules and data (rules version 13, complaints, nights K and L, R1 to R11 measured)
 - [x] M2 Screen and input (three groups, "?" tags, marks in the close-up, BREAK state, free typed questions)
-- [ ] M3 Teaching and words (tips, HOW TO PLAY, guide, KEYS, closing report, both languages)
+- [x] M3 Teaching and words (tips, HOW TO PLAY, guide, KEYS, closing report, both languages)
 - [ ] M4 The generated patient, protocol 5 (`complaint` class, voiced complaints, prompt rules, mock fixtures)
 - [ ] M5 Evidence (final tables, captures, live evaluation and redeploy if approved, acceptance sheet)
 - [ ] M6 Handoff (`HANDOFF.md`, `NEXT_AGENT_PROMPT.md`, `AGENTS.md`, last report)
@@ -51,6 +51,8 @@ M1, November 21: 5,929 engine rules; 1,155 / 1,156 / 1,155 scene checks; 57 prox
 Replaced v12 scenarios: free LOOK evidence → selecting an instrument with no evidence; refusal, INSIST, sealed port and CALM → first reactions always admitting each tool; per-case patience, paid or dodged ASK and price confirmation → two lamps, free answers and harmless text; second PRESS lamp requirement → warned BREAK at zero; v12 numbers in credit and glass scenarios → 50 bonus; idle lamp restoration → paused 30-second departure; first-slot courier and fourteen-tip lesson → second-slot courier. The old captures of these paths are preserved in the baseline. Fixed K/L and 235 weapon/attack frames now cover the redesigned counter. The speech-confirmation and typed-PRESS wire steps were replaced by free dispatch and button-only pressure. M0 commit `a351a21`; M1 commit titled *Build the two-lamp visit and measure complaint-guided play*.
 
 M2, November 21. Commit *Group the counter around free talk and two marked tests*. The engine passed 5,929 rules, 1,162 / 1,163 / 1,162 scene checks and 352 HTTP / 102 wire checks. The proxy and guard retained 57 + 9. Each language passed 1,608 fitted lines and produced 281 hidden-desktop frames including all five visits of K and L. Night K passed 32 checks through each of script, mock and forced timeout. The general conversation fixture now asks about looking away, since the former hand question legitimately asks about a body part. Sources: `M2/`, `M2release/`. M1 commit `37c90b8`.
+
+M3, November 21. Commit *Teach one action at a time across the first two visitors*. The bilingual scene test walked seven first-visitor tips, then the warning and three courier actions. Counts: 5,929 rules, 1,172 / 1,173 / 1,172 scenes, 57 + 9 proxy/guards, 352 / 102 HTTP and wire, 1,603 fitted lines and 281 hidden frames per language. The five replaced training strings account for the width-count change. The closing report totals the patient complaints that prompted the next test. Sources: `M3release/` and the `M3/checkpoint/` mock run. M2 commit `526c469`.
 
 ## The relations
 

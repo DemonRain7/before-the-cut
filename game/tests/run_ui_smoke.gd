@@ -1903,18 +1903,39 @@ func shift_training() -> void:
 	main.test_night = "K"
 	main.surprises_enabled = false
 	check(await d.open_counter(), "the training night opens")
-	check(main.coach.is_running(), "the first visit offers training")
+	check(main.coach.current() == "buzz", "tip 1: buzz in the visitor")
 	check(not main.shift.contact_for(str(main.shift.order[1])).is_empty(), "the training courier comes second")
 	for id in main.shift.order.duplicate():
 		var v: VisitState = await enter(id)
 		await d.settle()
-		if main.coach.is_running():
-			d.key(KEY_K)
 		if v == null:
 			return
-		if main.shift.index == 1:
+		if main.shift.index == 0:
+			check(main.coach.current() == "ask", "tip 2: the arrival leads to the free complaint")
+			await d.complain()
+			check(main.coach.current() == "test", "tip 3: the complaint points at a test")
+			check(await d.request_tool("penlight") == "open" and await d.sweep_eyes(), "the named eye test works during training")
+			await d.settle()
+			check(main.coach.current() == "mark", "tip 4: compare and mark inside the close-up")
+			d.click(main.clinic.scope.mark_rect(1).get_center())
+			await process_frame
+			check(main.coach.current() == "second", "tip 5: a mark offers another test or NEXT")
+			d.click(main.coach.next_rect().get_center())
+			await d.put_away()
+			check(main.coach.current() == "speech", "tip 6: NEXT leads to a listed question")
+			await d.ask(0)
+			await d.settle()
+			check(main.coach.current() == "decide" and main.coach.index() == 6, "tip 7: one listed answer leads to the call")
+		elif main.shift.index == 1:
+			check(main.coach.current() == "list", "the courier's arrival starts the contact lesson")
+			main.act_list(1)
+			await process_frame
+			check(main.coach.current() == "clues", "looking at the list prompts a clue comparison")
+			main.act_card(1)
+			await process_frame
+			check(main.coach.current() == "code", "looking at the card prompts the code")
 			await d.say_code(v.contact.id)
-			check(v.dropped, "the second visitor answers their code")
+			check(v.dropped and not main.coach.is_running(), "the code ends training and pays the matching visitor")
 			await d.settle()
 		await d.stamp("treat")
 		await finish_visit(id)

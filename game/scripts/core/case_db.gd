@@ -60,6 +60,7 @@ static func load_all(dir: String = DATA_DIR) -> Dictionary:
 	if typeof(sheet) != TYPE_DICTIONARY:
 		errors.append("sheet.json is missing or is not valid JSON.")
 	else:
+		sheet["threshold"] = int(rules.get("visit", {}).get("threshold", sheet.get("threshold", 2)))
 		out["sheet"] = sheet
 		errors.append_array(validate_sheet(sheet))
 	errors.append_array(validate_rules(rules, out["sheet"]))

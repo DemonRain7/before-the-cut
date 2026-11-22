@@ -563,8 +563,8 @@ def guide_rows(intro, numbers):
 
 TRAINING_LINES = 4      # lines a training tip may take (the box grows with them; four keeps it off the face)
 TRAINING_UNTIL = {"next", "list_open", "sheet_open", "card_open", "visit_start", "code_said", "mark", "verdict",
-                  "continue", "talk", "look", "check:penlight", "check:grip", "check:port"}
-TRAINING_AREAS = {"list", "sheet", "card", "marks", "guide", "cam", "code", "tools", "talk", "decide", "slip",
+                  "continue", "complaint", "first_test", "second_test", "listed_answer", "courier_arrives", "courier_list", "courier_card", "courier_code", "talk", "look", "check:penlight", "check:grip", "check:port"}
+TRAINING_AREAS = {"lead","list", "sheet", "card", "marks", "guide", "cam", "code", "tools", "talk", "decide", "slip",
                   "patience", "meter", "shutter"}
 
 
@@ -965,13 +965,13 @@ def main():
     # one visitor is one hour (rules.json night.visitors since rules version 9)
     hours = visitors
     per_hour = int(rules.get("line", {}).get("per_hour", 0))
-    threshold = int(sheet.get("threshold", 0))
+    threshold = int(rules["visit"]["threshold"])
     glass = int(rules.get("attack", {}).get("glass", 0))
     repair_cost = int(rules.get("attack", {}).get("repair_cost", 0))
     # the most glass a night can buy: a whole pane before every patient
     repair_most = repair_cost * glass * hours
     costs = rules.get("costs", {})
-    numbers = {"per_hour": per_hour, "hours": hours, "total": per_hour * hours, "threshold": threshold,
+    numbers = {"lamps": int(rules["visit"]["lamps"]), "idle": int(rules["patience"]["leave_ms"]/1000), "per_hour": per_hour, "hours": hours, "total": per_hour * hours, "threshold": threshold,
                "repair_cost": repair_cost, "pay": int(contacts.get("pay", 0)), "code_cost": int(contacts.get("wrong_cost", 0)),
                "per_night": int(contacts.get("per_night", 0)), "calm_cost": int(reassure.get("cost", 0)),
                "catch_bonus": int(rules["scoring"]["press_catch_bonus"]), "calm_gain": int(reassure.get("gain", 0)), "ask_cost": int(costs.get("ask", 0)),
