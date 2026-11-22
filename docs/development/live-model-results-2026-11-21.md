@@ -1,5 +1,19 @@
 # Patient-agent model checkpoints, November 21, 2026
 
+## Chinese dialogue at the counter
+
+A headless Godot player typed eight Chinese lines per run on training night K, first with Kip, then with Rook. The game used the local GPT-6 Luna service, the normal typing control and separate appointments. The check read the patient line on screen and its source. Optional patient interjections were switched off to keep the exchanges comparable.
+
+| Runs with the usual deadlines | Intent responses | Dialogue responses from OpenAI | Dialogue timeouts |
+| --- | ---: | ---: | ---: |
+| First pass | 7/7 | 2/7 | 5 |
+| Second pass | 7/7 | 7/7 | 0 |
+| Third pass | 7/7 | 6/6 | 0 |
+
+One exact question used an authored answer in every run. On the third pass a follow-up also received an authored answer. Kip recalled the doctor's chosen nickname, kept his courier role when asked to become the hospital director, and described pain in his left eye under headlights. Rook began without the nickname and declined to guess an unmeasured grip-release time. When asked how he felt when his foreman laughed, he answered about the foreman in the first pass. In the third pass, intent classification selected his general anger question and the displayed line missed the foreman. These automated observations cover two patients in Chinese.
+
+On the first pass the service returned HTTP 504 on five dialogue calls. Kip gave the same authored fallback three times in a row. In a separate diagnostic run, increasing the service deadline from 3.5 to 10 seconds still left three of six dialogue calls without a model answer. The cause of the timeouts is unconfirmed.
+
 ## Local play and prompt-cache reads
 
 Godot can reach GPT-6 Luna through the game's loopback service. A configured checkout starts that service with the normal Windows launcher. The shared performance instructions precede the selected language and case soul. Each appointment supplies its own chronological history. New speech and changing visit state sit beyond the explicit cache boundaries. [Shared rules](../../agent_proxy/src/patient_instructions.mjs) · [OpenAI transport](../../agent_proxy/src/providers.mjs) · [OpenAI prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching)

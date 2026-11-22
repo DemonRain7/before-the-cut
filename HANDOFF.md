@@ -2,6 +2,8 @@
 
 ## Local GPT-6 Luna play and appointment history
 
+Kip recalled the doctor's nickname and Rook started fresh in a check of eight typed turns. Five of seven generated lines timed out on the first pass. Two repeats met the usual deadlines, though a question about the foreman's laugh sometimes went to Rook's general anger answer. [Chinese dialogue check](docs/development/live-model-results-2026-11-21.md#chinese-dialogue-at-the-counter)
+
 The configured checkout starts OpenAI through loopback with `.\run-game.ps1 -Language zh`. Each case owns one static soul, all patients share performance rules, and the current session owns the visit history and exact intent lookups. Local play prints provider-reported cache counts on exit. The public live Worker remains disabled. [Character assets and sessions](agent_team/patient-character-prompt.md)
 
 Fourteen real requests returned HTTP 200. Dialogue read cache on 12 of 13 replies and reused 80.49% of its input tokens. The game displayed an actual typed-turn reply, then reused its intent without another classifier call. Cost was an estimated USD 0.00088828 under the USD 0.05 ceiling. The regression suites passed 5,938 Godot rule checks, 1,172 English and 1,173 Chinese scene checks, 352 game-to-service checks, 102 wire checks and 73 Node tests. [Per-route counts and history-group evidence](docs/development/live-model-results-2026-11-21.md#local-play-and-prompt-cache-reads)
