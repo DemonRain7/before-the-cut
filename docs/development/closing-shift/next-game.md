@@ -1,12 +1,37 @@
 # What would make someone run another night?
 
-Design notes, November 22, 2026. The owner has deferred the two-player version. The current implementation assignment is the [closing animation remake](claude-prompt.md). The experiments below are available for a later prototype.
+Design notes, November 22, 2026. The owner has deferred the two-player version. The [closing animation remake](film.md) is built. The experiments below are available for a later prototype.
 
 ## The owner's direction for a future two-player shift
 
-One player screens arrivals and decides who enters. The other operates on the admitted patient, working close to the affected implant. The doctor handles and replaces that specific component. A short QTE can give weight to a moment such as a wrist coupling seating in its socket. Between patients, preparing a part or testing a return could give intake information for its current decision.
+Recorded on November 22 and deferred by the owner: “双人玩法先记下来，后续再做” (write the two-player game down now, build it later).
 
-The doctor chooses where to look. During hand or port work they can look up from the part to check the patient's face, then return to the component. During work on the face, that frightening possibility is already within arm's reach. The expression or implant can suddenly change while the tool is engaged, including between timed inputs. For a future test, try one wrist case and one face case and watch when the doctor voluntarily looks up.
+- **Two roles, one patient.** One player works the front desk: screens each arrival and decides who goes in. The other works the back room as the surgeon and receives exactly the patient the partner just admitted: the same person, the same parts, the same hidden truth.
+- **Hands-on surgery.** The surgeon gets close to the affected part and takes out and fits a specific component by hand. Short QTEs mark the key moments, such as a part clicking into its seat or the calibration.
+- **Where to look is the heart of it.** The owner's words: “我最在意的是手术时看哪里” (what matters most is where you look during surgery). Head down over a wrist part, the surgeon feels the patient's hand tighten. They can keep their eyes on the part that is not seated yet, or choose to look up at the patient. In face surgery the face is already inches away and can change before the hands finish the move.
+- **The surgeon is never idle for nothing.** While the front desk is still questioning, or after it turns several people away in a row, the back room needs something worth doing.
+
+### What the closing film already prototypes
+
+The film's theatre shot is the surgeon's view of this design, played back instead of played: the patient seated at the size they stood at the counter, the push into the close-up the front desk examined, the driver and forceps, the click of the seated part, the calibration reading, and the moment the face wakes. A prototype can take that staging (`closing_film.gd`, the `theatre/` art, the rig's `release_hands`) and give the gloves to the second player. The film then stops being a verdict and becomes the job.
+
+### A first sketch
+
+- **Two framings, one pair of eyes.** The surgeon sees either the part (the close-up, hands at work) or the face (pulled back). Looking up is a deliberate input, such as holding a key or pushing the pointer to the top edge. The camera move is the film's tilt from the part to the face. The tool stays where it was, and any timed window keeps running while the surgeon looks away.
+- **Feel before sight.** Warnings reach the surgeon without looking: a strap creaks, the pulse on the monitor climbs, the part resists the driver, the hand tightens on the bar. Each has a steady explanation (pain, the anaesthetic thinning, wear) and a drifting one, as at the counter. Looking up shows the face and settles the doubt, at the cost of the window in hand.
+- **Face work.** The close-up is the face. A change (the iris rolling round to the lens, a smile under the drape) can start between two inputs, and the surgeon chooses whether to finish the move or stop.
+- **Two QTEs.** Seating: one timed press as the coupling lines up; a miss costs time, never the patient. Calibration: hold the reading inside the sheet's band while it settles. A drifting part will not settle, and that is the decision point: stop and restrain, or force it through.
+- **Stopping is always allowed.** Re-strap, sedate (once) or call Trauma Team from the theatre. Stopping a steady patient costs the fee. Finishing a drifting one plays the wake-up from the film, now with the surgeon's hands in it.
+- **Waiting with a purpose.**
+  - During a long interview the surgeon watches the counter feed without sound and sees the complaint the front desk marks. Laying out the matching part before the patient arrives shortens the operation, which rewards following the partner.
+  - Between patients the surgeon bench-tests the part taken out of the last one. Wear or drift is a fact they can pass to the front desk.
+  - After an incident the theatre is cleaned and restocked, and the damage carries over, as the relief crew does in the film.
+  - Through a run of refusals the theatre stands idle while the night's costs run on. The surgeon can call the desk to ask for someone, which puts the game's own money-against-safety pull between the two players.
+- **Talk.** One intercom button per side (“ready for the next”, “hold the next one”, “hand's tightening”) and voice when the players sit together. No free chat.
+
+### First test of the sketch
+
+One wrist case and one face case, each played steady and drifting. Note when the surgeon looks up, and whether it is before the change or after it. Time the surgeon's idle seconds during a long interview and through three refusals in a row; aim for no stretch over ten seconds without a meaningful action.
 
 ## Single player
 

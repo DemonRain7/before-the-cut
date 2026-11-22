@@ -38,6 +38,7 @@ var talking: bool = false
 var thinking: bool = false        # an answer is being worked out: the waiting pose and the thought bubble
 var listening: bool = false       # the doctor is speaking into the microphone: eyes on the doctor, hands still
 var frozen: bool = false          # the beat before an attack: nothing moves
+var sleeping: bool = false        # under anaesthetic in the closing film: eyes shut, hands still
 var less_blood: bool = false      # use the face overlay, the scream and the blow poses that were drawn without blood
 var pop: float = 0.0              # 0..1: out through the window, at the player
 var pop_target := Vector2(280, 138)   # where the face ends up, in view space (the middle of the screen)
@@ -227,6 +228,35 @@ func soften() -> void:
 	_apply_face()
 
 
+## Out from under the anaesthetic: the eyes open and their own habits come back.
+func wake() -> void:
+	sleeping = false
+	(_spr["lids"] as Sprite2D).visible = false
+	_blink_t = 0.0
+	_gaze_in = 0.4
+
+
+## One blink, now.
+func blink() -> void:
+	(_spr["lids"] as Sprite2D).visible = true
+	_blink_t = 0.11
+
+
+## A look, held for `hold` seconds, before their own habit takes the eyes back.
+func glance(gaze: Vector2, hold: float) -> void:
+	_gaze = gaze
+	_gaze_in = hold
+
+
+## The hands let go of a held gesture and go back to their own habit.
+func release_hands() -> void:
+	_react_hands = false
+	_hold_hands = false
+	_hand_frame = "hands_a"
+	_hand_in = 0.6
+	_apply_hands()
+
+
 ## The patient turns: the dark threads are over the face, the weapon is out.
 func show_pressure_tell() -> void:
 	surge(0.14)
@@ -359,7 +389,11 @@ func _process(delta: float) -> void:
 	_bubble.visible = minded and thinking
 	if _bubble.visible:
 		_bubble.queue_redraw()
-	if not frozen and not _attack:
+	if sleeping and not _attack:
+		(_spr["lids"] as Sprite2D).visible = true
+		_blink_t = 0.0
+		_gaze = Vector2.ZERO
+	elif not frozen and not _attack:
 		_update_blink(delta)
 		if minded:
 			_update_thought(delta)

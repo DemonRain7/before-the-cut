@@ -1,6 +1,6 @@
-# Escalating pressure and the closing cameras
+# Escalating pressure and the closing film
 
-November 22, 2026. Godot rules 15, patient protocol 5. [Watch the 17-second Chinese cut](ward-preview-zh.mp4) · [Hand the film to Claude](claude-prompt.md) · [Next solo and co-op prototypes](next-game.md)
+November 22, 2026. Godot rules 15, patient protocol 5. [Watch the closing film](film-night-K-zh.mp4) · [How the film works](film.md) · [Owner's brief](claude-prompt.md) · [Next solo and co-op prototypes](next-game.md)
 
 ## What a push can do
 
@@ -21,13 +21,9 @@ The game commits the state and presents the body cue when the doctor acts. The f
 
 ## The film
 
-Each settled visitor supplies the actual identity and outcome for one shot, in encounter order. The signed chart and theatre arm start an admission. A repaired implant works on camera. Nine outside incidents show the patient's own location and hardware. Priya's incident happens as her scanner powers up in the ward. The two attendants fall, their monitors stop, and any subsequent admissions use an overflow theatre with a relief crew. The case report carries the same ending.
+The night closes on the operating surgeon's headcam, built only from the night's settlements, in appointment order. Each admitted patient sits in the theatre chair as they stood at the counter, says the line they left the counter with and goes under. The camera pushes into the close-up the doctor examined at the counter and the part is swapped. The calibration then shows the truth. A steady patient's reading settles and they use the new part. A drifting patient's does not: they wake on the table, put the crew down and leave the headcam on the floor, and later admissions get a relief crew. Visitors who were sent away get a short counter recap. A night with nobody admitted ends on the empty chair. A doctor killed at the glass ends the film on that patient, then the hall camera shows anyone still waiting as a silhouette. People never seen at the counter are never named. [Shots, timings and report titles](film.md)
 
-Trauma Team collections, catches, shutter lockouts and departures use the corridor or counter. With zero admissions the film shows an unused chair. A doctor killed at the glass ends the footage on that patient's camera. People never seen at the counter stay out of the cast. The footage builds only from settlements. Appointment dialogue has already been released.
-
-The film runs automatically for 4.8 seconds per admission and 2.9 seconds per corridor or empty-chair shot. Enter or left click goes to the next shot. Escape, right click or the visible skip control opens the report. R or the replay button on any report page starts the same shift's footage again and returns to that page. The blood setting selects the portrait layers. Captions and monitor changes carry the incident with the sound muted.
-
-The sample stages four actual engine settlements to show the branches in one cut. Rook receives a successful repair, Priya's dangerous admission closes the ward, Lux receives treatment from relief staff, and Vale is caught at the counter. The preview is a recording of the Godot renderer with the in-game sound cues. Some secondary incidents use silhouettes, shared street scenery and a caption. Recognizability at a glance is the next film playtest.
+A repair runs about nine seconds, a wake-up about eleven and a counter recap 3.4. Enter, Space, Right or a left click goes to the next shot. Escape, a right click or SKIP opens the report. R or REPLAY on any report page plays the same night again and returns to that page without settling anything twice. Less blood swaps blood for scorch and a white flash. Captions and stamps carry each incident with the sound muted, and each `drifting.treat` report title names the incident the film shows. The first film, with its outdoor incidents and surveillance cameras, was rejected and replaced; its [17-second preview](ward-preview-zh.mp4) stays as a record.
 
 ## Verification
 
@@ -42,16 +38,18 @@ Pressure sampling used 30,000 appointments across five positions in 6,000 seeded
 
 A separate 25,000-night, 125,000-visit engine simulation followed the complaint-led routine and checked the intake file. Among 100,000 later visitors it made the correct call in 89.869% and ended 2.167% of appointments through pressure. The simulation assumes a successful shutter catch when it chooses to defend. The analytical desk-only comparisons in `analyze_loop.py` describe evidence selection under their original simplifying assumptions. Difficulty and appeal still need observation with outside players.
 
-The current build passed 7,921 engine assertions, 1,307 English UI assertions, 1,308 Chinese UI assertions and 1,307 English reduced-blood UI assertions, fixed nights K and L, 399 local transport integration assertions, 102 wire checks, 66 proxy unit cases and 10 evaluation guard cases. The UI suite includes a first-push walkout, early attack and successful catch, a surviving empty-lamp tell, the fourth-push confirmation and cancellation, ordinary and fatal shifts, film order, camera controls and replay without a second settlement. Both language catalogs and text-fit runs passed. A separate renderer pass captured all ten characters under both admission outcomes. The Chinese preview contains 209 rendered frames at 12 fps with a synchronized AAC track.
+Commit `c36f883` passed 7,921 engine assertions, 1,307 English UI assertions, 1,308 Chinese UI assertions and 1,307 English reduced-blood UI assertions, fixed nights K and L, 399 local transport integration assertions, 102 wire checks, 66 proxy unit cases and 10 evaluation guard cases. The UI suite includes a first-push walkout, early attack and successful catch, a surviving empty-lamp tell, the fourth-push confirmation and cancellation, ordinary and fatal shifts, film order, camera controls and replay without a second settlement. Both language catalogs and text-fit runs passed. A separate renderer pass captured all ten characters under both admission outcomes. Its Chinese preview of the first film contains 209 rendered frames at 12 fps with a synchronized AAC track.
+
+The film remake passed 7,957 engine assertions, 1,329 English, 1,330 Chinese and 1,329 reduced-blood UI assertions, fixed nights K and L and the shift capture's dry runs. [Film checks](film.md#checks)
 
 The actual desktop game connected over loopback to the game's OpenAI service for GPT-6 Luna. Two appointments, one English and one Chinese, each generated the first pressure reply, classified a free follow-up after the third push and generated that follow-up. All six provider requests returned HTTP 200. Each fourth push completed locally with the expected walkout. The four displayed model replies ranged from 25 to 107 characters. Visible body actions and character wording were also exercised offline and through proxy timeout. Of 7,858 input tokens, 4,026 were cached across three requests. This six-request sample measures this scenario only. The public live Worker stays disabled.
 
-## Reproducing the cut
+## Reproducing the film
 
-From the checkout, run the Godot executable with the following arguments. Use an absolute path to an empty capture directory. The script produces sequential PNGs and `cues.json` with the sound name and frame of each cue. The game plays the sound at 0.9 pitch and -9 dB.
+`capture_closing.gd` renders a staged night's film straight from engine settlements, one PNG per frame, and writes `cues.json` with each sound cue and the frame it starts on. `--night` picks `mixed`, `incidents`, `refused`, `death` or `first`, and `--shot=N` renders one shot. Use an absolute path to an empty directory and the real renderer (`tools/run_hidden.py` on Windows); `--dry` lists the shots and cues headless.
 
 ```text
---audio-driver Dummy --resolution 640x360 --fixed-fps 60 --path game --script res://tests/capture_closing.gd -- --out=<absolute-directory> --lang=zh --less-blood
+--audio-driver Dummy --resolution 640x360 --fixed-fps 60 --path game --script res://tests/capture_closing.gd -- --out=<absolute-directory> --night=incidents --lang=zh --fps=12
 ```
 
-For an ordinary playable shift, run `.\run-game.ps1 -Language zh -TestNight K`. The camera film begins after the last receipt or a lethal counter attack. The same game loop works with `-Patient script`.
+To see it at the real end of a night, play `.\run-game.ps1 -Patient script -Language zh -TestNight K` to the last slip. [Reaching another ending](film.md#reaching-another-ending) lists four ways through night K and the `record_night.gd` plans that play them by script.

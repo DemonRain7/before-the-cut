@@ -423,17 +423,30 @@ func leave() -> void:
 	await tree.process_frame
 
 
-## Tears the slip off. Returns once the next patient is on the camera or the report is up.
+## Tears the slip off. Returns once the next patient is on the camera, or once the report is up
+## (after the last slip, when the closing film has played through on its own).
 func take_slip() -> bool:
 	click(MainScript.SLIP_CLIP.get_center())
-	return await until(func() -> bool:
-		return (main.state == MainScript.State.WAIT and main.clinic.cam_prompt) or main.state == MainScript.State.REPORT, 38.0)
+	var on: bool = await until(func() -> bool:
+		return (main.state == MainScript.State.WAIT and main.clinic.cam_prompt) or main.state in [MainScript.State.REPORT, MainScript.State.AFTERMATH], 38.0)
+	if not on or main.state != MainScript.State.AFTERMATH:
+		return on
+	# the last slip of the night: the closing film plays through at normal speed, then the report
+	return await wait_through_film()
 
 
 ## Waits for the end-of-night report: after the last slip, or out of the dark when a blow
 ## landed and the night ended early.
 func wait_for_report(limit: float = 30.0) -> bool:
 	return await until(func() -> bool: return main.state == MainScript.State.REPORT, limit)
+
+
+## Waits for the closing film to start and play through at normal speed, then for the report.
+## No shot runs longer than 12 seconds; `limit` is the slack on top.
+func wait_through_film(limit: float = 10.0) -> bool:
+	if not await until(func() -> bool: return main.state in [MainScript.State.AFTERMATH, MainScript.State.REPORT], limit):
+		return false
+	return await until(func() -> bool: return main.state == MainScript.State.REPORT, 12.0 * main.reel.shots.size() + limit)
 
 
 ## Reads the report the way a player does: a click on each page once it has been up long

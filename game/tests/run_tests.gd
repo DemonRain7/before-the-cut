@@ -710,27 +710,40 @@ func test_pressure_draws_and_film() -> void:
 					if ends:
 						eq(result.result, "attack" if v.is_drifting() else "walkout", "truth selects only the terminal outcome")
 						eq(v.press().result, "closed", "terminal commitment cannot be replayed")
-	var reel = preload("res://scripts/ui/closing_reel.gd")
-	eq(reel.build([])[0].outcome, "empty", "an empty list shows the unused chair")
+	var film = preload("res://scripts/ui/closing_film.gd")
+	var nobody: Array = film.plan([])
+	eq([nobody.size(), nobody[0].kind], [1, "empty"], "a night with nobody admitted ends on the empty chair")
 	var records := []
 	for id in templates:
 		for truth in ["stable","drifting"]:
 			var v := VisitState.new(CaseDB.compose(templates[id], {"truth":truth}), rules)
 			v.verdict("treat")
 			records.append(v.settlement())
-	var shots: Array = reel.build(records)
+	var shots: Array = film.plan(records)
 	eq(shots.size(), records.size(), "one operation for each actual admission")
+	var after := ""
 	for i in records.size():
-		eq([shots[i].id,shots[i].outcome], [records[i].case_id,records[i].outcome], "film keeps identity, order and actual treatment")
-		ok(reel.STORIES.has(shots[i].id), "every admitted character has a success and an incident")
-	var mixed: Array = reel.build([{"case_id":"priya","name":"Priya","truth":"drifting","outcome":"treated_drifting"},{"case_id":"rook","name":"Rook","truth":"stable","outcome":"treated_ok"}])
-	eq([mixed[0].annex, mixed[1].annex], [false,true], "later admissions reach relief staff after a fatal ward incident")
+		eq([shots[i].kind,shots[i].id,shots[i].outcome], ["theatre",records[i].case_id,records[i].outcome], "film keeps identity, order and actual treatment")
+		ok(film.SITES.has(shots[i].id) and str(shots[i].title) == str(records[i].title), "every admitted character has a part to replace and the report's title")
+		eq([shots[i].relief,shots[i].after], [after != "",after], "after a patient wakes on the table the relief crew works the chair")
+		if records[i].outcome == "treated_drifting":
+			after = records[i].case_id
 	var records_at_door := []
-	for mode in ["referred_stable","referred_drifting","locked_out","false_alarm","walkout","gave_up","caught","hit"]:
+	for mode in ["referred_stable","referred_drifting","locked_out","false_alarm","walkout","gave_up","caught"]:
 		records_at_door.append({"case_id":"kip","name":"Kip","outcome":mode,"truth":"stable","title":mode})
-	shots = reel.build(records_at_door)
-	eq(shots.size(), records_at_door.size()+1, "every denial stays on camera and the vacant ward is shown once")
-	eq([shots[-2].outcome,shots[-1].outcome], ["empty","hit"], "a fatality cuts the final feed")
+	shots = film.plan(records_at_door)
+	eq(shots.size(), records_at_door.size()+1, "every refusal stays on the counter camera and the empty chair is shown once")
+	for i in records_at_door.size():
+		eq([shots[i].kind,shots[i].outcome], ["counter",records_at_door[i].outcome], "a refusal never reaches the theatre")
+		ok(film.COUNTER_LINES.has(shots[i].outcome), "every refusal has its own closing line")
+	eq(shots[-1].kind, "empty", "nobody admitted: the film ends on the empty chair")
+	records_at_door.append({"case_id":"bo","name":"Bo","outcome":"hit","truth":"drifting","title":"TOO SLOW"})
+	records_at_door.append({"case_id":"rook","name":"Rook","outcome":"treated_ok","truth":"stable","title":"ARM RESEATED"})
+	shots = film.plan(records_at_door, 3)
+	eq([shots.size(),shots[-2].kind,shots[-2].id,shots[-1].kind,shots[-1].unseen], [9,"death","bo","hall",3], "a death at the glass ends the film on the hall camera, which only counts who was waiting")
+	ok(shots.all(func(shot): return shot.kind != "empty" and shot.id != "rook"), "after a death nobody else is filmed and the empty chair is not shown")
+	var first: Array = film.plan([{"case_id":"ozzie","name":"Ozzie","outcome":"hit","truth":"drifting","title":"TOO SLOW"}], 4)
+	eq([first.size(),first[0].kind,first[1].unseen], [2,"death",4], "killed by the first patient: the death, then the four still waiting")
 	var wire := preload("res://scripts/core/model_client.gd").new()
 	var whole := {"state":{"press_count":3},"conversation_history":[{"role":"action","text":"press:3"},{"role":"reaction","text":"A hand stiffens."}],"visit_summary":{"after":1,"omitted":1,"actions":{"press:3":1}}}
 	var legacy: Dictionary = wire._wire_history(whole)

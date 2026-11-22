@@ -41,7 +41,7 @@ const ClinicView = preload("res://scripts/ui/clinic_view.gd")
 const DialogueBox = preload("res://scripts/ui/dialogue_box.gd")
 const Desk = preload("res://scripts/ui/desk.gd")
 const Clipboard = preload("res://scripts/ui/clipboard.gd")
-const ClosingReel = preload("res://scripts/ui/closing_reel.gd")
+const ClosingFilm = preload("res://scripts/ui/closing_film.gd")
 const Screens = preload("res://scripts/ui/screens.gd")
 const PatientRig = preload("res://scripts/ui/patient_rig.gd")
 const AudioBank = preload("res://scripts/ui/audio_bank.gd")
@@ -68,6 +68,7 @@ const SLIP_PARTS_Y := 115.0
 const SLIP_LATER_Y := 125.0
 const SLIP_PROMPT_Y := 136.0
 const REPORT_TURN := 0.25                       # seconds a report page stays before a click turns it
+const FILM_POINTER_REST := 1.2                  # seconds a still pointer stays over the closing film before it hides
 const CARD_LINGER := 1.3                        # seconds a card that was just stamped stays out by itself
 const ARM_TIME := 2.2
 const CALL_ARM_TIME := 3.5                      # how long the Trauma Team line waits for the second press
@@ -346,7 +347,7 @@ var dialogue: DialogueBox = null
 var desk: Desk = null
 var clipboard: Clipboard = null
 var screens: Screens = null
-var reel := ClosingReel.new()
+var reel := ClosingFilm.new()
 var _replaying_film := false
 var audio: AudioBank = null
 var mic: VoiceInput = null        # push-to-talk: a microphone that is open only while the key is held
@@ -368,6 +369,7 @@ var _cursor := Sprite2D.new()
 var _t: float = 0.0
 var _seq: int = 0                 # bumped by every action; a running sequence stops when it changes
 var _mouse := Vector2(320, 250)
+var _pointer_still: float = 0.0                 # seconds since the pointer last moved
 var _skip: bool = false           # a click that asks the current line to hurry up
 var _thinking: bool = false       # waiting for the patient brain
 var _think_t: float = 0.0
@@ -567,7 +569,8 @@ func _build() -> void:
 	reel.hide()
 	add_child(reel)
 	reel.finished.connect(_finish_reel)
-	reel.sound.connect(func(cue: String): audio.play(cue, 0.9, -9.0))
+	reel.sound.connect(func(cue: String, pitch: float, db: float): audio.play(cue, pitch, db))
+	reel.loop_sound.connect(_film_loop)
 	var line_rules: Dictionary = rules.get("line", {})
 	var per_hour := int(line_rules.get("per_hour", 0))
 	var night_rules: Dictionary = rules.get("night", {}) if typeof(rules.get("night")) == TYPE_DICTIONARY else {}
@@ -3585,7 +3588,15 @@ func _start_reel(replay: bool = false) -> void:
 	dialogue.clear()
 	if coach != null and coach.is_running():
 		coach.stop(false)
-	reel.start(shift.records, less_blood)
+	# tonight's patients exactly as they were composed, so the film shows the people the player saw
+	reel.start(shift.records, less_blood, cases, meta, shift.unseen().size())
+
+
+func _film_loop(cue: String, on: bool, db: float) -> void:
+	if on:
+		audio.loop(cue, db)
+	else:
+		audio.stop_loop(cue)
 
 
 func _finish_reel() -> void:
@@ -3733,6 +3744,7 @@ func _close() -> void:
 func pointer_move(pos: Vector2) -> void:
 	if pos != _mouse:
 		_beat_activity()
+		_pointer_still = 0.0
 	_mouse = pos
 
 
@@ -3791,7 +3803,7 @@ func _pointer_press(pos: Vector2, button: int) -> void:
 			act_intro_next()
 		return
 	if state == State.AFTERMATH:
-		if button == MOUSE_BUTTON_RIGHT or (button == MOUSE_BUTTON_LEFT and ClosingReel.SKIP.has_point(pos)):
+		if button == MOUSE_BUTTON_RIGHT or (button == MOUSE_BUTTON_LEFT and ClosingFilm.SKIP.has_point(pos)):
 			reel.finish()
 		elif button == MOUSE_BUTTON_LEFT:
 			reel.advance()
@@ -4335,6 +4347,7 @@ func _process(delta: float) -> void:
 			else:
 				_try_beat("idle")
 	_t += delta
+	_pointer_still += delta
 	_sync_ime()
 	if rig != null:
 		rig.talking = _patient_talking and dialogue.is_revealing()
@@ -4667,7 +4680,8 @@ func _update_cursor() -> void:
 	if _held_sprite.visible:
 		_held_sprite.position = (_mouse - Vector2(18, 30)).round()
 	var kind := _cursor_kind
-	_cursor.visible = kind != "none"
+	# the film is the surgeon's headcam: a pointer left resting would sit on the patient's face
+	_cursor.visible = kind != "none" and not (state == State.AFTERMATH and _pointer_still > FILM_POINTER_REST)
 	if _cursor.visible:
 		_cursor.texture = Gfx.tex("ui/cursor_%s.png" % kind)
 		var spot: Vector2 = HOTSPOT.get(kind, Vector2.ZERO)

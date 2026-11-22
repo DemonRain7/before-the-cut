@@ -200,6 +200,7 @@ func capture_loop(fixed: String) -> void:
 			if v.patience <= 0:
 				break
 			if row == "temper":
+				pin_pressure(4)
 				await d.press()
 				await d.settle()
 			else:
@@ -332,6 +333,31 @@ func restore_rules(was: Dictionary) -> void:
 		var g: Dictionary = main.rules[group]
 		for k in (was[group] as Dictionary).keys():
 			g[k] = was[group][k]
+
+
+## Rules 15 draw each push from the appointment's seed (visit_state.gd pressure_draw), so whether
+## a push ends the visit is random. The pushes below are staged: this gives the visit a seed whose
+## draws end it on push `ends_at` of the appointment (the fourth push always ends it) and show no
+## pressure tell up to then. pin_pressure(4) keeps a single push from ending the visit.
+func pin_pressure(ends_at: int) -> void:
+	var v = main.visit
+	if v == null:
+		reached(false, "a visit to pin the pressure of")
+		return
+	var count: int = v.press_count
+	for s in 20000:
+		v.pressure_seed = s
+		var fits := true
+		for k in range(count, ends_at):
+			v.press_count = k
+			var draw: Dictionary = v.pressure_draw()
+			if bool(draw.tell) or bool(draw.ends) != (k == ends_at - 1):
+				fits = false
+				break
+		v.press_count = count
+		if fits:
+			return
+	reached(false, "a pressure seed ends the visit on push %d" % ends_at)
 
 
 ## A shift seed whose contact list holds exactly these cases, drawn the way the game draws it
@@ -650,7 +676,8 @@ func through_shots(who: String) -> void:
 	await shot(who + "-last")
 	# the dark: no slip prints and nobody else comes in; the report comes up out of it
 	reached(await d.until(func() -> bool: return main.screens.fade >= 1.0, 6.0), who + ": the lights go out")
-	reached(await d.wait_for_report(10.0), who + ": the night ends: the report comes up out of the dark")
+	# the closing film plays first, at normal speed: tonight's admissions, the counter, the hall
+	reached(await d.wait_through_film(), who + ": the night ends: the film, then the report comes up out of the dark")
 	reached(main._slip_mode == "hidden" and main.shift.died and main.shift.is_done(), who + ": no slip prints, and nobody else comes in")
 	await d.until(func() -> bool: return main.screens.fade <= 0.5, 3.0)
 	await shot(who + "-lights-out")
@@ -929,6 +956,7 @@ func kip() -> void:
 	await d.settle()
 	await d.seconds(0.2)
 	await shot("kip-answer")
+	pin_pressure(4)
 	await d.press()
 	await d.seconds(0.5)
 	await shot("kip-press-reaction")
@@ -976,6 +1004,7 @@ func rook() -> void:
 	d.move(d.pad_pos("grip"))
 	await d.seconds(0.3)
 	await shot("rook-refuses-grip")
+	pin_pressure(4)
 	await d.press()
 	await d.seconds(0.12)
 	await shot("rook-slam")
@@ -1077,6 +1106,7 @@ func juno() -> void:
 	await staged_thinking("juno", 1)
 	await d.settle()
 	await shot("juno-deflects")
+	pin_pressure(4)
 	await d.press()      # her last lamps but one: the wrong code cost one of them
 	await d.seconds(0.4)
 	await shot("juno-press")
@@ -1125,6 +1155,7 @@ func maren_gets_through(brief: bool) -> void:
 		await d.settle()
 		await d.complain()
 		await d.settle()
+	pin_pressure(3)
 	await d.press()
 	await d.seconds(0.5)
 	if not brief:
@@ -1200,6 +1231,7 @@ func kip_runs_out() -> void:
 	await d.settle()
 	await d.buzz_in()
 	await d.settle()
+	pin_pressure(4)
 	await d.press()
 	await d.settle()
 	await d.ask(0)
@@ -1278,6 +1310,7 @@ func maren_stopped_late() -> void:
 	await d.settle()
 	await d.buzz_in()
 	await d.settle()
+	pin_pressure(3)
 	await d.press()
 	await d.settle()
 	await d.press()
@@ -1312,6 +1345,7 @@ func maren_stopped_bare() -> void:
 	await d.settle()
 	await d.buzz_in()
 	await d.settle()
+	pin_pressure(3)
 	await d.press()
 	await d.settle()
 	reached(blows_due() == 0, "maren-4: no glass is left for this attack")
@@ -1359,6 +1393,7 @@ func maren_whole_bar() -> void:
 	await d.settle()
 	await d.buzz_in()
 	await d.settle()
+	pin_pressure(3)
 	await d.press()
 	await d.settle()
 	reached(blows_due() == 3, "maren-5: the mended glass has all three blows in it again")
@@ -1424,6 +1459,7 @@ func wear_nights() -> void:
 						"grip": await d.squeeze_and_release()
 						"port": await d.watch_port()
 				elif row == "temper":
+					pin_pressure(4)
 					await d.press()
 					await d.settle()
 				else:
@@ -1438,8 +1474,10 @@ func wear_nights() -> void:
 				reached(main.visit.row_seen(row), "wear reading " + row)
 				await shot("wear-" + row)
 				if row == "temper":
-					await d.press()
-					await d.settle()
+					# push on until only the last push is left: the one that breaks, and asks first
+					while main.visit != null and main.visit.in_exam() and not main.visit.press_breaks():
+						await d.press()
+						await d.settle()
 					d.move(d.pad_pos("press"))
 					await d.seconds(0.35)
 					reached(main.visit.press_breaks() and main.desk.hover == "press", "the warned final PRESS is available")
@@ -1499,6 +1537,7 @@ func weapon_night(shift: String, plan: Array, night: String = "B") -> void:
 		reached(await d.buzz_in(), stem + ": comes to the counter")
 		reached(main.visit != null and str(main.visit.case_data.get("id", "")) == who, stem + ": the visit is " + who + "'s")
 		await d.settle()
+		pin_pressure(3)
 		await d.press()
 		await d.settle()
 		var due := blows_due()

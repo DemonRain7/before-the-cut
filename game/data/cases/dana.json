@@ -269,8 +269,8 @@
     },
     "drifting": {
       "treat": {
-        "title": "OVERLAY OFF",
-        "text": "The grid is off, and the TALON runs quieter for it. At 04:00 a sergeant fires into a crowd it sorted red. Your stamp is on her card."
+        "title": "IT CAME UP RED",
+        "text": "The light test fails: the TALON stops following and comes up red. Dana wakes, puts the crew down with her baton and walks out the back. Your stamp is on her card."
       },
       "refer": {
         "title": "TAKEN IN",

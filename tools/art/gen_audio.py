@@ -675,6 +675,86 @@ def glass_fit():
     return at(1.15, (0.0, servo), (0.26, slide), (0.54, seat), (0.54, seal), (0.55, ring), (0.78, latch * 0.6))
 
 
+# ------------------------------------------------------------------ the theatre (closing film)
+def hiss():
+    """Anaesthetic gas through the mask line: a valve tick, then a long soft hiss."""
+    sec = 1.1
+    x = t(sec)
+    gas = bp(noise(sec), 2200, 7500) * np.clip(x / 0.08, 0, 1) * np.exp(-np.maximum(x - 0.5, 0) / 0.25)
+    valve = bp(noise(0.02), 1500, 6000) * env(int(SR * 0.02), 0.0005, 0.005)
+    return fade(at(sec, (0.0, valve), (0.02, gas * 0.5)), 0.002, 0.05)
+
+
+def driver():
+    """A surgical micro-driver backing a part out: a geared whirr that rises, with a ratchet in it."""
+    sec = 0.7
+    x = t(sec)
+    f = 150 + 90 * (x / sec)
+    whirr = np.sin(2 * np.pi * np.cumsum(f) / SR) + 0.5 * np.sin(4 * np.pi * np.cumsum(f) / SR)
+    whirr = lp(whirr * (0.7 + 0.3 * square(31, sec)), 2400) * np.sin(np.pi * x / sec) ** 0.4
+    ratchet = at(sec, *[(i * 0.11 + 0.05, bp(noise(0.01), 2000, 7000) * env(int(SR * 0.01), 0.0005, 0.003)) for i in range(6)])
+    return fade(whirr * 0.6 + ratchet * 0.5, 0.01, 0.06)
+
+
+def seat():
+    """A part clicking home: tick, thunk and a short ring."""
+    tick = bp(noise(0.012), 2500, 8000) * env(int(SR * 0.012), 0.0005, 0.003)
+    thunk = sweep(260, 90, 0.08) * env(int(SR * 0.08), 0.001, 0.025)
+    ring = sum(sine(f, 0.25) * a for f, a in ((3120, 1.0), (4780, 0.4))) * env(int(SR * 0.25), 0.001, 0.06) * 0.25
+    return at(0.3, (0.0, tick), (0.005, thunk), (0.008, ring))
+
+
+def cal_ok():
+    """Calibration passed: two clean rising tones."""
+    a = fade(sine(880, 0.11) + 0.2 * square(880, 0.11), 0.003, 0.03)
+    b = fade(sine(1320, 0.2) + 0.2 * square(1320, 0.2), 0.003, 0.08)
+    return at(0.36, (0.0, a), (0.13, b))
+
+
+def cal_bad():
+    """Calibration failed: a low buzzing tone that sags and wobbles."""
+    sec = 0.7
+    x = t(sec)
+    f = 230 - 50 * (x / sec) + 8 * np.sin(2 * np.pi * 9 * x)
+    tone = np.where((np.cumsum(f) / SR) % 1.0 < 0.5, 1.0, -1.0)
+    return fade(lp(tone, 1800) * 0.6, 0.004, 0.08)
+
+
+def ecg():
+    """One beep of the theatre monitor."""
+    return fade(sine(960, 0.07) * env(int(SR * 0.07), 0.002, 0.05), 0.001, 0.01)
+
+
+def flatline():
+    return fade(sine(960, 1.8) * 0.8, 0.004, 0.3)
+
+
+def static():
+    """The headcam losing its signal: crushed noise, falling away."""
+    sec = 1.3
+    x = t(sec)
+    hiss_ = bits(noise(sec), levels=6, hold=4)
+    buzz = square(60, sec) * 0.25
+    return fade((hp(hiss_, 400) * 0.7 + buzz) * np.exp(-x / 0.7), 0.002, 0.2)
+
+
+def strap():
+    """A restraint strap tearing at the buckle, then the buckle hitting the floor."""
+    rip = bp(noise(0.3), 300, 2400) * (0.5 + 0.5 * np.abs(np.sin(2 * np.pi * 37 * t(0.3)))) * env(int(SR * 0.3), 0.01, 0.12)
+    clink = sum(sine(f, 0.2) * a for f, a in ((2600, 1.0), (4100, 0.5))) * env(int(SR * 0.2), 0.001, 0.04) * 0.4
+    return at(0.55, (0.0, rip), (0.32, clink))
+
+
+def note():
+    """One sung note from a voice box (the film pitches it), a little vibrato and a buzz."""
+    sec = 0.34
+    x = t(sec)
+    f = 523.25 * (1 + 0.012 * np.sin(2 * np.pi * 6 * x))
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    v = np.sin(ph) + 0.35 * np.sin(2 * ph) + 0.12 * np.where(np.sin(3 * ph) > 0, 1.0, -1.0)
+    return fade(v * env(len(x), 0.02, 0.5), 0.01, 0.06)
+
+
 # ------------------------------------------------------------------ results
 def cash():
     ching = at(0.7, (0.0, bell(2093, 0.4, 0.14)), (0.09, bell(2637, 0.6, 0.22)))
@@ -742,6 +822,8 @@ SOUNDS = {
     "jingle_good": (lambda: jingle([523.3, 659.3, 784.0, 1046.5]), 0.5),
     "jingle_bad": (lambda: jingle([392.0, 349.2, 311.1, 233.1], 0.2, 0.35), 0.5),
     "glass_fit": (glass_fit, 0.6),
+    "hiss": (hiss, 0.45), "driver": (driver, 0.5), "seat": (seat, 0.7), "cal_ok": (cal_ok, 0.35), "cal_bad": (cal_bad, 0.4),
+    "ecg": (ecg, 0.3), "flatline": (flatline, 0.3), "static": (static, 0.5), "strap": (strap, 0.7), "note": (note, 0.4),
     "clang": (clang, 0.75), "punch": (punch, 0.9), "servo_loop": (servo_loop, 0.35), "hum_loop": (hum_loop, 0.3),
     "scrape": (scrape, 0.6),
     "laser_loop": (laser_loop, 0.3), "laser_burst": (laser_burst, 0.7), "chop": (chop, 0.85),
@@ -751,7 +833,8 @@ SOUNDS = {
 # The sounds of the first build share one random stream, in the order above. Every sound added
 # since starts from a fresh stream instead: adding one changes no other file, and writing it
 # alone gives the same file as a full build. Add new sounds here as well as above.
-FRESH = {"radio", "siren", "glass_fit", "clang", "punch", "servo_loop", "hum_loop", "scrape",
+FRESH = {"hiss", "driver", "seat", "cal_ok", "cal_bad", "ecg", "flatline", "static", "strap", "note",
+         "radio", "siren", "glass_fit", "clang", "punch", "servo_loop", "hum_loop", "scrape",
          "laser_loop", "laser_burst", "chop", "arc_loop", "zap", "baton_hit", "stun_loop", "piston_loop", "spike"}
 
 

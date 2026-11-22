@@ -24,6 +24,7 @@ const CaseDB = preload("res://scripts/core/case_db.gd")
 const PlayDriver = preload("res://tests/play_driver.gd")
 const Gfx = preload("res://scripts/ui/gfx.gd")
 const Lang = preload("res://scripts/core/lang.gd")
+const ClosingFilm = preload("res://scripts/ui/closing_film.gd")
 
 const SPEED := 4.0
 
@@ -489,10 +490,18 @@ func finish_visit(label: String) -> void:
 ## A blow landed: the night ends with this visit. No slip prints; the report comes up out of the
 ## dark, names the visitors still in the hall, and nobody reads the meter.
 func lights_out(label: String, unseen: Array) -> void:
-	check(await d.until(func() -> bool: return main.state == MainScript.State.AFTERMATH, 40.0), "%s: the actual ward footage opens after the fatal blow" % label)
-	check(main.reel.visible and main.reel.shots.back().outcome == "hit" and main.reel.shots.back().id == main.shift.records.back().case_id, "the final camera names the patient who ended the shift")
+	check(await d.until(func() -> bool: return main.state == MainScript.State.AFTERMATH, 40.0), "%s: the closing film opens after the fatal blow" % label)
+	var deaths: Array = main.reel.shots.filter(func(shot) -> bool: return shot.kind == "death")
+	check(main.reel.visible and deaths.size() == 1 and deaths[0].outcome == "hit" and deaths[0].id == main.shift.records.back().case_id, "the death camera names the patient who ended the shift")
+	check(main.reel.shots.back().kind == "hall" and int(main.reel.shots.back().unseen) == unseen.size(), "%s: the hall camera ends the film and counts who was still waiting" % label)
+	check(main.reel.shots.size() == ClosingFilm.plan(main.shift.records, unseen.size()).size(), "%s: the film is planned from the night's settlements" % label)
 	for shot in main.reel.shots:
 		check(shot.id not in unseen, "unseen patients have no footage")
+	await d.seconds(main.FILM_POINTER_REST + 0.1)
+	check(main.state == MainScript.State.AFTERMATH and not main._cursor.visible, "%s: a resting pointer hides over the film" % label)
+	d.move(main._mouse + Vector2(6, 0))
+	await process_frame
+	check(main._cursor.visible, "%s: it comes back as soon as it moves" % label)
 	d.key(KEY_ESCAPE)
 	var up: bool = await d.wait_for_report()
 	check(up and main.screens.mode == "report", "skipping footage opens the closing report")
@@ -2407,12 +2416,19 @@ func voice_words() -> void:
 ## is drawn.
 func counter_words() -> void:
 	section("The counter's words fit where they are drawn")
-	for id in main.reel.STORIES:
-		var story: Array = main.reel.STORIES[id]
-		check(Gfx.text_w(story[0], true) < 250.0 and Gfx.wrap_text(story[1],590).size() <= 2 and Gfx.wrap_text(story[2],590).size() <= 2, "both camera captions fit for " + str(id))
+	# the closing film's captions sit left of its two buttons, one line each
+	var film_lines: Array = main.reel.COUNTER_LINES.values()
+	film_lines.append_array(["The repair holds.", "The reading will not settle.", "Headcam signal lost.", "The doctor did not get up.",
+		"One more was waiting.", "No one else was waiting.", "No one was admitted tonight."])
+	for line in film_lines:
+		check(Gfx.wrap_text(line, 356).size() == 1, "the film caption fits beside its buttons: " + str(line))
+	check(Gfx.wrap_raw(Lang.tf("%s left by the back door.", ["Adrian Vale"]), 356).size() == 1 and Gfx.wrap_raw(Lang.tf("%d more were waiting.", [8]), 356).size() == 1, "the film's name and count captions fit")
+	for id in main.templates:
+		var c: Dictionary = main.templates[id]
+		check(Gfx.wrap_text(str(c.get("request", "")), 356).size() <= 2, "the film's job card line fits for " + str(id))
+	for words in ["Next shot [ENTER]", "Skip film [ESC]"]:
+		check(Gfx.text_w(words) <= ClosingFilm.NEXT.size.x - 8, "the film's button fits: " + words)
 	check(Gfx.text_w("Replay film [R]") <= main.screens.REPLAY_FILM.size.x - 4, "the report replay control fits")
-	for caption in main.reel.EXIT_LINES.values():
-		check(Gfx.wrap_text(caption,590).size() <= 2, "corridor and quiet ward captions fit")
 	var hints: Array = [main.SHORT_HINT, main.LEAVING_HINT, main.LEAVING_LAST_HINT, main.NOTE_COACH_HINT,
 		main.NOTE_OPEN_COACH_HINT, main.LAMP_COACH_HINT, main.GLASS_COACH_HINT, main.WAIT_HINT, main.CAM_HINT, main.CAM_PEEK_HINT,
 		main.CAM_OFF_HINT, main.THINK_HINT, Lang.tf(main.GLASS_HINT, 40), Lang.tf(main.GLASS_HINT, 999), main.GLASS_BUSY_HINT, main.GLASS_WHOLE_HINT,

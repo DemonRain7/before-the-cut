@@ -275,8 +275,8 @@
     },
     "drifting": {
       "treat": {
-        "title": "EYE TUNED",
-        "text": "As the new SCAN comes online, Priya turns on the two attendants. The surgery feed cuts out. Neither attendant survives. Your stamp is on her card."
+        "title": "SCAN ONLINE",
+        "text": "The light test fails: the new SCAN stops following and locks on the surgeon. Priya wakes, the laser fires and the headcam goes dark. She walks out the back. Your stamp is on her card."
       },
       "refer": {
         "title": "TAKEN IN",
