@@ -1,10 +1,12 @@
 extends SceneTree
 ## Render the closing film from real settlements: one PNG per frame at a fixed rate, and the
 ## sound cues with the frame each one starts on.
-##   -- --out=<directory> [--night=mixed|incidents|refused|death|first] [--fps=12]
-##      [--lang=zh] [--less-blood] [--dry] [--shot=N]
-## --dry steps the whole film and writes only the cues and the shot list (it works headless).
-## --shot=N skips to shot N (from 0) and stops when it ends.
+##   -- --out=<directory> [--night=mixed|incidents|steady|refused|death|first] [--fps=12]
+##      [--patient=<id> [--truth=stable|drifting]] [--from=S] [--to=S]
+##      [--lang=zh] [--less-blood] [--dry]
+## --patient replaces the night with that one patient, admitted: a stable one is the repair film
+## on their part, a drifting one the massacre. --from/--to keep only that stretch of the film, in
+## seconds. --dry steps the whole film and writes only the cues and the plan (it works headless).
 ## Frames need the real renderer: run it on the hidden desktop (tools/run_hidden.py).
 const Film = preload("res://scripts/ui/closing_film.gd")
 const DB = preload("res://scripts/core/case_db.gd")
@@ -12,14 +14,16 @@ const Visit = preload("res://scripts/core/visit_state.gd")
 const Lang = preload("res://scripts/core/lang.gd")
 
 ## Each night is [patient, truth, what the doctor did] in the order they were seen.
-## mixed: repairs, one patient who wakes on the table, and a call to Trauma Team.
-## incidents: four dangerous admissions and one good repair. refused: nobody admitted.
+## mixed: repairs and one drifting admission, so the massacre. incidents: four drifting admissions.
+## steady: every admission was stable, so one repair. refused: nobody admitted, the empty chair.
 ## death: a repair, then the doctor is killed at the glass. first: killed by the first patient.
 const NIGHTS := {
 	"mixed": [["rook", "stable", "treat"], ["priya", "drifting", "treat"], ["lux", "stable", "treat"],
 		["vale", "drifting", "refer"], ["juno", "stable", "treat"]],
 	"incidents": [["kip", "drifting", "treat"], ["maren", "drifting", "treat"], ["dana", "stable", "treat"],
 		["juno", "drifting", "treat"], ["lux", "drifting", "treat"]],
+	"steady": [["rook", "stable", "treat"], ["kip", "stable", "treat"], ["lux", "stable", "treat"],
+		["vale", "drifting", "refer"], ["juno", "stable", "treat"]],
 	"refused": [["rook", "stable", "refer"], ["priya", "drifting", "shutter"], ["bo", "stable", "shutter"],
 		["ozzie", "stable", "walkout"], ["dana", "stable", "gave_up"], ["vale", "drifting", "caught"]],
 	"death": [["rook", "stable", "treat"], ["bo", "drifting", "hit"]],
@@ -39,7 +43,10 @@ func _capture() -> void:
 	var out := ""
 	var night := "mixed"
 	var fps := 12
-	var only := -1
+	var patient := ""
+	var truth := "stable"
+	var from := 0.0
+	var to := INF
 	var args := OS.get_cmdline_user_args()
 	for arg in args:
 		if arg.begins_with("--out="):
@@ -48,8 +55,14 @@ func _capture() -> void:
 			night = arg.trim_prefix("--night=")
 		elif arg.begins_with("--fps="):
 			fps = maxi(1, int(arg.trim_prefix("--fps=")))
-		elif arg.begins_with("--shot="):
-			only = int(arg.trim_prefix("--shot="))
+		elif arg.begins_with("--patient="):
+			patient = arg.trim_prefix("--patient=")
+		elif arg.begins_with("--truth="):
+			truth = arg.trim_prefix("--truth=")
+		elif arg.begins_with("--from="):
+			from = maxf(0.0, float(arg.trim_prefix("--from=")))
+		elif arg.begins_with("--to="):
+			to = float(arg.trim_prefix("--to="))
 	var dry := args.has("--dry")
 	if out == "" or not NIGHTS.has(night) or DirAccess.make_dir_recursive_absolute(out) != OK:
 		push_error("capture_closing: give --out=<directory> and a known --night")
@@ -59,7 +72,15 @@ func _capture() -> void:
 	var db := DB.load_all()
 	var records := []
 	var cases := {}
-	for member in NIGHTS[night]:
+	var members: Array = NIGHTS[night]
+	if patient != "":
+		if not db.templates.has(patient):
+			push_error("capture_closing: no patient " + patient)
+			quit(1)
+			return
+		members = [[patient, truth, "treat"]]
+		night = "%s-%s" % [patient, truth]
+	for member in members:
 		var id := str(member[0])
 		var c := DB.compose(db.templates[id], {"truth": str(member[1])})
 		DB.resolve_parts(c, db.parts)
@@ -74,16 +95,12 @@ func _capture() -> void:
 	film.start(records, args.has("--less-blood"), cases, {}, int(UNSEEN.get(night, 0)))
 	var shots: Array = []
 	for s in film.shots:
-		shots.append({"kind": s.kind, "id": s.id, "outcome": s.outcome, "relief": s.relief})
-	var starts := []
-	var last := -1
-	if only >= 0:
-		while film.visible and film.index < only:
-			film.advance()
-	while film.visible and (only < 0 or film.index == only):
-		if film.index != last:
-			last = film.index
-			starts.append(count)
+		shots.append({"kind": s.kind, "id": s.id, "outcome": s.outcome, "died": s.died, "admitted": s.admitted, "unseen": s.unseen})
+	if from > 0.0:
+		film._seek(from)
+	var times := []
+	while film.visible and film.elapsed < to:
+		times.append(snappedf(film.elapsed, 0.001))
 		if not dry:
 			await process_frame
 			await RenderingServer.frame_post_draw
@@ -97,9 +114,10 @@ func _capture() -> void:
 	if log == null:
 		quit(1)
 		return
-	log.store_string(JSON.stringify({"night": night, "fps": fps, "shots": shots, "starts": starts, "cues": cues}, "\t"))
+	log.store_string(JSON.stringify({"night": night, "fps": fps, "shots": shots, "chapters": Film.CHAPTERS.get(str(shots[0].kind), []),
+		"times": times, "cues": cues}, "\t"))
 	log.close()
-	print("Closing film, night %s: %d shots, %d frames at %d fps%s." % [night, shots.size(), count, fps, " (dry)" if dry else ""])
+	print("Closing film, night %s: %s of %s, %d frames at %d fps%s." % [night, shots[0].kind, shots[0].id, count, fps, " (dry)" if dry else ""])
 	quit()
 
 

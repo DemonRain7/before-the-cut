@@ -1,6 +1,6 @@
 # Escalating pressure and the closing film
 
-November 22, 2026. Godot rules 15, patient protocol 5. [Watch the closing film](film-night-K-zh.mp4) · [How the film works](film.md) · [Owner's brief](claude-prompt.md) · [Next solo and co-op prototypes](next-game.md)
+November 22, 2026. Godot rules 15, patient protocol 5. [Watch the closing film](film-night-K-zh.mp4) · [How the film works](film.md) · [Brief for the second version](claude-prompt.md) · [Next solo and co-op prototypes](next-game.md)
 
 ## What a push can do
 
@@ -21,9 +21,9 @@ The game commits the state and presents the body cue when the doctor acts. The f
 
 ## The film
 
-The night closes on the operating surgeon's headcam, built only from the night's settlements, in appointment order. Each admitted patient sits in the theatre chair as they stood at the counter, says the line they left the counter with and goes under. The camera pushes into the close-up the doctor examined at the counter and the part is swapped. The calibration then shows the truth. A steady patient's reading settles and they use the new part. A drifting patient's does not: they wake on the table, put the crew down and leave the headcam on the floor, and later admissions get a relief crew. Visitors who were sent away get a short counter recap. A night with nobody admitted ends on the empty chair. A doctor killed at the glass ends the film on that patient, then the hall camera shows anyone still waiting as a silhouette. People never seen at the counter are never named. [Shots, timings and report titles](film.md)
+The night closes on one short film in the back room, built only from the night's settlements. Everyone in it is a silhouette against the theatre lamp. If the doctor admitted a drifting patient, the film is about one of them: the surgeon swaps the part in close-up, the counter's own test fails, the lamp bursts, and in the flashes of a dead tube the patient kills the crew. Then it comes for the lens, its face shows for a few frames, and a card names it. If everyone admitted was steady, one of them is repaired, the part holds and they open their eyes under the lamp. A doctor killed at the glass ends on the crew waiting in the back for someone who never comes; the people still waiting are only a count. A night with nobody admitted ends on the empty chair. [Shots, camera and timings](film.md)
 
-A repair runs about nine seconds, a wake-up about eleven and a counter recap 3.4. Enter, Space, Right or a left click goes to the next shot. Escape, a right click or SKIP opens the report. R or REPLAY on any report page plays the same night again and returns to that page without settling anything twice. Less blood swaps blood for scorch and a white flash. Captions and stamps carry each incident with the sound muted, and each `drifting.treat` report title names the incident the film shows. The first film, with its outdoor incidents and surveillance cameras, was rejected and replaced; its [17-second preview](ward-preview-zh.mp4) stays as a record.
+The massacre runs 44 seconds, the repair 26, the waiting 18 and the empty chair 12. Enter, Space, Right or a left click jumps to the next chapter. Escape, a right click or SKIP opens the report. R or REPLAY on any report page plays the same film again and returns to that page without settling anything twice. Less blood removes the splats and the pools. Captions and the end card carry the story with the sound muted, and each `drifting.treat` report title names what happened in the theatre. Two earlier films were rejected and replaced: outdoor incidents on surveillance cameras (its [17-second preview](ward-preview-zh.mp4) stays as a record) and the surgeon's headcam, which showed every admission in turn.
 
 ## Verification
 
@@ -40,16 +40,16 @@ A separate 25,000-night, 125,000-visit engine simulation followed the complaint-
 
 Commit `c36f883` passed 7,921 engine assertions, 1,307 English UI assertions, 1,308 Chinese UI assertions and 1,307 English reduced-blood UI assertions, fixed nights K and L, 399 local transport integration assertions, 102 wire checks, 66 proxy unit cases and 10 evaluation guard cases. The UI suite includes a first-push walkout, early attack and successful catch, a surviving empty-lamp tell, the fourth-push confirmation and cancellation, ordinary and fatal shifts, film order, camera controls and replay without a second settlement. Both language catalogs and text-fit runs passed. A separate renderer pass captured all ten characters under both admission outcomes. Its Chinese preview of the first film contains 209 rendered frames at 12 fps with a synchronized AAC track.
 
-The film remake passed 7,957 engine assertions, 1,329 English, 1,330 Chinese and 1,329 reduced-blood UI assertions, fixed nights K and L and the shift capture's dry runs. [Film checks](film.md#checks)
+The silhouette film passed 7,889 engine assertions, 1,300 English, 1,301 Chinese and 1,300 reduced-blood UI assertions, fixed nights K and L and the shift capture's dry runs. [Film checks](film.md#checks)
 
 The actual desktop game connected over loopback to the game's OpenAI service for GPT-6 Luna. Two appointments, one English and one Chinese, each generated the first pressure reply, classified a free follow-up after the third push and generated that follow-up. All six provider requests returned HTTP 200. Each fourth push completed locally with the expected walkout. The four displayed model replies ranged from 25 to 107 characters. Visible body actions and character wording were also exercised offline and through proxy timeout. Of 7,858 input tokens, 4,026 were cached across three requests. This six-request sample measures this scenario only. The public live Worker stays disabled.
 
 ## Reproducing the film
 
-`capture_closing.gd` renders a staged night's film straight from engine settlements, one PNG per frame, and writes `cues.json` with each sound cue and the frame it starts on. `--night` picks `mixed`, `incidents`, `refused`, `death` or `first`, and `--shot=N` renders one shot. Use an absolute path to an empty directory and the real renderer (`tools/run_hidden.py` on Windows); `--dry` lists the shots and cues headless.
+`capture_closing.gd` renders a staged night's film straight from engine settlements, one PNG per frame, and writes `cues.json` with each sound cue and the frame it starts on. `--night` picks `mixed` or `incidents` (a massacre), `steady` (a repair), `refused` (the empty chair), `death` or `first` (the crew waiting). `--patient=<id> --truth=stable|drifting` films one patient's repair or massacre, and `--from`/`--to` keep a stretch, in seconds. Use an absolute path to an empty directory and the real renderer (`tools/run_hidden.py` on Windows); `--dry` lists the plan and cues headless.
 
 ```text
---audio-driver Dummy --resolution 640x360 --fixed-fps 60 --path game --script res://tests/capture_closing.gd -- --out=<absolute-directory> --night=incidents --lang=zh --fps=12
+--audio-driver Dummy --resolution 640x360 --fixed-fps 60 --path game --script res://tests/capture_closing.gd -- --out=<absolute-directory> --night=mixed --lang=zh --fps=12
 ```
 
-To see it at the real end of a night, play `.\run-game.ps1 -Patient script -Language zh -TestNight K` to the last slip. [Reaching another ending](film.md#reaching-another-ending) lists four ways through night K and the `record_night.gd` plans that play them by script.
+To see it at the real end of a night, play `.\run-game.ps1 -Patient script -Language zh -TestNight K` to the last slip. [Reaching each ending](film.md#reaching-each-ending) lists five ways through night K and the `record_night.gd` plans that play them by script.

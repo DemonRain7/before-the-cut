@@ -675,7 +675,7 @@ def glass_fit():
     return at(1.15, (0.0, servo), (0.26, slide), (0.54, seat), (0.54, seal), (0.55, ring), (0.78, latch * 0.6))
 
 
-# ------------------------------------------------------------------ the theatre (closing film)
+# ------------------------------------------------------------------ the back room (closing film)
 def hiss():
     """Anaesthetic gas through the mask line: a valve tick, then a long soft hiss."""
     sec = 1.1
@@ -730,7 +730,7 @@ def flatline():
 
 
 def static():
-    """The headcam losing its signal: crushed noise, falling away."""
+    """The picture losing its signal: crushed noise, falling away."""
     sec = 1.3
     x = t(sec)
     hiss_ = bits(noise(sec), levels=6, hold=4)
@@ -754,6 +754,67 @@ def note():
     v = np.sin(ph) + 0.35 * np.sin(2 * ph) + 0.12 * np.where(np.sin(3 * ph) > 0, 1.0, -1.0)
     return fade(v * env(len(x), 0.02, 0.5), 0.01, 0.06)
 
+
+
+# When the lamp's light is on while it strikes, in seconds from the start of flicker(); the film
+# flickers the lamp on the same windows (closing_film.gd FLICKER).
+FLICKER_GATES = ((0.0, 0.05), (0.17, 0.21), (0.48, 0.66), (0.86, 0.9), (1.05, 1.2))
+
+
+def flicker():
+    """The theatre lamp failing to strike, then catching: a mains buzz that cuts in and out, with a
+    tick at every strike."""
+    sec = 1.25
+    x = t(sec)
+    buzz = square(100, sec) * 0.3 + sine(200, sec) * 0.45 + sine(300, sec) * 0.15
+    gate = np.zeros(len(x))
+    ticks = []
+    for a, b in FLICKER_GATES:
+        gate[(x >= a) & (x < b)] = 1.0
+        ticks.append((a, bp(noise(0.015), 1500, 6000) * env(int(SR * 0.015), 0.0005, 0.004)))
+    gate = lp(gate, 300)
+    return fade(bp(buzz, 90, 4000) * gate * 0.7 + at(sec, *ticks) * 0.9, 0.001, 0.03)
+
+
+def lamp_loop():
+    """The lamp's ballast once it is lit: a low mains hum and a faint rattle. Whole cycles in the
+    second, so it loops clean."""
+    sec = 1.0
+    x = t(sec)
+    hum = (np.sin(2 * np.pi * 100 * x) * 0.5 + np.sin(2 * np.pi * 200 * x) * 0.28
+           + np.sin(2 * np.pi * 300 * x) * 0.1 + np.sign(np.sin(2 * np.pi * 100 * x)) * 0.05)
+    rattle = loop_noise(sec, lambda f: ((f > 2000) & (f < 6000)) * 1.0) * (0.6 + 0.4 * np.sin(2 * np.pi * 3 * x) ** 2)
+    return hum + rattle * 0.06
+
+
+def breath():
+    """A slow breath in the dark, close to the lens: in through the teeth, then out, rasping."""
+    sec = 2.6
+    inhale = bp(noise(1.1), 700, 3200) * np.sin(np.pi * t(1.1) / 1.1) ** 1.6
+    rasp = 0.6 + 0.4 * np.abs(np.sin(2 * np.pi * 23 * t(1.3)))
+    exhale = bp(noise(1.3), 300, 1600) * np.sin(np.pi * t(1.3) / 1.3) ** 1.2 * rasp
+    return fade(at(sec, (0.0, inhale * 0.7), (1.2, exhale)), 0.02, 0.2)
+
+
+def boom():
+    """One heavy step on the theatre floor, felt more than heard."""
+    thump = sweep(80, 32, 0.6) * env(int(SR * 0.6), 0.002, 0.18)
+    knock = lp(noise(0.08), 900) * env(int(SR * 0.08), 0.001, 0.02)
+    tail = lp(noise(0.9), 300) * env(int(SR * 0.9), 0.01, 0.3) * 0.3
+    return at(1.0, (0.0, thump), (0.0, knock * 0.6), (0.01, tail))
+
+
+def riser():
+    """Detuned tones and air climbing together for three seconds, then cut dead."""
+    sec = 3.2
+    x = t(sec)
+    k = (x / sec) ** 2
+    tones = np.zeros(len(x))
+    for f0, f1, a in ((55.0, 110.0, 1.0), (55.6, 111.5, 0.8), (82.4, 164.8, 0.5), (220.0, 880.0, 0.25)):
+        ph = 2 * np.pi * np.cumsum(f0 + (f1 - f0) * k) / SR
+        tones += a * (np.sin(ph) + 0.3 * np.sin(2 * ph) + 0.15 * np.sin(3 * ph))
+    air = bp(noise(sec), 1500, 7000) * k
+    return fade((tones * 0.35 + air * 0.6) * (0.1 + 0.9 * k), 0.2, 0.01)
 
 # ------------------------------------------------------------------ results
 def cash():
@@ -824,6 +885,8 @@ SOUNDS = {
     "glass_fit": (glass_fit, 0.6),
     "hiss": (hiss, 0.45), "driver": (driver, 0.5), "seat": (seat, 0.7), "cal_ok": (cal_ok, 0.35), "cal_bad": (cal_bad, 0.4),
     "ecg": (ecg, 0.3), "flatline": (flatline, 0.3), "static": (static, 0.5), "strap": (strap, 0.7), "note": (note, 0.4),
+    "flicker": (flicker, 0.5), "lamp_loop": (lamp_loop, 0.25), "breath": (breath, 0.6), "boom": (boom, 0.9),
+    "riser": (riser, 0.6),
     "clang": (clang, 0.75), "punch": (punch, 0.9), "servo_loop": (servo_loop, 0.35), "hum_loop": (hum_loop, 0.3),
     "scrape": (scrape, 0.6),
     "laser_loop": (laser_loop, 0.3), "laser_burst": (laser_burst, 0.7), "chop": (chop, 0.85),
@@ -834,6 +897,7 @@ SOUNDS = {
 # since starts from a fresh stream instead: adding one changes no other file, and writing it
 # alone gives the same file as a full build. Add new sounds here as well as above.
 FRESH = {"hiss", "driver", "seat", "cal_ok", "cal_bad", "ecg", "flatline", "static", "strap", "note",
+         "flicker", "lamp_loop", "breath", "boom", "riser",
          "radio", "siren", "glass_fit", "clang", "punch", "servo_loop", "hum_loop", "scrape",
          "laser_loop", "laser_burst", "chop", "arc_loop", "zap", "baton_hit", "stun_loop", "piston_loop", "spike"}
 

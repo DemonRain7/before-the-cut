@@ -13,7 +13,8 @@ extends SceneTree
 ##   python tools/run_hidden.py --timeout 900 -- <Godot GUI executable> --fixed-fps 30
 ##       --write-movie <absolute path>.avi --path game --script res://tests/record_night.gd
 ##       -- --test-night=K --plan=treat,treat,treat,refer,treat --lang=zh
-## Without --write-movie (and with --headless) it plays the same night and prints what happened.
+## Without --write-movie (and with --headless) it plays the same night and prints what happened;
+## add --fixed-fps 30 to play it in seconds instead of its real three and a half minutes.
 const MainScript = preload("res://scripts/ui/main.gd")
 const Driver = preload("res://tests/play_driver.gd")
 const Gfx = preload("res://scripts/ui/gfx.gd")
@@ -59,7 +60,10 @@ func _record() -> void:
 		_need(main.state == MainScript.State.AFTERMATH or main.state == MainScript.State.REPORT, "the closing film starts when the night ends")
 		var shots: Array = []
 		for shot in main.reel.shots:
-			shots.append("%s %s %s" % [shot.kind, shot.id, shot.get("outcome", "")])
+			var line := "%s %s %s" % [shot.kind, shot.id, shot.get("outcome", "")]
+			if shot.kind == "waiting":
+				line += " (%d still waiting)" % int(shot.get("unseen", 0))
+			shots.append(line)
 		print("Film: ", ", ".join(shots))
 		_need(await d.wait_through_film(), "the report comes up after the film")
 		await d.seconds(2.5)

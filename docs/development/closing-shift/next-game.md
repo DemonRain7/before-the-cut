@@ -13,7 +13,7 @@ Recorded on November 22 and deferred by the owner: “双人玩法先记下来�
 
 ### What the closing film already prototypes
 
-The film's theatre shot is the surgeon's view of this design, played back instead of played: the patient seated at the size they stood at the counter, the push into the close-up the front desk examined, the driver and forceps, the click of the seated part, the calibration reading, and the moment the face wakes. A prototype can take that staging (`closing_film.gd`, the `theatre/` art, the rig's `release_hands`) and give the gloves to the second player. The film then stops being a verdict and becomes the job.
+The film's close-up is the surgeon's view of this design, played back instead of played: the part the front desk examined, as it looked in the counter's scope, the driver and forceps, the click of the seated part and the calibration reading that holds or fails, then the tilt up to the face. A prototype can take that staging (the close-up set in `closing_film.gd`, the gloves and parts in `film/`, the counter's `scope/` art) and give the gloves to the second player. The film then stops being a verdict and becomes the job.
 
 ### A first sketch
 
@@ -25,7 +25,7 @@ The film's theatre shot is the surgeon's view of this design, played back instea
 - **Waiting with a purpose.**
   - During a long interview the surgeon watches the counter feed without sound and sees the complaint the front desk marks. Laying out the matching part before the patient arrives shortens the operation, which rewards following the partner.
   - Between patients the surgeon bench-tests the part taken out of the last one. Wear or drift is a fact they can pass to the front desk.
-  - After an incident the theatre is cleaned and restocked, and the damage carries over, as the relief crew does in the film.
+  - After an incident the theatre is cleaned and restocked, and the damage carries over to the next patient.
   - Through a run of refusals the theatre stands idle while the night's costs run on. The surgeon can call the desk to ask for someone, which puts the game's own money-against-safety pull between the two players.
 - **Talk.** One intercom button per side (“ready for the next”, “hold the next one”, “hand's tightening”) and voice when the players sit together. No free chat.
 

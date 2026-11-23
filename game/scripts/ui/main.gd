@@ -3602,6 +3602,9 @@ func _film_loop(cue: String, on: bool, db: float) -> void:
 func _finish_reel() -> void:
 	if state != State.AFTERMATH:
 		return
+	# the film turns the rain and the drone down for itself: back to the clinic's levels
+	audio.loop("amb_rain", -15.0)
+	audio.loop("amb_drone", -24.0)
 	if _replaying_film:
 		state = State.REPORT
 	else:
@@ -4680,7 +4683,7 @@ func _update_cursor() -> void:
 	if _held_sprite.visible:
 		_held_sprite.position = (_mouse - Vector2(18, 30)).round()
 	var kind := _cursor_kind
-	# the film is the surgeon's headcam: a pointer left resting would sit on the patient's face
+	# a pointer left resting would sit on the film, over the figure in the dark
 	_cursor.visible = kind != "none" and not (state == State.AFTERMATH and _pointer_still > FILM_POINTER_REST)
 	if _cursor.visible:
 		_cursor.texture = Gfx.tex("ui/cursor_%s.png" % kind)

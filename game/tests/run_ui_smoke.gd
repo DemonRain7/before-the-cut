@@ -491,12 +491,17 @@ func finish_visit(label: String) -> void:
 ## dark, names the visitors still in the hall, and nobody reads the meter.
 func lights_out(label: String, unseen: Array) -> void:
 	check(await d.until(func() -> bool: return main.state == MainScript.State.AFTERMATH, 40.0), "%s: the closing film opens after the fatal blow" % label)
-	var deaths: Array = main.reel.shots.filter(func(shot) -> bool: return shot.kind == "death")
-	check(main.reel.visible and deaths.size() == 1 and deaths[0].outcome == "hit" and deaths[0].id == main.shift.records.back().case_id, "the death camera names the patient who ended the shift")
-	check(main.reel.shots.back().kind == "hall" and int(main.reel.shots.back().unseen) == unseen.size(), "%s: the hall camera ends the film and counts who was still waiting" % label)
-	check(main.reel.shots.size() == ClosingFilm.plan(main.shift.records, unseen.size()).size(), "%s: the film is planned from the night's settlements" % label)
-	for shot in main.reel.shots:
-		check(shot.id not in unseen, "unseen patients have no footage")
+	var planned: Array = ClosingFilm.plan(main.shift.records, unseen.size())
+	check(main.reel.visible and main.reel.shots.size() == 1 and planned.size() == 1 and main.reel.shots[0].kind == planned[0].kind and main.reel.shots[0].id == planned[0].id,
+		"%s: the night is one film, planned from its settlements" % label)
+	var film: Dictionary = main.reel.shots[0]
+	check(bool(film.died), "%s: the film knows the doctor died" % label)
+	if film.kind == "waiting":
+		check(film.id == main.shift.records.back().case_id and int(film.unseen) == unseen.size(),
+			"%s: the crew wait in the back; the card names who ended the shift and counts who was still waiting" % label)
+	else:
+		check(film.kind == "massacre" and film.outcome == "treated_drifting", "%s: a drifting admission is filmed even on a night the doctor died" % label)
+	check(film.id not in unseen, "unseen patients have no footage")
 	await d.seconds(main.FILM_POINTER_REST + 0.1)
 	check(main.state == MainScript.State.AFTERMATH and not main._cursor.visible, "%s: a resting pointer hides over the film" % label)
 	d.move(main._mouse + Vector2(6, 0))
@@ -2238,11 +2243,14 @@ func shift_pressure_draws() -> void:
 	var report_page := main.screens.page
 	check(report_page == 1, "the report can open a later patient before replay")
 	d.key(KEY_R)
-	check(main.reel.visible and main.reel.shots.size() == 5, "the report replays all five settled visitors")
-	for i in 5:
-		check(main.reel.shots[main.reel.index].id == main.shift.records[i].case_id, "the camera follows admission order and identity")
+	var planned: Array = ClosingFilm.plan(main.shift.records)
+	check(main.reel.visible and main.reel.shots.size() == 1 and main.reel.shots[0].kind == planned[0].kind and main.reel.shots[0].id == planned[0].id, "the report replays the night's one film")
+	var chapters: Array = ClosingFilm.CHAPTERS.get(str(main.reel.shots[0].kind), [])
+	for i in chapters.size():
 		d.key(KEY_RIGHT)
-	check(main.state == MainScript.State.REPORT and main.screens.page == report_page and logged("shift_end").size() == ended, "playing every shot returns to the same report page")
+		check(main.reel.visible and absf(main.reel.elapsed - float(chapters[i])) < 0.01, "the film's next control jumps to its next chapter")
+	d.key(KEY_RIGHT)
+	check(main.state == MainScript.State.REPORT and main.screens.page == report_page and logged("shift_end").size() == ended, "stepping through every chapter returns to the same report page")
 	main.test_night = ""
 
 
@@ -2416,18 +2424,15 @@ func voice_words() -> void:
 ## is drawn.
 func counter_words() -> void:
 	section("The counter's words fit where they are drawn")
-	# the closing film's captions sit left of its two buttons, one line each
-	var film_lines: Array = main.reel.COUNTER_LINES.values()
-	film_lines.append_array(["The repair holds.", "The reading will not settle.", "Headcam signal lost.", "The doctor did not get up.",
-		"One more was waiting.", "No one else was waiting.", "No one was admitted tonight."])
+	# the closing film's caption and end card lines, one line each across the picture
+	var film_lines: Array = ["The back room, after closing.", "Calibration...", "In spec.", "Out of spec.",
+		"You let them in.", "Admitted tonight. The part held.", "No one came back from the counter.",
+		"One more was waiting.", "No one else was waiting.", "No one was admitted tonight."]
 	for line in film_lines:
-		check(Gfx.wrap_text(line, 356).size() == 1, "the film caption fits beside its buttons: " + str(line))
-	check(Gfx.wrap_raw(Lang.tf("%s left by the back door.", ["Adrian Vale"]), 356).size() == 1 and Gfx.wrap_raw(Lang.tf("%d more were waiting.", [8]), 356).size() == 1, "the film's name and count captions fit")
-	for id in main.templates:
-		var c: Dictionary = main.templates[id]
-		check(Gfx.wrap_text(str(c.get("request", "")), 356).size() <= 2, "the film's job card line fits for " + str(id))
-	for words in ["Next shot [ENTER]", "Skip film [ESC]"]:
-		check(Gfx.text_w(words) <= ClosingFilm.NEXT.size.x - 8, "the film's button fits: " + words)
+		check(Gfx.wrap_text(line, 600).size() == 1, "the film's line fits on one line: " + str(line))
+	check(Gfx.wrap_raw(Lang.tf("%d more were waiting.", [8]), 600).size() == 1, "the film's count line fits")
+	for words in ["Next [ENTER]", "Skip [ESC]"]:
+		check(Gfx.text_w(words) <= ClosingFilm.SKIP.size.x - 8, "the film's control fits: " + words)
 	check(Gfx.text_w("Replay film [R]") <= main.screens.REPLAY_FILM.size.x - 4, "the report replay control fits")
 	var hints: Array = [main.SHORT_HINT, main.LEAVING_HINT, main.LEAVING_LAST_HINT, main.NOTE_COACH_HINT,
 		main.NOTE_OPEN_COACH_HINT, main.LAMP_COACH_HINT, main.GLASS_COACH_HINT, main.WAIT_HINT, main.CAM_HINT, main.CAM_PEEK_HINT,

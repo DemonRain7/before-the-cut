@@ -10,8 +10,8 @@ import gen_font
 import gen_gore
 import gen_patients
 import gen_scopes
+import gen_film
 import gen_team
-import gen_theatre
 import gen_ui
 
 
@@ -21,7 +21,7 @@ def main():
     gen_clinic.main()
     gen_patients.main(None)
     gen_scopes.main(None)
-    gen_theatre.main()    # the closing film's theatre: it reuses close-up art gen_scopes draws
+    gen_film.main()       # the closing film's back room: it reuses close-up art gen_scopes draws
     gen_ui.main()
     gen_booth.main()      # the booth round the window: it uses the pads gen_ui draws
     gen_team.main()

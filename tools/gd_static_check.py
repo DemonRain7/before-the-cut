@@ -129,6 +129,17 @@ def blank_strings(text):
                 out.append(" ")
             i += 1
             continue
+        if text.startswith('"""', i) or text.startswith("'''", i):
+            # a multi-line string (a shader's code, say): blank it whole, keeping its newlines
+            q3 = text[i:i + 3]
+            j = text.find(q3, i + 3)
+            body_end = n if j < 0 else j
+            out.append(q3)
+            out.append("".join("\n" if c == "\n" else " " for c in text[i + 3:body_end]))
+            if j >= 0:
+                out.append(q3)
+            i = n if j < 0 else j + 3
+            continue
         if ch in "\"'":
             quote = ch
             out.append(ch)

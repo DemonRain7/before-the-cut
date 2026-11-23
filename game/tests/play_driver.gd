@@ -442,11 +442,11 @@ func wait_for_report(limit: float = 30.0) -> bool:
 
 
 ## Waits for the closing film to start and play through at normal speed, then for the report.
-## No shot runs longer than 12 seconds; `limit` is the slack on top.
+## The night is one film of at most 44 seconds; `limit` is the slack on top.
 func wait_through_film(limit: float = 10.0) -> bool:
 	if not await until(func() -> bool: return main.state in [MainScript.State.AFTERMATH, MainScript.State.REPORT], limit):
 		return false
-	return await until(func() -> bool: return main.state == MainScript.State.REPORT, 12.0 * main.reel.shots.size() + limit)
+	return await until(func() -> bool: return main.state == MainScript.State.REPORT, 50.0 + limit)
 
 
 ## Reads the report the way a player does: a click on each page once it has been up long

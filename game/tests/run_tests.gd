@@ -712,38 +712,42 @@ func test_pressure_draws_and_film() -> void:
 						eq(v.press().result, "closed", "terminal commitment cannot be replayed")
 	var film = preload("res://scripts/ui/closing_film.gd")
 	var nobody: Array = film.plan([])
-	eq([nobody.size(), nobody[0].kind], [1, "empty"], "a night with nobody admitted ends on the empty chair")
+	eq([nobody.size(), nobody[0].kind, nobody[0].admitted, nobody[0].died], [1, "empty", 0, false], "a night with nobody admitted ends on the empty chair")
 	var records := []
 	for id in templates:
 		for truth in ["stable","drifting"]:
 			var v := VisitState.new(CaseDB.compose(templates[id], {"truth":truth}), rules)
 			v.verdict("treat")
 			records.append(v.settlement())
+	var drifting := []
+	for r in records:
+		if r.outcome == "treated_drifting":
+			drifting.append(r.case_id)
+	ok(not drifting.is_empty(), "the templates include drifting admissions")
 	var shots: Array = film.plan(records)
-	eq(shots.size(), records.size(), "one operation for each actual admission")
-	var after := ""
-	for i in records.size():
-		eq([shots[i].kind,shots[i].id,shots[i].outcome], ["theatre",records[i].case_id,records[i].outcome], "film keeps identity, order and actual treatment")
-		ok(film.SITES.has(shots[i].id) and str(shots[i].title) == str(records[i].title), "every admitted character has a part to replace and the report's title")
-		eq([shots[i].relief,shots[i].after], [after != "",after], "after a patient wakes on the table the relief crew works the chair")
-		if records[i].outcome == "treated_drifting":
-			after = records[i].case_id
+	eq(shots.size(), 1, "the night is one film")
+	eq([shots[0].kind, shots[0].outcome, shots[0].died], ["massacre", "treated_drifting", false], "a drifting admission takes the chair")
+	ok(drifting.has(shots[0].id) and film.SITES.has(shots[0].id), "the film is about one of the drifting patients the doctor admitted, and has their part")
+	eq(film.plan(records)[0].id, shots[0].id, "the same night always picks the same patient")
+	eq(shots[0].admitted, records.size(), "the film counts everyone admitted")
+	var steady := records.filter(func(r): return r.outcome == "treated_ok")
+	shots = film.plan(steady)
+	eq([shots.size(), shots[0].kind, shots[0].outcome], [1, "repair", "treated_ok"], "only steady admissions: one of them is repaired and the part holds")
+	ok(steady.any(func(r): return r.case_id == shots[0].id) and film.SITES.has(shots[0].id), "the repair shows one of the night's admissions, and has their part")
 	var records_at_door := []
 	for mode in ["referred_stable","referred_drifting","locked_out","false_alarm","walkout","gave_up","caught"]:
 		records_at_door.append({"case_id":"kip","name":"Kip","outcome":mode,"truth":"stable","title":mode})
 	shots = film.plan(records_at_door)
-	eq(shots.size(), records_at_door.size()+1, "every refusal stays on the counter camera and the empty chair is shown once")
-	for i in records_at_door.size():
-		eq([shots[i].kind,shots[i].outcome], ["counter",records_at_door[i].outcome], "a refusal never reaches the theatre")
-		ok(film.COUNTER_LINES.has(shots[i].outcome), "every refusal has its own closing line")
-	eq(shots[-1].kind, "empty", "nobody admitted: the film ends on the empty chair")
+	eq([shots.size(), shots[0].kind, shots[0].id], [1, "empty", ""], "a refusal never reaches the theatre: nobody admitted, the empty chair")
 	records_at_door.append({"case_id":"bo","name":"Bo","outcome":"hit","truth":"drifting","title":"TOO SLOW"})
 	records_at_door.append({"case_id":"rook","name":"Rook","outcome":"treated_ok","truth":"stable","title":"ARM RESEATED"})
 	shots = film.plan(records_at_door, 3)
-	eq([shots.size(),shots[-2].kind,shots[-2].id,shots[-1].kind,shots[-1].unseen], [9,"death","bo","hall",3], "a death at the glass ends the film on the hall camera, which only counts who was waiting")
-	ok(shots.all(func(shot): return shot.kind != "empty" and shot.id != "rook"), "after a death nobody else is filmed and the empty chair is not shown")
+	eq([shots.size(), shots[0].kind, shots[0].id, shots[0].unseen, shots[0].died], [1, "waiting", "bo", 3, true], "a death at the glass and no drifting admission: the crew wait for someone who never comes")
+	records_at_door.append({"case_id":"vale","name":"Vale","outcome":"treated_drifting","truth":"drifting","title":"THE RIG WOKE FIRST"})
+	shots = film.plan(records_at_door, 3)
+	eq([shots[0].kind, shots[0].id, shots[0].died, shots[0].admitted], ["massacre", "vale", true, 2], "a drifting admission is filmed even on a night the doctor died")
 	var first: Array = film.plan([{"case_id":"ozzie","name":"Ozzie","outcome":"hit","truth":"drifting","title":"TOO SLOW"}], 4)
-	eq([first.size(),first[0].kind,first[1].unseen], [2,"death",4], "killed by the first patient: the death, then the four still waiting")
+	eq([first.size(), first[0].kind, first[0].unseen], [1, "waiting", 4], "killed by the first patient: the crew wait, and four were still waiting")
 	var wire := preload("res://scripts/core/model_client.gd").new()
 	var whole := {"state":{"press_count":3},"conversation_history":[{"role":"action","text":"press:3"},{"role":"reaction","text":"A hand stiffens."}],"visit_summary":{"after":1,"omitted":1,"actions":{"press:3":1}}}
 	var legacy: Dictionary = wire._wire_history(whole)
