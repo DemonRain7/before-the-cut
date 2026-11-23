@@ -17,6 +17,10 @@ languages are kept in step; none of it has been reviewed.
   先别下刀 ("don't cut yet": the doctor's job is to stop a cut that should not happen), set over
   a small BEFORE THE CUT on the sign and used for the window's title.
 - Yes to downloading Fusion Pixel Font for the Chinese glyphs.
+- Natural Chinese with character, never flat (November 23). Vale's massacre card line 义体先醒了 read
+  "太ai了", and the plain 锯子出来了 that replaced it was "太烂了". The student asked for madness instead:
+  "新的赛博精神病诞生了 / 真要多感谢你啊哈哈哈哈哈哈这种疯狂的感觉". The card now ends on the patient's own thanks breaking into
+  a laugh (under the patients' voices below).
 
 What else stays English is the assistant's choice: the binder's model names (KITE, IRIS, TALON,
 SCAN, LOADER, DEFT, REFLEX, LANCET, CHOP, PISTON, SEAM, VX-9), key names (ENTER, ESC, TAB, SPACE
@@ -107,6 +111,11 @@ voice:
 - **Dana Kirsch**, 47, an off-duty police sergeant: dry, clipped, used to asking the questions
   (请便。不许反抗。).
 - **Bo Kowalski**, 29, a pit fighter: loud and cheerful; his "pal" is 哥们 (没问题，哥们。).
+
+On the massacre card (November 23) each drifting patient's thanks from the counter comes back
+twisted and breaks into a laugh, in the same voice: Vale still says 您 (真是太感谢您了，医生。按约定，请保密。), Juno's
+skip spreads (明-明-明星), Maren still says 孩子, Ozzie 老板 and Bo 哥们. The laugh is 哈哈哈; Maren's starts
+with a soft 呵呵. The ten lines are in [film.md](closing-shift/film.md#the-massacre-cards-words).
 
 ## How it works
 

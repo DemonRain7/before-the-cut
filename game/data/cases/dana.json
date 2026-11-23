@@ -270,7 +270,8 @@
     "drifting": {
       "treat": {
         "title": "IT CAME UP RED",
-        "text": "The light test fails: the TALON stops following and comes up red. Dana wakes, puts the crew down with her baton and walks out the back. Your stamp is on her card."
+        "text": "The light test fails: the TALON stops following and comes up red. Dana wakes, puts the crew down with her baton and walks out the back. Your stamp is on her card.",
+        "quote": "\"Good work, doctor. We never met. Hahahahahaha\""
       },
       "refer": {
         "title": "TAKEN IN",

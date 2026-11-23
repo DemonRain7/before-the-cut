@@ -41,9 +41,11 @@ COACH_GD = os.path.join(UI, "coach.gd")
 # (clinic_view.gd: SLOT, 207 px wide). "tally" is the bold count in the record's DECISION box
 # (clipboard.gd: DECISION, 78 px wide). "screen" is one centred line across the whole screen
 # (title card, opening cards). "lit_item" is one line of the lease picture's list.
+# "film_line" is a drifting patient's words on the closing film's massacre card, centred across
+# the picture with room on either side for the laugh to shake (closing_film.gd: _card_quote).
 LIMITS = {"note": 186, "look": 186, "sheet": 182, "footer": 220, "row": 176, "question": 180, "name": 120, "request": 140,
           "slip_title": 180, "report_title": 368, "visit_title": 368, "report_line": 352, "report_row": 286, "report_tally": 368, "hint": 376,
-          "plate": 203, "tally": 74, "screen": 624}
+          "plate": 203, "tally": 74, "screen": 624, "film_line": 560}
 SLIP_WIDTH = 180        # the text column of the result slip (main.gd: _draw_slip)
 SLIP_GAP = 8            # least space between the call and the money on its last line (main.gd: SLIP_GAP)
 REPORT_X0 = 136         # the report's text column (screens.gd: the panel's x + 16 ...
@@ -926,6 +928,8 @@ def main():
                 rows.append(check("visit_title", where + ".title", o["title"], bold=True))
                 rows.append(check("totals_row", where + ".title (totals row)", o["title"],
                                   limit=REPORT_VISIT_ROOM - tw(widest_money) - SLIP_GAP))
+                if o.get("quote"):
+                    rows.append(check("film_line", where + ".quote (film card)", o["quote"]))
         rows.append(check("line", cid + ".teaser", c["teaser"]))
         for k, v in c["lines"].items():
             for s in (v if isinstance(v, list) else [v]):

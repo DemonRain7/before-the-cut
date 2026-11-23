@@ -94,6 +94,11 @@ const LENS_CRACK_AT := Vector2(210, 150)       # the impact in lens_crack.png
 ## The long runs keep clear of the words in the middle.
 const CARD_DRIPS := [[34, 96], [78, 40], [131, 128], [176, 62], [206, 20], [262, 12], [351, 16], [446, 84], [497, 130], [552, 48], [603, 110]]
 const RED0 := Color("5a1418")                  # the dark edge of a run, as gore_layer draws it
+## The patient's words on that card type out at QUOTE_PEN pixels a second, the laugh after them
+## at LAUGH_PEN, and the laugh starts after the last of SENTENCE_ENDS with words still after it.
+const QUOTE_PEN := 210.0
+const LAUGH_PEN := 380.0
+const SENTENCE_ENDS := ".!?。！？"
 
 # light
 const AMB := Vector3(0.045, 0.05, 0.065)
@@ -340,6 +345,8 @@ var _flash_col := Color.WHITE
 var _black: float = 0.0
 var _cam_on: bool = true
 var _card_on: bool = false
+var _quote_said: String = ""               # the massacre card's words as shown ...
+var _quote_x := PackedFloat32Array()       # ... and where each letter of them starts
 
 # light, set again every frame
 var _lights: Array = []                    # [position in the world, radius, strength, colour, squash]
@@ -526,6 +533,7 @@ static func _shot_for(kind: String, rec: Dictionary) -> Dictionary:
 		"outcome": str(rec.get("outcome", "")),
 		"truth": str(rec.get("truth", "")),
 		"title": str(rec.get("title", "")),
+		"quote": str(rec.get("quote", "")),
 		"correct": bool(rec.get("correct", false)),
 		"died": false,
 		"admitted": 0,
@@ -2839,7 +2847,8 @@ func _caption() -> Array:
 	return ["", Gfx.TEAL6, 0.0]
 
 
-## The end card: whom the film was about, what came of them, and what it means.
+## The end card: whom the film was about, what came of them, and what it means. After a
+## massacre it is the patient's own words, laughing, then whose doing it was.
 func _draw_card() -> void:
 	var age := elapsed - _card_t
 	var who := str(_shot.get("name", ""))
@@ -2850,8 +2859,9 @@ func _draw_card() -> void:
 				_draw_card_blood(age)
 			_card_name(who, 168.0, Gfx.RED2, _card_k(age, 0.6))
 			_card_rule(194.0, Gfx.RED1, _card_k(age, 0.9))
-			_card_line(title, 202.0, Gfx.RED3, _card_k(age, 1.2))
-			_card_line("You let them in.", 226.0, Gfx.TEAL6, _card_k(age, 2.0))
+			var words := str(_shot.get("quote", ""))
+			var typed := _card_quote(words if words != "" else title, 202.0, Gfx.RED3, age, 1.2)
+			_card_line("You let them in.", 226.0, Gfx.TEAL6, _card_k(age, maxf(2.0, typed + 0.35)))
 		"repair":
 			_card_name(who, 168.0, Gfx.GRN4, _card_k(age, 0.3))
 			_card_rule(194.0, Gfx.GRN2, _card_k(age, 0.5))
@@ -2902,6 +2912,59 @@ func _card_rule(y: float, col: Color, k: float) -> void:
 func _card_line(s: String, y: float, col: Color, k: float) -> void:
 	if k > 0.0 and s != "":
 		Gfx.text_center(_post, 320, y, s, Color(col, k))
+
+
+## The patient's words on the massacre card, typed out from their centred place from the card's
+## second at on: the words at an even pace, the laugh after them faster. The words hold still;
+## each letter of the laugh shakes on its own, harder toward its end and once the line is all
+## out, and now and then one flares. Returns the card's second at which the last letter is down.
+func _card_quote(s: String, y: float, col: Color, age: float, at: float) -> float:
+	var said := Lang.t(s)
+	if said != _quote_said:
+		_quote_said = said
+		_quote_x = PackedFloat32Array()
+		for i in said.length() + 1:
+			_quote_x.append(Gfx.text_w_raw(said.left(i)))
+	var n := said.length()
+	if n == 0:
+		return at
+	var laugh := laugh_at(said)
+	var x0 := 320.0 - floorf(_quote_x[n] / 2.0)
+	var lx: float = _quote_x[laugh]
+	var done := at + lx / QUOTE_PEN + (_quote_x[n] - lx) / LAUGH_PEN
+	var tick := floorf(elapsed * 15.0)
+	var grow := 1.0 + 0.6 * clampf((age - done) / 2.0, 0.0, 1.0)
+	for i in n:
+		var x: float = _quote_x[i]
+		var due := at + (x / QUOTE_PEN if i < laugh else lx / QUOTE_PEN + (x - lx) / LAUGH_PEN)
+		if age < due:
+			break
+		var p := Vector2(x0 + x, y)
+		var c := col
+		if i >= laugh:
+			# up to 3 px up and down; sideways at most a quarter of the letter, so a narrow
+			# English letter keeps clear of the next while a wide hanzi swings as far
+			var amp := (0.6 + 1.4 * float(i - laugh + 1) / float(n - laugh)) * grow
+			var ax := minf(amp, 0.25 * (_quote_x[i + 1] - x))
+			var h := float(i) * 3.1
+			p += Vector2(roundf((_hash(h, tick) - 0.5) * 2.0 * ax), roundf((_hash(h + 1.7, tick) - 0.5) * 2.0 * amp))
+			if _hash(h + 0.9, tick + 5.0) > 0.86:
+				c = c.lerp(Color.WHITE, 0.55)
+		Gfx.text_raw(_post, p, said[i], c)
+	return done
+
+
+## Where the laugh starts in a patient's words on the massacre card: after the last full stop,
+## exclamation or question mark that still has words after it (a closing quote mark does not
+## count). Words without one have no laugh: the length of s.
+static func laugh_at(s: String) -> int:
+	var end := s.length()
+	while end > 0 and "\"“”' ".contains(s[end - 1]):
+		end -= 1
+	for i in range(end - 2, -1, -1):
+		if SENTENCE_ENDS.contains(s[i]):
+			return i + 1
+	return s.length()
 
 
 func _unseen_line() -> String:

@@ -723,10 +723,19 @@ func test_pressure_draws_and_film() -> void:
 	for r in records:
 		if r.outcome == "treated_drifting":
 			drifting.append(r.case_id)
+			var q := str(r.quote)
+			ok(q != "" and film.laugh_at(q) < q.length(), "%s's words on the massacre card end on a laugh" % r.case_id)
+		else:
+			eq(r.quote, "", "%s says nothing on a card after a repair" % r.case_id)
 	ok(not drifting.is_empty(), "the templates include drifting admissions")
 	var shots: Array = film.plan(records)
 	eq(shots.size(), 1, "the night is one film")
 	eq([shots[0].kind, shots[0].outcome, shots[0].died], ["massacre", "treated_drifting", false], "a drifting admission takes the chair")
+	eq(shots[0].quote, records.filter(func(r): return r.case_id == shots[0].id and r.outcome == "treated_drifting")[0].quote, "the massacre card has the patient's own words")
+	var laughs := {"\"Good work, doctor. We never met. Hahaha\"": " Hahaha\"", "“谢谢你，医生。你救了我的命！哈哈哈”": "哈哈哈”",
+		"\"Doc, you're a s-s-star! La la la, haha\"": " La la la, haha\"", "“我请！哈哈！”": "哈哈！”", "TOO SLOW": "", "\"Ha!\"": ""}
+	for q in laughs:
+		eq(q.substr(film.laugh_at(q)), laughs[q], "the laugh starts after the last sentence with words after it: " + q)
 	ok(drifting.has(shots[0].id) and film.SITES.has(shots[0].id), "the film is about one of the drifting patients the doctor admitted, and has their part")
 	eq(film.plan(records)[0].id, shots[0].id, "the same night always picks the same patient")
 	eq(shots[0].admitted, records.size(), "the film counts everyone admitted")
@@ -743,9 +752,9 @@ func test_pressure_draws_and_film() -> void:
 	records_at_door.append({"case_id":"rook","name":"Rook","outcome":"treated_ok","truth":"stable","title":"ARM RESEATED"})
 	shots = film.plan(records_at_door, 3)
 	eq([shots.size(), shots[0].kind, shots[0].id, shots[0].unseen, shots[0].died], [1, "waiting", "bo", 3, true], "a death at the glass and no drifting admission: the crew wait for someone who never comes")
-	records_at_door.append({"case_id":"vale","name":"Vale","outcome":"treated_drifting","truth":"drifting","title":"THE RIG WOKE FIRST"})
+	records_at_door.append({"case_id":"vale","name":"Vale","outcome":"treated_drifting","truth":"drifting","title":"THE SAW WOULDN'T STOP","quote":"\"Discretion. Hahaha\""})
 	shots = film.plan(records_at_door, 3)
-	eq([shots[0].kind, shots[0].id, shots[0].died, shots[0].admitted], ["massacre", "vale", true, 2], "a drifting admission is filmed even on a night the doctor died")
+	eq([shots[0].kind, shots[0].id, shots[0].died, shots[0].admitted, shots[0].quote], ["massacre", "vale", true, 2, "\"Discretion. Hahaha\""], "a drifting admission is filmed even on a night the doctor died, with his words")
 	var first: Array = film.plan([{"case_id":"ozzie","name":"Ozzie","outcome":"hit","truth":"drifting","title":"TOO SLOW"}], 4)
 	eq([first.size(), first[0].kind, first[0].unseen], [1, "waiting", 4], "killed by the first patient: the crew wait, and four were still waiting")
 	var wire := preload("res://scripts/core/model_client.gd").new()

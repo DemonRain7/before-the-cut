@@ -44,7 +44,7 @@ Everyone in the room is a black silhouette with a thin rim of light, the counter
 | 37.6–38 | Black. | The pause before the answer. |
 | 38.0–38.45 | The face, lit cold for a moment: the counter portrait with its turned brows, mouth and overlay, a band of blood across it that keeps clear of the eyes, and blood running from the mouth. The print and the crack are still on the lens, to one side. A high string stab. | **Full face at 4×.** This is the answer to "whom did I let in". |
 | 38.6–39 | It screams at the lens (5×) with static and the picture tearing, and spits blood on the glass. Under the scream the same voice comes through its hardware, crushed and stuttering. | |
-| 39–44 | The card: the name, the report title for that patient and "You let them in." The eyes hang over the card until 39.9. Blood runs down from the top of the picture, clear of the words. | |
+| 39–44 | The card: the name; the patient's thanks from the counter, twisted, typing out until it breaks into a laugh whose letters shake; then "You let them in." The eyes hang over the card until 39.9. Blood runs down from the top of the picture, clear of the words. | |
 
 Each attack style keeps its own sound: Vale's saw grinds on each blow and its loop runs while it stands there, Maren's torch, Priya's laser and Lux's arc colour the room. The scream is pitched for each patient.
 
@@ -121,6 +121,27 @@ Every line goes through the language catalogs (`game/data/lang/zh/ui.json`).
 
 Kip's and Priya's drifting reports no longer mention a headcam: Kip's lens now "stares into the lamp" (直直盯着手术灯) and Priya's laser leaves "the theatre" dark (手术室黑了).
 
+### The massacre card's words
+
+On November 23 the owner found the last line of Vale's card read like AI: "最后的那个（义体先醒了）说的太ai了、改得自然一点行不行？" It was his report title, THE RIG WOKE FIRST, 义体先醒了. The plain THE SAW CAME OUT, 锯子出来了, that replaced it was turned down the same hour: "锯子出来了 不行、太烂了，改成比如说啥、新的赛博精神病诞生了 / 真要多感谢你啊哈哈哈哈哈哈这种疯狂的感觉". So the card now gives the patient the last word. Each case's `outcomes.drifting.treat` has a `quote`: the thanks they gave at the counter when the doctor said yes, coming back wrong and breaking into a laugh, in the patient's own voice. The report keeps its title; Vale's is now THE SAW WOULDN'T STOP, 锯子停不下来了.
+
+The words type out from 1.2 s into the card at 210 px a second. From the last sentence end on (`laugh_at()`) the laugh types at 380 px a second; each of its letters jumps up to 3 px up and down and a quarter of its own width sideways, now and then flashes white, and the shaking grows for two seconds after the last letter. "You let them in." fades in 0.35 s after the last letter, never before 2 s. A drifting case without a quote fails the case check, and `measure_text.py` holds each quote to 560 px.
+
+| Patient | English | 中文 |
+| --- | --- | --- |
+| Kip Marlow | "Thank you, doc. You're a lifesaver! Hahahahahahaha" | “谢谢你，医生。你救了我的命！哈哈哈哈哈哈哈哈” |
+| Rook Dunmore | "About time. Quiet now. Very quiet. Hahahahahaha" | “总算好了。安静了。特别安静。哈哈哈哈哈哈哈” |
+| Adrian Vale | "Thank you so much, doctor. Discretion, as agreed. Hahahahahaha" | “真是太感谢您了，医生。按约定，请保密。哈哈哈哈哈哈哈” |
+| Juno Reyes | "Doc, you're a s-s-star! La la la, hahahahahaha" | “医生，你是明-明-明星！啦啦啦……哈哈哈哈哈哈” |
+| Maren Holt | "Thank you, dear. I knew you'd understand. Hehe, hahahahahaha" | “谢谢你，孩子。我就知道你会明白。呵呵……哈哈哈哈哈哈” |
+| Priya Nair | "Thank you, doctor. Clear as a chart. Hahahahahaha" | “谢谢你，医生。现在看得一清二楚。哈哈哈哈哈哈哈” |
+| Ozzie Brandt | "Like new, chief! Come by the cart. On the house! Hahahahahaha" | “跟新的一样，老板！来摊上坐坐，我请！哈哈哈哈哈哈哈” |
+| Lux Ferreira | "That's clean, doc. That's so clean. Hahahahahaha" | “好干净啊，医生。真的好干净。哈哈哈哈哈哈哈” |
+| Dana Kirsch | "Good work, doctor. We never met. Hahahahahaha" | “干得好，医生。我们没见过。哈哈哈哈哈哈哈” |
+| Bo Kowalski | "Like a train! Thanks, pal! Hahahahahahaha" | “跟火车一样猛！谢了啊，哥们！哈哈哈哈哈哈哈哈” |
+
+"新的赛博精神病诞生了" was not used: 赛博精神病 (cyberpsycho) is the word the Cyberpunk games made famous, and this game's word is drifting, 失控.
+
 ## Controls
 
 Enter, Space, Right or a left click jumps to the next chapter, and after the last one opens the report. Escape, a right click or SKIP opens the report at once. R or REPLAY on any report page plays the same film again and returns to that page with the accounts untouched. A pointer left still for 1.2 seconds hides while the film plays and comes back as soon as it moves.
@@ -159,6 +180,17 @@ Play night K with the scripted patient (no model calls): `.\run-game.ps1 -Patien
 
 ## Checks
 
+November 23, the massacre card's words, on the working tree before the commit. Automated checks and agent-viewed renders, not a playtest. No person has seen the new card in play.
+
+| Check | Result |
+| --- | --- |
+| `run_tests.gd` | 7,916 passed, 0 failed. Every drifting treatment has a quote with a laugh after its last sentence and every other outcome has none; the massacre shot carries the settled patient's quote; `laugh_at()` finds the laugh in English and Chinese lines and leaves a line without one whole |
+| `run_ui_smoke.gd` | 1,300 in English, 1,301 in Chinese, 0 failed |
+| `record_night.gd` | Night K's Vale plan, headless at a fixed 30 fps, printed the film with Vale's words in each language. It was recorded again with Movie Maker on a hidden desktop for the clip |
+| `check_lang.py`, `measure_text.py` in both languages | 0 problems; 1,705 lines fit in each language; the widest quote is 279 px of the 560 allowed |
+| `gd_static_check.py` | 38 scripts, no findings |
+| `capture_closing.gd` on a hidden desktop | Vale's and Maren's cards in both languages, rendered at 12 fps from 39 to 44 s and looked at by Claude as contact sheets: the words hold still, the laugh shakes and flashes without the letters running into each other, and "You let them in." comes after it. Claude also looked at frames of the new clip |
+
 November 23, the bloodier massacre, on the working tree before the commit. Automated checks and agent-viewed renders, not a playtest. No person has watched or listened to the new massacre yet.
 
 | Check | Result |
@@ -190,6 +222,6 @@ November 22, the silhouette film, on the working tree before that commit. Automa
 | `record_night.gd` | Night K played to the report with all five plans above, headless at a fixed 30 fps. Each printed the film in the table: Vale's massacre, Juno's massacre, Rook's repair, the empty chair, and the crew waiting after Vale with 2 still waiting. The Vale plan was also recorded with Movie Maker on a hidden desktop, which is where the first clip came from |
 | `gd_static_check.py` | 38 scripts, no findings. It now blanks triple-quoted strings, so the shader code in `closing_film.gd` is no longer read as GDScript calls |
 
-The clip [film-night-K-zh.mp4](film-night-K-zh.mp4) is cut from a 3 minute 24 second recording of night K in Chinese made with Godot's Movie Maker on a hidden desktop: an agent operated the game with scripted inputs and the plan `treat,treat,treat,refer,treat`. It was recorded again on November 23 with the bloodier massacre. The film runs from 0:04 to 0:48 of the clip. Claude looked at frames of the new clip; no person has watched or listened to it. The full recordings and the logs are local evidence in `validation/2026-11-22/silhouette-film/` and `validation/2026-11-23/bloodier-massacre/`.
+The clip [film-night-K-zh.mp4](film-night-K-zh.mp4) is cut from a 3 minute 23 second recording of night K in Chinese made with Godot's Movie Maker on a hidden desktop: an agent operated the game with scripted inputs and the plan `treat,treat,treat,refer,treat`. It was recorded again on November 23 with the bloodier massacre, and once more that day with Vale's words on the card. The film runs from 0:04 to 0:48 of the clip. Claude looked at frames of the new clip; no person has watched or listened to it. The full recordings and the logs are local evidence in `validation/2026-11-22/silhouette-film/`, `validation/2026-11-23/bloodier-massacre/` and `validation/2026-11-23/card-quote/`.
 
 Still unmeasured: whether a first-time player recognizes the face before the card names them, whether 44 seconds is slow enough to frighten or long enough to skip, whether seeing the massacre changes their next night's calls, and whether the blood and the new sounds frighten players or put them off.

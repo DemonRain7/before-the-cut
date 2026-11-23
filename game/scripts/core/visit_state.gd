@@ -712,7 +712,8 @@ func counter_key() -> String:
 ## drop, less CALM. "counter" is the part of it that came in at the counter (the fee for work
 ## done, the drop, less CALM) and "closing" the part that waits for the night's reports. The
 ## slip shows only "counter_title", "counter_text" and "counter"; "title", "text", "truth",
-## "correct" and the findings ("rows") are for the report at closing.
+## "correct" and the findings ("rows") are for the report at closing, and "quote" (a drifting
+## patient's words once admitted, "" otherwise) for the closing film's massacre card.
 func settlement() -> Dictionary:
 	var counter: Dictionary = _rule("counter", counter_key(), {})
 	var key := outcome
@@ -778,6 +779,7 @@ func settlement() -> Dictionary:
 		"injured": outcome == "hit",
 		"title": str(text.get("title", outcome.to_upper())),
 		"text": str(text.get("text", "")),
+		"quote": str(text.get("quote", "")),
 		"rows": rows,
 		"patience_left": patience,
 		"press_count": press_count,

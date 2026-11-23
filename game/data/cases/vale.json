@@ -272,8 +272,9 @@
     },
     "drifting": {
       "treat": {
-        "title": "THE RIG WOKE FIRST",
-        "text": "Without the limiter the rig fails the grip test and will not let go. Vale wakes, the saw comes out and the crew goes down. He walks out the back. Your name is on the work order."
+        "title": "THE SAW WOULDN'T STOP",
+        "text": "Without the limiter the rig fails the grip test and will not let go. Vale wakes, the saw comes out and the crew goes down. He walks out the back. Your name is on the work order.",
+        "quote": "\"Thank you so much, doctor. Discretion, as agreed. Hahahahahaha\""
       },
       "refer": {
         "title": "TAKEN IN",

@@ -1192,6 +1192,9 @@ static func validate_case(c: Dictionary, rules: Dictionary, sheet: Dictionary = 
 		var o: Variant = outcomes.get(key)
 		if typeof(o) != TYPE_DICTIONARY or str(o.get("title", "")) == "" or str(o.get("text", "")) == "":
 			errors.append("outcomes.%s needs 'title' and 'text'." % str(key))
+	# the closing film ends a drifting admission on the patient's own words, a laugh at the end
+	if drifting and typeof(outcomes.get("treat")) == TYPE_DICTIONARY and str(outcomes["treat"].get("quote", "")).strip_edges() == "":
+		errors.append("outcomes.treat needs a 'quote' on a drifting night: the patient's words on the massacre card.")
 	var exit_lines: Dictionary = c.get("exit", {}) if typeof(c.get("exit")) == TYPE_DICTIONARY else {}
 	for key in ["treat", "refer", "gave_up"]:
 		if str(exit_lines.get(key, "")) == "":

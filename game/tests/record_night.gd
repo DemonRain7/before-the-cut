@@ -18,6 +18,7 @@ extends SceneTree
 const MainScript = preload("res://scripts/ui/main.gd")
 const Driver = preload("res://tests/play_driver.gd")
 const Gfx = preload("res://scripts/ui/gfx.gd")
+const Lang = preload("res://scripts/core/lang.gd")
 
 var main: MainScript = null
 var d: Driver = null
@@ -63,6 +64,8 @@ func _record() -> void:
 			var line := "%s %s %s" % [shot.kind, shot.id, shot.get("outcome", "")]
 			if shot.kind == "waiting":
 				line += " (%d still waiting)" % int(shot.get("unseen", 0))
+			elif shot.kind == "massacre":
+				line += " %s" % Lang.t(str(shot.get("quote", "")))
 			shots.append(line)
 		print("Film: ", ", ".join(shots))
 		_need(await d.wait_through_film(), "the report comes up after the film")

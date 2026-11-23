@@ -63,7 +63,7 @@ SHOWN = {
       + [("signs", "*", "*", "*", key) for key in ("text", "note", "look", "after")]
       + [("signs", "*", "*", "*", "answers", "*", key) for key in ("a", "note")]
       + [("signs", "*", "*", "*", part, key) for part in ("press", "flare") for key in ("line", "note")]
-      + [("outcomes", "*", "*", key) for key in ("title", "text")],
+      + [("outcomes", "*", "*", key) for key in ("title", "text", "quote")],
     # a contact's alias is a code name: the same in every language (drawn with Gfx.text_raw).
     # Since contacts.json version 2 the codes are a list of their own, drawn onto tonight's entries
     "contacts.json": [
