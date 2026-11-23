@@ -816,6 +816,143 @@ def riser():
     air = bp(noise(sec), 1500, 7000) * k
     return fade((tones * 0.35 + air * 0.6) * (0.1 + 0.9 * k), 0.2, 0.01)
 
+# ------------------------------------------------------------------ the massacre, closer
+def wet_drops(sec, n, start, spread, level=0.3):
+    """Drops of blood landing round about: short falling ticks, scattered in time."""
+    return at(sec, *[(start + rng.random() ** 1.4 * spread,
+                      sweep(700 + rng.random() * 900, 260, 0.03) * env(int(SR * 0.03), 0.001, 0.007) * level * (0.4 + 0.6 * rng.random()))
+                     for _ in range(n)])
+
+
+def gore_hit():
+    """A blow that goes in: the weight of it, bone giving way under it in a few dry snaps, and
+    the wet after."""
+    thud = sweep(120, 38, 0.32) * env(int(SR * 0.32), 0.001, 0.085)
+    slap = lp(noise(0.06), 1100) * env(int(SR * 0.06), 0.0005, 0.016)
+    snaps = at(0.12, *[(0.006 + i * 0.017 + rng.random() * 0.007,
+                        hp(noise(0.02), 1700) * env(int(SR * 0.02), 0.0002, 0.0035) * (1.0 - i * 0.17))
+                       for i in range(5)])
+    grit = hp(noise(0.09), 2600) * env(int(SR * 0.09), 0.001, 0.02) * (rng.random(int(SR * 0.09)) > 0.9)
+    x = t(0.5)
+    wob = np.clip(np.sin(2 * np.pi * 17 * x + 4.0 * lp(noise(0.5), 30)), 0, 1)
+    squelch = bp(noise(0.5), 220, 1500) * env(int(SR * 0.5), 0.012, 0.11) * (0.35 + 0.65 * wob)
+    return at(1.0, (0.0, thud), (0.0, slap * 0.9), (0.004, snaps), (0.01, grit * 0.5), (0.03, squelch * 0.85),
+              (0.0, wet_drops(1.0, 10, 0.14, 0.6)))
+
+
+def spray():
+    """An opened artery: a hissing jet that comes in pulses with the last beats of the heart,
+    weaker each time, and the patter where it lands. The pulses are 0.42 s apart, as in the film."""
+    sec = 1.9
+    pulses = ((0.0, 1.0), (0.42, 0.7), (0.84, 0.46), (1.26, 0.26))
+    out = np.zeros(int(SR * sec))
+    for start, a in pulses:
+        d = 0.36
+        n = int(SR * d)
+        sput = lp((lp(noise(d), 70) * 9.0 > -0.15).astype(float), 300)       # the jet catching and spitting
+        hiss = bp(noise(d), 1100, 5200) * env(n, 0.006, 0.11)
+        rush = bp(noise(d), 380, 1400) * env(n, 0.004, 0.08)
+        pulse = fade((hiss * 0.65 + rush * 0.85) * (0.3 + 0.7 * sput), 0.001, 0.08)
+        push = sweep(95, 48, 0.09) * env(int(SR * 0.09), 0.002, 0.025)           # the heart behind it
+        pulse[:len(push)] += push * 0.45
+        i0 = int(SR * start)
+        k = min(n, len(out) - i0)
+        out[i0:i0 + k] += pulse[:k] * a
+    patter = sum(wet_drops(sec, int(3 + 7 * a), s + 0.07, 0.3, 0.32 * a) for s, a in pulses)
+    return fade(out + patter, 0.001, 0.12)
+
+
+def gurgle():
+    """Air through blood in a throat: wet bubbles over a choked rasp, slowing as it gives out."""
+    sec = 1.5
+    placed = []
+    s = 0.02
+    while s < sec - 0.15:
+        f0 = 140 + rng.random() * 150
+        dur = 0.03 + rng.random() * 0.045
+        b = sweep(f0, f0 * (1.8 + rng.random() * 1.2), dur, 0.6) * env(int(SR * dur), 0.002, dur * 0.35)
+        placed.append((s, b * (0.45 + 0.55 * rng.random()) * (1.0 - 0.55 * s / sec)))
+        s += 0.022 + rng.random() * 0.05 * (1.0 + 1.6 * s)
+    bubbles = lp(at(sec, *placed), 1500)
+    x = t(sec)
+    rasp = bp(noise(sec), 170, 950) * (0.45 + 0.55 * np.abs(np.sin(2 * np.pi * 24 * x))) * np.exp(-x / 0.75)
+    click = lp(noise(0.02), 700) * env(int(SR * 0.02), 0.002, 0.005)          # the throat closing
+    return fade(at(sec, (0.0, bubbles), (0.0, rasp * 0.5), (sec - 0.2, click * 0.35)), 0.01, 0.18)
+
+
+def smear():
+    """A wet palm dragged down glass: a squeal that sticks and slips, and the wet under it."""
+    sec = 0.55
+    x = t(sec)
+    f = 1250.0 - 520.0 * (x / sec) + 60.0 * lp(noise(sec), 20) * 8.0
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    tone = np.sin(ph) + 0.45 * np.sin(2 * ph) + 0.25 * np.sin(3 * ph) + 0.1 * np.sin(5 * ph)
+    stick = lp((np.sin(2 * np.pi * 29 * x + 5.0 * lp(noise(sec), 35)) > 0.15).astype(float), 350)
+    wet = bp(noise(sec), 350, 2600)
+    shape = np.clip(x / 0.03, 0, 1) * np.clip((sec - x) / 0.14, 0, 1)
+    return fade((tone * 0.55 * stick + wet * (0.25 + 0.35 * stick)) * shape, 0.002, 0.02)
+
+
+def scream_cut():
+    """A scream cut off dead at exactly one second (the blow lands then) and the wet choke after
+    it. Played early by 1/pitch seconds, the cut falls on the blow."""
+    cut = 1.0
+    v = scream(1.4, 430.0, 830.0)[:int(SR * cut)]
+    v = v * np.clip((cut - t(cut)) / 0.003, 0, 1)
+    choke = gurgle()[:int(SR * 0.4)] * np.exp(-t(0.4) / 0.12) * 0.35
+    return at(1.45, (0.0, v), (cut + 0.02, choke))
+
+
+def scream_glitch():
+    """The same throat through the hardware in it: the scream ring-modulated, crushed to a few
+    levels and stuttering, for the face's last scream."""
+    v = scream(1.15, 380.0, 700.0)
+    x = t(1.15)
+    ring = v * np.sin(2 * np.pi * (83 + 40 * x) * x)
+    crushed = bits(np.tanh(ring * 2.0), levels=5, hold=5)
+    seg = int(SR * 0.04)
+    out = crushed.copy()
+    for i in range(0, len(out) - 2 * seg, seg):
+        if rng.random() < 0.3:
+            out[i + seg:i + 2 * seg] = out[i:i + seg]          # the buffer sticking
+    return fade(bp(out, 300, 5000) * np.clip(x / 0.02, 0, 1), 0.002, 0.15)
+
+
+def stab():
+    """The face's flash: a high cluster of bowed strings struck hard, and the scrape of the bows."""
+    sec = 1.0
+    x = t(sec)
+    out = np.zeros(len(x))
+    for f, a in ((987.8, 1.0), (1046.5, 0.9), (1108.7, 0.8), (1479.98, 0.45), (1568.0, 0.4)):
+        fr = f * (1.0 + 0.012 * np.sin(2 * np.pi * 6.3 * x + f)) * (1.0 + 0.03 * np.exp(-x / 0.05))
+        ph = 2 * np.pi * np.cumsum(fr) / SR
+        out += a * (2.0 * ((ph / (2 * np.pi)) % 1.0) - 1.0)
+    bows = bp(noise(sec), 2400, 7000) * (0.6 + 0.4 * np.abs(np.sin(2 * np.pi * 41 * x)))
+    body = lp(out, 5200) * env(len(x), 0.004, 0.32) + bows * env(len(x), 0.002, 0.12) * 0.5
+    return fade(np.tanh(body * 1.4), 0.001, 0.1)
+
+
+def wet_step():
+    """A heavy foot coming down in blood: a slap, the squelch under it, the splash round it."""
+    slap = lp(noise(0.07), 900) * env(int(SR * 0.07), 0.001, 0.02)
+    x = t(0.4)
+    squelch = bp(noise(0.4), 180, 1200) * env(int(SR * 0.4), 0.008, 0.08) * (0.4 + 0.6 * np.clip(np.sin(2 * np.pi * 21 * x), 0, 1))
+    suck = bp(noise(0.14), 300, 1100) * env(int(SR * 0.14), 0.03, 0.04) * 0.3     # the foot lifting out
+    return at(0.7, (0.0, slap), (0.01, squelch * 0.9), (0.18, suck), (0.0, wet_drops(0.7, 6, 0.06, 0.35, 0.25)))
+
+
+def dread_loop():
+    """Under the dark after the lamp bursts: two low tones a hair apart, beating slowly, a thin
+    dissonance far above them and air moving. Whole cycles in six seconds, so it loops clean."""
+    sec = 6.0
+    x = t(sec)
+    low = np.sin(2 * np.pi * 41.0 * x) + 0.9 * np.sin(2 * np.pi * 43.5 * x) + 0.35 * np.sin(2 * np.pi * 61.5 * x)
+    low = low * (0.75 + 0.25 * np.sin(2 * np.pi * x / 3.0))
+    high = (np.sin(2 * np.pi * 622.0 * x) + 0.8 * np.sin(2 * np.pi * 659.5 * x)) * (0.5 + 0.5 * np.sin(2 * np.pi * x / 2.0)) ** 2
+    air = loop_noise(sec, lambda f: ((f > 200) & (f < 1400)) * 1.0) * (0.6 + 0.4 * np.sin(2 * np.pi * x / 6.0 + 1.0))
+    return low * 0.55 + high * 0.05 + air * 0.25
+
+
 # ------------------------------------------------------------------ results
 def cash():
     ching = at(0.7, (0.0, bell(2093, 0.4, 0.14)), (0.09, bell(2637, 0.6, 0.22)))
@@ -892,6 +1029,9 @@ SOUNDS = {
     "laser_loop": (laser_loop, 0.3), "laser_burst": (laser_burst, 0.7), "chop": (chop, 0.85),
     "arc_loop": (arc_loop, 0.3), "zap": (zap, 0.75), "baton_hit": (baton_hit, 0.8), "stun_loop": (stun_loop, 0.25),
     "piston_loop": (piston_loop, 0.35), "spike": (spike, 0.9),
+    "gore_hit": (gore_hit, 0.95), "spray": (spray, 0.6), "gurgle": (gurgle, 0.6), "smear": (smear, 0.5),
+    "scream_cut": (scream_cut, 0.85), "scream_glitch": (scream_glitch, 0.6), "stab": (stab, 0.7),
+    "wet_step": (wet_step, 0.8), "dread_loop": (dread_loop, 0.45),
 }
 # The sounds of the first build share one random stream, in the order above. Every sound added
 # since starts from a fresh stream instead: adding one changes no other file, and writing it
@@ -899,7 +1039,8 @@ SOUNDS = {
 FRESH = {"hiss", "driver", "seat", "cal_ok", "cal_bad", "ecg", "flatline", "static", "strap", "note",
          "flicker", "lamp_loop", "breath", "boom", "riser",
          "radio", "siren", "glass_fit", "clang", "punch", "servo_loop", "hum_loop", "scrape",
-         "laser_loop", "laser_burst", "chop", "arc_loop", "zap", "baton_hit", "stun_loop", "piston_loop", "spike"}
+         "laser_loop", "laser_burst", "chop", "arc_loop", "zap", "baton_hit", "stun_loop", "piston_loop", "spike",
+         "gore_hit", "spray", "gurgle", "smear", "scream_cut", "scream_glitch", "stab", "wet_step", "dread_loop"}
 
 
 def main(only=None):

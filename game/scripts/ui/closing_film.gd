@@ -50,7 +50,7 @@ const FACE_SET := Vector2(2400, 0)             # the face, lit for its last fram
 const EXIT_LAMP := Vector2(420, 50)            # the red emergency light, high on the back wall
 const STAND_AT := Vector2(240, 48)             # the patient's canvas, standing by the chair
 const BODIES := [Vector2(14, 242), Vector2(626, 244)]   # the crew where they fell (the assistant mirrored)
-const POOLS := [Vector2(128, 311), Vector2(506, 313)]   # ... the blood spreading under them
+const POOLS := [Vector2(128, 304), Vector2(506, 306)]   # ... the blood spreading under them
 const BODY_SCALE := 0.55                       # body_floor.png at the crew's size
 
 # the clock of each film, in seconds
@@ -63,6 +63,37 @@ const BOOMS := [35.0, 35.9, 36.8]             # it comes for the lens, a step ea
 const STEPS := [[1.6, Vector2(318, 140)], [2.4, Vector2(322, 152)], [3.6, Vector2(320, 166)]]
 const GATES := [[0.0, 0.05], [0.17, 0.21], [0.48, 0.66], [0.86, 0.9], [1.05, 1.2]]   # the lamp catching, from 1.6
 const BROWNOUT := [[0.0, 0.12, 0.25], [0.3, 0.36, 0.45], [1.1, 1.3, 0.6], [1.9, 1.95, 0.3]]   # from 15.2: from, to, level
+
+# what the kills leave: the blood is all left out with less blood; the palm, the crack, the
+# twitches and the red flashes stay
+## The blows that open an artery, at the dead tube's catches: when, where the wound is in the
+## room, how far it sinks while the body falls, which way the jet points, and a salt.
+const KILLS := [
+	{"t": 27.4, "at": Vector2(88, 195), "drift": Vector2(-8, 6), "aim": -0.95, "salt": 0.0},
+	{"t": 28.9, "at": Vector2(568, 197), "drift": Vector2(8, 6), "aim": PI + 0.95, "salt": 50.0},
+]
+## The jet comes in pulses with the last beats of the heart, weaker each time: when after the
+## blow, how many drops, how hard. The spray sound has the same pulses.
+const PUMPS := [[0.0, 56, 1.0], [0.42, 22, 0.8], [0.84, 14, 0.65], [1.26, 8, 0.5]]
+## The dead are not quite still: when, which body (surgeon, assistant), and which way it jerks.
+const TWITCHES := [[31.1, 0, Vector2(-2, -1)], [31.6, 0, Vector2(1, -1)], [33.9, 0, Vector2(-1, -2)], [32.4, 1, Vector2(2, -1)], [34.7, 1, Vector2(1, -2)]]
+## Blood thrown on the lens: where it lands on the screen, which splat, and whether it runs. The
+## surgeon's lands on the left, the assistant's across the right; the middle stays clear.
+const LENS_SPLATS := [
+	[Vector2(140, 96), "splat_m1", true], [Vector2(64, 210), "splat_s2", false], [Vector2(176, 270), "splat_s0", false],
+	[Vector2(36, 132), "splat_s1", true],
+	[Vector2(548, 118), "splat_l1", true], [Vector2(604, 236), "splat_m2", true], [Vector2(470, 268), "splat_m0", false],
+	[Vector2(512, 196), "spray_0", false], [Vector2(590, 70), "splat_s1", false], [Vector2(458, 92), "splat_s0", false],
+	[Vector2(622, 160), "splat_s2", true], [Vector2(500, 300), "splat_s1", false], [Vector2(560, 290), "castoff_0", false],
+]
+const SLAM := 37.05                            # its palm hits the lens
+const LENS_HIT := Vector2(500, 176)            # ... there, on the screen
+const LENS_PALM := Vector2(75, 121)            # the palm's middle in lens_hand.png and lens_print.png
+const LENS_CRACK_AT := Vector2(210, 150)       # the impact in lens_crack.png
+## The card after a massacre: where blood runs down from the top of the picture, and how far.
+## The long runs keep clear of the words in the middle.
+const CARD_DRIPS := [[34, 96], [78, 40], [131, 128], [176, 62], [206, 20], [262, 12], [351, 16], [446, 84], [497, 130], [552, 48], [603, 110]]
+const RED0 := Color("5a1418")                  # the dark edge of a run, as gore_layer draws it
 
 # light
 const AMB := Vector3(0.045, 0.05, 0.065)
@@ -269,6 +300,8 @@ var _glow := Node2D.new()                  # light in the air: glare, the cone, 
 var _sil := Node2D.new()                   # the silhouettes
 var _front := Node2D.new()                 # the drape, nearest the camera
 var _vig := Node2D.new()
+var _lens_rim := Node2D.new()              # the palm's edge on the lens, in the red behind it
+var _lens := Node2D.new()                  # on the lens itself: blood thrown at it, the palm, the crack
 var _fxpost := ColorRect.new()             # the picture tearing
 var _glow2 := Node2D.new()                 # the eyes: framed like _cam, but over the tearing
 var _post := Node2D.new()                  # black, flash, grain, bars, caption, card
@@ -288,6 +321,7 @@ var _m_ins: ShaderMaterial = null
 var _m_threads: ShaderMaterial = null
 var _m_fill: ShaderMaterial = null
 var _m_post: ShaderMaterial = null
+var _m_lens_rim: ShaderMaterial = null
 
 # the camera, set again every frame
 var _set: String = "room"
@@ -401,6 +435,11 @@ func _ready() -> void:
 	_glow2.material = Gfx.dither(true)
 	_vig.material = Gfx.dither(false)
 	add_child(_vig)
+	# the lens, before the tearing, so it tears with the picture
+	_m_lens_rim = _flat_mat(ALARM_RED, false)
+	_lens_rim.material = _m_lens_rim
+	add_child(_lens_rim)
+	add_child(_lens)
 	_fxpost.size = Gfx.SCREEN
 	_fxpost.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fxpost.material = _m_post
@@ -412,9 +451,12 @@ func _ready() -> void:
 	_post_glow.material = Gfx.dither(true)
 	add_child(_post_glow)
 	_props.draw.connect(_draw_props)
+	_front.draw.connect(_draw_front)
 	_glow.draw.connect(_draw_glow)
 	_glow2.draw.connect(_draw_glow2)
 	_vig.draw.connect(_draw_vig)
+	_lens_rim.draw.connect(_draw_lens_rim)
+	_lens.draw.connect(_draw_lens)
 	_post.draw.connect(_draw_post)
 	_post_glow.draw.connect(_draw_post_glow)
 	_trace.resize(64)
@@ -1131,7 +1173,7 @@ func _frame(delta: float) -> void:
 		_m_post.set_shader_parameter("split", _split)
 		_m_post.set_shader_parameter("slices", _slices)
 		_m_post.set_shader_parameter("seed", _post_seed)
-	for ci in [_props, _glow, _glow2, _vig, _post, _post_glow, _straps, _passer, _close_fx]:
+	for ci in [_props, _front, _glow, _glow2, _vig, _lens_rim, _lens, _post, _post_glow, _straps, _passer, _close_fx]:
 		if ci != null:
 			(ci as CanvasItem).queue_redraw()
 
@@ -1298,7 +1340,18 @@ func _pose_crew() -> void:
 	for i in _bodies.size():
 		var b: Shade = _bodies[i]
 		b.visible = _set == "room" and t >= (28.9 if i == 0 else 30.4) and t < 37.6
+		b.position = (BODIES[i] as Vector2) + _twitch(i)
 		b.rim(Vector2(0, -1))
+
+
+## A body on the floor jerking: a pixel or two for a frame, half that while it settles.
+func _twitch(i: int) -> Vector2:
+	var o := Vector2.ZERO
+	for tw in TWITCHES:
+		var a := elapsed - float(tw[0])
+		if int(tw[1]) == i and a >= 0.0 and a < 0.25:
+			o += (tw[2] as Vector2) * (1.0 if a < 0.08 else 0.5)
+	return o.round()
 
 
 ## The patient in the chair. After a wrong admission they wake with the lamp dying and turn their
@@ -1449,24 +1502,46 @@ func _massacre() -> void:
 	if _at(26.2):
 		_play("zap", 1.0, -8.0)
 		_play("strap", 0.8, -8.0)
+	# each scream is cut off dead by its blow: scream_cut stops one second into the file, so at
+	# pitch p it starts 1/p seconds before the blow
+	if _at(27.4 - 1.0 / 0.85):
+		_play("scream_cut", 0.85, -6.0)
+	if _at(28.9 - 1.0 / 1.08):
+		_play("scream_cut", 1.08, -6.0)
 	if _at(27.4):
 		_play(str(info.get("bite", "")), 1.0, -2.0)
-		_play("scream_far", 1.0, -8.0)
 		if not less_blood:
-			_play("splat", 1.0, -6.0)
+			_play("gore_hit", 1.0, -2.0)
+			_play("spray", 1.0, -6.0)
+	if _at(27.48) and not less_blood:
+		_play("splat", 1.4, -12.0)
 	if _at(28.9):
 		_play(str(info.get("bite", "")), 0.9, -4.0)
-		_play("scream_far", 0.8, -10.0)
 		if not less_blood:
-			_play("splat", 0.9, -8.0)
+			_play("gore_hit", 0.9, -3.0)
+			_play("spray", 1.1, -7.0)
+	if _at(28.98) and not less_blood:
+		_play("splat", 1.3, -6.0)
 	if _at(29.1):
 		_play("clang", 1.0, -8.0)
 	if _at(30.4):
 		_play("boom", 0.6, -10.0)
+	if not less_blood:
+		# what runs out of them, and a throat that still works
+		for d in [30.9, 31.5, 32.1]:
+			if _at(float(d)):
+				_play("drip", 0.55, -10.0)
+		if _at(31.1):
+			_play("gurgle", 1.0, -10.0)
+		if _at(33.9):
+			_play("gurgle", 0.85, -14.0)
 	if t >= 26.2 and t < 32.5:
 		_loop(str(info.get("loop", "")), -18.0)
 	if t >= 29.5 and t < 37.6:
 		_loop("flatline", -16.0 if t < 32.5 else -26.0)
+	# under all of it from the dark on, swelling as it comes
+	if t >= 23.5 and t < 37.6:
+		_loop("dread_loop", lerpf(-24.0, -14.0, _k(23.5, 37.0)))
 	# it comes for the lens, a step at a time
 	if t >= 32.5 and t < 37.6:
 		_loop("heartbeat", -8.0)
@@ -1477,15 +1552,29 @@ func _massacre() -> void:
 	for b in BOOMS:
 		if _at(float(b)):
 			_play("boom", 1.0, -2.0)
+			if not less_blood:
+				_play("wet_step", 1.0, -6.0)
+	# its palm hits the lens, and drags down the cracked glass
+	if _at(SLAM):
+		_play("bang", 0.7, -4.0)
+		_play("glass_crack", 1.0, -2.0)
+		if not less_blood:
+			_play("splat", 1.25, -6.0)
+	if _at(37.25):
+		_play("smear", 1.0, -4.0)
 	# the face
 	if _at(38.0):
 		_play("turn_hit", 1.0, 0.0)
 		_play("sting", 1.0, -2.0)
+		_play("stab", 1.0, -4.0)
 	if _at(38.6):
 		_play("scream", float(info.get("pitch", 1.0)), 0.0)
+		_play("scream_glitch", float(info.get("pitch", 1.0)), -6.0)
 		_play("static", 1.2, -6.0)
 	if _at(39.0):
 		_play("tinnitus", 1.0, -10.0)
+	if not less_blood and (_at(39.6) or _at(40.5)):
+		_play("drip", 0.8, -14.0)
 	# the game's own rain and drone: louder in the dark, gone for the face
 	if t >= 23.5:
 		_drone_db = -14.0
@@ -1508,6 +1597,19 @@ func _massacre() -> void:
 		_shake = maxf(_shake, 6.0 * kb)
 		_split = maxf(_split, 2.0 * kb)
 		_slices = maxf(_slices, 0.4 * kb)
+	# each kill shows red for a moment, in the dark between the tube's catches
+	for b in [27.4, 28.9]:
+		if t >= float(b) + 0.12 and t < float(b) + 0.16:
+			_flash = 0.25
+			_flash_col = Color(0.55, 0.0, 0.02)
+	# the palm on the lens: the hardest blow the picture takes
+	var ks := _kick(SLAM, 0.4)
+	_shake = maxf(_shake, 8.0 * ks)
+	_split = maxf(_split, 3.0 * ks)
+	_slices = maxf(_slices, 0.5 * ks)
+	if t >= SLAM and t < SLAM + 0.1:
+		_flash = 0.3 * _kick(SLAM, 0.1)
+		_flash_col = Color.WHITE
 	if t >= 38.6 and t < 39.0:
 		var n := floorf(t * 20.0)
 		_shake = 3.0
@@ -1985,9 +2087,14 @@ func _port_pings() -> void:
 
 
 # ------------------------------------------------------------------ drawing
-## The lamp's arm and dish, the emergency light's box, and the blood on the wall: shapes the
-## film draws, coloured by the lights so they sit in the room.
+## The lamp's arm and dish, the emergency light's box, and the blood: on the wall and the floor
+## behind the figures, on the face at the end. Shapes the film draws, coloured by the lights so
+## they sit in the room.
 func _draw_props() -> void:
+	if _set == "face":
+		if _drift and not less_blood:
+			_draw_face_blood()
+		return
 	if _set != "room":
 		return
 	_draw_lamp()
@@ -1995,15 +2102,24 @@ func _draw_props() -> void:
 	_props.draw_rect(box, Color(0.035, 0.04, 0.045))
 	_props.draw_rect(Rect2(box.position + Vector2(3, 3), Vector2(10, 4)), _lit_col(Color(0.45, 0.07, 0.06), box.get_center()))
 	_props.draw_rect(Rect2(box.position, Vector2(box.size.x, 1)), _lit_col(Color(0.6, 0.62, 0.65), box.position))
-	if _drift and not less_blood:
-		# the surgeon's, then the assistant's
-		if elapsed >= 27.4 and elapsed < 37.6:
-			_draw_splat(Vector2(150, 196), 27.4, 0.0)
-		if elapsed >= 28.9 and elapsed < 37.6:
-			_draw_splat(Vector2(498, 188), 28.9, 40.0)
+	if _drift and not less_blood and elapsed < 37.6:
+		# under the surgeon, then the assistant; then what the jets threw on the wall
+		if elapsed >= 28.9:
 			_draw_pool(POOLS[0], 28.9, 0.0)
-		if elapsed >= 30.4 and elapsed < 37.6:
+		if elapsed >= 30.4:
 			_draw_pool(POOLS[1], 30.4, 40.0)
+		for kill in KILLS:
+			_draw_spray(_props, kill, false)
+
+
+## Nearest the camera, in front of the figures: the jets' drops in flight, and the weapon and the
+## hand that used it, dripping.
+func _draw_front() -> void:
+	if not _drift or less_blood or _set != "room" or elapsed < 27.4 or elapsed >= 37.6:
+		return
+	for kill in KILLS:
+		_draw_spray(_front, kill, true)
+	_draw_drips()
 
 
 func _draw_lamp() -> void:
@@ -2016,43 +2132,239 @@ func _draw_lamp() -> void:
 	_props.draw_line(at + Vector2(-14, -8), at + Vector2(14, -8), _lit_col(Color(0.7, 0.72, 0.75), at + Vector2(0, -8)), 1.0)
 
 
-## Blood thrown on the wall at t0, round at, running down after. salt keeps two splats apart.
-func _draw_splat(at: Vector2, t0: float, salt: float) -> void:
-	var k := _ease_out(_k(t0, t0 + 0.3))
-	var base := Color(0.32, 0.02, 0.03)
-	for i in 14:
-		var h := float(i) + salt
-		var a := _hash(h, 21.0) * TAU
-		var r := (6.0 + 30.0 * _hash(h, 22.0)) * k
-		var p := (at + Vector2(cos(a), sin(a) * 0.6) * r).round()
-		var d := 1.0 + floorf(3.0 * _hash(h, 23.0))
-		_props.draw_rect(Rect2(p, Vector2(d, d)), _lit_col(base, p))
-	for i in 5:
-		var h := float(i) + salt
-		var p := (at + Vector2(-14.0 + 28.0 * _hash(h, 24.0), -6.0 + 14.0 * _hash(h, 25.0))).round()
-		var drop := roundf((4.0 + 18.0 * _hash(h, 26.0)) * _k(t0 + 0.2, t0 + 5.0))
-		_props.draw_rect(Rect2(p, Vector2(1, drop + 1.0)), _lit_col(base, p))
+## An opened artery, from a blow in KILLS: the jet comes in PUMPS, and each drop flies, falls and
+## lands, a stain that darkens and, if it is big enough, runs. Drawn twice: on ci in_air, the
+## drops still flying (in front of the figures); otherwise what has landed (on the wall behind).
+func _draw_spray(ci: CanvasItem, kill: Dictionary, in_air: bool) -> void:
+	var t0 := float(kill["t"])
+	if elapsed < t0:
+		return
+	var salt := float(kill["salt"])
+	var aim := float(kill["aim"])
+	var wound: Vector2 = kill["at"]
+	var drift: Vector2 = kill["drift"]
+	if in_air:
+		_draw_jet(ci, kill)
+	for j in PUMPS.size():
+		var pump: Array = PUMPS[j]
+		var n := int(pump[1])
+		for i in n:
+			var h := salt + float(j) * 100.0 + float(i)
+			var frac := float(i) / float(n)
+			# each pulse sweeps a little as it goes, and some drops fly wide of it
+			var launch := t0 + float(pump[0]) + 0.26 * frac
+			var age := elapsed - launch
+			if age < 0.0:
+				continue
+			var wide := 0.5 if _hash(h, 41.0) < 0.75 else 1.6
+			var ang := aim + 0.3 * sin(frac * PI * 1.5 + salt) + (_hash(h, 42.0) - 0.5) * wide
+			var v := Vector2(cos(ang), sin(ang)) * (180.0 + 300.0 * _hash(h, 43.0)) * float(pump[2])
+			var flight := 0.12 + 0.3 * _hash(h, 44.0)
+			var src := wound + drift * clampf((launch - t0) / 1.5, 0.0, 1.0)
+			var d := 1.0 + floorf((2.6 if j == 0 else 1.8) * _hash(h, 45.0))
+			if age < flight:
+				if in_air:
+					var back := maxf(0.0, age - 0.035)
+					var p := src + v * age + Vector2(0, 260.0 * age * age)
+					var q := src + v * back + Vector2(0, 260.0 * back * back)
+					ci.draw_line(q.round(), p.round(), _blood(Color(0.9, 0.07, 0.07), p, 0.5), d)
+				continue
+			if in_air:
+				continue
+			var land := (src + v * flight + Vector2(0, 260.0 * flight * flight)).round()
+			var since := age - flight
+			var col := _blood(Color(0.55, 0.03, 0.04).lerp(Color(0.26, 0.01, 0.02), clampf(since / 3.0, 0.0, 1.0)), land, 0.55)
+			ci.draw_rect(Rect2(land, Vector2(d, d)), col)
+			if d >= 2.0:
+				var run := _run_len(since, 4.0 + 22.0 * _hash(h, 46.0), 5.0 + 4.0 * _hash(h, 47.0))
+				if run >= 1.0:
+					ci.draw_rect(Rect2(land + Vector2(0, d), Vector2(1, run)), col)
+				ci.draw_rect(Rect2(land, Vector2(1, 1)), _lit_col(Color(1.2, 0.35, 0.3), land))
 
 
-## Blood spreading on the floor from under a body that fell at t0: a flat ragged pool, dark,
-## with a wet edge that catches the red light. salt keeps two pools apart.
+## The jet itself, while the heart still pumps: what has left the wound in the last moments and
+## is still in the air, as one stream along its arc from the wound, thickest where it leaves. When
+## a pulse ends the stream comes away from the wound and flies on.
+func _draw_jet(ci: CanvasItem, kill: Dictionary) -> void:
+	var t0 := float(kill["t"])
+	var salt := float(kill["salt"])
+	var aim := float(kill["aim"])
+	var wound: Vector2 = kill["at"]
+	var drift: Vector2 = kill["drift"]
+	for j in PUMPS.size():
+		var pump: Array = PUMPS[j]
+		var start := t0 + float(pump[0])
+		var pw := float(pump[2])
+		var fl := 0.26 * pw
+		var newest := minf(start + 0.24, elapsed)
+		var oldest := maxf(start, elapsed - fl)
+		if elapsed < start or newest - oldest < 0.004:
+			continue
+		var pts := PackedVector2Array()
+		for s in 9:
+			var launch := lerpf(newest, oldest, float(s) / 8.0)
+			var age := elapsed - launch
+			var ang := aim + 0.3 * sin((launch - start) / 0.26 * PI * 1.5 + salt)
+			var src := wound + drift * clampf((launch - t0) / 1.5, 0.0, 1.0)
+			pts.append((src + Vector2(cos(ang), sin(ang)) * 340.0 * pw * age + Vector2(0, 260.0 * age * age)).round())
+		for s in 8:
+			var w := (3.0 if s < 3 else (2.0 if s < 6 else 1.0)) if j == 0 else (2.0 if s < 4 else 1.0)
+			ci.draw_line(pts[s], pts[s + 1], _blood(Color(0.85, 0.06, 0.06), pts[s], 0.5), w)
+
+
+## Blood as the light finds it, but never quite lost in the dark: wet, it keeps lo of its own
+## colour from the red round it.
+func _blood(base: Color, p: Vector2, lo: float) -> Color:
+	var c := _lit_col(base, p)
+	return Color(maxf(c.r, base.r * lo), maxf(c.g, base.g * lo), maxf(c.b, base.b * lo), base.a)
+
+
+## How far a run has crept age seconds after it starts: it sticks, then slips, every 0.3 s, and
+## covers most pixels in about dur seconds, slowing as it goes.
+static func _run_len(age: float, most: float, dur: float) -> float:
+	if age <= 0.0 or dur <= 0.0:
+		return 0.0
+	var slip := clampf((fposmod(age, 0.3) - 0.2) / 0.1, 0.0, 1.0)
+	var k := clampf((floorf(age / 0.3) + _smooth(slip)) * 0.3 / dur, 0.0, 1.0)
+	return roundf(most * _ease_out(k))
+
+
+static func _dim(c: Color, m: float) -> Color:
+	return Color(c.r * m, c.g * m, c.b * m, c.a)
+
+
+## Blood spreading on the floor from under a body that fell at t0: a flat ragged pool, deeper in
+## the middle, wet at its near edge and shining at its far edge, with runs creeping out from it
+## across the floor; the right one holds the emergency light. salt keeps two pools apart.
 func _draw_pool(at: Vector2, t0: float, salt: float) -> void:
-	var k := _ease_out(_k(t0 + 0.4, t0 + 4.5))
+	var k := _ease_out(_k(t0 + 0.3, t0 + 6.0))
 	if k <= 0.01:
 		return
-	var rx := 20.0 + 56.0 * k
-	var ry := 3.0 + 8.0 * k
+	var rx := 18.0 + 112.0 * k
+	var ry := 3.0 + 12.0 * k
+	# the fills keep their exact points: one point to every angle round the middle always makes a
+	# simple polygon, while rounded points on a thin new pool can meet and fail to triangulate.
+	# The edges are drawn through the rounded points (pts), so they stay on the pixel grid.
 	var pts := PackedVector2Array()
-	var n := 22
+	var fill := PackedVector2Array()
+	var core := PackedVector2Array()
+	var n := 30
 	for i in n:
 		var a := TAU * float(i) / float(n)
-		var j := 0.8 + 0.35 * _hash(float(i) + salt, 27.0)
-		pts.append((at + Vector2(cos(a) * rx * j, sin(a) * ry * j)).round())
-	_props.draw_colored_polygon(pts, _lit_col(Color(0.2, 0.008, 0.012), at))
-	# the near edge, from a little right of the middle round to a little left of it
-	var wet := _lit_col(Color(0.75, 0.06, 0.05), at + Vector2(0, ry))
-	for i in range(2, 9):
+		var j := 0.78 + 0.4 * _hash(float(i) + salt, 27.0)
+		var o := Vector2(cos(a) * rx * j, sin(a) * ry * j)
+		pts.append((at + o).round())
+		fill.append(at + o)
+		core.append(at + o * 0.55)
+	_props.draw_colored_polygon(fill, _lit_col(Color(0.2, 0.008, 0.012), at))
+	_props.draw_colored_polygon(core, _lit_col(Color(0.11, 0.004, 0.007), at))
+	# the near edge wet, the far edge shining
+	var wet := _blood(Color(0.75, 0.06, 0.05), at + Vector2(0, ry), 0.4)
+	for i in range(3, 12):
 		_props.draw_line(pts[i], pts[i + 1], wet, 1.0)
+	for i in range(18, 27):
+		_props.draw_line(pts[i], pts[i + 1], _lit_col(Color(1.3, 0.45, 0.4), pts[i]), 1.0)
+	# runs creeping out from it along the floor
+	var kr := _ease_out(_k(t0 + 1.5, t0 + 8.0))
+	if kr > 0.01:
+		for r in 4:
+			var h := salt + float(r)
+			var i0 := int(_hash(h, 28.0) * float(n))
+			var a0 := TAU * float(i0) / float(n)
+			var dir := Vector2(cos(a0), 0.35 * sin(a0)).normalized()
+			var q := Vector2(pts[i0])
+			var col := _blood(Color(0.24, 0.01, 0.015), q, 0.6)
+			for s in int((12.0 + 34.0 * _hash(h, 29.0)) * kr / 4.0):
+				var nq := q + dir * 4.0 + Vector2(0, roundf((_hash(h + float(s), 30.0) - 0.5) * 2.0))
+				_props.draw_line(q.round(), nq.round(), col, 1.0)
+				q = nq
+	# the emergency light, red in the blood: a streak down the pool below where the lamp is
+	var em := _emergency()
+	var x := roundf(EXIT_LAMP.x + _ro.x + 6.0)
+	if em > 0.02 and absf(x - at.x) < rx * 0.7:
+		var top := roundf(at.y - ry * 0.75)
+		var tall := roundf(ry * 1.2)
+		_props.draw_rect(Rect2(x - 1.0, top, 3, tall), Color(ALARM_RED, 0.35 * em))
+		_props.draw_rect(Rect2(x, top + 1.0, 1, maxf(1.0, tall - 2.0)), Color(1.0, 0.45, 0.35, 0.8 * em))
+
+
+## The weapon and the hand that used it, dripping: each drop swells where it hangs, then falls.
+func _draw_drips() -> void:
+	if _pat == null or not _pat.visible:
+		return
+	var attack: Dictionary = _rig_meta.get("attack", {}) if typeof(_rig_meta.get("attack")) == TYPE_DICTIONARY else {}
+	var tool := _meta_pt(attack.get("tool"), Vector2(32, 114))
+	var hand := _meta_pt(attack.get("hand"), Vector2(138, 108))
+	var t := elapsed
+	var s := _pat.scale.x
+	var srcs: Array = [tool + Vector2(0, 4), tool + Vector2(-5, 7)]
+	if t >= 28.9 and s < 3.0:
+		# the free hand is up from the second kill, wet to the wrist: blood runs down its palm
+		# and on down the forearm, and drips from it
+		for r in 4:
+			var hr := float(r)
+			var top := hand + Vector2(-12.0 + 4.0 * hr, 2.0 + roundf(4.0 * _hash(hr, 95.0)))
+			var n := _run_len(t - 28.95 - 0.15 * hr, 8.0 + roundf(14.0 * _hash(hr, 96.0)), 2.5)
+			if n < 1.0:
+				continue
+			var p0 := (_pat.transform * top).round()
+			var w := maxf(1.0, roundf(s * (2.0 if r == 1 else 1.0)))
+			var tall := roundf(n * s)
+			_front.draw_rect(Rect2(p0, Vector2(w, tall)), _blood(Color(0.6, 0.03, 0.04), p0, 0.6))
+			_front.draw_rect(Rect2(p0 + Vector2(0, tall - 1.0), Vector2(w, maxf(1.0, roundf(s)))), _blood(Color(0.9, 0.08, 0.07), p0, 0.6))
+		srcs.append(hand + Vector2(-5, 10))
+		srcs.append(hand + Vector2(4, 12))
+	for si in srcs.size():
+		var hs := float(si)
+		var period := 0.7 + 0.4 * _hash(hs, 91.0)
+		var ph := t - 27.4 + period * _hash(hs, 92.0)
+		var cyc := floorf(ph / period)
+		var a := ph - cyc * period
+		var hang := period * 0.65
+		var at := (_pat.transform * (srcs[si] as Vector2)).round()
+		var d := maxf(1.0, roundf(s * (1.5 + _hash(cyc + hs * 7.0, 93.0))))
+		var p := at
+		var size := Vector2(d, d + 1.0)
+		if a < hang:
+			var g := maxf(1.0, roundf(d * clampf(a / hang + 0.3, 0.0, 1.0)))
+			size = Vector2(g, g)
+		else:
+			var f := a - hang
+			p = at + Vector2(0, roundf(450.0 * f * f))
+			if f > 0.05:
+				_front.draw_line(p - Vector2(0, roundf(27.0 * f)), p, _blood(Color(0.55, 0.03, 0.04), p, 0.5), 1.0)
+		_front.draw_rect(Rect2(p, size), _blood(Color(0.8, 0.05, 0.05), p, 0.5))
+
+
+static func _meta_pt(v: Variant, fallback: Vector2) -> Vector2:
+	if typeof(v) == TYPE_ARRAY and (v as Array).size() >= 2:
+		var a: Array = v
+		return Vector2(float(a[0]), float(a[1]))
+	return fallback
+
+
+## The face, for its last frames: what the kills threw across it, and blood running from the
+## corners of its mouth, longer by the time it screams.
+func _draw_face_blood() -> void:
+	var mid := (_eye_l + _eye_r) / 2.0
+	var a := mid + Vector2(22, -20)
+	var b := mid + Vector2(-18, 26)
+	var side := (b - a).orthogonal().normalized()
+	for i in 34:
+		var h := float(i)
+		var p := (a + (b - a) * _hash(h, 71.0) + side * (_hash(h, 72.0) * 2.0 - 1.0) * (3.0 + 9.0 * _hash(h, 73.0))).round()
+		if p.distance_to(_eye_l) < 7.0 or p.distance_to(_eye_r) < 7.0:
+			continue
+		var d := 1.0 if _hash(h, 74.0) < 0.75 else 2.0
+		var w := FACE_SET + p
+		_props.draw_rect(Rect2(w, Vector2(d, d)), _lit_col(Color(0.5, 0.025, 0.03), w))
+	var my := float(_rig_meta.get("mouth_y", mid.y + 20.0))
+	var grow := 6.0 + 8.0 * _k(38.0, 39.0)
+	for sx in [-9.0, 9.0]:
+		var top := FACE_SET + Vector2(roundf(mid.x + float(sx)), roundf(my) + 2.0)
+		var tall := roundf(grow * (1.0 if float(sx) < 0.0 else 0.8))
+		_props.draw_rect(Rect2(top, Vector2(1, tall)), _lit_col(Color(0.5, 0.02, 0.03), top))
+		_props.draw_rect(Rect2(top + Vector2(0, tall - 1.0), Vector2(1, 2)), _lit_col(Color(0.9, 0.08, 0.07), top))
 
 
 ## Light in the air, added over the room: the lamp's glare and its cone, the dead lamp arcing,
@@ -2315,6 +2627,166 @@ func _vband(top: float, bottom: float, top_a: float, bottom_a: float) -> void:
 	_vig.draw_polygon(pts, PackedColorArray([a, a, b, b]))
 
 
+# ------------------------------------------------------------------ the lens
+## Where its palm is on the lens, from just before it hits to its lifting away: {"at": the
+## top-left of lens_hand.png on the screen, "s": its scale, "a": how much of it is left}, or {}
+## when it is not there. It flies at the lens, sticks there shaking, drags down the glass and
+## lifts off.
+func _palm() -> Dictionary:
+	var t := elapsed
+	if not _drift or t < 36.97 or t >= 37.6:
+		return {}
+	var c := LENS_HIT
+	var s := 1.0
+	var a := 1.0
+	if t < SLAM:
+		var k := _ease_in(_k(36.97, SLAM))
+		c = Vector2(560, 230).lerp(LENS_HIT, k)
+		s = lerpf(0.6, 1.0, k)
+	elif t < 37.25:
+		var f := floorf(t * 30.0)
+		c += Vector2(roundf(_hash(f, 51.0) * 2.0 - 1.0), roundf(_hash(f, 52.0) * 2.0 - 1.0))
+	else:
+		c += Vector2(0, roundf(44.0 * _smooth(_k(37.25, 37.5))))
+		if t >= 37.5:
+			var e := _k(37.5, 37.6)
+			c += Vector2(20, 30) * e
+			s = 1.0 - 0.3 * e
+			a = 1.0 - e
+	return {"at": (c - LENS_PALM * s).round(), "s": s, "a": a}
+
+
+## The palm where _palm puts it, off pixels aside, modulated by col; its wrist runs on down off
+## the bottom of the screen.
+func _draw_hand(ci: CanvasItem, hp: Dictionary, off: Vector2, col: Color) -> void:
+	var tex := _ptex("film/lens_hand.png")
+	if tex == null:
+		return
+	var at: Vector2 = (hp["at"] as Vector2) + off
+	var size := tex.get_size() * float(hp["s"])
+	ci.draw_texture_rect(tex, Rect2(at, size), false, col)
+	var bottom := at.y + size.y
+	if bottom < 360.0:
+		ci.draw_texture_rect_region(tex, Rect2(at.x, bottom - 1.0, size.x, 361.0 - bottom), Rect2(0, tex.get_height() - 1.0, tex.get_width(), 1), col)
+
+
+## The palm's edge, caught by the red behind it: the palm a pixel off each way, in the
+## emergency light's colour, under the palm itself.
+func _draw_lens_rim() -> void:
+	if not _drift or not _cam_on or _set != "room":
+		return
+	var hp := _palm()
+	if hp.is_empty():
+		return
+	var em := 0.4 + 0.6 * _emergency()
+	_m_lens_rim.set_shader_parameter("tint", Color(ALARM_RED.r * em, ALARM_RED.g * em, ALARM_RED.b * em, float(hp["a"])))
+	for off in [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1)]:
+		_draw_hand(_lens_rim, hp, off as Vector2, Color.WHITE)
+
+
+## On the lens itself, in front of the picture but under the eyes, still while the picture
+## shakes: its palm, slammed flat on the glass and dragged down it; the blood the kills threw at
+## the glass, running; the print the palm leaves, and the crack under it; on the face, what it
+## spits as it screams. The blood is left out with less blood; the palm and the crack stay.
+func _draw_lens() -> void:
+	var t := elapsed
+	if not _drift or not _cam_on or t < 27.4 or (_set != "room" and _set != "face"):
+		return
+	var face := _set == "face"
+	var m := 0.8 if face else clampf(0.55 + 0.45 * _strobe() + 0.25 * _emergency(), 0.0, 1.0)
+	var hp := _palm()
+	if not hp.is_empty():
+		_draw_hand(_lens, hp, Vector2.ZERO, Color(1, 1, 1, float(hp["a"])))
+	if not less_blood:
+		_draw_lens_splats(m)
+	if t < SLAM:
+		return
+	var pr := _ptex("film/lens_print.png")
+	if not less_blood and pr != null:
+		var rows := minf(pr.get_height(), roundf(165.0 + 60.0 * _smooth(_k(37.25, 37.5))))
+		var w := float(pr.get_width())
+		_lens.draw_texture_rect_region(pr, Rect2(LENS_HIT - LENS_PALM, Vector2(w, rows)), Rect2(0, 0, w, rows), _dim(Color.WHITE, m))
+	var cr := _ptex("film/lens_crack.png")
+	if cr != null:
+		var col := Color(0.8, 0.85, 1.0, 0.5)
+		if not face:
+			col = Color(0.9, 0.62, 0.58, minf(1.0, 0.35 + 0.25 * _emergency() + 0.5 * _kick(SLAM, 0.3)))
+		_lens.draw_texture(cr, LENS_HIT - LENS_CRACK_AT, col)
+	if face and not less_blood and t >= 38.6:
+		_draw_spit()
+
+
+## The blood the kills threw at the lens: each splat in LENS_SPLATS lands with the kill on its
+## side of the picture, and those marked run, two runs each. m: how much light is on it.
+func _draw_lens_splats(m: float) -> void:
+	for i in LENS_SPLATS.size():
+		var sp: Array = LENS_SPLATS[i]
+		var at: Vector2 = sp[0]
+		var t0 := (27.48 if at.x < 320.0 else 28.98) + 0.07 * _hash(float(i), 53.0)
+		var age := elapsed - t0
+		if age < 0.0:
+			continue
+		var tex := _ptex("fx/%s.png" % str(sp[1]))
+		if tex == null:
+			continue
+		var tw := float(tex.get_width())
+		var th := float(tex.get_height())
+		if bool(sp[2]):
+			for r in 2:
+				var h := float(i) * 2.0 + float(r)
+				var most := roundf(th * (0.5 + 0.8 * _hash(h, 55.0)))
+				var n := _run_len(age - 0.5 - 0.3 * _hash(h, 54.0), most, 5.0 + 3.0 * _hash(h, 56.0))
+				var x := roundf(at.x + tw * (_hash(h, 57.0) - 0.5) * 0.48)
+				var y := roundf(at.y + th * (0.05 + 0.15 * _hash(h, 58.0)))
+				_draw_run(_lens, x, y, 1.0 if _hash(h, 59.0) < 0.5 else 2.0, n, n < most, m)
+		# it lands hard, then sits
+		var size := tex.get_size() * lerpf(0.6, 1.0, clampf(age / 0.05, 0.0, 1.0))
+		_lens.draw_texture_rect(tex, Rect2((at - size / 2.0).round(), size), false, _dim(Color.WHITE, m))
+
+
+## What the face spits at the lens as it screams: small drops across the picture, none of them
+## over its eyes.
+func _draw_spit() -> void:
+	if _fs == null:
+		return
+	var eyes: Array = []
+	for e in _eye_pts(_fs, 0.0):
+		eyes.append(_cam.transform * (e as Vector2))
+	var shown := 0
+	for i in 28:
+		if shown >= 16:
+			return
+		var h := float(i)
+		var p := Vector2(roundf(150.0 + 340.0 * _hash(h, 61.0)), roundf(70.0 + 230.0 * _hash(h, 62.0)))
+		var clear := true
+		for e in eyes:
+			if p.distance_to(e as Vector2) < 34.0:
+				clear = false
+		if not clear:
+			continue
+		shown += 1
+		if elapsed < 38.6 + 0.012 * h + 0.03 * _hash(h, 63.0):
+			continue
+		var tex := _ptex("fx/splat_s%d.png" % (i % 3))
+		if tex == null:
+			continue
+		var size := tex.get_size() * (0.45 + 0.55 * _hash(h, 64.0))
+		_lens.draw_texture_rect(tex, Rect2((p - size / 2.0).round(), size), false, Color(0.85, 0.85, 0.85))
+
+
+## A run of blood as gore_layer draws them: n pixels down from (x, y), w wide, darker at its left
+## edge, with a bead at its foot that shines while it still runs. m dims it.
+func _draw_run(ci: CanvasItem, x: float, y: float, w: float, n: float, running: bool, m: float = 1.0) -> void:
+	if n < 1.0:
+		return
+	ci.draw_rect(Rect2(x, y, w, n), _dim(Gfx.RED1, m))
+	if w > 1.0:
+		ci.draw_rect(Rect2(x, y, 1, n), _dim(RED0, m))
+	var bx := x - (1.0 if w > 1.0 else 0.0)
+	var bw := w + (2.0 if w > 1.0 else 1.0)
+	ci.draw_rect(Rect2(bx, y + n - 2.0, bw, 3), _dim(Gfx.RED2 if running else Gfx.RED1, m))
+
+
 ## Over the picture: black, the flash, the grain, the letterbox bars, the caption or the end
 ## card, and the controls.
 func _draw_post() -> void:
@@ -2374,6 +2846,8 @@ func _draw_card() -> void:
 	var title := str(_shot.get("title", ""))
 	match _kind:
 		"massacre":
+			if not less_blood:
+				_draw_card_blood(age)
 			_card_name(who, 168.0, Gfx.RED2, _card_k(age, 0.6))
 			_card_rule(194.0, Gfx.RED1, _card_k(age, 0.9))
 			_card_line(title, 202.0, Gfx.RED3, _card_k(age, 1.2))
@@ -2393,6 +2867,22 @@ func _draw_card() -> void:
 				Gfx.text_center_raw(_post, 320, 236, _unseen_line(), Color(Gfx.TEAL5, k))
 		_:
 			_card_line("No one was admitted tonight.", 174.0, Gfx.TEAL6, _card_k(age, 0.4))
+
+
+## The massacre's card, from under the top bar: blood welling along the bar's edge and running
+## down the black in a few runs, slowing as they go, clear of the words.
+func _draw_card_blood(age: float) -> void:
+	var lip := clampf(age / 0.3, 0.0, 1.0)
+	for x in range(0, 640, 2):
+		var hh := roundf((1.0 + 3.0 * _hash(float(x), 81.0)) * lip)
+		if hh >= 1.0:
+			_post.draw_rect(Rect2(x, 46, 2, hh), RED0)
+	for i in CARD_DRIPS.size():
+		var d: Array = CARD_DRIPS[i]
+		var h := float(i)
+		var most := float(d[1])
+		var n := _run_len(age - 0.15 - 0.6 * _hash(h, 82.0), most, 2.5 + 2.0 * _hash(h, 83.0))
+		_draw_run(_post, float(d[0]), 47.0, 1.0 + floorf(3.0 * _hash(h, 84.0)), n, n < most)
 
 
 func _card_k(age: float, at: float) -> float:

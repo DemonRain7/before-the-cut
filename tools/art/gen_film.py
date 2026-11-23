@@ -27,6 +27,12 @@ shown at twice the size) and these pieces in the same space:
   jack_old, jack_new, jack_hole      Lux's port
   box_old, box_new, box_hole         Juno's voice box
   kip/eyes_front_fixed, dana/iris_fixed   the repaired optics
+
+The massacre's last blow lands on the camera itself, drawn over the picture at screen size:
+
+  lens_hand     the patient's palm pressed to the lens, a near-black shape the film rims in red
+  lens_print    the bloody print it leaves, smeared down where it is dragged (shown with more blood)
+  lens_crack    the lens cracked under it, from LENS_CRACK's point of impact
 No picture here has words in it, so none needs a twin per language.
 """
 import math
@@ -36,6 +42,7 @@ import numpy as np
 from scipy import ndimage as ndi
 
 import gen_scopes
+from gen_gore import blood, crack_set, crush, drag_down, draw_cracks, rings
 from people import CLOTH, OUTLINE, smooth, stroke
 from px import ASSETS, OUT, Canvas, contact_sheet, from_image
 
@@ -459,6 +466,89 @@ def dana_fixed_iris():
     return c
 
 
+# ------------------------------------------------------------------ the lens: the massacre's last blow
+# The hand is measured in the units of gen_gore.handprint, at LENS_S times that size, from the
+# same corner of lens_hand and lens_print, so the print lies exactly under the palm that leaves it.
+LENS_S = 3.4
+LENS_O = (4.0, 2.0)                  # where unit (0, 0) of the hand falls on both canvases
+LENS_W, LENS_HAND_H, LENS_DRAG = 150, 236, 60
+LENS_FINGERS = ((-9, -14, 8, 3.2), (-3, -5, 3, 3.3), (3, 5, 6, 3.2), (9, 14, 13, 2.8))   # base x, tip x, tip y, width
+LENS_CRACK = (420, 300, 210, 150)    # lens_crack's size and the point of impact in it
+
+
+def lens_palm(c, solid):
+    """The whole hand (solid) or only what touches the glass: the heel and pads of the palm, the
+    fingers between their joints, the fingertips. Also returns each fingertip as (x, y, rx, ry)."""
+    s = LENS_S
+    X = lambda u: LENS_O[0] + u * s
+    Y = lambda u: LENS_O[1] + u * s
+    cx = 21
+    m = c.ell(X(cx), Y(38), 10 * s, 8 * s) | c.ell(X(cx - 5), Y(31), 6 * s, 5 * s) | c.ell(X(cx + 5), Y(31), 6 * s, 5 * s)
+    gaps = c.ell(X(cx), Y(35), 3.8 * s, 3.2 * s)        # the hollow of the palm
+    tips = []
+    for bx, tx, ty, w in LENS_FINGERS:
+        fw = w + 1.0 if solid else w
+        m |= c.seg([(X(cx + bx), Y(28)), (X(cx + tx), Y(ty + 5))], int(round(fw * s)))
+        tip = (X(cx + tx), Y(ty + 2), fw * 0.5 * s, 3.8 * s)
+        m |= c.ell(*tip)
+        tips.append(tip)
+        for k in (0.38, 0.72):                           # the joints
+            gaps |= c.ell(X(cx + bx + (tx - bx) * k), Y(28 + (ty + 5 - 28) * k), w * 0.85 * s, 1.1 * s)
+    m |= c.seg([(X(cx - 9), Y(38)), (X(cx - 16), Y(29))], int(round((5.0 if solid else 4.0) * s)))
+    tip = (X(cx - 17), Y(27), (3.0 if solid else 2.7) * s, 3.6 * s)
+    m |= c.ell(*tip)
+    tips.append(tip)
+    gaps |= c.ell(X(cx - 13), Y(33), 2.2 * s, 1.2 * s)
+    if solid:                                            # the wrist, down out of the picture
+        m |= c.poly([(X(cx - 10), Y(41)), (X(cx + 10), Y(41)), (X(cx + 9) + 8, c.h), (X(cx - 9) - 8, c.h)])
+        return ndi.binary_closing(m, iterations=3) | m, tips
+    return m & ~gaps, tips
+
+
+def lens_hand():
+    """The hand itself, pressed to the lens: a near-black shape the film rims in red."""
+    c = Canvas(LENS_W, LENS_HAND_H)
+    m, _ = lens_palm(c, True)
+    return c.fill(m, "07090c")
+
+
+def lens_print(seed=61):
+    """What the hand leaves on the lens: the print without the skin's ridges and the joints,
+    smeared down where the hand is dragged, and what flew off it when it hit."""
+    rng = np.random.default_rng(seed)
+    c = Canvas(LENS_W, int(LENS_O[1] + 54 * LENS_S) + LENS_DRAG)
+    m, tips = lens_palm(c, False)
+    yy, xx = c.grid()
+    skin = c.none()
+    pads = c.none()
+    for x, y, rx, ry in tips:                            # whorls on the fingertips
+        d = np.hypot((xx - x) * ry / rx, yy - y)
+        pads |= d < ry
+        skin |= (d < ry) & (np.mod(d, 3.3) < 1.0)
+    skin |= ~pads & (np.mod(xx * 0.55 + yy * 0.85 + 2.5 * np.sin(xx * 0.08), 4.6) < 1.1)   # lines across the palm
+    skin &= rng.random(m.shape) > 0.35
+    holes = np.kron(rng.random((c.h // 2 + 1, c.w // 2 + 1)) < 0.1, np.ones((2, 2), dtype=bool))[:c.h, :c.w]
+    m &= ~skin & ~holes
+    m = drag_down(m, LENS_DRAG, rng)
+    cx, cy = LENS_O[0] + 21 * LENS_S, LENS_O[1] + 30 * LENS_S
+    for _ in range(20):                                  # what flew off the hand when it hit
+        a = rng.uniform(0, 2 * np.pi)
+        d = rng.uniform(52, 88)
+        r = rng.uniform(0.9, 2.1)
+        m |= c.ell(cx + np.cos(a) * d * 0.8, cy + np.sin(a) * d, r, r * rng.uniform(1.0, 1.6))
+    return blood(c, m, wet=True, seed=seed)
+
+
+def lens_crack():
+    """The lens cracked under the blow, as the counter's glass cracks (gen_gore.cracks)."""
+    w, h, cx, cy = LENS_CRACK
+    c = Canvas(w, h)
+    draw_cracks(c, crack_set(71, cx, cy, 13, 190), 1.0)
+    rings(c, 72, cx, cy, (14, 30, 52, 80))
+    crush(c, 73, cx, cy, 4.5)
+    return c
+
+
 def main():
     out = {"room": room(), "chair": chair(), "drape": drape(), "body_floor": body_floor(), "legs": legs()}
     for name, kw in POSES.items():
@@ -468,6 +558,7 @@ def main():
         "hatch": hatch(), "cart_old": cartridge(), "cart_new": cartridge(True), "gauze": gauze(),
         "eye_empty": eye_empty(), "jack_old": jack(), "jack_new": jack(True), "jack_hole": jack_hole(),
         "box_old": voice_box(), "box_new": voice_box(True), "box_hole": voice_hole(),
+        "lens_hand": lens_hand(), "lens_print": lens_print(), "lens_crack": lens_crack(),
     })
     for name, c in out.items():
         c.save("%s/%s.png" % (D, name))
