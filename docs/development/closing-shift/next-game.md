@@ -1,10 +1,10 @@
 # What would make someone run another night?
 
-Design notes, November 22, 2026. The owner has deferred the two-player version. The [closing animation remake](film.md) is built. The experiments below are available for a later prototype.
+Design notes, November 22, 2026. The owner deferred the two-player version that day. On November 23 they asked for a first online version; its handoff prompt is [../two-player/fable-prompt.md](../two-player/fable-prompt.md) (not started). The [closing animation remake](film.md) is built. The experiments below are available for a later prototype.
 
 ## The owner's direction for a future two-player shift
 
-Recorded on November 22 and deferred by the owner: “双人玩法先记下来，后续再做” (write the two-player game down now, build it later).
+Recorded on November 22 and deferred by the owner: “双人玩法先记下来，后续再做” (write the two-player game down now, build it later). On November 23 the owner asked for a first, basic online version and for its design to be thought through: [the handoff prompt](../two-player/fable-prompt.md).
 
 - **Two roles, one patient.** One player works the front desk: screens each arrival and decides who goes in. The other works the back room as the surgeon and receives exactly the patient the partner just admitted: the same person, the same parts, the same hidden truth.
 - **Hands-on surgery.** The surgeon gets close to the affected part and takes out and fits a specific component by hand. Short QTEs mark the key moments, such as a part clicking into its seat or the calibration.

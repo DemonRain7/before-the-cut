@@ -8,6 +8,8 @@ Rules 15 and patient protocol 5 are on main. A committed push can reveal a physi
 
 One steady desk light indicates a possible next action based on what the patient has said. All tests remain available under the two-lamp rules. On K, watch where an unfamiliar player looks after Kip mentions his eyes. On L, Juno has no specific complaint. [Current desk guidance](docs/development/play-loop-redesign/PROGRESS.md#guidance-at-the-counter)
 
+Two-player has a handoff prompt for Claude Fable, written November 23 and not started: [docs/development/two-player/fable-prompt.md](docs/development/two-player/fable-prompt.md). It is built on its own branch, `two-player-v1`, in a separate worktree, and the student merges it after accepting it. Keep single-player on `main` as it is, and start two-player work here only if the student asks.
+
 ## Run the game
 
 A configured checkout starts GPT-6 Luna on loopback. `-CheckPatient` verifies its connection in Godot at the title. A typed turn through the live local service, return visits, and reuse of complete history groups were checked in the [local cache evaluation](docs/development/live-model-results-2026-11-21.md#local-play-and-prompt-cache-reads).
